@@ -54,7 +54,7 @@ export function Header() {
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
     <Group gap="sm">
-      <Avatar src='/public/black-circle-user-symbo.png' size={36} radius="xl" />
+      <Avatar src={'../../../public/black-circle-user-symbo.png'} size={36} radius="xl" />
       <div>
         <Text size="sm">{option.value}</Text>
         <Text size="xs" opacity={0.5}>
