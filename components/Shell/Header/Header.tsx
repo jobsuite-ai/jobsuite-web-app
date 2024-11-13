@@ -6,7 +6,7 @@ import classes from './Header.module.css';
 import { RLPPLogo } from '../../Global/RLPPLogo';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { forwardRef, MouseEvent } from 'react';
+import { MouseEvent } from 'react';
 
 const links = [
   { link: '/jobs', label: 'Jobs' },
@@ -34,32 +34,27 @@ export function Header() {
     </Link>
   ));
 
-  const usersData: Record<string, { image: string; email: string }> = {
+  const usersData: Record<string, { email: string }> = {
     'Emily Johnson': {
-      image: 'https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/avatars/avatar-7.png',
       email: 'emily92@gmail.com',
     },
     'Ava Rodriguez': {
-      image: 'https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/avatars/avatar-8.png',
       email: 'ava_rose@gmail.com',
     },
     'Olivia Chen': {
-      image: 'https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/avatars/avatar-4.png',
       email: 'livvy_globe@gmail.com',
     },
     'Ethan Barnes': {
-      image: 'https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/avatars/avatar-1.png',
       email: 'ethan_explorer@gmail.com',
     },
     'Mason Taylor': {
-      image: 'https://raw.githubusercontent.com/mantinedev/mantine/master/.demo/avatars/avatar-2.png',
       email: 'mason_musician@gmail.com',
     },
   };
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
     <Group gap="sm">
-      <Avatar src={usersData[option.value].image} size={36} radius="xl" />
+      <Avatar src='/public/black-circle-user-symbo.png' size={36} radius="xl" />
       <div>
         <Text size="sm">{option.value}</Text>
         <Text size="xs" opacity={0.5}>
@@ -88,8 +83,8 @@ export function Header() {
           </Group>
           <Autocomplete
             className={classes.search}
-            placeholder="Search"
-            leftSection={<IconSearch style={{ width: rem(16), height: rem(16) }} stroke={1.5} />}
+            placeholder='Search by client name'
+            leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
             renderOption={renderAutocompleteOption}
             data={data}
             visibleFrom="xs"
