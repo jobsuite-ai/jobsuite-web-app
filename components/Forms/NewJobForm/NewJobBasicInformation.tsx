@@ -31,7 +31,7 @@ export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
             <DatePickerInput
                 label='Job Date'
                 valueFormat='MMM DD, YYYY'
-                placeholder='Set job date'
+                placeholder='Set job date - optional if it is not yet scheduled'
                 type='range'
                 key={form.key('job_date')}
                 {...form.getInputProps('job_date')}

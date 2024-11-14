@@ -4,7 +4,6 @@ import { Header } from './Header/Header';
 import styled from 'styled-components';
 
 export function Shell({ children }: { children: any }) {
-
   const Wrapper = styled.div`
     display: flex;
     flex-direction: row;

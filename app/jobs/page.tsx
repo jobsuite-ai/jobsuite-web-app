@@ -1,9 +1,9 @@
 import { ColorSchemeToggle } from '@/components/ColorSchemeToggle/ColorSchemeToggle';
 
-export default function Community() {
+export default function Jobs() {
     return (
         <>
-            <div>Community</div>
+            <div>Jobs List</div>
             <ColorSchemeToggle />
         </>
     );

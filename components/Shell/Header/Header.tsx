@@ -21,8 +21,6 @@ export function Header() {
     router.push(link);
   }
 
-  const jobs = ['React', 'Last', 'Another', 'Peek', 'Test']
-
   const items = links.map((link) => (
     <Link
       key={link.label}
@@ -54,7 +52,7 @@ export function Header() {
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
     <Group gap="sm">
-      <Avatar src={'../../../public/black-circle-user-symbo.png'} size={36} radius="xl" />
+      <Avatar src={'/black-circle-user-symbol.png'} size={36} radius="xl" />
       <div>
         <Text size="sm">{option.value}</Text>
         <Text size="xs" opacity={0.5}>
