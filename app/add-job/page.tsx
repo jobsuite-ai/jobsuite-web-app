@@ -1,5 +1,5 @@
-import { NewJobForm } from '@/components/Forms/NewJobForm/NewJobForm';
+import { NewJobWorkflow } from '@/components/Workflows/NewJobWorkflow';
 
 export default function About() {
-    return (<NewJobForm />);
+    return (<NewJobWorkflow />);
 }

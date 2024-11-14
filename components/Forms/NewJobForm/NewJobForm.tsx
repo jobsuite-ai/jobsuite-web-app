@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Group, TextInput, TagsInput, Select } from '@mantine/core';
+import { Button, Group, TextInput, TagsInput, Select, Textarea } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
@@ -8,7 +8,6 @@ import { useForm } from '@mantine/form';
 import { useState } from 'react';
 
 export function NewJobForm() {
-    const [value, setValue] = useState<[Date | null, Date | null]>([null, null]);
     const form = useForm({
       mode: 'uncontrolled',
       initialValues: {
@@ -65,11 +64,14 @@ export function NewJobForm() {
                     key={form.key('job_status')}
                     {...form.getInputProps('job_status')}
                 />
-                <TagsInput
-                    label="Job tag - type and press enter to submit a tag"
-                    placeholder="Enter tag" 
-                    key={form.key('tags')}
-                    {...form.getInputProps('tags')}
+                <Textarea
+                    withAsterisk
+                    size="md"
+                    label="Job description"
+                    description="Job description"
+                    placeholder="Write up some notes on the job"
+                    key={form.key('job_status')}
+                    {...form.getInputProps('job_status')}
                 />
 
                 <Group justify="flex-end" mt="md">
