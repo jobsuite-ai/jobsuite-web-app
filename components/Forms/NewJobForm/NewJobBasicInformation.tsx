@@ -1,4 +1,4 @@
-import { TextInput } from '@mantine/core';
+import { Select, TextInput } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
@@ -27,6 +27,12 @@ export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
                 placeholder="Client email"
                 key={form.key('client_email')}
                 {...form.getInputProps('client_email')}
+            />
+            <Select
+                label="Job type"
+                placeholder="Pick job type"
+                key={form.key('job_type')}
+                data={['Interior', 'Exterior']}
             />
             <DatePickerInput
                 label='Job Date'
