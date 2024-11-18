@@ -1,26 +1,80 @@
 "use client";
 
-import { Button, Group, rem, Text } from '@mantine/core';
+import { Box, Button, Group, LoadingOverlay, rem, Text } from '@mantine/core';
 import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
 import { UseFormReturnType } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
 import { IconMovie, IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import classes from './Styling/NewJobVideoUpload.module.css';
 
-
 export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     const [video, setVideos] = useState<FileWithPath | null>(null);
+    const [loading, setLoading] = useState(false);
     const openRef = useRef<() => void>(null);
 
-    const handleVideoUpload = (videos: FileWithPath[]) => {
-        const vid = videos[0];
-        form.setValues({ video:{
-            type: vid.type,
-            path: vid.path,
-            size: vid.size,
-            name: vid.name,
-        }})
-        setVideos(vid);
+    async function uploadDocuments(files: FileWithPath[]) {
+        const file = files[0];
+        setLoading(true);
+        setVideos(file);
+
+        const response = await fetch(
+            '/api/jobs',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ filename: file.name, contentType: file.type, jobID: form.getValues().jobID }),
+            }
+        )
+      
+        if (response.ok) {
+            const { url, fields } = await response.json()
+    
+            const formData = new FormData()
+            Object.entries(fields).forEach(([key, value]) => {
+                formData.append(key, value as string)
+            })
+            formData.append('file', file)
+        
+            const uploadResponse = await fetch(url, {
+                method: 'POST',
+                body: formData,
+            })
+        
+            if (uploadResponse.ok) {
+                setLoading(false);
+                notifications.show({
+                    title: 'Success!',
+                    position: 'top-center',
+                    color: 'green',
+                    message: 'The video was successfully uploaded, proceed to the next step.',
+                });
+
+                form.setValues({ video:{
+                    aws_key: form.getValues().jobID + '/' + file.name,
+                    type: file.type,
+                    size: file.size,
+                    name: file.name,
+                }})
+            } else {
+                setLoading(false);
+                notifications.show({
+                    title: 'Upload Failed',
+                    position: 'top-center',
+                    color: 'red',
+                    message: 'The video upload failed, please make sure the video isn\'t over 50mb and try again.',
+                })
+            }
+        } else {
+            notifications.show({
+                title: 'Upload Failed',
+                position: 'top-center',
+                color: 'red',
+                message: 'Failed to get presigned url.',
+            })
+        }
     }
 
     const removeVideoUpload = () => {
@@ -57,14 +111,16 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     }
 
     return (
-        <div
+        <Box
+            pos='relative'
             className={classes.wrapper}
         >
+            <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
             {video == null && (
                 <>
                     <Dropzone
                         openRef={openRef}
-                        onDrop={(vid) => handleVideoUpload(vid)}
+                        onDrop={(vids) => uploadDocuments(vids)}
                         maxSize={50 * 1024 ** 2}
                         accept={[MIME_TYPES.mp4, 'video/quicktime']}
                     >
@@ -115,6 +171,6 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                     </div>
                 </div>
             )}
-        </div>
+        </Box>
     );
 }

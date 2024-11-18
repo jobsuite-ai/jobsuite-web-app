@@ -5,6 +5,7 @@ import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
 import { NewJobVideoUpload } from '../Forms/NewJobForm/NewJobVideoUpload';
+import { v4 as uuidv4 } from 'uuid';
 
 const NUMBER_OF_STEPS = 2;
 
@@ -13,6 +14,7 @@ export function NewJobWorkflow() {
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
+            jobID: uuidv4(),
             client_name: '',
             client_address: '',
             client_email: '',
