@@ -87,6 +87,57 @@
     "@smithy/util-utf8" "^2.0.0"
     tslib "^2.6.2"
 
+"@aws-sdk/client-dynamodb@^3.693.0":
+  version "3.693.0"
+  resolved "https://registry.npmjs.org/@aws-sdk/client-dynamodb/-/client-dynamodb-3.693.0.tgz"
+  integrity sha512-EmgFoE/wAxiOq/sfO/VFGlmvfq0FexUO4IMURr3deIpU/AuCsuU87HJH/UodFdKu88ykNZxMfHHku6o6BV2dAA==
+  dependencies:
+    "@aws-crypto/sha256-browser" "5.2.0"
+    "@aws-crypto/sha256-js" "5.2.0"
+    "@aws-sdk/client-sso-oidc" "3.693.0"
+    "@aws-sdk/client-sts" "3.693.0"
+    "@aws-sdk/core" "3.693.0"
+    "@aws-sdk/credential-provider-node" "3.693.0"
+    "@aws-sdk/middleware-endpoint-discovery" "3.693.0"
+    "@aws-sdk/middleware-host-header" "3.693.0"
+    "@aws-sdk/middleware-logger" "3.693.0"
+    "@aws-sdk/middleware-recursion-detection" "3.693.0"
+    "@aws-sdk/middleware-user-agent" "3.693.0"
+    "@aws-sdk/region-config-resolver" "3.693.0"
+    "@aws-sdk/types" "3.692.0"
+    "@aws-sdk/util-endpoints" "3.693.0"
+    "@aws-sdk/util-user-agent-browser" "3.693.0"
+    "@aws-sdk/util-user-agent-node" "3.693.0"
+    "@smithy/config-resolver" "^3.0.11"
+    "@smithy/core" "^2.5.2"
+    "@smithy/fetch-http-handler" "^4.1.0"
+    "@smithy/hash-node" "^3.0.9"
+    "@smithy/invalid-dependency" "^3.0.9"
+    "@smithy/middleware-content-length" "^3.0.11"
+    "@smithy/middleware-endpoint" "^3.2.2"
+    "@smithy/middleware-retry" "^3.0.26"
+    "@smithy/middleware-serde" "^3.0.9"
+    "@smithy/middleware-stack" "^3.0.9"
+    "@smithy/node-config-provider" "^3.1.10"
+    "@smithy/node-http-handler" "^3.3.0"
+    "@smithy/protocol-http" "^4.1.6"
+    "@smithy/smithy-client" "^3.4.3"
+    "@smithy/types" "^3.7.0"
+    "@smithy/url-parser" "^3.0.9"
+    "@smithy/util-base64" "^3.0.0"
+    "@smithy/util-body-length-browser" "^3.0.0"
+    "@smithy/util-body-length-node" "^3.0.0"
+    "@smithy/util-defaults-mode-browser" "^3.0.26"
+    "@smithy/util-defaults-mode-node" "^3.0.26"
+    "@smithy/util-endpoints" "^2.1.5"
+    "@smithy/util-middleware" "^3.0.9"
+    "@smithy/util-retry" "^3.0.9"
+    "@smithy/util-utf8" "^3.0.0"
+    "@smithy/util-waiter" "^3.1.8"
+    "@types/uuid" "^9.0.1"
+    tslib "^2.6.2"
+    uuid "^9.0.1"
+
 "@aws-sdk/client-s3@^3.693.0", "@aws-sdk/client-s3@3.693.0":
   version "3.693.0"
   resolved "https://registry.npmjs.org/@aws-sdk/client-s3/-/client-s3-3.693.0.tgz"
@@ -403,6 +454,26 @@
     "@smithy/types" "^3.7.0"
     tslib "^2.6.2"
 
+"@aws-sdk/endpoint-cache@3.693.0":
+  version "3.693.0"
+  resolved "https://registry.npmjs.org/@aws-sdk/endpoint-cache/-/endpoint-cache-3.693.0.tgz"
+  integrity sha512-/zK0ZZncBf5FbTfo8rJMcQIXXk4Ibhe5zEMiwFNivVPR2uNC0+oqfwXz7vjxwY0t6BPE3Bs4h9uFEz4xuGCY6w==
+  dependencies:
+    mnemonist "0.38.3"
+    tslib "^2.6.2"
+
+"@aws-sdk/lib-dynamodb@^3.693.0":
+  version "3.693.0"
+  resolved "https://registry.npmjs.org/@aws-sdk/lib-dynamodb/-/lib-dynamodb-3.693.0.tgz"
+  integrity sha512-LrGLXoioeT9xJQxJHmtV9MSQW5rl0Pv1wzgnWARIUsF+srkO2dA2UgTES0G1Sv3fXSFqPwplU6Knwe0yx+P2/w==
+  dependencies:
+    "@aws-sdk/core" "3.693.0"
+    "@aws-sdk/util-dynamodb" "3.693.0"
+    "@smithy/core" "^2.5.2"
+    "@smithy/smithy-client" "^3.4.3"
+    "@smithy/types" "^3.7.0"
+    tslib "^2.6.2"
+
 "@aws-sdk/middleware-bucket-endpoint@3.693.0":
   version "3.693.0"
   resolved "https://registry.npmjs.org/@aws-sdk/middleware-bucket-endpoint/-/middleware-bucket-endpoint-3.693.0.tgz"
@@ -414,6 +485,18 @@
     "@smithy/protocol-http" "^4.1.6"
     "@smithy/types" "^3.7.0"
     "@smithy/util-config-provider" "^3.0.0"
+    tslib "^2.6.2"
+
+"@aws-sdk/middleware-endpoint-discovery@3.693.0":
+  version "3.693.0"
+  resolved "https://registry.npmjs.org/@aws-sdk/middleware-endpoint-discovery/-/middleware-endpoint-discovery-3.693.0.tgz"
+  integrity sha512-OG8WM8OzYuAt3Ueb8TZoBgA+vqNgPaXksHhiy8SFTQxNamSMMRvKrDSBbdUuV96mq0lcJq1mFgJ4oRXJ1HPh6A==
+  dependencies:
+    "@aws-sdk/endpoint-cache" "3.693.0"
+    "@aws-sdk/types" "3.692.0"
+    "@smithy/node-config-provider" "^3.1.10"
+    "@smithy/protocol-http" "^4.1.6"
+    "@smithy/types" "^3.7.0"
     tslib "^2.6.2"
 
 "@aws-sdk/middleware-expect-continue@3.693.0":
@@ -601,6 +684,13 @@
   version "3.693.0"
   resolved "https://registry.npmjs.org/@aws-sdk/util-arn-parser/-/util-arn-parser-3.693.0.tgz"
   integrity sha512-WC8x6ca+NRrtpAH64rWu+ryDZI3HuLwlEr8EU6/dbC/pt+r/zC0PBoC15VEygUaBA+isppCikQpGyEDu0Yj7gQ==
+  dependencies:
+    tslib "^2.6.2"
+
+"@aws-sdk/util-dynamodb@3.693.0":
+  version "3.693.0"
+  resolved "https://registry.npmjs.org/@aws-sdk/util-dynamodb/-/util-dynamodb-3.693.0.tgz"
+  integrity sha512-lwJnlQndVS7cGN1UmtG4s6IdVW3U/WheJ14Xc/mUeAH3vga7GTY3hGi+Jp1TbnaYQkad589tU+NQ5KUW7V8ZjA==
   dependencies:
     tslib "^2.6.2"
 
@@ -2216,10 +2306,10 @@
     "@jridgewell/resolve-uri" "^3.1.0"
     "@jridgewell/sourcemap-codec" "^1.4.14"
 
-"@mantine/core@^7.13.5", "@mantine/core@7.14.0", "@mantine/core@7.14.1":
-  version "7.14.0"
-  resolved "https://registry.npmjs.org/@mantine/core/-/core-7.14.0.tgz"
-  integrity sha512-Osj3nwCXFhOVHIoDtpEpciP7huPhGmG/0w+Zol5tKJ9SG5trV4NDfdFwFcNoxx5al8L6eCLS/fJhloFXaqhOnA==
+"@mantine/core@^7.14.1", "@mantine/core@7.14.1":
+  version "7.14.1"
+  resolved "https://registry.npmjs.org/@mantine/core/-/core-7.14.1.tgz"
+  integrity sha512-oHqaOE1n4KJkvJgF628OCVXE2zUgkEotEsPUdVaC58qRfJ7SvZAI26JNbUG8+MoqHHEqHKtBaRkTyuEVMbomxw==
   dependencies:
     "@floating-ui/react" "^0.26.27"
     clsx "^2.1.1"
@@ -2228,32 +2318,32 @@
     react-textarea-autosize "8.5.4"
     type-fest "^4.26.1"
 
-"@mantine/dates@^7.14.0":
-  version "7.14.0"
-  resolved "https://registry.npmjs.org/@mantine/dates/-/dates-7.14.0.tgz"
-  integrity sha512-GXChSxIQi1iFg6Z9t7c2AUuHPDKu2e188MYbUwbVB7EkKSSnSDAs0YxHguF2+uMAKea/u22WyKi/LPdemIyr0w==
+"@mantine/dates@^7.14.1":
+  version "7.14.1"
+  resolved "https://registry.npmjs.org/@mantine/dates/-/dates-7.14.1.tgz"
+  integrity sha512-NtQWisJi0DmYehShmYvHM6bvUsVE864kW4NJc8rbatFL7/bhCp9U49s6vqpz6B1GxZ2WfiQZtjPE1FLInWX+Pw==
   dependencies:
     clsx "^2.1.1"
 
-"@mantine/dropzone@^7.14.0":
-  version "7.14.0"
-  resolved "https://registry.npmjs.org/@mantine/dropzone/-/dropzone-7.14.0.tgz"
-  integrity sha512-tKliuCx4CfSmGtojg5uK3iOIGBNBpqdWq8URPMaPvAeWVnuWTDsHy27ktWQAcr0pfFgBDA3GUsKpt2EWIdQIEA==
+"@mantine/dropzone@^7.14.1":
+  version "7.14.1"
+  resolved "https://registry.npmjs.org/@mantine/dropzone/-/dropzone-7.14.1.tgz"
+  integrity sha512-ADeCp9dCixqXTzDXmGy4kbkf1pep7/84MSYnmGqYSFzSdFRl/0VDyiRO+oCJQUzx09rq4rRYEVqacDbY7KTFVg==
   dependencies:
     react-dropzone-esm "15.0.1"
 
-"@mantine/form@^7.14.0":
-  version "7.14.0"
-  resolved "https://registry.npmjs.org/@mantine/form/-/form-7.14.0.tgz"
-  integrity sha512-oZQuSiREcZLALTILUwovIc1GuNSQAZfFyhUCQE2MqF5tmjcy51HdeQ0kBtkjCylrc50v165KVtANuWhFwA/2dg==
+"@mantine/form@^7.14.1":
+  version "7.14.1"
+  resolved "https://registry.npmjs.org/@mantine/form/-/form-7.14.1.tgz"
+  integrity sha512-ziYsTsFhR1sEjGebwahKr7LRRFQQtH47o+rPLbvD0FGb6aYRVQgaebQo4jVgxFIgqiafxGNEpD6GkPBqmCmU4g==
   dependencies:
     fast-deep-equal "^3.1.3"
     klona "^2.0.6"
 
-"@mantine/hooks@^7.13.5", "@mantine/hooks@7.14.0", "@mantine/hooks@7.14.1":
-  version "7.14.0"
-  resolved "https://registry.npmjs.org/@mantine/hooks/-/hooks-7.14.0.tgz"
-  integrity sha512-BJ577AoQ5KnvbuaG174TYAmL2UqcX9qh9aL0aOx+gqyMM6GWeBXUXWx1kcMCzaDbYZwfQptU476fpSjHdcLjMw==
+"@mantine/hooks@^7.14.1", "@mantine/hooks@7.14.1":
+  version "7.14.1"
+  resolved "https://registry.npmjs.org/@mantine/hooks/-/hooks-7.14.1.tgz"
+  integrity sha512-VlgTyV/9WNFCwCshW1KHMYNzLt+M8aG68E1lWaqOXtyWSLJo+X5zQJGg0f8bwGbJvIMQCpQd0yTLfnjD6uAtrA==
 
 "@mantine/notifications@^7.14.1":
   version "7.14.1"
@@ -3597,6 +3687,11 @@
 
 "@types/tough-cookie@*":
   version "4.0.3"
+
+"@types/uuid@^9.0.1":
+  version "9.0.8"
+  resolved "https://registry.npmjs.org/@types/uuid/-/uuid-9.0.8.tgz"
+  integrity sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==
 
 "@types/yargs-parser@*":
   version "21.0.1"
@@ -7129,6 +7224,13 @@ mkdirp-classic@^0.5.2:
 mkdirp@^1.0.3:
   version "1.0.4"
 
+mnemonist@0.38.3:
+  version "0.38.3"
+  resolved "https://registry.npmjs.org/mnemonist/-/mnemonist-0.38.3.tgz"
+  integrity sha512-2K9QYubXx/NAjv4VLq1d1Ly8pWNC5L3BrixtdkyTegXWJIqY+zLNDhhX/A+ZwWt70tB1S8H4BE8FLYEFyNoOBw==
+  dependencies:
+    obliterator "^1.6.1"
+
 mri@^1.2.0:
   version "1.2.0"
 
@@ -7313,6 +7415,11 @@ object.values@^1.2.0:
     call-bind "^1.0.7"
     define-properties "^1.2.1"
     es-object-atoms "^1.0.0"
+
+obliterator@^1.6.1:
+  version "1.6.1"
+  resolved "https://registry.npmjs.org/obliterator/-/obliterator-1.6.1.tgz"
+  integrity sha512-9WXswnqINnnhOG/5SLimUlzuU1hFJUc8zkwyD59Sd+dPOMf05PmnYG/d6Q7HZ+KmgkZJa1PxRso6QdM3sTNHig==
 
 on-finished@2.4.1:
   version "2.4.1"

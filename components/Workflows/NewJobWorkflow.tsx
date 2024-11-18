@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
 import { NewJobVideoUpload } from '../Forms/NewJobForm/NewJobVideoUpload';
 import { v4 as uuidv4 } from 'uuid';
+import { notifications } from '@mantine/notifications';
 
 const NUMBER_OF_STEPS = 2;
 
@@ -34,9 +35,52 @@ export function NewJobWorkflow() {
         },
     });
 
+    async function submitJob() {
+        console.log("form values");
+        console.log(form.getValues());
+        const formValues = form.getValues();
+        const response = await fetch(
+            '/api/jobs',
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    jobID: formValues.jobID,
+                    client_name: formValues.client_name,
+                    client_address: formValues.client_address,
+                    client_email: formValues.client_email,
+                    job_date: formValues.job_date,
+                    video: formValues.video
+                }),
+            }
+        )
+
+        if (response.ok) {
+            notifications.show({
+                title: 'Success!',
+                position: 'top-center',
+                color: 'green',
+                message: 'The job was created successfully.',
+            });
+        } else {
+            notifications.show({
+                title: 'Creation Failed',
+                position: 'top-center',
+                color: 'red',
+                message: 'The job failed to create.',
+            });
+        }
+    }
+
     const nextStep = () => setActive((current) => {
+        console.log("Current: " + current);
         if (form.validate().hasErrors) {
             return current;
+        }
+        if (current === NUMBER_OF_STEPS - 1) {
+            submitJob();
         }
         return current < NUMBER_OF_STEPS ? current + 1 : current;
     });

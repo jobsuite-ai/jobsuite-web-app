@@ -19,7 +19,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
         setVideos(file);
 
         const response = await fetch(
-            '/api/jobs',
+            '/api/videos',
             {
                 method: 'POST',
                 headers: {
