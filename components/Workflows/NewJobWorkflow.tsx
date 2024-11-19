@@ -36,8 +36,6 @@ export function NewJobWorkflow() {
     });
 
     async function submitJob() {
-        console.log("form values");
-        console.log(form.getValues());
         const formValues = form.getValues();
         const response = await fetch(
             '/api/jobs',
@@ -75,7 +73,6 @@ export function NewJobWorkflow() {
     }
 
     const nextStep = () => setActive((current) => {
-        console.log("Current: " + current);
         if (form.validate().hasErrors) {
             return current;
         }
