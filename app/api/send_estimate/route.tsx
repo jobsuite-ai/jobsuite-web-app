@@ -18,7 +18,6 @@ export async function POST(request: Request) {
           };
 
         return axios.request(options).then(function (response: any) {
-            console.log(response.data);
             const output = response.data;
             return Response.json({ output });
         }).catch(function (error: any) {

@@ -15,8 +15,6 @@ export function UploadNewTemplate() {
         );
         const templateData = await templateResponse.json();
         
-        console.log("Template creation");
-        console.log(templateData);
 
         const sendResponse = await fetch(
             '/api/send_estimate',
@@ -28,14 +26,13 @@ export function UploadNewTemplate() {
             }
         );
         const sendData = await sendResponse.json();
-        console.log('Estimate response');
-        console.log(sendData);
+        console.log('Sent docuseal request.');
     }
 
     return (
         <div className='workflow-container'>
             <Button variant="default" onClick={createAndSendTemplate}>
-                Create Template
+                Send Estimate
             </Button>
         </div>
     );
