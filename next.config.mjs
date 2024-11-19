@@ -23,9 +23,6 @@ export default withBundleAnalyzer({
 
     DOCU_SEAL_KEY: process.env.JOB_TABLE_NAME || "peKFECsD79yHyd5CTeyXUXZGiu8RPnnruqhGL9v5xGT",
   },
-  feature: {
-    webpack5: true,
-  },
   experimental: {
     optimizePackageImports: ['@mantine/core', '@mantine/hooks'],
   },
