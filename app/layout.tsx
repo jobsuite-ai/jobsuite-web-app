@@ -2,9 +2,9 @@ import '@mantine/core/styles.css';
 
 import React from 'react';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import { Shell } from '@/components/Shell/Shell';
 import { Notifications } from '@mantine/notifications';
-import '@mantine/notifications/styles.css'
+import { Shell } from '@/components/Shell/Shell';
+import '@mantine/notifications/styles.css';
 
 export const metadata = {
   title: 'RL Peek Painting',
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <MantineProvider>
-          <Notifications/>
+          <Notifications />
           <Shell>{children}</Shell>
         </MantineProvider>
       </body>

@@ -1,15 +1,15 @@
-import { S3Client } from "@aws-sdk/client-s3";
+import { S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 
 export async function POST(request: Request) {
-    const { filename, contentType, jobID } = await request.json()
+    const { filename, contentType, jobID } = await request.json();
 
     try {
         const client = new S3Client({ region: process.env.AWS_REGION });
 
         const { url, fields } = await createPresignedPost(client, {
             Bucket: process.env.AWS_BUCKET_NAME as string,
-            Key: jobID + '/' + filename,
+            Key: `${jobID}/${filename}`,
             Conditions: [
                 ['content-length-range', 0, 10485760], // up to 10 MB
                 ['starts-with', '$Content-Type', contentType],
@@ -19,10 +19,10 @@ export async function POST(request: Request) {
                 'Content-Type': contentType,
             },
             Expires: 600, // Seconds before the presigned post expires. 3600 by default.
-        })
+        });
 
-        return Response.json({ url, fields })
+        return Response.json({ url, fields });
     } catch (error: any) {
-        return Response.json({ error: error.message })
+        return Response.json({ error: error.message });
     }
 }

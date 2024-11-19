@@ -1,4 +1,4 @@
-import { TemplateInput } from "./template_model";
+import { TemplateInput } from './template_model';
 
 export const generateTemplate = (template: TemplateInput) => `
     <!DOCTYPE html>

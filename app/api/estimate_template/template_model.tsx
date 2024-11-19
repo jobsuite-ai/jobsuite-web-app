@@ -1,3 +1,3 @@
 export type TemplateInput = {
-    clientName: string; 
-}
+    clientName: string;
+};
