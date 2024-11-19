@@ -19,8 +19,6 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@aws-amplify/backend": "^1.7.0",
-    "@aws-amplify/backend-cli": "^1.4.2",
     "@aws-amplify/ui-react": "^6.6.0",
     "@aws-sdk/client-dynamodb": "^3.693.0",
     "@aws-sdk/client-s3": "^3.693.0",
@@ -48,6 +46,8 @@
     "uuid": "^11.0.3"
   },
   "devDependencies": {
+    "@aws-amplify/backend": "^1.7.0",
+    "@aws-amplify/backend-cli": "^1.4.2",
     "@babel/core": "^7.26.0",
     "@babel/preset-env": "^7.26.0",
     "@ianvs/prettier-plugin-sort-imports": "^4.3.1",
@@ -61,7 +61,11 @@
     "@types/react": "18.3.3",
     "@typescript-eslint/eslint-plugin": "^7.13.1",
     "@typescript-eslint/parser": "^7.13.1",
+    "aws-cdk": "^2.167.2",
+    "aws-cdk-lib": "^2.167.2",
     "babel-loader": "^9.2.1",
+    "constructs": "^10.4.2",
+    "esbuild": "^0.24.0",
     "eslint": "^8.57.0",
     "eslint-config-airbnb": "19.0.4",
     "eslint-config-airbnb-typescript": "^18.0.0",
@@ -83,7 +87,8 @@
     "stylelint": "^16.6.1",
     "stylelint-config-standard-scss": "^13.1.0",
     "ts-jest": "^29.1.5",
-    "typescript": "5.5.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
     "webpack": "^5.96.1"
   },
   "packageManager": "yarn@4.5.1"
