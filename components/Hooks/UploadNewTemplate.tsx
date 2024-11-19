@@ -31,7 +31,7 @@ export function UploadNewTemplate() {
 
     return (
         <div className='workflow-container'>
-            <Button variant="default" onClick={createAndSendTemplate}>
+            <Button onClick={createAndSendTemplate}>
                 Send Estimate
             </Button>
         </div>

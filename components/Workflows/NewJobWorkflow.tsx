@@ -106,7 +106,7 @@ export function NewJobWorkflow() {
 
             <Group justify="flex-end" mt="xl">
                 {active !== 0 && (
-                    <Button variant="default" onClick={prevStep}>
+                    <Button onClick={prevStep}>
                         Back
                     </Button>
                 )}

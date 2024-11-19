@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Group, useMantineColorScheme } from '@mantine/core';
+import '@mantine/core/styles.css';
 
 export function ColorSchemeToggle() {
   const { setColorScheme } = useMantineColorScheme();

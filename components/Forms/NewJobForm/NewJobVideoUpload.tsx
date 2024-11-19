@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { IconMovie, IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import classes from './Styling/NewJobVideoUpload.module.css';
+import '@mantine/dropzone/styles.css';
 
 export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     const [video, setVideos] = useState<FileWithPath | null>(null);
