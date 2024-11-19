@@ -5,6 +5,7 @@ import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { Shell } from '@/components/Shell/Shell';
 import '@mantine/notifications/styles.css';
+import ConfigureAmplifyClientSide from "@/components/ConfigureAmplify";
 
 export const metadata = {
   title: 'RL Peek Painting',
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <MantineProvider>
+          <ConfigureAmplifyClientSide />
           <Notifications />
           <Shell>{children}</Shell>
         </MantineProvider>
