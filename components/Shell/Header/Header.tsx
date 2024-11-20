@@ -1,12 +1,15 @@
 "use client";
 
-import { Autocomplete, Group, Avatar, Text, rem, AutocompleteProps } from '@mantine/core';
+import { Autocomplete, Group, Avatar, Text, rem, AutocompleteProps, Divider } from '@mantine/core';
 import { IconSearch } from '@tabler/icons-react';
 import classes from './Header.module.css';
 import { RLPPLogo } from '../../Global/RLPPLogo';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MouseEvent } from 'react';
+import { AuthButtons } from '@/components/navigation/auth-buttons';
+import { useUser } from "@auth0/nextjs-auth0/client";
+
 
 const links = [
   { link: '/jobs', label: 'Jobs' },
@@ -14,7 +17,8 @@ const links = [
 ];
 
 export function Header() {
-  const router = useRouter()
+  const router = useRouter();
+  const { user } = useUser();
 
   const handleNavLinkClick = (event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>, link: string) => {
     event.preventDefault();
@@ -76,10 +80,13 @@ export function Header() {
         </Link>
 
         <Group>
-          <Group ml={50} gap={5} className={classes.links} visibleFrom="sm">
-            {items}
-          </Group>
+          {user && (
+            <Group ml={50} gap={5} className={classes.links} visibleFrom="sm">
+              {items}
+            </Group>
+          )}
           <Autocomplete
+            style={{ marginRight: rem(12) }}
             className={classes.search}
             placeholder='Search by client name'
             leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
@@ -87,6 +94,8 @@ export function Header() {
             data={data}
             visibleFrom="xs"
           />
+          <Divider orientation="vertical" />
+          <AuthButtons />
         </Group>
       </div>
     </header>

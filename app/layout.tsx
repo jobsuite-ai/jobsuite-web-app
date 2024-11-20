@@ -1,11 +1,9 @@
-import '@mantine/core/styles.css';
-
-import React from 'react';
+import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { Shell } from '@/components/Shell/Shell';
+import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import ConfigureAmplifyClientSide from '@/components/ConfigureAmplify';
 
 export const metadata = {
   title: 'RL Peek Painting',
@@ -25,9 +23,10 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <MantineProvider>
-          <ConfigureAmplifyClientSide />
-          <Notifications />
-          <Shell>{children}</Shell>
+          <UserProvider>
+            <Notifications />
+            <Shell>{children}</Shell>
+          </UserProvider>
         </MantineProvider>
       </body>
     </html>
