@@ -1,16 +1,4 @@
 version: 1
-backend:
-  phases:
-    preBuild:
-      commands:
-        - npm install
-    build:
-      commands:
-        - amplify add auth
-        - amplify push
-    postBuild:
-      commands:
-        - echo "Backend build complete" 
 frontend:
   phases:
     build:
