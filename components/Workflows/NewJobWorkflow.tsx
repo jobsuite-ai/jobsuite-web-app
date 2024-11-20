@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Code, Group, Stepper } from '@mantine/core';
+import { Button, Code, Group, rem, Stepper } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
@@ -8,7 +8,7 @@ import { NewJobVideoUpload } from '../Forms/NewJobForm/NewJobVideoUpload';
 import { v4 as uuidv4 } from 'uuid';
 import { notifications } from '@mantine/notifications';
 
-const NUMBER_OF_STEPS = 2;
+const NUMBER_OF_STEPS = 3;
 
 export function NewJobWorkflow() {
     const [active, setActive] = useState(0);
@@ -85,15 +85,19 @@ export function NewJobWorkflow() {
     const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
 
     return (
-        <div className='workflow-container'>
+        <div>
             <h1>Add Job</h1>
             <Stepper active={active}>
-                <Stepper.Step label="First step" description="Basic Information" className='step-container'>
+                <Stepper.Step label="First step" description="Basic Information">
                     <NewJobBasicInformation form={form} />
                 </Stepper.Step>
 
                 <Stepper.Step label="Second step" description="Video Upload">
                     <NewJobVideoUpload form={form} />
+                </Stepper.Step>
+
+                <Stepper.Step label="Third step" description="Filler">
+                    <h1>Third step</h1>
                 </Stepper.Step>
                 
                 <Stepper.Completed>

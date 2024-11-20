@@ -3,10 +3,11 @@ import { DatePickerInput } from '@mantine/dates';
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import { UseFormReturnType } from '@mantine/form';
+import classes from './Styling/NewJobBasicInformation.module.css'
 
 export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
     return (
-        <>
+        <div className={classes.wrapper}>
             <TextInput
                 withAsterisk
                 label="Name"
@@ -42,6 +43,6 @@ export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
                 key={form.key('job_date')}
                 {...form.getInputProps('job_date')}
             />
-        </>
+        </div>
     );
 }

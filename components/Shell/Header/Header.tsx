@@ -1,14 +1,13 @@
 "use client";
 
-import { Autocomplete, Group, Avatar, Text, rem, AutocompleteProps, Divider } from '@mantine/core';
-import { IconSearch } from '@tabler/icons-react';
-import classes from './Header.module.css';
-import { RLPPLogo } from '../../Global/RLPPLogo';
+import { useUser } from "@auth0/nextjs-auth0/client";
+import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, rem } from '@mantine/core';
+import { IconSearch, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MouseEvent } from 'react';
-import { AuthButtons } from '@/components/navigation/auth-buttons';
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { RLPPLogo } from '../../Global/RLPPLogo';
+import classes from './Header.module.css';
 
 
 const links = [
@@ -95,7 +94,15 @@ export function Header() {
             visibleFrom="xs"
           />
           <Divider orientation="vertical" />
-          <AuthButtons />
+          {/* <AuthButtons /> */}
+          <Link
+            style={{ marginTop: rem(5) }}
+            key={'Profile'}
+            href={'/profile'}
+            onClick={(event) => handleNavLinkClick(event, '/profile')}
+          >
+            <IconUser color='black' size={28} radius="xl" />
+          </Link>
         </Group>
       </div>
     </header>

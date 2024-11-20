@@ -6,8 +6,8 @@ import { UseFormReturnType } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconMovie, IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
-import classes from './Styling/NewJobVideoUpload.module.css';
 import '@mantine/dropzone/styles.css';
+import classes from './Styling/NewJobVideoUpload.module.css';
 
 export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     const [video, setVideos] = useState<FileWithPath | null>(null);
@@ -17,7 +17,6 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     async function uploadDocuments(files: FileWithPath[]) {
         const file = files[0];
         setLoading(true);
-        setVideos(file);
 
         const response = await fetch(
             '/api/videos',
@@ -46,6 +45,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
         
             if (uploadResponse.ok) {
                 setLoading(false);
+                setVideos(file);
                 notifications.show({
                     title: 'Success!',
                     position: 'top-center',
@@ -112,14 +112,11 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
     }
 
     return (
-        <Box
-            pos='relative'
-            className={classes.wrapper}
-        >
-            <LoadingOverlay visible={loading} zIndex={1000} overlayProps={{ radius: "sm", blur: 2 }} />
+        <>
             {video == null && (
-                <>
+                <div className={classes.wrapper}>
                     <Dropzone
+                        loading={loading}
                         openRef={openRef}
                         onDrop={(vids) => uploadDocuments(vids)}
                         maxSize={50 * 1024 ** 2}
@@ -143,7 +140,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                             </Dropzone.Idle>
                         </Group>
 
-                        <Text ta="center" fw={700} fz="lg" mt="xl">
+                        <Text ta="center" fz="lg" mt="xl">
                             <Dropzone.Accept>Drop files here</Dropzone.Accept>
                             <Dropzone.Reject>Files less than 30mb</Dropzone.Reject>
                             <Dropzone.Idle>Upload walk around video</Dropzone.Idle>
@@ -157,7 +154,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                     <Group justify="center" mt="md">
                         <Button onClick={() => openRef.current?.()}>Select files</Button>
                     </Group>
-                </>
+                </div>
             )}
 
             {video && (
@@ -172,6 +169,6 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                     </div>
                 </div>
             )}
-        </Box>
+        </>
     );
 }

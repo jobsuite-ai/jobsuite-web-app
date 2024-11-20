@@ -1,16 +1,15 @@
 "use client";
 
 import { useUser } from "@auth0/nextjs-auth0/client";
-import React from "react";
-import { SignupButton } from "@/components/auth-buttons/signup-button";
-import { LoginButton } from "@/components/auth-buttons/login-button";
-import { LogoutButton } from "@/components/auth-buttons/logout-button";
+import { SignupButton } from "@/components/AuthButtons/signup-button";
+import { LoginButton } from "@/components/AuthButtons/login-button";
+import { LogoutButton } from "@/components/AuthButtons/logout-button";
 
 export const AuthButtons = () => {
   const { user } = useUser();
 
   return (
-    <div style={{ display: "flex", flexDirection: "row" }}>
+    <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'center' }}>
       {!user && (
         <>
           <SignupButton />
