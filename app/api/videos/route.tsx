@@ -11,14 +11,14 @@ export async function POST(request: Request) {
             Bucket: process.env.AWS_BUCKET_NAME as string,
             Key: `${jobID}/${filename}`,
             Conditions: [
-                ['content-length-range', 0, 10485760], // up to 10 MB
+                ['content-length-range', 0, 150 * 1024 * 1024],
                 ['starts-with', '$Content-Type', contentType],
             ],
             Fields: {
                 acl: 'public-read',
                 'Content-Type': contentType,
             },
-            Expires: 600, // Seconds before the presigned post expires. 3600 by default.
+            Expires: 600,
         });
 
         return Response.json({ url, fields });

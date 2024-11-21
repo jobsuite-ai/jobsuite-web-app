@@ -1,10 +1,11 @@
 "use client";
 
-import { Box, Button, Group, LoadingOverlay, rem, Text } from '@mantine/core';
+import { Button, Group, rem, Text } from '@mantine/core';
 import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
+import '@mantine/dropzone/styles.css';
 import { UseFormReturnType } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconMovie, IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
+import { IconCloudUpload, IconDownload, IconMovie, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import '@mantine/dropzone/styles.css';
 import classes from './Styling/NewJobVideoUpload.module.css';
@@ -28,21 +29,21 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                 body: JSON.stringify({ filename: file.name, contentType: file.type, jobID: form.getValues().jobID }),
             }
         )
-      
+     
         if (response.ok) {
             const { url, fields } = await response.json()
-    
-            const formData = new FormData()
+
+            const formData = new FormData();
             Object.entries(fields).forEach(([key, value]) => {
                 formData.append(key, value as string)
             })
             formData.append('file', file)
-        
+
             const uploadResponse = await fetch(url, {
                 method: 'POST',
                 body: formData,
             })
-        
+
             if (uploadResponse.ok) {
                 setLoading(false);
                 setVideos(file);
@@ -53,12 +54,14 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                     message: 'The video was successfully uploaded, proceed to the next step.',
                 });
 
-                form.setValues({ video:{
-                    aws_key: form.getValues().jobID + '/' + file.name,
-                    type: file.type,
-                    size: file.size,
-                    name: file.name,
-                }})
+                form.setValues({
+                    video: {
+                        aws_key: form.getValues().jobID + '/' + file.name,
+                        type: file.type,
+                        size: file.size,
+                        name: file.name,
+                    }
+                })
             } else {
                 setLoading(false);
                 notifications.show({
@@ -95,7 +98,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
         let step = 0;
         let adjustedSize = size;
         while (adjustedSize > 1024) {
-            adjustedSize = adjustedSize/1024;
+            adjustedSize = adjustedSize / 1024;
             step += 1;
         }
 
@@ -119,7 +122,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                         loading={loading}
                         openRef={openRef}
                         onDrop={(vids) => uploadDocuments(vids)}
-                        maxSize={50 * 1024 ** 2}
+                        maxSize={150 * 1024 * 1024}
                         accept={[MIME_TYPES.mp4, 'video/quicktime']}
                     >
                         <Group justify="center">
