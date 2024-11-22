@@ -1,17 +1,20 @@
 "use client";
 
-import { Button, Code, Group, rem, Stepper } from '@mantine/core';
+import { Button, Group, Stepper } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useState } from 'react';
 import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
-import { NewJobVideoUpload } from '../Forms/NewJobForm/NewJobVideoUpload';
+import { NewJobWorkInformation } from '../Forms/NewJobForm/NewJobWorkInformation';
 import { v4 as uuidv4 } from 'uuid';
 import { notifications } from '@mantine/notifications';
+import { useRouter } from 'next/navigation';
 
-const NUMBER_OF_STEPS = 3;
+const NUMBER_OF_STEPS = 2;
 
 export function NewJobWorkflow() {
     const [active, setActive] = useState(0);
+    const router = useRouter();
+
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
@@ -19,7 +22,8 @@ export function NewJobWorkflow() {
             client_name: '',
             client_address: '',
             client_email: '',
-            job_date: new Array<Date>(),
+            client_phone_number: '',
+            estimate_date: null,
             video: null,
         },
 
@@ -29,6 +33,7 @@ export function NewJobWorkflow() {
                     client_name: values.client_name === '' ? 'Must enter client name' : null,
                     client_address: values.client_address === '' ? 'Must enter client address' : null,
                     client_email: /^\S+@\S+$/.test(values.client_email) ? null : 'Invalid email',
+                    client_phone_number: values.client_phone_number === '' ? 'Must enter client phone number' : null,
                 }
             }
             return {};
@@ -49,7 +54,8 @@ export function NewJobWorkflow() {
                     client_name: formValues.client_name,
                     client_address: formValues.client_address,
                     client_email: formValues.client_email,
-                    job_date: formValues.job_date,
+                    estimate_date: formValues.estimate_date,
+                    client_phone_number: formValues.client_phone_number,
                     video: formValues.video
                 }),
             }
@@ -83,6 +89,7 @@ export function NewJobWorkflow() {
     });
 
     const prevStep = () => setActive((current) => (current > 0 ? current - 1 : current));
+    const goToJobList = () => router.push('/jobs');
 
     return (
         <div>
@@ -93,23 +100,17 @@ export function NewJobWorkflow() {
                 </Stepper.Step>
 
                 <Stepper.Step label="Second step" description="Video Upload">
-                    <NewJobVideoUpload form={form} />
+                    <NewJobWorkInformation form={form} />
                 </Stepper.Step>
-
-                <Stepper.Step label="Third step" description="Filler">
-                    <h1>Third step</h1>
-                </Stepper.Step>
-                
-                <Stepper.Completed>
-                    Completed! Form values:
-                    <Code block mt="xl">
-                        {JSON.stringify(form.getValues(), null, 2)}
-                    </Code>
-                </Stepper.Completed>
             </Stepper>
 
             <Group justify="flex-end" mt="xl">
-                {active !== 0 && (
+                {active === NUMBER_OF_STEPS && (
+                    <Button style={{ margin: "auto" }} onClick={goToJobList}>
+                        Go to Job List
+                    </Button>
+                )}
+                {active !== 0 && active !== NUMBER_OF_STEPS && (
                     <Button onClick={prevStep}>
                         Back
                     </Button>

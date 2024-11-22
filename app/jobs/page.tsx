@@ -1,10 +1,10 @@
-import { ColorSchemeToggle } from '@/components/ColorSchemeToggle/ColorSchemeToggle';
+import JobsList from '@/components/JobsList/JobsList';
 
 export default function Jobs() {
     return (
         <>
-            <div>Jobs List</div>
-            <ColorSchemeToggle />
+            <h1>Jobs List</h1>
+            <JobsList />
         </>
     );
 }

@@ -11,11 +11,14 @@ export async function POST(request: Request) {
             url: 'https://api.docuseal.com/submissions',
             headers: { 'X-Auth-Token': process.env.DOCU_SEAL_KEY, 'content-type': 'application/json' },
             data: {
-              template_id,
-              send_email: true,
-              submitters: [{ role: 'First Party', email: 'jonas+thisand@rlpeekpainting.com' }],
+                template_id,
+                send_email: true,
+                submitters: [
+                    { role: 'Property Owner', email: 'jonaspeek@gmail.com' },
+                    { role: 'Service Provider', email: 'jonas@rlpeekpainting.com' },
+                ],
             },
-          };
+        };
 
         return axios.request(options).then((response: any) => {
             const output = response.data;

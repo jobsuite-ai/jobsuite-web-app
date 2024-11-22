@@ -29,19 +29,12 @@ export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
                 key={form.key('client_email')}
                 {...form.getInputProps('client_email')}
             />
-            <Select
-                label="Job type"
-                placeholder="Pick job type"
-                key={form.key('job_type')}
-                data={['Interior', 'Exterior']}
-            />
-            <DatePickerInput
-                label='Job Date'
-                valueFormat='MMM DD, YYYY'
-                placeholder='Set job date - optional if it is not yet scheduled'
-                type='range'
-                key={form.key('job_date')}
-                {...form.getInputProps('job_date')}
+            <TextInput
+                withAsterisk
+                label="Phone Number"
+                placeholder="Client phone number"
+                key={form.key('client_phone_number')}
+                {...form.getInputProps('client_phone_number')}
             />
         </div>
     );

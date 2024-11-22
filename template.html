@@ -14,6 +14,10 @@
             color: #333;
         }
 
+        p {
+            margin: 0;
+        }
+
         .container {
             background: #fff;
             border: 1px solid #ddd;
@@ -65,14 +69,18 @@
         }
 
         .estimate-body {
-            border-bottom: 1px solid !important;
-            padding: 30px 0;
+            padding-bottom: 30px;
         }
 
         .footer {
             text-align: center;
             font-size: 0.9em;
             color: #555;
+        }
+
+        .description {
+            border-bottom: 1px solid !important;
+            padding: 10px 0;
         }
 
         .price-section {
@@ -93,8 +101,12 @@
             justify-content: space-between;
         }
 
+        .total {
+            border-top: 2px solid !important;
+        }
+
         .subtotal {
-            border-bottom: 2px solid !important;
+            margin-bottom: 10px;
         }
 
         .subtotal,
@@ -165,7 +177,7 @@
 
             <div class="top-wrapper">
                 <div class="left-top-wrapper">
-                    <img class="logo" src="https://i.postimg.cc/qMqG0VVT/rlpp-logo-clear.png">
+                    <img class="logo" src="https://i.postimg.cc/qMqG0VVT/rlpp-logo-clear.png" alt="RL Peek Painting Logo">
                     <div class="rlpp-contact">
                         <h3>R L Peek Painting</h3>
                         <p>P.O. Box 2351, Park City, Utah 84060</p>
@@ -177,11 +189,11 @@
 
                 <div class="client-contact">
                     <h3>Prepared For</h3>
-                    <p>Test Client</p>
+                    <p>Test Name</p>
                     <p>1234 Example St</p>
-                    <p>Phone: (435) 640-1234</p>
-                    <p><strong>Estimate #:</strong> 3110</p>
-                    <p><strong>Date:</strong> 10/08/2024</p>
+                    <p>Phone: (435)-640-1234</p>
+                    <p><strong>Estimate #:</strong> 3115</p>
+                    <p><strong>Date:</strong> 11/21/2024</p>
                 </div>
             </div>
 
@@ -191,45 +203,60 @@
                     <h3>Total</h3>
                 </div>
                 <div class="estimate-body">
-                    <div class="price-section">
-                        <p>Interior</p>
-                        <p>$34,228.00</p>
+
+                    <div class="description">
+                        <div class="price-section">
+                            <p>Test</p>
+                            <p>$10,000.50</p>
+                        </div>
+                        <div>
+                            This is some good content. This is some good content. This is some good content.
+                            This is some good content. This is some good content.
+                        </div>
                     </div>
-                    <p>
-                        Areas to be painted are all areas other than Master bedroom/bath/closet, kitchen and dining
-                        areas, garage/mudroom area, basement (except stairway). No posts and beams to be painted
-                        except one in upper bedroom. Mask and cover any areas needing protection. Prime and paint:
-                    </p>
-                    <ul>
-                        <li>All vanities (excluding Master Bedroom)</li>
-                        <li>All interior doors, jambs, and casings in specified areas</li>
-                        <li>Office cabinets, living room mantel and cabinet underneath</li>
-                        <li>Railings to upstairs and downstairs</li>
-                        <li>Exterior window/door casings & baseboards</li>
-                        <li>Stairway walls to basement (no walls or trim beyond that area)</li>
-                    </ul>
-                    <p>
-                        All closets in upstairs bedroom areas will be painted. Brush and roll two coats on walls
-                        and ceilings in specified areas. Clean and remove any paint/stain-related debris.
-                    </p>
+
+                    <div class="description">
+                        <div class="price-section">
+                            <p>Test 2</p>
+                            <p>$100,001.00</p>
+                        </div>
+                        <div>
+                            This is some good content. This is some good content. This is some good content.
+                            This is some good content. This is some good content.
+                        </div>
+                    </div>
+
                 </div>
 
                 <div class="notes">
-                    <h3>Notes</h3>
-                    <p>Estimate includes a winter discount for work completed between January 6th and April 1st.</p>
+                    <h3 style="margin-top: 0;">Notes</h3>
+                    <p>These are some good notes. These are some good notes. These are some good notes.
+                        These are some good notes. </p>
                 </div>
 
                 <div class="totals-wrapper">
                     <div class="totals-container"></div>
                     <div class="totals-container">
+
                         <div class="subtotal">
-                            <p>Subtotal</p>
-                            <p style="font-weight: normal;">$34,228.00</p>
+                            <div>Test</div>
+                            <div style="font-weight: normal;">$10,000.50</div>
+                        </div>
+
+                        <div class="subtotal">
+                            <div>Test 2</div>
+                            <div style="font-weight: normal;">$100,001.00</div>
+                        </div>
+
+                        <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
+                            <div>Subtotal</div>
+                            <div style="font-weight: normal;">$110,001.50</div>
                         </div>
                         <div class="total">
                             <p>Total</p>
-                            <p>$34,228.00</p>
+                            <p>$110,001.50</p>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -243,16 +270,16 @@
 
             <div class="terms">
                 <h3>Terms</h3>
-                <p style="margin-bottom: 30px;">
-                <ul>
-                    <li>A 30% deposit is due prior to commencement of work. Balance is due upon completion.</li>
-                    <li>Only payment form accepted is check.</li>
-                    <li>We do not wash windows upon completion.</li>
-                    <li>We do not dispose of any additional paint or stain material.</li>
-                    <li>This proposal is valid for completion of the project within 6 months.</li>
-                    <li>All accounts are due on completion of job.</li>
-                </ul>
-                </p>
+                <div style="margin-bottom: 30px;">
+                    <ul>
+                        <li>A 30% deposit is due prior to commencement of work. Balance is due upon completion.</li>
+                        <li>Only payment form accepted is check.</li>
+                        <li>We do not wash windows upon completion.</li>
+                        <li>We do not dispose of any additional paint or stain material.</li>
+                        <li>This proposal is valid for completion of the project within 6 months.</li>
+                        <li>All accounts are due on completion of job.</li>
+                    </ul>
+                </div>
                 <p style="margin-bottom: 30px;">
                     Customer agrees to pay R. L. Peek painting interest
                     on all past due accounts at a rate of 2% per month and agrees to pay all expenses incurred by R.

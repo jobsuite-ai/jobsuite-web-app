@@ -1,10 +1,9 @@
 import {
     DeleteItemCommand,
     DynamoDBClient,
-    GetItemCommand,
     UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
-import { PutCommand, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -16,21 +15,24 @@ export async function POST(request: Request) {
             client_name,
             client_address,
             client_email,
-            job_date,
+            estimate_date,
+            client_phone_number,
             video,
         } = await request.json();
 
         const command = new PutCommand({
             TableName: process.env.JOB_TABLE_NAME,
             Item: {
+                user_id: process.env.RLPP_USER_ID,
                 id: jobID,
                 client_name,
                 client_address,
                 client_email,
-                job_date,
+                estimate_date,
+                client_phone_number,
                 video,
             },
-          });
+        });
 
         const data = await docClient.send(command);
         return Response.json({ data });
@@ -39,20 +41,16 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET(request: Request) {
-    // const { jobID, content } = await request.json();
-    const { jobID } = await request.json();
-
+export async function GET() {
     try {
-        const getItemCommand = new GetItemCommand({
-            TableName: process.env.JOB_TABLE_NAME,
-            Key: {
-                id: { S: jobID },
-            },
+        const command = new ScanCommand({
+            TableName: 'job',
+            IndexName: 'user_id-estimate_date-index',
         });
-        const { Item } = await client.send(getItemCommand);
 
-        return Response.json({ Item });
+        const { Items } = await docClient.send(command);
+
+        return Response.json({ Items });
     } catch (error: any) {
         return Response.json({ error: error.message });
     }
