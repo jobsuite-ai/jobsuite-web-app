@@ -11,19 +11,31 @@ export type Job = {
 }
 
 export type SingleJob = {
-    client_address: TypedDynamoReturn; 
-    client_email: TypedDynamoReturn;
-    client_name: TypedDynamoReturn;
-    client_phone_number: TypedDynamoReturn;
-    estimate_date: TypedDynamoReturn;
-    id: TypedDynamoReturn;
-    user_id: TypedDynamoReturn;
-    video: any;
+    client_address: TypedDynamoStringReturn; 
+    client_email: TypedDynamoStringReturn;
+    client_name: TypedDynamoStringReturn;
+    client_phone_number: TypedDynamoStringReturn;
+    estimate_date: TypedDynamoStringReturn;
+    id: TypedDynamoStringReturn;
+    user_id: TypedDynamoStringReturn;
+    video: TypedDynamoMapReturn<JobVideo>;
     status: JobStatus;
 }
 
-type TypedDynamoReturn = {
+type TypedDynamoStringReturn = {
     S: string;
+}
+type TypedDynamoNumberReturn = {
+    N: string;
+}
+type TypedDynamoMapReturn<T> = {
+    M: T;
+}
+
+type JobVideo = {
+    name: TypedDynamoStringReturn,
+    size: TypedDynamoNumberReturn,
+    lastModified: TypedDynamoNumberReturn
 }
 
 export enum JobStatus {

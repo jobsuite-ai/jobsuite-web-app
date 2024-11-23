@@ -7,7 +7,7 @@ import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
-export async function GET(req: Request, { params }: { params: { job_id: string } }) {
+export async function GET(req: Request, { params }: { params: any }) {
     const jobID = params.job_id as string;
 
     try {

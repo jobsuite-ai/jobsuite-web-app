@@ -2,18 +2,21 @@
 
 import { Button, Group, rem, Text } from '@mantine/core';
 import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
-import '@mantine/dropzone/styles.css';
-import { UseFormReturnType } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconCloudUpload, IconDownload, IconMovie, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import '@mantine/dropzone/styles.css';
-import classes from './Styling/NewJobVideoUpload.module.css';
+import classes from './Styles/NewJobVideoUpload.module.css';
 
-export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
-    const [video, setVideos] = useState<FileWithPath | null>(null);
+export function NewJobVideoUpload({ jobID }: { jobID: string }) {
+    const [video, setVideo] = useState<FileWithPath | null>(null);
     const [loading, setLoading] = useState(false);
     const openRef = useRef<() => void>(null);
+
+    const handleVideoDrop = (files: FileWithPath[]) => {
+        uploadDocuments(files);
+        updateJobWithVideo(files);
+    }
 
     async function uploadDocuments(files: FileWithPath[]) {
         const file = files[0];
@@ -26,10 +29,11 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ filename: file.name, contentType: file.type, jobID: form.getValues().jobID }),
+                body: JSON.stringify({ filename: file.name, contentType: file.type, jobID: jobID }),
             }
         )
-     
+        
+
         if (response.ok) {
             const { url, fields } = await response.json()
 
@@ -46,22 +50,13 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
 
             if (uploadResponse.ok) {
                 setLoading(false);
-                setVideos(file);
+                setVideo(file);
                 notifications.show({
                     title: 'Success!',
                     position: 'top-center',
                     color: 'green',
                     message: 'The video was successfully uploaded, proceed to the next step.',
                 });
-
-                form.setValues({
-                    video: {
-                        aws_key: form.getValues().jobID + '/' + file.name,
-                        type: file.type,
-                        size: file.size,
-                        name: file.name,
-                    }
-                })
             } else {
                 setLoading(false);
                 notifications.show({
@@ -81,9 +76,36 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
         }
     }
 
+    
+    async function updateJobWithVideo(files: FileWithPath[]) {
+        const video = files[0];
+        if (video) {
+            const content = {
+                video: {
+                    name: video.name,
+                    size: video.size,
+                    lastModified: video.lastModified
+                }
+            }
+
+            const response = await fetch(
+                `/api/jobs`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content, jobID: jobID }),
+                }
+            )
+
+            const {Attributes} = await response.json();
+            
+        }
+    }
+
     const removeVideoUpload = () => {
-        form.setValues({ video: {} })
-        setVideos(null);
+        setVideo(null);
     }
 
     function roundToTwoDecimals(num: number): number {
@@ -121,7 +143,7 @@ export function NewJobVideoUpload({ form }: { form: UseFormReturnType<any> }) {
                     <Dropzone
                         loading={loading}
                         openRef={openRef}
-                        onDrop={(vids) => uploadDocuments(vids)}
+                        onDrop={(vids) => handleVideoDrop(vids)}
                         maxSize={150 * 1024 * 1024}
                         accept={[MIME_TYPES.mp4, 'video/quicktime']}
                     >

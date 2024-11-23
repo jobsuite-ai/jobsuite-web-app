@@ -59,24 +59,32 @@ export async function GET() {
 export async function PUT(request: Request) {
     const { jobID, content } = await request.json();
 
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            TableName: process.env.JOB_TABLE_NAME,
-            Key: {
-                id: { S: jobID },
-            },
-            UpdateExpression: 'set content = :c',
-            ExpressionAttributeValues: {
-                ':c': { S: content },
-            },
-            ReturnValues: 'ALL_NEW',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
+    if (content.video) {
+        try {
+            const updateItemCommand = new UpdateItemCommand({
+                ExpressionAttributeValues: {
+                    ':v': {
+                        M: {
+                            name: { S: content.video.name.toString() },
+                            size: { N: content.video.size.toString() },
+                            lastModified: { N: content.video.lastModified.toString() },
+                        },
+                    },
+                },
+                Key: { id: { S: jobID } },
+                ReturnValues: 'ALL_NEW',
+                TableName: 'job',
+                UpdateExpression: 'SET video = :v',
+            });
+            const { Attributes } = await client.send(updateItemCommand);
 
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
+            return Response.json({ Attributes });
+        } catch (error: any) {
+            return Response.json({ error: error.message });
+        }
     }
+
+    return Response.json({ error: 'Not handled yet' });
 }
 
 export async function DELETE(request: Request) {
