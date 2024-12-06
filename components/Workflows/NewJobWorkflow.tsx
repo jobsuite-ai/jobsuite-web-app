@@ -21,6 +21,9 @@ export function NewJobWorkflow() {
             jobID: uuidv4(),
             client_name: '',
             client_address: '',
+            city: '',
+            state: 'Utah',
+            zip_code: '',
             client_email: '',
             client_phone_number: '',
             estimate_date: null,
@@ -53,6 +56,9 @@ export function NewJobWorkflow() {
                     jobID: formValues.jobID,
                     client_name: formValues.client_name,
                     client_address: formValues.client_address,
+                    city: formValues.city,
+                    state: formValues.state,
+                    zip_code: formValues.zip_code,
                     client_email: formValues.client_email,
                     estimate_date: formValues.estimate_date,
                     client_phone_number: formValues.client_phone_number,
@@ -95,11 +101,11 @@ export function NewJobWorkflow() {
         <div>
             <h1>Add Job</h1>
             <Stepper active={active}>
-                <Stepper.Step label="First step" description="Basic Information">
+                <Stepper.Step label="First step" description="Client Information">
                     <NewJobBasicInformation form={form} />
                 </Stepper.Step>
 
-                <Stepper.Step label="Second step" description="Video Upload">
+                <Stepper.Step label="Second step" description="Job Details">
                     <NewJobWorkInformation form={form} />
                 </Stepper.Step>
             </Stepper>

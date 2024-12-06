@@ -8,6 +8,9 @@ export function RLPPLogo() {
       src="/RLPP_logo.png"
       w="auto"
       fit="contain"
+      left='30px'
+      top={0}
+      style={{ position: 'fixed' }}
     />
   )
 }

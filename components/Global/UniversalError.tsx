@@ -1,10 +1,11 @@
+import { Flex } from '@mantine/core';
 import { IconExclamationCircle } from '@tabler/icons-react';
 
-export default function UniversalError() {
+export default function UniversalError({ message = "Unexpected Error" }: { message: string }) {
     return (
-        <div>
-            <IconExclamationCircle color='red' size={200} />
-            <h2>Unexpected Error</h2>
-        </div>
+        <Flex direction='column' align='center'>
+            <IconExclamationCircle color='#FF7F7F' size={180} />
+            <h2>{message}</h2>
+        </Flex>
     );
 }

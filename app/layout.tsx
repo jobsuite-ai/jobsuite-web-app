@@ -4,6 +4,7 @@ import { Notifications } from '@mantine/notifications';
 import { Shell } from '@/components/Shell/Shell';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import '@mantine/carousel/styles.css';
 
 export const metadata = {
   title: 'RL Peek Painting',

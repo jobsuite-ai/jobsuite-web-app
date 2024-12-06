@@ -2,7 +2,8 @@ export type TemplateInput = {
     client: ClientInfo;
     items: TemplateDescription[];
     notes: string;
-    estimateNumber: number;
+    image: string;
+    estimateNumber: string;
 };
 
 export type TemplateDescription = {
@@ -13,6 +14,9 @@ export type TemplateDescription = {
 
 type ClientInfo = {
     name: string;
+    city: string;
+    state: string;
+    email: string;
     address: string;
     phone: string;
 };

@@ -1,10 +1,20 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useUser } from '@auth0/nextjs-auth0/client';
 import JobsList from '@/components/JobsList/JobsList';
 
 export default function Jobs() {
-    return (
-        <>
-            <h1>Jobs List</h1>
-            <JobsList />
-        </>
-    );
+    const { user, isLoading } = useUser();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!isLoading && !user) {
+            // Redirect to login page if the user is not logged in
+            router.push('/profile');
+        }
+    }, [isLoading, user, router]);
+
+    return (<JobsList />);
 }

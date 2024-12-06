@@ -1,0 +1,25 @@
+.markdown h1,
+.markdown h2,
+.markdown h3 {
+    color: #333;
+}
+
+.markdown p {
+    line-height: 1.6;
+}
+
+.markdown a {
+    color: blue;
+    text-decoration: underline;
+}
+
+.markdown ul {
+    list-style: disc;
+    padding-left: 20px;
+}
+
+.markdown code {
+    background-color: #f4f4f4;
+    padding: 2px 4px;
+    border-radius: 4px;
+}

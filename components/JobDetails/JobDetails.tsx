@@ -1,22 +1,28 @@
 "use client";
 
-import { UploadNewTemplate } from '@/components/Hooks/UploadNewTemplate';
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
-import { Button } from '@mantine/core';
-import { IconArrowLeft } from '@tabler/icons-react';
-import { SingleJob } from '../Global/job';
+import { Flex } from '@mantine/core';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { NewJobVideoUpload } from './NewJobVideoUpload';
 import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
-import classes from './styles/JobDetails.module.css'
+import { SingleJob } from '../Global/model';
+import ClientDetails from './ClientDetails';
+import ImageCarousel from './ImageCarousel';
+import { NewJobVideoUpload } from './NewJobVideoUpload';
+import JobComments from './comments/JobComments';
+import EstimateDetails from './estimate/EstimateDetails';
+import TranscriptionSummary from './estimate/TranscriptionSummary';
+import classes from './styles/JobDetails.module.css';
+import SpanishTranscription from './estimate/SpanishTranscription';
+import LineItems from './estimate/LineItems';
 
-
-export default function JobDetails({jobID}: {jobID: string}) {
+export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
     const [job, setJob] = useState<SingleJob>();
-    const router = useRouter();
+    const [images, setImages] = useState<string[] | undefined>();
+    const searchParams = useSearchParams()
+    const page = searchParams.get('page')
 
     useEffect(() => {
         setLoading(true);
@@ -34,41 +40,78 @@ export default function JobDetails({jobID}: {jobID: string}) {
             }
         )
 
-        const {Item} = await response.json();
+        const { Item } = await response.json();
         setJob(Item);
+        setImages(job?.images ? job?.images.L.map((image) => image.M.name.S) : undefined)
     }
 
-    return (
+    const fileNamesFromDynamo = job?.images ? job?.images.L.map((image) => image.M.name.S) : [];
+    interface OverviewDetailsProps {
+        job: SingleJob | undefined;
+        loading: boolean;
+        jobID: string;
+        fileNamesFromDynamo: string[]; // Assuming this is an array of strings
+    }
+
+    const OverviewDetails = ({ job, loading, jobID, fileNamesFromDynamo }: OverviewDetailsProps) => (
         <>
             {loading ? <LoadingState /> : <>
-                    <div className={classes.header}>
-                        <Button
-                            onClick={() => router.push('/jobs')}
-                            style={{ border: 'none' }}
-                            variant="default"
-                            leftSection={<IconArrowLeft size={14}
-                        />}>
-                            Back To Job List
-                        </Button>
-                    </div>
-                    <div className={classes.jobDetailsWrapper}>
-                        {job ? <>
-                                <div>{job.client_name.S}</div>
-                                <div>{job.client_address.S}</div>
-                                <div>{job.client_email.S}</div>
-                                <div>{job.client_phone_number.S}</div>
-
-                                {job.video?.M?.name
-                                    ? <VideoFrame name={job.video.M.name.S} />
-                                    : <NewJobVideoUpload jobID={jobID} />
-                                }
-                                <UploadNewTemplate />
-                            </>
-                            : <UniversalError />
-                        }
-                    </div>
-                </>
+                <div className={classes.jobDetailsWrapper}>
+                    {job ? 
+                        <>
+                            <Flex direction='row' gap='md' align='stretch' mt='lg' mb='lg' style={{ width: '930px' }}>
+                                <div style={{ width: '70%' }}>
+                                    {job.video?.M?.name
+                                        ? <VideoFrame name={job.video.M.name.S} />
+                                        : <NewJobVideoUpload jobID={jobID} />
+                                    }
+                                </div>
+                                <div style={{ width: '30%' }}>
+                                    <ClientDetails job={job} />
+                                </div>
+                            </Flex>
+                            <Flex direction='column' gap='md'>
+                                <ImageCarousel jobID={jobID} imageNames={fileNamesFromDynamo} />
+                                <LineItems job={job} />
+                                <TranscriptionSummary job={job} />
+                                <SpanishTranscription job={job} />
+                            </Flex>
+                        </> : <UniversalError message='Unable to access job details' />
+                    }
+                </div>
+            </>
             }
         </>
     );
+
+    if (job) {
+        switch (page) {
+            case 'overview':
+                return (<OverviewDetails
+                    job={job}
+                    loading={loading}
+                    jobID={jobID}
+                    fileNamesFromDynamo={fileNamesFromDynamo}
+                />);
+            case 'estimate':
+                return (<EstimateDetails job={job} />);
+            case 'comments':
+                return (<JobComments jobID={jobID} />);
+            default:
+                return (<OverviewDetails
+                    job={job}
+                    loading={loading}
+                    jobID={jobID}
+                    fileNamesFromDynamo={fileNamesFromDynamo}
+                />);
+        }
+    }
+
+
+    return (<OverviewDetails
+        job={job}
+        loading={loading}
+        jobID={jobID}
+        fileNamesFromDynamo={fileNamesFromDynamo}
+    />)
 }

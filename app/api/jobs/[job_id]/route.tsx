@@ -8,6 +8,7 @@ const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
 export async function GET(req: Request, { params }: { params: any }) {
+    await params;
     const jobID = params.job_id as string;
 
     try {
@@ -22,7 +23,8 @@ export async function GET(req: Request, { params }: { params: any }) {
 
             return Response.json({ Item });
         }
-            throw Error('JobID must be defined to get a job');
+
+        throw Error('JobID must be defined to get a job');
     } catch (error: any) {
         return Response.json({ error: error.message });
     }

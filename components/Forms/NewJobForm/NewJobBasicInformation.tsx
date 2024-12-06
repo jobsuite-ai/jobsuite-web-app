@@ -1,9 +1,9 @@
 import { Select, TextInput } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import { UseFormReturnType } from '@mantine/form';
 import classes from './Styling/NewJobBasicInformation.module.css'
+import { USStatesMap } from '@/components/Global/usStates';
 
 export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
     return (
@@ -21,6 +21,30 @@ export function NewJobBasicInformation({form}: {form: UseFormReturnType<any>}) {
                 placeholder="Client address"
                 key={form.key('client_address')}
                 {...form.getInputProps('client_address')}
+            />
+            <TextInput
+                withAsterisk
+                label="City"
+                placeholder="City"
+                key={form.key('city')}
+                {...form.getInputProps('city')}
+            />
+            <Select
+                withAsterisk
+                clearable
+                searchable
+                data={USStatesMap}
+                label="State"
+                placeholder="State"
+                key={form.key('state')}
+                {...form.getInputProps('state')}
+            />
+            <TextInput
+                withAsterisk
+                label="Zip Code"
+                placeholder="Zip Code"
+                key={form.key('zip_code')}
+                {...form.getInputProps('zip_code')}
             />
             <TextInput
                 withAsterisk

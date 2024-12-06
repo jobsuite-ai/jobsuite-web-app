@@ -1,8 +1,5 @@
-.header {
-    display: flex;
-    margin-bottom: 30px;
-}
-.jobDetailsWrapper {
+
+.jobCommentsWrapper {
     display: flex;
     width: 100%;
     flex-direction: column;

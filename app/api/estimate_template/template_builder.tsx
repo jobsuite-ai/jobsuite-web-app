@@ -69,16 +69,16 @@ export const generateTemplate = (template: TemplateInput) => `
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Estimate #3110</title>
         <style>
-            body {
+            p {
+                margin: 0;
+            }
+
+            .body-wrapper {
                 font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
                 line-height: 1.5;
                 padding: 20px;
                 background-color: #f9f9f9;
                 color: #333;
-            }
-
-            p {
-                margin: 0;
             }
 
             .container {
@@ -119,11 +119,17 @@ export const generateTemplate = (template: TemplateInput) => `
             /* Section Styling */
             .rlpp-contact {
                 text-align: left;
-                font-size: 0.9em;
             }
 
             .client-contact {
                 text-align: right;
+            }
+
+            .image-wrapper {
+                margin-top: 30px;
+                display: flex;
+                justify-self: center;
+                width: 550px;
             }
 
             .estimate-details {
@@ -221,7 +227,7 @@ export const generateTemplate = (template: TemplateInput) => `
 
             .signature-field {
                 border-bottom: 1px solid !important;
-                width: 350px;
+                width: 300px;
                 height: 80px;
             }
 
@@ -232,7 +238,7 @@ export const generateTemplate = (template: TemplateInput) => `
         </style>
     </head>
 
-    <body>
+    <body class="body-wrapper">
         <div class="full-page-wrapper">
             <div class="container">
                 <h1>ESTIMATE</h1>
@@ -250,13 +256,18 @@ export const generateTemplate = (template: TemplateInput) => `
                     </div>
 
                     <div class="client-contact">
-                        <h3>Prepared For</h3>
-                        <p>${template.client.name}</p>
-                        <p>${template.client.address}</p>
-                        <p>Phone: ${template.client.phone}</p>
-                        <p><strong>Estimate #:</strong> ${template.estimateNumber}</p>
                         <p><strong>Date:</strong> ${getTodaysDate()}</p>
+                        <p><strong>Estimate ID:</strong> 8a57d91694e3</p>
+                        <h3 style="margin-top: 94px;">Prepared For</h3>
+                        <p>${template.client.name}</p>
+                        <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
+                        <p>Phone: ${template.client.phone}</p>
+                        <p>${template.client.email}</p>
                     </div>
+                </div>
+
+                <div class="image-wrapper">
+                    <img src="${template.image}" alt="Image of the house" style="width: 100%; border-radius: 10px;" />
                 </div>
 
                 <div class="estimate-details">
@@ -269,7 +280,6 @@ export const generateTemplate = (template: TemplateInput) => `
                     </div>
 
                     <div class="notes">
-                        <h3 style="margin-top: 0;">Notes</h3>
                         <p>${template.notes}</p>
                     </div>
 
