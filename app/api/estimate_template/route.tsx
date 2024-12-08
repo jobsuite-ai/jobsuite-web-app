@@ -4,6 +4,7 @@ export async function POST(request: Request) {
     try {
         const {
             template,
+            jobID,
         } = await request.json();
 
         const options = {
@@ -13,6 +14,7 @@ export async function POST(request: Request) {
             data: {
                 html: template,
                 name: 'Job Estimate',
+                external_id: jobID,
             },
         };
 

@@ -17,7 +17,7 @@ export function LineItem({ lineItemDetails }: { lineItemDetails: DynamoLineItem 
                 <Text size="lg" pl='md'><strong>{lineItemDetails.header.S}</strong></Text>
                 <Text size="sm">$ {price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </Group>
-            <Text pl={40} pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
+            <Text pl='md' pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
         </Card>
     );
 }

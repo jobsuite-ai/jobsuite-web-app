@@ -19,6 +19,8 @@ export function NewJobWorkflow() {
         mode: 'uncontrolled',
         initialValues: {
             jobID: uuidv4(),
+            client_id: uuidv4(),
+            existing_client: false,
             client_name: '',
             client_address: '',
             city: '',
@@ -44,6 +46,63 @@ export function NewJobWorkflow() {
     });
 
     async function submitJob() {
+        await Promise.all([createJobRecord(), createOrUpdateClientRecord()]);
+    }
+
+    async function createOrUpdateClientRecord() {
+        const formValues = form.getValues();
+
+        console.log("Form Values");
+        console.log(formValues);
+
+        // Add job to client's job list
+        if (formValues.existing_client) {
+            const content = {
+                job: {
+                    jobID: formValues.jobID
+                }
+            }
+
+            const response = await fetch(
+                `/api/clients`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content, clientID: formValues.client_id }),
+                }
+            )
+
+            await response.json();
+        } else {
+            const response = await fetch(
+                '/api/clients',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+
+                    body: JSON.stringify({
+                        id: formValues.client_id,
+                        jobs: [formValues.jobID],
+                        name: formValues.client_name,
+                        address: formValues.client_address,
+                        city: formValues.city,
+                        state: formValues.state,
+                        zip_code: formValues.zip_code,
+                        email: formValues.client_email,
+                        phone_number: formValues.client_phone_number,
+                        timestamp: Date.now()
+                    }),
+                }
+            )
+            const out = await response.json();
+        }
+    }
+
+    async function createJobRecord() {
         const formValues = form.getValues();
         const response = await fetch(
             '/api/jobs',
@@ -56,6 +115,7 @@ export function NewJobWorkflow() {
                     jobID: formValues.jobID,
                     client_name: formValues.client_name,
                     client_address: formValues.client_address,
+                    client_id: formValues.client_id,
                     city: formValues.city,
                     state: formValues.state,
                     zip_code: formValues.zip_code,

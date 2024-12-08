@@ -76,8 +76,6 @@ export const generateTemplate = (template: TemplateInput) => `
             .body-wrapper {
                 font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
                 line-height: 1.5;
-                padding: 20px;
-                background-color: #f9f9f9;
                 color: #333;
             }
 
@@ -129,12 +127,12 @@ export const generateTemplate = (template: TemplateInput) => `
                 margin-top: 30px;
                 display: flex;
                 justify-self: center;
-                width: 550px;
+                width: 625px;
             }
 
             .estimate-details {
                 border-bottom: 1px solid !important;
-                margin-bottom: 100px;
+                margin-bottom: 50px;
             }
 
             .estimate-body {
@@ -267,7 +265,7 @@ export const generateTemplate = (template: TemplateInput) => `
                 </div>
 
                 <div class="image-wrapper">
-                    <img src="${template.image}" alt="Image of the house" style="width: 100%; border-radius: 10px;" />
+                    <img src="${template.image}" alt="Image of the house" style="width: 100%; border-radius: 5px;" />
                 </div>
 
                 <div class="estimate-details">

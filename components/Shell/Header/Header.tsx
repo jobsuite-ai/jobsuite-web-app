@@ -13,6 +13,7 @@ import classes from './Header.module.css';
 const links = [
   { link: '/jobs', label: 'Jobs' },
   { link: '/add-job', label: 'Add Job' },
+  { link: '/clients', label: 'Clients' },
 ];
 
 export function Header() {
@@ -94,7 +95,6 @@ export function Header() {
             visibleFrom="xs"
           />
           <Divider orientation="vertical" />
-          {/* <AuthButtons /> */}
           <Link
             style={{ marginTop: rem(5) }}
             key={'Profile'}

@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     try {
         const {
             jobID,
+            client_id,
             client_name,
             client_address,
             city,
@@ -30,6 +31,7 @@ export async function POST(request: Request) {
                 user_id: process.env.RLPP_USER_ID,
                 id: jobID,
                 job_status: JobStatus.PENDING_ESTIMATE,
+                client_id,
                 client_name,
                 client_address,
                 city,
@@ -85,7 +87,7 @@ export async function PUT(request: Request) {
                     },
                 },
                 Key: { id: { S: jobID } },
-                ReturnValues: 'ALL_NEW',
+                ReturnValues: 'UPDATED_NEW',
                 TableName: 'job',
                 UpdateExpression: 'SET video = :v',
             });
@@ -117,7 +119,7 @@ export async function PUT(request: Request) {
                     },
                 },
                 Key: { id: { S: jobID } },
-                ReturnValues: 'ALL_NEW',
+                ReturnValues: 'UPDATED_NEW',
                 TableName: 'job',
                 UpdateExpression: 'SET images = :i',
             });
@@ -154,6 +156,23 @@ export async function PUT(request: Request) {
                 UpdateExpression: 'SET line_items = list_append(if_not_exists(line_items, :empty_list), :new_line_items)',
             });
 
+            const { Attributes } = await client.send(updateItemCommand);
+
+            return Response.json({ Attributes });
+        } catch (error: any) {
+            return Response.json({ error: error.message });
+        }
+    }
+
+    if (content.job_status) {
+        try {
+            const updateItemCommand = new UpdateItemCommand({
+                ExpressionAttributeValues: {':status': {S: content.job_status}},
+                Key: { id: { S: jobID } },
+                ReturnValues: 'UPDATED_NEW',
+                TableName: 'job',
+                UpdateExpression: 'SET job_status = :status',
+            });
             const { Attributes } = await client.send(updateItemCommand);
 
             return Response.json({ Attributes });

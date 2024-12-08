@@ -22,6 +22,9 @@ const ImageCarousel = ({ jobID, imageNames }: { jobID: string, imageNames: strin
             {imageNames.length > 0 ?
                 <Paper shadow='sm' radius='md' withBorder className={classes.carousel}>
                     <Carousel
+                        pl={50}
+                        pr={50}
+                        pt={20}
                         withIndicators
                         height={200}
                         slideSize={{ base: '100%', sm: '50%', md: '33.333333%' }}
@@ -35,14 +38,14 @@ const ImageCarousel = ({ jobID, imageNames }: { jobID: string, imageNames: strin
                             </Carousel.Slide>
                         ))}
                     </Carousel>
-                    <Group justify="center" mt="xl">
+                    <Group justify="center" mt="lg">
                         <Button onClick={() => setShowImageUploadModal(true)}>Upload more pictures</Button>
                     </Group>
                 </Paper> :
                 
                 <Paper shadow='sm' radius='md' withBorder className={classes.carousel}>
                     <Text>You don't have any images uploaded</Text>
-                    <Group justify="center" mt="xl">
+                    <Group justify="center" mt="lg">
                         <Button onClick={() => setShowImageUploadModal(true)}>Upload more pictures</Button>
                     </Group>
                 </Paper>

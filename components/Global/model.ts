@@ -7,10 +7,37 @@ export type Job = {
     client_name: string;
     client_phone_number: string;
     estimate_date: string;
+    client_id: string;
     id: string;
     user_id: string;
     video: any;
-    status: JobStatus;
+    job_status: JobStatus;
+}
+
+export type Client = {
+    address: string; 
+    city: string;
+    state: string;
+    zip_code: string;
+    email: string;
+    name: string;
+    phone_number: string;
+    user_id: string;
+    id: string;
+    jobs: string[];
+}
+
+export type DynamoClient = {
+    address: TypedDynamoStringReturn; 
+    city: TypedDynamoStringReturn;
+    state: TypedDynamoStringReturn;
+    zip_code: TypedDynamoStringReturn;
+    email: TypedDynamoStringReturn;
+    name: TypedDynamoStringReturn;
+    phone_number: TypedDynamoStringReturn;
+    user_id: TypedDynamoStringReturn;
+    id: TypedDynamoStringReturn;
+    jobs: TypedDynamoListReturn<TypedDynamoStringReturn[]>;
 }
 
 export type SingleJob = {

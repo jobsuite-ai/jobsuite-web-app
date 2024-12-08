@@ -6,7 +6,7 @@ import '@mantine/dropzone/styles.css';
 import { notifications } from '@mantine/notifications';
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
-import classes from './Styles/NewJobVideoUpload.module.css';
+import classes from './styles/NewJobVideoUpload.module.css';
 import { VideoFrame } from './VideoFrame';
 
 export function NewJobVideoUpload({ jobID }: { jobID: string }) {

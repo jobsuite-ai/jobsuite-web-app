@@ -3,21 +3,21 @@ import { JobStatus } from './model'
 export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
         case JobStatus.COMPLETED:
-            return 'green';
+            return '#4CAF50';
         case JobStatus.IN_PROGRESS:
-            return '#90EE90';
+            return '#2196F3';
         case JobStatus.ESTIMATE_ACCEPTED:
-            return 'green';
+            return '#FF9800';
         case JobStatus.ESTIMATE_DECLINED:
-            return '#FF7F7F';
+            return '#F44336';
         case JobStatus.ESTIMATE_SENT:
-            return '#D3D3D3';
+            return '#FFC107';
         case JobStatus.ESTIMATE_OPENED:
-            return '#D3D3D3';
+            return '#3F51B5';
         case JobStatus.PENDING_ESTIMATE:
-            return '#D3D3D3';
+            return '#d3d3d3';
         default:
-            return "#D3D3D3";
+            return "#d3d3d3";
     }
 }
 

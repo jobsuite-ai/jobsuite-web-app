@@ -4,19 +4,20 @@ import {
   IconListTree,
   IconMessage2
 } from '@tabler/icons-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import classes from './SideNav.module.css';
 
 const data = [
   { link: 'overview', label: 'Overview', icon: IconListTree },
-  { link: 'estimate', label: 'Estimate', icon: IconClockQuestion },
+  { link: 'estimate', label: 'Estimate Preview', icon: IconClockQuestion },
   { link: 'comments', label: 'Comments', icon: IconMessage2 }
 ];
 
 export function JobDetailsSideNav() {
   const [active, setActive] = useState('Billing');
   const router = useRouter();
+  const pathname = usePathname();
 
   const links = data.map((item) => (
     <a
@@ -40,7 +41,10 @@ export function JobDetailsSideNav() {
       <div className={classes.header}>
         <a href="#" className={classes.link} onClick={(event) => {
           event.preventDefault();
-          router.back();
+          const pathSegments = pathname.split('/');
+          pathSegments.pop();
+          const newPath = pathSegments.join('/');
+          router.push(newPath)
         }}>
           <IconArrowLeft className={classes.linkIcon} stroke={1.5} />
           <span>Back To Jobs</span>

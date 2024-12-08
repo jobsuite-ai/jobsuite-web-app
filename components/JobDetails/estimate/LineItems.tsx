@@ -17,12 +17,12 @@ export default function LineItems({ job }: { job: SingleJob }) {
         mode: 'uncontrolled',
         initialValues: {
             header: '',
-            description: 'Pleas see the description below',
+            description: 'Please see the description below',
             price: 0,
         },
     });
 
-    async function updateJobWithImages() {
+    async function updateJobWithLineItems() {
         setIsUploading(true);
         const formValues = form.getValues();
 
@@ -128,7 +128,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
                         />
 
                         <Group mt="md">
-                            <Button type="submit" onClick={updateJobWithImages}>Add Line Item</Button>
+                            <Button type="submit" onClick={updateJobWithLineItems}>Add Line Item</Button>
                         </Group>
                     </div>
                 }

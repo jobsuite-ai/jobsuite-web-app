@@ -1,12 +1,19 @@
 "use client";
 
-import { Badge, Card, Flex, Text } from '@mantine/core';
-import { useRouter } from 'next/navigation';
-import { SingleJob } from '../Global/model';
+import { ActionIcon, Badge, Card, Flex, Menu, Text } from '@mantine/core';
+import { IconPencil } from '@tabler/icons-react';
+import { JobStatus, SingleJob } from '../Global/model';
+import updateJobStatus from '../Global/updateJobStatus';
 import { getBadgeColor, getFormattedStatus } from "../Global/utils";
+import { useState } from 'react';
 
 export default function ClientDetails({ job }: { job: SingleJob }) {
-    const router = useRouter();
+    const [jobStatus, setJobStateStatus] = useState(job.job_status.S);
+
+    const setJobStatus = (status: JobStatus) => {
+        updateJobStatus(status, job.id.S)
+        setJobStateStatus(status);
+    }
 
     return (
         <Card
@@ -18,7 +25,29 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
         >
             <Flex direction='column' gap="lg">
                 <Text fw={500}>{job.client_name.S}</Text>
-                <Badge color={getBadgeColor(job.job_status.S)}>{getFormattedStatus(job.job_status.S)}</Badge>
+                <Flex direction='row' gap={5}>
+                    <Badge style={{ color: '#ffffff' }} color={getBadgeColor(jobStatus)} mr='10px'>
+                        {getFormattedStatus(jobStatus)}
+                    </Badge>
+                    {[JobStatus.ESTIMATE_ACCEPTED, JobStatus.IN_PROGRESS, JobStatus.COMPLETED].includes(jobStatus) && 
+                        <Menu shadow="md" width={200}>
+                            <Menu.Target>
+                                <ActionIcon size={20} variant='transparent'  pb='2px'>
+                                    <IconPencil/>
+                                </ActionIcon>
+                            </Menu.Target>
+
+                            <Menu.Dropdown>
+                                <Menu.Item onClick={() => setJobStatus(JobStatus.IN_PROGRESS)}>
+                                    Mark Job In Progress
+                                </Menu.Item>
+                                <Menu.Item onClick={() => setJobStatus(JobStatus.COMPLETED)}>
+                                    Mark Job Complete
+                                </Menu.Item>
+                            </Menu.Dropdown>
+                        </Menu>
+                    }
+                </Flex>
             </Flex>
             <Flex direction='column' gap="lg" mt="md" mb="xs">
                 <Flex direction='column'>

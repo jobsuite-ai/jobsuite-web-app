@@ -2,7 +2,7 @@
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
-import { SingleJob } from '@/components/Global/model';
+import { JobStatus, SingleJob } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 import { UploadNewTemplate } from '@/components/JobDetails/estimate/UploadNewTemplate';
 import { Flex, Paper } from '@mantine/core';
@@ -16,6 +16,7 @@ import EstimateTodo from './EstimateTodo';
 
 export default function EstimateDetails({ job }: { job: SingleJob }) {
     const [loading, setLoading] = useState(true);
+    const [isSending, setIsSending] = useState(false);
     const [template, setTemplate] = useState<string>('');
 
     useEffect(() => {
@@ -56,16 +57,24 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
     }
 
     return (
-        <>{loading ? <LoadingState /> :
+        <>{loading || isSending ? <LoadingState /> :
             <div className={classes.jobDetailsWrapper}>
                 {job ? 
                     <>
-                        <h1 style={{ marginTop: '30px' }}>Estimate Preview</h1>
+                        {job.job_status.S == JobStatus.PENDING_ESTIMATE ?
+                            <h1 style={{ marginTop: '30px' }}>Estimate Preview</h1>
+                            :
+                            <h1 style={{ marginTop: '30px' }}>Estimate Has Been Sent</h1>
+                        }
+
                         <EstimateTodo job={job} />
                         <Paper shadow='sm' radius='md' mt='lg' withBorder>
                             <div dangerouslySetInnerHTML={{ __html: template }} />
                         </Paper>
-                        <UploadNewTemplate template={template} job={job} />
+                        
+                        {job.job_status.S == JobStatus.PENDING_ESTIMATE &&
+                            <UploadNewTemplate template={template} job={job} setLoading={setIsSending} />
+                        }
                     </>
                     : <UniversalError message='Unable to access job details' />
                 }
