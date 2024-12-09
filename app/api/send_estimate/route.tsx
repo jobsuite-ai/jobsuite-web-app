@@ -2,7 +2,7 @@ const axios = require('axios').default;
 
 export async function POST(request: Request) {
     try {
-        const {template_id} = await request.json();
+        const { template_id } = await request.json();
 
         const options = {
             method: 'POST',
@@ -12,10 +12,10 @@ export async function POST(request: Request) {
                 template_id,
                 send_email: true,
                 submitters: [
-                    { role: 'Property Owner', email: 'jonaspeek@gmail.com'},
-                    { role: 'Service Provider', email: 'jonas@rlpeekpainting.com'},
+                    { role: 'Property Owner', email: 'jonaspeek@gmail.com' },
+                    { role: 'Service Provider', email: 'jonas@rlpeekpainting.com' },
                 ],
-                reply_to: 'info@rlpeekpainting.com'
+                reply_to: 'info@rlpeekpainting.com',
             },
         };
 

@@ -1,6 +1,6 @@
 import {
     DynamoDBClient,
-    UpdateItemCommand
+    UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
             TableName: 'client',
             Item: {
                 user_id: process.env.RLPP_USER_ID,
-                id: id,
+                id,
                 jobs,
                 name,
                 address,
@@ -66,18 +66,15 @@ export async function GET() {
     }
 }
 
-
 export async function PUT(request: Request) {
     const { clientID, content } = await request.json();
-    console.log("Content");
-    console.log(content);
 
     if (content.job) {
         try {
             const updateItemCommand = new UpdateItemCommand({
                 ExpressionAttributeValues: {
                     ':new_job': {
-                        L: [{S: content.job.jobID}],
+                        L: [{ S: content.job.jobID }],
                     },
                     ':empty_list': {
                         L: [],

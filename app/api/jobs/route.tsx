@@ -167,7 +167,7 @@ export async function PUT(request: Request) {
     if (content.job_status) {
         try {
             const updateItemCommand = new UpdateItemCommand({
-                ExpressionAttributeValues: {':status': {S: content.job_status}},
+                ExpressionAttributeValues: { ':status': { S: content.job_status } },
                 Key: { id: { S: jobID } },
                 ReturnValues: 'UPDATED_NEW',
                 TableName: 'job',
