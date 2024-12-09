@@ -1,7 +1,7 @@
 "use client";
 
 import { Carousel } from '@mantine/carousel';
-import { Button, Group, Image, Modal, Paper, Text } from '@mantine/core';
+import { Button, Flex, Group, Image, Modal, Paper, Text } from '@mantine/core';
 import classes from './styles/NewJobVideoUpload.module.css';
 import { useState } from 'react';
 import ImageUpload from './ImageUpload';
@@ -41,13 +41,13 @@ const ImageCarousel = ({ jobID, imageNames }: { jobID: string, imageNames: strin
                     <Group justify="center" mt="lg">
                         <Button onClick={() => setShowImageUploadModal(true)}>Upload more pictures</Button>
                     </Group>
-                </Paper> :
-                
-                <Paper shadow='sm' radius='md' withBorder className={classes.carousel}>
-                    <Text>You don't have any images uploaded</Text>
-                    <Group justify="center" mt="lg">
+                </Paper>
+                : 
+                <Paper shadow='sm' radius='md' withBorder className={classes.carousel} p='lg'>
+                    <Flex justify="center" align='center' gap='lg' direction='column'>
+                        <Text>You don't have any images uploaded</Text>
                         <Button onClick={() => setShowImageUploadModal(true)}>Upload more pictures</Button>
-                    </Group>
+                    </Flex>
                 </Paper>
             }    
             <Modal

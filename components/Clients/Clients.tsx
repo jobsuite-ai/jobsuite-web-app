@@ -70,8 +70,6 @@ export default function ClientsList() {
                                     padding="lg"
                                     radius="md"
                                     withBorder
-                                    style={{ cursor: 'pointer' }}
-                                    onClick={() => router.push(`/clients/${client.id}`)}
                                 >
                                     <Group justify="space-between" mt="md" mb="xs">
                                         <Text fw={500}>{client.name}</Text>

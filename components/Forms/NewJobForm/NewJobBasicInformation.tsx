@@ -4,7 +4,7 @@ import { Select, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { UseFormReturnType } from '@mantine/form';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ClientSearch } from './ClientSearch';
 import classes from './Styling/NewJobBasicInformation.module.css';
 
@@ -12,6 +12,7 @@ export function NewJobBasicInformation({ form }: { form: UseFormReturnType<any> 
     const [clientType, setClientType] = useState<string>('new');
     const [existingClientSelected, setExistingClientSelected] = useState(false);
 
+    useEffect(() => {}, [existingClientSelected]);
 
     return (
         <div className={classes.wrapper}>

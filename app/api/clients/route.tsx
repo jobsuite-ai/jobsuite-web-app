@@ -55,7 +55,7 @@ export async function GET() {
             ExpressionAttributeValues: {
                 ':pk': '8de087f0-f33e-4e38-90ad-319d7edf7f27',
             },
-            ScanIndexForward: true,
+            ScanIndexForward: false,
         };
 
         const { Items } = await docClient.send(new QueryCommand(params));
@@ -79,11 +79,12 @@ export async function PUT(request: Request) {
                     ':empty_list': {
                         L: [],
                     },
+                    ':timestamp': {N: content.timestamp.toString()},
                 },
                 Key: { id: { S: clientID } },
                 ReturnValues: 'UPDATED_NEW',
                 TableName: 'client',
-                UpdateExpression: 'SET jobs = list_append(if_not_exists(jobs, :empty_list), :new_job)',
+                UpdateExpression: 'SET jobs = list_append(if_not_exists(jobs, :empty_list), :new_job), timestamp = :timestamp',
             });
             const { Attributes } = await client.send(updateItemCommand);
 

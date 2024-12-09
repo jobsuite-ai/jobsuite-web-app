@@ -52,14 +52,12 @@ export function NewJobWorkflow() {
     async function createOrUpdateClientRecord() {
         const formValues = form.getValues();
 
-        console.log("Form Values");
-        console.log(formValues);
-
         // Add job to client's job list
         if (formValues.existing_client) {
             const content = {
                 job: {
-                    jobID: formValues.jobID
+                    jobID: formValues.jobID,
+                    timestamp: Date.now()
                 }
             }
 

@@ -39,8 +39,6 @@ export default function JobComments({ jobID }: { jobID: string }) {
 
     async function postJobComment() {
         setCommentInputLoading(true);
-        console.log("user");
-        console.log(user);
         const timestamp = new Date();
         const id = uuidv4();
         const commenter = user?.name ?? 'unknown';

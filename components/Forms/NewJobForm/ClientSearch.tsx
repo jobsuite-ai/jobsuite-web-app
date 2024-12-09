@@ -40,6 +40,7 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
 
     function populateFormWithExistingClient(option: ComboboxStringItem) {
         const client = clientData[option.value];
+
         form.setValues((current) => ({
             ...current,
             client_id: client.id,
@@ -52,6 +53,7 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
             client_email: client.email,
             client_phone_number: client.phone_number
         }));
+
         setExistingClientSelected(true);
     }
 
