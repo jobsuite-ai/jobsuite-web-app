@@ -79,7 +79,7 @@ export async function PUT(request: Request) {
                     ':empty_list': {
                         L: [],
                     },
-                    ':timestamp': {N: content.timestamp.toString()},
+                    ':timestamp': { N: content.timestamp.toString() },
                 },
                 Key: { id: { S: clientID } },
                 ReturnValues: 'UPDATED_NEW',

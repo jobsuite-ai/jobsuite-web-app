@@ -12,7 +12,9 @@ export function NewJobBasicInformation({ form }: { form: UseFormReturnType<any> 
     const [clientType, setClientType] = useState<string>('new');
     const [existingClientSelected, setExistingClientSelected] = useState(false);
 
-    useEffect(() => {}, [existingClientSelected]);
+    useEffect(() => {
+        console.log(existingClientSelected);
+    }, [existingClientSelected]);
 
     return (
         <div className={classes.wrapper}>

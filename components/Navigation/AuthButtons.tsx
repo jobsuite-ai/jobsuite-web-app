@@ -5,7 +5,7 @@ import { SignupButton } from "@/components/AuthButtons/signup-button";
 import { LoginButton } from "@/components/AuthButtons/login-button";
 import { LogoutButton } from "@/components/AuthButtons/logout-button";
 
-export const AuthButtons = () => {
+export default function AuthButtons() {
   const { user } = useUser();
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { AuthButtons } from "@/components/Navigation/auth-buttons";
+import AuthButtons from "@/components/Navigation/AuthButtons";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { Loader, rem } from "@mantine/core";
 
