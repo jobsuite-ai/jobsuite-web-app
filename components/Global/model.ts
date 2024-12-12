@@ -46,6 +46,7 @@ export type SingleJob = {
     state: TypedDynamoStringReturn; 
     zip_code: TypedDynamoStringReturn; 
     client_email: TypedDynamoStringReturn;
+    description: TypedDynamoStringReturn;
     transcription_summary: TypedDynamoStringReturn;
     line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
     spanish_transcription: TypedDynamoStringReturn;

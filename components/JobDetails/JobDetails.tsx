@@ -16,6 +16,7 @@ import TranscriptionSummary from './estimate/TranscriptionSummary';
 import classes from './styles/JobDetails.module.css';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import LineItems from './estimate/LineItems';
+import DescriptionOfWork from './DescriptionOfWork';
 
 export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
@@ -71,6 +72,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                 </div>
                             </Flex>
                             <Flex direction='column' gap='md'>
+                                <DescriptionOfWork job={job} />
                                 <ImageCarousel jobID={jobID} imageNames={fileNamesFromDynamo} />
                                 <LineItems job={job} />
                                 <TranscriptionSummary job={job} />

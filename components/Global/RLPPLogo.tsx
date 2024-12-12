@@ -4,12 +4,11 @@ export function RLPPLogo() {
   return (
     <Image
       radius="md"
-      h={80}
+      h='60px'
       src="/RLPP_logo.png"
       w="auto"
       fit="contain"
-      left='30px'
-      top={0}
+      top='10px'
       style={{ position: 'fixed' }}
     />
   )
