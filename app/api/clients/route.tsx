@@ -53,7 +53,7 @@ export async function GET() {
             IndexName: 'user_id-timestamp-index',
             KeyConditionExpression: 'user_id = :pk',
             ExpressionAttributeValues: {
-                ':pk': '8de087f0-f33e-4e38-90ad-319d7edf7f27',
+                ':pk': process.env.RLPP_USER_ID,
             },
             ScanIndexForward: false,
         };

@@ -99,7 +99,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
                         {commentInputLoading ? <LoadingState /> :
                         <>
                             <Textarea
-                                style={{ width: '700px' }}
+                                className={classes.commentTextArea}
                                 placeholder="Enter comment here"
                                 label="Add comment"
                                 autosize
