@@ -5,6 +5,7 @@ import MarkdownRenderer from '../../Global/MarkdownRenderer';
 import { SingleJob } from '../../Global/model';
 import { notifications } from '@mantine/notifications';
 import { IconCopy } from '@tabler/icons-react';
+import classes from './Estimate.module.css'
 
 export default function TranscriptionSummary({ job }: { job: SingleJob }) {
     const copyToClipboard = async () => {
@@ -31,7 +32,7 @@ export default function TranscriptionSummary({ job }: { job: SingleJob }) {
     return (
         <>
             {job.video?.M?.name &&
-                <Paper shadow='sm' radius='md' withBorder pr='lg' pb='lg' pl='lg' style={{ width: '930px' }}>
+                <Paper shadow='sm' radius='md' withBorder pr='lg' pb='lg' pl='lg' className={classes.estimateWrapper}>
                     {job.transcription_summary?.S ? 
                         <>
                             <div style={{ position: 'relative' }}>

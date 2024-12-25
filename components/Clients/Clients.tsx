@@ -7,6 +7,7 @@ import LoadingState from "../Global/LoadingState";
 import { Client, Job } from "../Global/model";
 import UniversalError from "../Global/UniversalError";
 import { getBadgeColor, getFormattedStatus } from "../Global/utils";
+import classes from './Clients.module.css';
 
 export default function ClientsList() {
     const [clients, setClients] = useState(new Array<Client>());
@@ -59,7 +60,7 @@ export default function ClientsList() {
     return (
         <>
             {loading ? <LoadingState /> :
-                <Flex w='930px' justify='center' mb='lg' direction='column' gap='lg' style={{ justifySelf: 'center' }}>
+                <div className={classes.flexWrapper}>
                     {clients ? (
                         <>
                             <h1>Clients List</h1>
@@ -70,6 +71,7 @@ export default function ClientsList() {
                                     padding="lg"
                                     radius="md"
                                     withBorder
+                                    w='85%'
                                 >
                                     <Group justify="space-between" mt="md" mb="xs">
                                         <Text fw={500}>{client.name}</Text>
@@ -116,7 +118,7 @@ export default function ClientsList() {
                             <UniversalError message='Unable to access list of clients' />
                         </div>
                     )}
-                </Flex>}
+                </div>}
         </>
     );
 }

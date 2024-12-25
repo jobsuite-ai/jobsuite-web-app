@@ -8,6 +8,7 @@ import { getBadgeColor, getFormattedStatus } from "../Global/utils";
 import UniversalError from "../Global/UniversalError";
 import LoadingState from "../Global/LoadingState";
 import { IconFilter, IconFilterOff } from "@tabler/icons-react";
+import classes from './JobsList.module.css';
 
 export default function JobsList() {
     const [jobs, setJobs] = useState(new Array<Job>());
@@ -45,10 +46,10 @@ export default function JobsList() {
     return (
         <>
             {loading ? <LoadingState /> :
-                <Flex w='930px' justify='center' direction='column' gap='lg' style={{ justifySelf: 'center' }}>
+                <div className={classes.flexWrapper}>
                     {jobs ? (
                         <>
-                            <Flex direction='row' justify='space-between' align='center'>
+                            <Flex direction='row' justify='space-between' align='center' w='85%'>
                                 <h1>Jobs List</h1>
 
                                 <Group>
@@ -98,7 +99,7 @@ export default function JobsList() {
                                     }
                                 </Group>
                             </Flex>
-                            <Flex direction='column' mb='lg' gap='md' justify='center' align='center'>
+                            <Flex direction='column' mb='lg' gap='md' justify='center' align='center' w='100%'>
                                 {(filteredJobs || jobs).map((job) => (
                                     <Card
                                         key={job.id}
@@ -138,7 +139,7 @@ export default function JobsList() {
                             <UniversalError message='Unable to access list of jobs' />
                         </div>
                     )}
-                </Flex>}
+                </div>}
         </>
     );
 }

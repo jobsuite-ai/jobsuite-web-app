@@ -60,18 +60,18 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                 <div className={classes.jobDetailsWrapper}>
                     {job ? 
                         <>
-                            <Flex direction='row' gap='md' align='stretch' mt='lg' mb='lg' style={{ width: '930px' }}>
-                                <div style={{ width: '70%' }}>
+                            <div className={classes.flexContainer}>
+                                <div className={classes.videoWrapper}>
                                     {job.video?.M?.name
                                         ? <VideoFrame name={job.video.M.name.S} />
                                         : <NewJobVideoUpload jobID={jobID} />
                                     }
                                 </div>
-                                <div style={{ width: '30%' }}>
+                                <div className={classes.detailsWrapper}>
                                     <ClientDetails job={job} />
                                 </div>
-                            </Flex>
-                            <Flex direction='column' gap='md'>
+                            </div>
+                            <Flex direction='column' gap='md' className={classes.jobFieldWrapper}>
                                 <DescriptionOfWork job={job} />
                                 <ImageCarousel jobID={jobID} imageNames={fileNamesFromDynamo} />
                                 <LineItems job={job} />

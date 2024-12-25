@@ -6,7 +6,7 @@ import {
 } from '@tabler/icons-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
-import classes from './SideNav.module.css';
+import classes from './JobDetailsSideNav.module.css';
 
 const data = [
   { link: 'overview', label: 'Overview', icon: IconListTree },

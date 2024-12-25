@@ -1,0 +1,24 @@
+.estimateWrapper {
+    width: 930px;
+}
+
+/* Media Query for mobile screens */
+@media (max-width: 768px) {
+    .estimateWrapper {
+        width: 100%;
+    }
+
+    .estimatePlaceholderText {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .estimateWrapper {
+        width: 100%;
+    }
+
+    .estimatePlaceholderText {
+        width: 100%;
+    }
+}

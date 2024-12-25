@@ -9,3 +9,40 @@
     align-items: center;
     margin-bottom: 30px;
 }
+.videoWrapper {
+    width: 70%;
+}
+.detailsWrapper {
+    width: 30%;
+}
+
+.flexContainer {
+    display: flex;
+    flex-direction: row; /* Default direction for web */
+    gap: var(--mantine-spacing-md); /* Matches 'md' gap in Mantine */
+    align-items: stretch; /* Align items to stretch */
+    margin-top: var(--mantine-spacing-lg); /* Matches 'lg' margin */
+    margin-bottom: var(--mantine-spacing-lg);
+    width: 930px; /* Fixed width for web version */
+}
+
+/* Media query for mobile screens */
+@media (max-width: 768px) {
+    .flexContainer {
+        flex-direction: column; /* Stack items vertically */
+        width: 100%; /* Use full width for mobile */
+    }
+    .videoWrapper {
+        width: 100%;
+    }
+    .videoFrame {
+        margin-top: 70px;
+        justify-self: center;
+    }
+    .detailsWrapper {
+        width: 100%;
+    }
+    .jobFieldWrapper {
+        width: 100%;
+    }
+}

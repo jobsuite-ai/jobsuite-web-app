@@ -58,3 +58,38 @@
     width: 25px;
     height: 25px;
 }
+
+
+/* Mobile-specific styles grouped together */
+@media (max-width: 768px) {
+    .navbar {
+        height: 60vh;
+        position: relative;
+        width: 100%;
+        flex-direction: row; /* Horizontal layout for mobile */
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+        background-color: var(--mantine-color-body); /* Optional: ensure background matches */
+    }
+
+    .navbarMain {
+        flex: unset; /* Remove flex: 1 to let content adjust naturally */
+    }
+
+    .header {
+        padding: var(--mantine-spacing-sm); /* Reduce padding */
+        margin-bottom: var(--mantine-spacing-sm); /* Adjust spacing */
+        border-bottom: none; /* Simplify design for smaller screens */
+        border-top: none;
+    }
+
+    .link {
+        font-size: var(--mantine-font-size-xs); /* Smaller font size */
+        padding: var(--mantine-spacing-xs); /* Reduce padding */
+    }
+
+    .linkIcon {
+        margin-right: var(--mantine-spacing-xs); /* Reduce margin */
+        width: 20px; /* Smaller icon size */
+        height: 20px;
+    }
+}

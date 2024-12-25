@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { LineItem } from './LineItem';
 import { v4 as uuidv4 } from 'uuid';
 import LoadingState from '@/components/Global/LoadingState';
+import classes from './Estimate.module.css'
 
 export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
@@ -70,7 +71,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
 
     return (
         <div>
-            <Paper shadow='sm' radius='md' withBorder p='lg' style={{ width: '930px' }}>
+            <Paper shadow='sm' radius='md' withBorder p='lg' className={classes.estimateWrapper}>
                 {job.line_items ? 
                     <>
                         {job.line_items.L.map((item) => (
@@ -78,7 +79,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
                         ))}
                     </>
                     :
-                    <Group justify="center">
+                    <Group justify="center" className={classes.estimatePlaceholderText}>
                         <Text>You do not have any line Items</Text>
                     </Group>
                 }

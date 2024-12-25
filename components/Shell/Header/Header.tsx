@@ -81,7 +81,7 @@ export function Header() {
 
         <Group>
           {user && (
-            <Group ml={50} gap={5} className={classes.links} visibleFrom="sm">
+            <Group className={classes.linkWrapper}>
               {items}
             </Group>
           )}
