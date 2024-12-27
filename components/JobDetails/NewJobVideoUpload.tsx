@@ -132,7 +132,7 @@ export function NewJobVideoUpload({ jobID }: { jobID: string }) {
                     openRef={openRef}
                     onDrop={(vids) => handleVideoDrop(vids)}
                     maxSize={150 * 1024 * 1024}
-                    accept={[MIME_TYPES.mp4, 'video/quicktime']}
+                    accept={[MIME_TYPES.mp4, 'video/quicktime', 'video/hevc']}
                     className={classes.wrapper}
                 >
                     <div style={{ marginTop: '5%' }}>
