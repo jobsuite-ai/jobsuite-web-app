@@ -63,7 +63,7 @@
 /* Mobile-specific styles grouped together */
 @media (max-width: 768px) {
     .navbar {
-        height: 20vh;
+        height: 25vh;
         position: relative;
         width: 100%;
         flex-direction: row; /* Horizontal layout for mobile */

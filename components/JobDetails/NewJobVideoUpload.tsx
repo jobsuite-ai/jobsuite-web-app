@@ -131,7 +131,7 @@ export function NewJobVideoUpload({ jobID }: { jobID: string }) {
                     loading={loading}
                     openRef={openRef}
                     onDrop={(vids) => handleVideoDrop(vids)}
-                    maxSize={150 * 1024 * 1024}
+                    maxSize={200 * 1024 * 1024}
                     accept={[MIME_TYPES.mp4, 'video/quicktime', 'video/hevc']}
                     className={classes.wrapper}
                 >
@@ -161,7 +161,7 @@ export function NewJobVideoUpload({ jobID }: { jobID: string }) {
                         </Text>
                         <Text ta="center" fz="sm" mt="xs" c="dimmed">
                             Drag and drop files here to upload. We can only accept files that
-                            are less than 150mb in size.
+                            are less than 200mb in size.
                         </Text>
                     </div>
                 </Dropzone>
