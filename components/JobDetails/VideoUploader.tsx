@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
-import classes from './styles/NewJobVideoUpload.module.css';
+import classes from './styles/VideoUploader.module.css';
 import { Flex, Group, Paper, rem, Text } from '@mantine/core';
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';

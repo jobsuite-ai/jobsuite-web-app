@@ -2,7 +2,7 @@
 
 import { Carousel } from '@mantine/carousel';
 import { Button, Flex, Group, Image, Modal, Paper, Text } from '@mantine/core';
-import classes from './styles/NewJobVideoUpload.module.css';
+import classes from './styles/VideoUploader.module.css';
 import { useState } from 'react';
 import ImageUpload from './ImageUpload';
 

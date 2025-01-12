@@ -6,7 +6,7 @@ import '@mantine/dropzone/styles.css';
 import { notifications } from '@mantine/notifications';
 import { IconCloudUpload, IconDownload, IconPhoto, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
-import classes from './styles/NewJobVideoUpload.module.css';
+import classes from './styles/VideoUploader.module.css';
 
 export default function ImageUpload({ jobID, setImages }: { jobID: string, setImages: Function }) {
     const [loading, setLoading] = useState(false);
