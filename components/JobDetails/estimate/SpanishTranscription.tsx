@@ -4,10 +4,14 @@ import { Flex, Paper, Text } from '@mantine/core';
 import MarkdownRenderer from '../../Global/MarkdownRenderer';
 import { SingleJob } from '../../Global/model';
 import { notifications } from '@mantine/notifications';
-import { IconCopy } from '@tabler/icons-react';
+import { IconCopy, IconReload } from '@tabler/icons-react';
 import classes from './Estimate.module.css'
+import { useState } from 'react';
+import LoadingState from '@/components/Global/LoadingState';
 
-export default function SpanishTranscription({ job }: { job: SingleJob }) {
+export default function SpanishTranscription({ job, refresh }: { job: SingleJob, refresh: Function }) {
+    const [loading, setLoading] = useState(false);
+
     const copyToClipboard = async () => {
         try {
             await navigator.clipboard.writeText(job.spanish_transcription.S);
@@ -29,6 +33,10 @@ export default function SpanishTranscription({ job }: { job: SingleJob }) {
         }
     };
 
+    const reload = async () => {
+        setLoading(true);
+        refresh().finally(() => setLoading(false));
+    };
 
     return (
         <>
@@ -37,12 +45,27 @@ export default function SpanishTranscription({ job }: { job: SingleJob }) {
                     {job.spanish_transcription?.S ?
                         <>
                             <Flex justify='space-between'>
-                                <h2 style={{ marginTop: '0px'}}>Spanish Transcription</h2>
+                                <h2 style={{ marginTop: '0px' }}>Spanish Transcription</h2>
                                 <IconCopy onClick={() => copyToClipboard()} style={{ cursor: 'pointer' }} />
                             </Flex>
                             <MarkdownRenderer markdown={job.spanish_transcription.S} />
                         </>
-                        : <Text>The spanish transcription is still processing... try reloading</Text>
+                        :
+                        <>
+                            {loading ?
+                                <LoadingState size="sm" />
+                                :
+                                <>
+                                    <div style={{ position: 'relative' }}>
+                                        <IconReload
+                                            onClick={() => reload()}
+                                            style={{ cursor: 'pointer', position: 'absolute', right: '0px' }}
+                                        />
+                                    </div>
+                                    <Text>The spanish transcription is still processing.</Text>
+                                </>
+                            }
+                        </>
                     }
                 </Paper>
             }

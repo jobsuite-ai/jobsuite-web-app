@@ -25,6 +25,10 @@
     margin-bottom: var(--mantine-spacing-lg);
     width: 930px; /* Fixed width for web version */
 }
+.videoFrame {
+    width: 100%;
+    height: 100%;
+}
 
 /* Media query for mobile screens */
 @media (max-width: 768px) {

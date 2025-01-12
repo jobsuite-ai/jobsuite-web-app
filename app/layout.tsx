@@ -1,17 +1,26 @@
-import { UserProvider } from '@auth0/nextjs-auth0/client';
+'use client';
+
+import { useEffect } from 'react';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { Shell } from '@/components/Shell/Shell';
+import '@mantine/carousel/styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import '@mantine/carousel/styles.css';
+import { UserProvider } from '@auth0/nextjs-auth0/client';
 
-export const metadata = {
-  title: 'RL Peek Painting',
-  description: 'Quality Interior And Exterior Painting Services For Over 30 Years',
-};
+import { Shell } from '@/components/Shell/Shell';
 
 export default function RootLayout({ children }: { children: any }) {
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/service-worker.js')
+        .catch((error) => {
+          throw Error('Service Worker registered successfully', error);
+        });
+    }
+  }, []);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

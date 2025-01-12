@@ -26,6 +26,10 @@
   padding: 10px;
 }
 
+.placeholderWrapper {
+  width: 930px;
+}
+
 @media (max-width: 480px) {
   .wrapper {
     margin: auto;
@@ -39,6 +43,10 @@
   .carousel {
     width: 100%;
     padding: 10px;
+  }
+
+  .placeholderWrapper {
+    width: 100%;
   }
 }
 
