@@ -81,12 +81,10 @@ export const generateTemplate = (template: TemplateInput) => `
 
             .container {
                 background: #fff;
-                border: 1px solid #ddd;
                 border-radius: 5px;
                 padding: 40px;
                 max-width: 800px;
                 margin: auto;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             }
 
             h1 {
@@ -101,6 +99,7 @@ export const generateTemplate = (template: TemplateInput) => `
             /* Flex Box Page Layout */
             .full-page-wrapper {
                 display: flex;
+                flex-direction: column;
             }
 
             .top-wrapper {
@@ -111,6 +110,7 @@ export const generateTemplate = (template: TemplateInput) => `
 
             .left-top-wrapper {
                 display: flex;
+                flex: 1;
                 flex-direction: column;
             }
 
@@ -120,18 +120,15 @@ export const generateTemplate = (template: TemplateInput) => `
             }
 
             .client-contact {
+                flex: 1;
                 text-align: right;
             }
 
             .image-wrapper {
                 margin-top: 30px;
-                display: flex;
-                justify-self: center;
-                width: 625px;
             }
 
             .estimate-details {
-                border-bottom: 1px solid !important;
                 margin-bottom: 50px;
             }
 
@@ -200,14 +197,10 @@ export const generateTemplate = (template: TemplateInput) => `
                 margin-bottom: 10px;
             }
 
-            .page-break {
-                clear: both;
-                page-break-before: always;
-            }
-
             .notes {
+                margin-top: 30px;
+                padding-top: 30px;
                 padding-bottom: 30px;
-                border-bottom: 1px solid !important;
             }
 
             .signature-section {
@@ -233,6 +226,13 @@ export const generateTemplate = (template: TemplateInput) => `
                 font-size: 18px;
                 text-align: center;
             }
+
+            .page-break {
+                page-break-before: always;
+                height: 2px; /* Optional height */
+                margin-top: 20px; /* Optional margin */
+            }
+
         </style>
     </head>
 
@@ -256,7 +256,7 @@ export const generateTemplate = (template: TemplateInput) => `
                     <div class="client-contact">
                         <p><strong>Date:</strong> ${getTodaysDate()}</p>
                         <p><strong>Estimate ID:</strong> 8a57d91694e3</p>
-                        <h3 style="margin-top: 94px;">Prepared For</h3>
+                        <h3 style="margin-top: 60px;">Prepared For</h3>
                         <p>${template.client.name}</p>
                         <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
                         <p>Phone: ${template.client.phone}</p>
@@ -265,10 +265,20 @@ export const generateTemplate = (template: TemplateInput) => `
                 </div>
 
                 <div class="image-wrapper">
-                    <img src="${template.image}" alt="Image of the house" style="width: 100%; border-radius: 5px;" />
+                    <img src="${template.image}" alt="Image of the house" style="height: 550px; border-radius: 5px; display: block; margin: 30px auto;" />
                 </div>
 
-                <div class="estimate-details">
+                <div class="page-break"></div>
+
+                <div class="estimate-details">                    
+                    <div class="notes">
+                        <p>${template.notes}</p>
+                    </div>
+                </div>
+
+                <div class="page-break"></div>
+
+                <div class="estimate-details">      
                     <div class="content-headers">
                         <h3>Description</h3>
                         <h3>Total</h3>
@@ -277,9 +287,6 @@ export const generateTemplate = (template: TemplateInput) => `
                         ${generateDescriptions(template.items)}
                     </div>
 
-                    <div class="notes">
-                        <p>${template.notes}</p>
-                    </div>
 
                     <div class="totals-wrapper">
                         <div class="totals-container"></div>

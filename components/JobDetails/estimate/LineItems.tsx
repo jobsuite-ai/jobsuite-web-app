@@ -18,7 +18,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
         mode: 'uncontrolled',
         initialValues: {
             header: '',
-            description: 'Please see the description below',
+            description: 'Please see the description above',
             price: 0,
         },
     });
