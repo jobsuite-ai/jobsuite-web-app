@@ -9,23 +9,19 @@ export default function EstimateTodo({ job }: { job: SingleJob }) {
         </ThemeIcon>
     );
 
-    if (!job.job_status || job.job_status.S !== JobStatus.PENDING_ESTIMATE) {
-        return (
-            <>
-                {!job.images || !job.video || !job.transcription_summary || !job.line_items &&
-                    <Text>Please complete the following steps before sending the estimate</Text>
+    return (
+        <>
+            {!job.images || !job.video || !job.transcription_summary || !job.line_items &&
+                <Text>Please complete the following steps before sending the estimate</Text>
+            }
+            <List spacing="xs" size="sm" mt='lg'>
+                {!job.images && <List.Item icon={inProgressIcon}>Upload an image of the house</List.Item>}
+                {!job.video && <List.Item icon={inProgressIcon}>Upload a video of the house</List.Item>}
+                {!job.line_items && <List.Item icon={inProgressIcon}>Add line items for the cost of the job</List.Item>}
+                {!job.transcription_summary && 
+                    <List.Item icon={inProgressIcon}>Wait for transcription summary to be uploaded</List.Item>
                 }
-                <List spacing="xs" size="sm" mt='lg'>
-                    {!job.images && <List.Item icon={inProgressIcon}>Upload an image of the house</List.Item>}
-                    {!job.video && <List.Item icon={inProgressIcon}>Upload a video of the house</List.Item>}
-                    {!job.line_items && <List.Item icon={inProgressIcon}>Add line items for the cost of the job</List.Item>}
-                    {!job.transcription_summary && 
-                        <List.Item icon={inProgressIcon}>Wait for transcription summary to be uploaded</List.Item>
-                    }
-                </List>
-            </>
-        );
-    } else {
-        return <></>;
-    }
+            </List>
+        </>
+    );
 }

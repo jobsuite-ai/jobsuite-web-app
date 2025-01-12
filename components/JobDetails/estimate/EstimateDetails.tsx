@@ -32,11 +32,14 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
         const result = await remark().use(html).process(job.transcription_summary.S);
         const htmlString = result.toString();
 
-        const lineItems: TemplateDescription[] = job.line_items.L.map((item) => ({
-            header: item.M.header.S,
-            content: item.M.description.S,
-            price: +item.M.price.N,
-        }));
+        let lineItems: TemplateDescription[] = [];
+        if (job?.line_items) {
+            lineItems = job?.line_items?.L.map((item) => ({
+                header: item.M.header.S,
+                content: item.M.description.S,
+                price: +item.M.price.N,
+            }))
+        };
 
         const template: TemplateInput = {
             client: {
