@@ -28,6 +28,7 @@ export function UploadNewTemplate({ template, job, setLoading }: { template: str
                 body: JSON.stringify({
                     template_id: templateData.out.id,
                     jobID: job.id.S,
+                    client_email: job.client_email.S,
                 })
             }
         );
