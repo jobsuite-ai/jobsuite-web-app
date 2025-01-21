@@ -135,9 +135,9 @@ export async function PUT(request: Request) {
         try {
             const lineItem = {
                 M: {
-                        header: { S: content.line_item.header },
-                        description: { S: content.line_item.description },
-                        price: { N: content.line_item.price.toString() },
+                    header: { S: content.line_item.header },
+                    description: { S: content.line_item.description },
+                    price: { N: content.line_item.price.toString() },
                 },
             };
 
@@ -156,6 +156,23 @@ export async function PUT(request: Request) {
                 UpdateExpression: 'SET line_items = list_append(if_not_exists(line_items, :empty_list), :new_line_items)',
             });
 
+            const { Attributes } = await client.send(updateItemCommand);
+
+            return Response.json({ Attributes });
+        } catch (error: any) {
+            return Response.json({ error: error.message });
+        }
+    }
+
+    if (content.transcription_summary) {
+        try {
+            const updateItemCommand = new UpdateItemCommand({
+                ExpressionAttributeValues: { ':summary': { S: content.transcription_summary } },
+                Key: { id: { S: jobID } },
+                ReturnValues: 'UPDATED_NEW',
+                TableName: 'job',
+                UpdateExpression: 'SET transcription_summary = :summary',
+            });
             const { Attributes } = await client.send(updateItemCommand);
 
             return Response.json({ Attributes });
