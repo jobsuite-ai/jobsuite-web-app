@@ -164,23 +164,6 @@ export async function PUT(request: Request) {
         }
     }
 
-    if (content.job_status) {
-        try {
-            const updateItemCommand = new UpdateItemCommand({
-                ExpressionAttributeValues: { ':status': { S: content.job_status } },
-                Key: { id: { S: jobID } },
-                ReturnValues: 'UPDATED_NEW',
-                TableName: 'job',
-                UpdateExpression: 'SET job_status = :status',
-            });
-            const { Attributes } = await client.send(updateItemCommand);
-
-            return Response.json({ Attributes });
-        } catch (error: any) {
-            return Response.json({ error: error.message });
-        }
-    }
-
     return Response.json({ error: 'Not handled yet' });
 }
 

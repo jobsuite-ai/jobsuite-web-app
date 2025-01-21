@@ -1,3 +1,5 @@
+"use client";
+
 import { JobStatus } from './model'
 
 export default async function updateJobStatus(status: JobStatus, jobID: string) {
@@ -6,7 +8,7 @@ export default async function updateJobStatus(status: JobStatus, jobID: string) 
     }
 
     const response = await fetch(
-        `/api/jobs`,
+        '/api/jobs',
         {
             method: 'PUT',
             headers: {
