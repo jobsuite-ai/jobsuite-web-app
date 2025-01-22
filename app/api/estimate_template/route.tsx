@@ -13,7 +13,7 @@ export async function POST(request: Request) {
             headers: { 'X-Auth-Token': process.env.DOCU_SEAL_KEY, 'content-type': 'application/json' },
             data: {
                 html: template,
-                name: 'Job Estimate',
+                name: `Job Estimate - ${jobID}`,
                 external_id: jobID,
             },
         };

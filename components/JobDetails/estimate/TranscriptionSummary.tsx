@@ -11,7 +11,7 @@ import { useState } from 'react';
 
 export default function TranscriptionSummary({ job, refresh }: { job: SingleJob, refresh: Function }) {
     const [editMarkdown, setEditMarkdown] = useState(false);
-    const [markdown, setMarkdown] = useState(job.transcription_summary.S);
+    const [markdown, setMarkdown] = useState(job.transcription_summary?.S ?? '');
     const [loading, setLoading] = useState(false);
 
     const copyToClipboard = async () => {
