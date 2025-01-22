@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       }
 
       const updateItemCommand = new UpdateItemCommand({
-        ExpressionAttributeValues: { ':status': { S: jobStatus } },
+        ExpressionAttributeValues: { ':status': { S: jobStatusEnum } },
         Key: { id: { S: payload.data.template.external_id } },
         ReturnValues: 'UPDATED_NEW',
         TableName: 'job',
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
       const { Attributes } = await client.send(updateItemCommand);
 
-      logToCloudWatch(`Successfully processed webhook for job: ${payload.data.template.external_id}, status: ${jobStatus}`);
+      logToCloudWatch(`Successfully processed webhook for job: ${payload.data.template.external_id}, status: ${jobStatusEnum}`);
       return Response.json({ message: `Webhook received successfully: ${Attributes}` }, { status: 200 });
     } catch (error: any) {
       logToCloudWatch(`Failed to process webhook: ${error.message}`);
