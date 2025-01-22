@@ -67,6 +67,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
         })
 
         setIsUploading(false);
+        setOpened(false);
     }
 
     return (

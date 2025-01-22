@@ -20,7 +20,6 @@ export async function POST(request: Request) {
             state,
             zip_code,
             client_email,
-            estimate_date,
             client_phone_number,
             video,
         } = await request.json();
@@ -38,7 +37,6 @@ export async function POST(request: Request) {
                 state,
                 zip_code,
                 client_email,
-                estimate_date,
                 client_phone_number,
                 video,
             },

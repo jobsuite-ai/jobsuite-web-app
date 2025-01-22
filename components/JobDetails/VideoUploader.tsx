@@ -68,7 +68,7 @@ export default function VideoUploader({ jobID, refresh }: { jobID: string, refre
                     title: 'Video upload started',
                     position: 'top-center',
                     color: 'green',
-                    message: 'You video is uploading, we will send you an email when it has completed processing.',
+                    message: 'You video is uploading.',
                 });
                 updateJobWithVideo(file);
             } else {                
