@@ -14,13 +14,6 @@ export function NewJobWorkInformation({form}: {form: UseFormReturnType<any>}) {
                 key={form.key('job_type')}
                 data={['Interior', 'Exterior']}
             />
-            <DatePickerInput
-                label='Estimate Date'
-                valueFormat='MMM DD, YYYY'
-                placeholder='Set estimate date - optional if it is not yet scheduled'
-                key={form.key('estimate_date')}
-                {...form.getInputProps('estimate_date')}
-            />
         </div>
     );
 }
