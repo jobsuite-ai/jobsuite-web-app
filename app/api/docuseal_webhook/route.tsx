@@ -10,6 +10,9 @@ export async function POST(request: Request) {
 
       let jobStatusEnum = JobStatus.PENDING_ESTIMATE;
       const jobStatus = payload.event_type.split('.')[1];
+      logToCloudWatch(`Data for docuseal event: ${payload.data}`);
+      logToCloudWatch(`Role from docusign: ${payload.data.role}`);
+
       await logToCloudWatch(`Handling new job status: ${jobStatus}`);
       switch (payload.event_type.split('.')[1]) {
         case 'viewed':
