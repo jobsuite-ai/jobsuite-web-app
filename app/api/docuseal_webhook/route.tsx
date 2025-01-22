@@ -1,8 +1,8 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { JobStatus, SingleJob } from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
 import createJiraTicket from '@/components/Global/createJiraTicket';
-import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -13,8 +13,6 @@ export async function POST(request: Request) {
 
     let jobStatusEnum = JobStatus.PENDING_ESTIMATE;
     const jobStatus = payload.event_type.split('.')[1];
-
-
 
     await logToCloudWatch(`Handling new job status: ${jobStatus}`);
     if (payload.data.role === 'Property Owner') {
