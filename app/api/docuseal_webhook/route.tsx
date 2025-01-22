@@ -14,23 +14,44 @@ export async function POST(request: Request) {
       logToCloudWatch(`Role from docusign: ${payload.data.role}`);
 
       await logToCloudWatch(`Handling new job status: ${jobStatus}`);
-      switch (payload.event_type.split('.')[1]) {
-        case 'viewed':
-          jobStatusEnum = JobStatus.ESTIMATE_OPENED;
-          break;
-        case 'started':
-          jobStatusEnum = JobStatus.ESTIMATE_OPENED;
-          break;
-        case 'completed':
-          jobStatusEnum = JobStatus.ESTIMATE_ACCEPTED;
-          break;
-        case 'declined':
-          jobStatusEnum = JobStatus.ESTIMATE_DECLINED;
-          break;
-        default:
-          logToCloudWatch(`Unknown job status: ${jobStatus}`);
-          jobStatusEnum = JobStatus.PENDING_ESTIMATE;
-          break;
+      if (payload.data.role === 'Property Owner') {
+        switch (payload.event_type.split('.')[1]) {
+          case 'viewed':
+            jobStatusEnum = JobStatus.ESTIMATE_OPENED;
+            break;
+          case 'started':
+            jobStatusEnum = JobStatus.ESTIMATE_OPENED;
+            break;
+          case 'completed':
+            jobStatusEnum = JobStatus.ESTIMATE_ACCEPTED;
+            break;
+          case 'declined':
+            jobStatusEnum = JobStatus.ESTIMATE_DECLINED;
+            break;
+          default:
+            logToCloudWatch(`Unknown job status: ${jobStatus}`);
+            jobStatusEnum = JobStatus.PENDING_ESTIMATE;
+            break;
+        }
+      } else {
+        switch (payload.event_type.split('.')[1]) {
+          case 'viewed':
+            jobStatusEnum = JobStatus.RLPP_OPENED;
+            break;
+          case 'started':
+            jobStatusEnum = JobStatus.RLPP_OPENED;
+            break;
+          case 'completed':
+            jobStatusEnum = JobStatus.RLPP_SIGNED;
+            break;
+          case 'declined':
+            jobStatusEnum = JobStatus.RLPP_DECLINED;
+            break;
+          default:
+            logToCloudWatch(`Unknown job status: ${jobStatus}`);
+            jobStatusEnum = JobStatus.RLPP_OPENED;
+            break;
+        }
       }
 
       const updateItemCommand = new UpdateItemCommand({

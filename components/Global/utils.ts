@@ -16,6 +16,12 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
             return '#3F51B5';
         case JobStatus.PENDING_ESTIMATE:
             return '#d3d3d3';
+        case JobStatus.RLPP_SIGNED:
+            return '#FF9800';
+        case JobStatus.RLPP_DECLINED:
+            return '#F44336';
+        case JobStatus.RLPP_OPENED:
+            return '#3F51B5';
         default:
             return "#d3d3d3";
     }
@@ -28,7 +34,7 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
         case JobStatus.IN_PROGRESS:
             return 'In Progress';
         case JobStatus.ESTIMATE_ACCEPTED:
-            return 'Estimate Accepted';
+            return 'Estimate Needs RLPP Signature';
         case JobStatus.ESTIMATE_DECLINED:
             return 'Estimate Declined';
         case JobStatus.ESTIMATE_SENT:
@@ -37,6 +43,12 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
             return 'Client Opened Estimate';
         case JobStatus.PENDING_ESTIMATE:
             return 'Estimate Not Finished';
+        case JobStatus.RLPP_SIGNED:
+            return 'Estimate Finished';
+        case JobStatus.RLPP_DECLINED:
+            return 'RLPP Declined';
+        case JobStatus.RLPP_OPENED:
+            return 'RLPP Opened';
         default:
             return "Estimate Not Finished";
     }
