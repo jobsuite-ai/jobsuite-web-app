@@ -2,6 +2,8 @@ import { JobStatus } from './model'
 
 export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
+        case JobStatus.ESTIMATE_NOT_SCHEDULED:
+            return '#3F51B5';
         case JobStatus.COMPLETED:
             return '#4CAF50';
         case JobStatus.IN_PROGRESS:
@@ -29,6 +31,8 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
 
 export const getFormattedStatus = (jobStatus: JobStatus) => {
     switch (jobStatus) {
+        case JobStatus.ESTIMATE_NOT_SCHEDULED:
+            return 'Estimate Not Scheduled';
         case JobStatus.COMPLETED:
             return 'Completed';
         case JobStatus.IN_PROGRESS:

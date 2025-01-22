@@ -6,13 +6,38 @@ import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import { getBadgeColor, getFormattedStatus } from "../Global/utils";
 import { useState } from 'react';
+import { DatePickerInput, DateValue } from '@mantine/dates';
+import '@mantine/core/styles.css'
+import '@mantine/dates/styles.css'
 
 export default function ClientDetails({ job }: { job: SingleJob }) {
     const [jobStatus, setJobStateStatus] = useState(job.job_status.S);
+    const [estimateDate, setEstimateStateDate] = useState(job.estimate_date?.S ?? '');
 
     const setJobStatus = (status: JobStatus) => {
-        updateJobStatus(status, job.id.S)
+        updateJobStatus(status, job.id.S);
         setJobStateStatus(status);
+    }
+
+    const setEstimateDate = async (estimateDate: DateValue) => {
+        const content = {
+            estimate_date: estimateDate
+        }
+    
+        const response = await fetch(
+            '/api/jobs',
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content, jobID: job.id.S }),
+            }
+        )
+    
+        const { Attributes } = await response.json();
+        setEstimateStateDate(estimateDate?.toISOString() as string);
+        setJobStatus(JobStatus.PENDING_ESTIMATE);
     }
 
     return (
@@ -53,7 +78,17 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
                 <Flex direction='column'>
                     <Text size="sm" c="dimmed">{job.client_email.S}</Text>
                     <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
-                    <Text size="sm" c="dimmed">Estimate date: {job.estimate_date.S.split('T')[0]}</Text>
+                    {estimateDate != '' ?
+                        <Text size="sm" c="dimmed">Estimate date: {estimateDate.split('T')[0]}</Text>
+                        :
+                        <DatePickerInput
+                            label='Estimate Date'
+                            valueFormat='MMM DD, YYYY'
+                            placeholder='Set estimate date'
+                            onChange={setEstimateDate}
+                        />
+                    }
+                    
                 </Flex>
                 <Flex direction='column'>
                     <Text size="sm" c="dimmed">{job.client_address.S}</Text>

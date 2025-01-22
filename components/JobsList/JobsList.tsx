@@ -122,7 +122,9 @@ export default function JobsList() {
                                             <Flex direction='column'>
                                                 <Text size="sm" c="dimmed">{job.client_email}</Text>
                                                 <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number}</Text>
-                                                <Text size="sm" c="dimmed">Estimate date: {job.estimate_date.split('T')[0]}</Text>
+                                                {job.estimate_date &&
+                                                    <Text size="sm" c="dimmed">Estimate date: {job.estimate_date.split('T')[0]}</Text>
+                                                }
                                             </Flex>
                                             <Flex direction='column' align='flex-end'>
                                                 <Text size="sm" c="dimmed">{job.client_address}</Text>

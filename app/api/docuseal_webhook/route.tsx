@@ -1,6 +1,6 @@
+import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { JobStatus } from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
-import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 
 const client = new DynamoDBClient({});
 

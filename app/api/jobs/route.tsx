@@ -30,7 +30,7 @@ export async function POST(request: Request) {
             Item: {
                 user_id: process.env.RLPP_USER_ID,
                 id: jobID,
-                job_status: JobStatus.PENDING_ESTIMATE,
+                job_status: JobStatus.ESTIMATE_NOT_SCHEDULED,
                 client_id,
                 client_name,
                 client_address,
@@ -55,7 +55,7 @@ export async function GET() {
     try {
         const params = {
             TableName: 'job',
-            IndexName: 'user_id-estimate_date-index',
+            IndexName: 'user_id-job_status-index',
             KeyConditionExpression: 'user_id = :pk',
             ExpressionAttributeValues: {
                 ':pk': process.env.RLPP_USER_ID,
@@ -188,6 +188,23 @@ export async function PUT(request: Request) {
                 ReturnValues: 'UPDATED_NEW',
                 TableName: 'job',
                 UpdateExpression: 'SET transcription_summary = :summary',
+            });
+            const { Attributes } = await client.send(updateItemCommand);
+
+            return Response.json({ Attributes });
+        } catch (error: any) {
+            return Response.json({ error: error.message });
+        }
+    }
+
+    if (content.estimate_date) {
+        try {
+            const updateItemCommand = new UpdateItemCommand({
+                ExpressionAttributeValues: { ':estimate_date': { S: content.estimate_date } },
+                Key: { id: { S: jobID } },
+                ReturnValues: 'UPDATED_NEW',
+                TableName: 'job',
+                UpdateExpression: 'SET estimate_date = :estimate_date',
             });
             const { Attributes } = await client.send(updateItemCommand);
 

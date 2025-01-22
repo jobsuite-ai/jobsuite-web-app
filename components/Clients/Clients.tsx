@@ -102,7 +102,7 @@ export default function ClientsList() {
                                                 style={{ cursor: 'pointer' }}
                                             >
                                                 <Flex direction='row' justify='space-between'>
-                                                    <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>
+                                                    {job.estimate_date && <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>}
                                                     <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
                                                         {getFormattedStatus(job.job_status)}
                                                     </Badge>
