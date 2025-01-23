@@ -38,7 +38,7 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
         case JobStatus.IN_PROGRESS:
             return 'In Progress';
         case JobStatus.ESTIMATE_ACCEPTED:
-            return 'Estimate Needs RLPP Signature';
+            return 'Needs RLPP Signature';
         case JobStatus.ESTIMATE_DECLINED:
             return 'Estimate Declined';
         case JobStatus.ESTIMATE_SENT:

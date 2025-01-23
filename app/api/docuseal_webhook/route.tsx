@@ -77,6 +77,8 @@ export async function POST(request: Request) {
 
 async function getJobAndCreateTicket(payload: any) {
   try {
+    logToCloudWatch(`Attempting to create a JIRA ticket for job: ${payload.data.template.external_id}`);
+
     if (payload.data.template.external_id) {
       const getItemCommand = new GetItemCommand({
         TableName: process.env.JOB_TABLE_NAME,
@@ -87,6 +89,7 @@ async function getJobAndCreateTicket(payload: any) {
       const { Item } = await docClient.send(getItemCommand);
 
       const job = Item as SingleJob;
+      logToCloudWatch(`Successfully fetched job: ${payload.data.template.external_id}`);
 
       await createJiraTicket(
         'PAINT',
@@ -98,6 +101,7 @@ async function getJobAndCreateTicket(payload: any) {
 
     throw Error('JobID must be defined to get a job');
   } catch (error: any) {
+    logToCloudWatch(`Failed to create a JIRA ticket for job: ${payload.data.template.external_id}, error: ${error.message}`);
     return Response.json({ error: error.message });
   }
 }
