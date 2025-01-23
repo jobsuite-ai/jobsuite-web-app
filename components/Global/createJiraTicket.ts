@@ -1,3 +1,4 @@
+import { logToCloudWatch } from '@/public/logger';
 import axios from 'axios';
 
 export default async function createJiraTicket(
@@ -51,7 +52,7 @@ export default async function createJiraTicket(
     console.log('Ticket created successfully:', response.data);
     return response.data; // Return the response from Jira
   } catch (error: any) {
-    console.error('Error creating Jira ticket:', error.response?.data || error.message);
+    logToCloudWatch(`Error creating Jira ticket: ${JSON.stringify(error.response?.data) || error.message}, stack: ${error.stack}`);
     throw error;
   }
 }
