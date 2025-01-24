@@ -75,8 +75,7 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
                             <div dangerouslySetInnerHTML={{ __html: template }} />
                         </Paper>
                         
-                        
-                            <UploadNewTemplate template={template} job={job} setLoading={setIsSending} />
+                        <UploadNewTemplate template={template} job={job} setLoading={setIsSending} />
                     </>
                     : <UniversalError message='Unable to access job details' />
                 }

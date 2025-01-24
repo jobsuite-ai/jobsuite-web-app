@@ -265,7 +265,7 @@ export const generateTemplate = (template: TemplateInput) => `
                 </div>
 
                 <div class="image-wrapper">
-                    <img src="${template.image}" alt="Image of the house" style="height: 550px; border-radius: 5px; display: block; margin: 30px auto;" />
+                    <img src="${template.image}" alt="Image of the house" style="width: 720px; border-radius: 5px; display: block; margin: 30px auto;" />
                 </div>
 
                 <div class="page-break"></div>
