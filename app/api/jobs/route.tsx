@@ -87,6 +87,7 @@ export async function PUT(request: Request) {
         jobID,
         typedContent.delete_line_item
     );
+    typedContent.estimate_hours && await setEstimateHours(jobID, typedContent.estimate_hours);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -201,6 +202,23 @@ async function updateEstimateDate(jobID: string, estimateDate: any) {
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
             UpdateExpression: 'SET estimate_date = :estimate_date',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
+
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function setEstimateHours(jobID: string, estimateHours: any) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: { ':estimate_hours': { N: estimateHours } },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET estimate_hours = :estimate_hours',
         });
         const { Attributes } = await client.send(updateItemCommand);
 

@@ -41,25 +41,26 @@ export type DynamoClient = {
 }
 
 export type SingleJob = {
-    client_address: TypedDynamoStringReturn; 
     city: TypedDynamoStringReturn; 
-    state: TypedDynamoStringReturn; 
-    zip_code: TypedDynamoStringReturn; 
+    client_address: TypedDynamoStringReturn; 
     client_email: TypedDynamoStringReturn;
-    description: TypedDynamoStringReturn;
-    transcription_summary: TypedDynamoStringReturn;
-    line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
-    spanish_transcription: TypedDynamoStringReturn;
     client_name: TypedDynamoStringReturn;
     client_phone_number: TypedDynamoStringReturn;
+    description: TypedDynamoStringReturn;
     estimate_date: TypedDynamoStringReturn;
+    estimate_hours: TypedDynamoNumberReturn;
     id: TypedDynamoStringReturn;
-    user_id: TypedDynamoStringReturn;
-    video: TypedDynamoMapReturn<JobVideo>;
     images: TypedDynamoListReturn<TypedDynamoMapReturn<JobVideo>[]>;
     job_status: {
         S: JobStatus;
     };
+    line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
+    spanish_transcription: TypedDynamoStringReturn;
+    state: TypedDynamoStringReturn; 
+    transcription_summary: TypedDynamoStringReturn;
+    user_id: TypedDynamoStringReturn;
+    video: TypedDynamoMapReturn<JobVideo>;
+    zip_code: TypedDynamoStringReturn; 
 }
 
 export type SingleLineItem = {

@@ -8,6 +8,7 @@ export type UpdateJobContent = {
     job_status?: JobStatus,
     transcription_summary?: string,
     estimate_date?: any,
+    estimate_hours?: string,
 };
 
 export type JobVideo = {

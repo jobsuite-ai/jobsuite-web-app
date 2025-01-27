@@ -1,6 +1,6 @@
 "use client";
 
-import { ActionIcon, Badge, Card, Flex, Menu, Text } from '@mantine/core';
+import { ActionIcon, Badge, Card, Flex, Menu, Text, TextInput } from '@mantine/core';
 import { IconPencil } from '@tabler/icons-react';
 import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
@@ -14,6 +14,8 @@ import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 export default function ClientDetails({ job }: { job: SingleJob }) {
     const [jobStatus, setJobStateStatus] = useState(job.job_status.S);
     const [estimateDate, setEstimateStateDate] = useState(job.estimate_date?.S ?? '');
+    const [estimateHoursTextInput, setEstimateHoursTextInput] = useState<string>();
+    const [estimateHours, setEstimateStateHours] = useState(job.estimate_hours?.N ?? undefined);
 
     const setJobStatus = (status: JobStatus) => {
         updateJobStatus(status, job.id.S);
@@ -41,6 +43,32 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
         setJobStatus(JobStatus.PENDING_ESTIMATE);
     }
 
+    const setEstimateHours = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        setEstimateHoursTextInput(event.target.value); 
+    }
+
+    const handleKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter' && estimateHoursTextInput) {
+            const content: UpdateJobContent = {
+                estimate_hours: estimateHoursTextInput
+            }
+        
+            const response = await fetch(
+                '/api/jobs',
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content, jobID: job.id.S }),
+                }
+            )
+        
+            const { Attributes } = await response.json();
+            setEstimateStateHours(estimateHoursTextInput);
+        }
+    };
+
     return (
         <Card
             shadow="sm"
@@ -59,6 +87,17 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
             </Flex>
             <Flex direction='column' gap="lg" mt="md" mb="xs">
                 <Flex direction='column'>
+                    {estimateHours ?
+                        <Text size="sm" mb='sm' fw={700}>Job hours: {estimateHours}</Text>
+                        :
+                        <TextInput
+                            mb='sm'
+                            label='Estimate Hours'
+                            placeholder='Set estimate hours'
+                            onChange={setEstimateHours}
+                            onKeyDown={handleKeyDown}
+                        />
+                    }
                     <Text size="sm" c="dimmed">{job.client_email.S}</Text>
                     <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
                     {estimateDate != '' ?
@@ -71,7 +110,6 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
                             onChange={setEstimateDate}
                         />
                     }
-                    
                 </Flex>
                 <Flex direction='column'>
                     <Text size="sm" c="dimmed">{job.client_address.S}</Text>
