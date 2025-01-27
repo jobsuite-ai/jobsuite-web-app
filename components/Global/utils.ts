@@ -4,10 +4,6 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
         case JobStatus.ESTIMATE_NOT_SCHEDULED:
             return '#3F51B5';
-        case JobStatus.COMPLETED:
-            return '#4CAF50';
-        case JobStatus.IN_PROGRESS:
-            return '#2196F3';
         case JobStatus.ESTIMATE_ACCEPTED:
             return '#FF9800';
         case JobStatus.ESTIMATE_DECLINED:
@@ -33,10 +29,6 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
     switch (jobStatus) {
         case JobStatus.ESTIMATE_NOT_SCHEDULED:
             return 'Estimate Not Scheduled';
-        case JobStatus.COMPLETED:
-            return 'Completed';
-        case JobStatus.IN_PROGRESS:
-            return 'In Progress';
         case JobStatus.ESTIMATE_ACCEPTED:
             return 'Needs RLPP Signature';
         case JobStatus.ESTIMATE_DECLINED:

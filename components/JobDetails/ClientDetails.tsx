@@ -55,24 +55,6 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
                     <Badge style={{ color: '#ffffff' }} color={getBadgeColor(jobStatus)} mr='10px'>
                         {getFormattedStatus(jobStatus)}
                     </Badge>
-                    {[JobStatus.ESTIMATE_ACCEPTED, JobStatus.IN_PROGRESS, JobStatus.COMPLETED].includes(jobStatus) && 
-                        <Menu shadow="md" width={200}>
-                            <Menu.Target>
-                                <ActionIcon size={20} variant='transparent'  pb='2px'>
-                                    <IconPencil/>
-                                </ActionIcon>
-                            </Menu.Target>
-
-                            <Menu.Dropdown>
-                                <Menu.Item onClick={() => setJobStatus(JobStatus.IN_PROGRESS)}>
-                                    Mark Job In Progress
-                                </Menu.Item>
-                                <Menu.Item onClick={() => setJobStatus(JobStatus.COMPLETED)}>
-                                    Mark Job Complete
-                                </Menu.Item>
-                            </Menu.Dropdown>
-                        </Menu>
-                    }
                 </Flex>
             </Flex>
             <Flex direction='column' gap="lg" mt="md" mb="xs">
