@@ -97,6 +97,7 @@ export type JobVideo = {
 }
 
 export type DynamoLineItem = {
+    id: TypedDynamoStringReturn,
     header: TypedDynamoStringReturn,
     description: TypedDynamoStringReturn,
     price: TypedDynamoNumberReturn

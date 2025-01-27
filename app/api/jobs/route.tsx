@@ -133,6 +133,7 @@ async function addLineItem(jobID: string, lineItem: JobLineItem) {
     try {
         const updatedLineItem = {
             M: {
+                id: { S: lineItem.id },
                 header: { S: lineItem.header },
                 description: { S: lineItem.description },
                 price: { N: lineItem.price.toString() },

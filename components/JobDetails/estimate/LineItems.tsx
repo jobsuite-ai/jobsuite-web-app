@@ -14,6 +14,7 @@ import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [lineItems, setLineItems] = useState(job.line_items?.L ?? []);
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -24,12 +25,14 @@ export default function LineItems({ job }: { job: SingleJob }) {
         },
     });
 
-    async function updateJobWithLineItems() {
+    async function addLineItem() {
         setIsUploading(true);
         const formValues = form.getValues();
+        const lineItemID = uuidv4();
 
         const content: UpdateJobContent = {
             line_item: {
+                id: lineItemID,
                 header: formValues.header,
                 description: formValues.description,
                 price: formValues.price
@@ -49,12 +52,11 @@ export default function LineItems({ job }: { job: SingleJob }) {
 
         const { Attributes } = await response.json();
 
-        job.line_items ?? {
-            L: []
-        };
-
-        job.line_items.L.push({
+        setLineItems([...lineItems, {
             M: {
+                id: {
+                    S: lineItemID
+                },
                 header: {
                     S: formValues.header
                 },
@@ -65,19 +67,29 @@ export default function LineItems({ job }: { job: SingleJob }) {
                     N: formValues.price.toString()
                 }
             }
-        })
+        }]);
 
         setIsUploading(false);
         setOpened(false);
     }
 
+    const removeLineItem = (id: string) => {
+        setLineItems((prevItems: any) => prevItems.filter((item: any) => item.M.id?.S !== id));
+    }
+
     return (
         <div>
             <Paper shadow='sm' radius='md' withBorder p='lg' className={classes.estimateWrapper}>
-                {job.line_items && job.line_items.L.length > 0 ? 
+                {lineItems && lineItems.length > 0 ? 
                     <>
-                        {job.line_items.L.map((item, index) => (
-                            <LineItem jobID={job.id.S} lineItemDetails={item.M} key={uuidv4()} index={index} />
+                        {lineItems.map((item, index) => (
+                            <LineItem 
+                                jobID={job.id.S} 
+                                lineItemDetails={item.M} 
+                                key={uuidv4()} 
+                                index={index} 
+                                removeLineItem={removeLineItem} 
+                            />
                         ))}
                     </>
                     :
@@ -131,7 +143,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
                         />
 
                         <Group mt="md">
-                            <Button type="submit" onClick={updateJobWithLineItems}>Add Line Item</Button>
+                            <Button type="submit" onClick={addLineItem}>Add Line Item</Button>
                         </Group>
                     </div>
                 }

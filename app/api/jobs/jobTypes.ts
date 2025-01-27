@@ -25,6 +25,7 @@ export type JobImage = {
 };
 
 export type JobLineItem = {
+    id: string;
     header: string;
     description: string;
     price: number;
