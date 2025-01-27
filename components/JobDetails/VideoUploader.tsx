@@ -6,14 +6,12 @@ import classes from './styles/VideoUploader.module.css';
 import { Flex, Group, Paper, rem, Text } from '@mantine/core';
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 interface PresignedPostData {
     url: string;
     fields: Record<string, string>;
 }
-
-// I need to move the video to audio conversion to a lambda
-// I need to figure out how to send an email from a lambda - this would mean passing the email address through
 
 async function requestPresignedPost(file: File, jobID: string): Promise<PresignedPostData> {
     const response = await fetch(
@@ -91,7 +89,7 @@ export default function VideoUploader({ jobID, refresh }: { jobID: string, refre
 
     async function updateJobWithVideo(video: FileWithPath) {
         if (video) {
-            const content = {
+            const content: UpdateJobContent = {
                 video: {
                     name: video.name,
                     size: video.size,

@@ -1,9 +1,10 @@
 "use client";
 
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 import { JobStatus } from './model'
 
 export default async function updateJobStatus(status: JobStatus, jobID: string) {
-    const content = {
+    const content: UpdateJobContent = {
         job_status: status
     }
 

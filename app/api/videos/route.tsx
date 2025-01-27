@@ -1,5 +1,6 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+import { logToCloudWatch } from '@/public/logger';
 
 export async function POST(request: Request) {
     const { filename, contentType, jobID } = await request.json();
@@ -24,6 +25,7 @@ export async function POST(request: Request) {
 
         return Response.json({ url, fields });
     } catch (error: any) {
+        logToCloudWatch(`Failed to generate presigned post url for video upload: ${error.stack}`);
         return Response.json({ error: error.message });
     }
 }

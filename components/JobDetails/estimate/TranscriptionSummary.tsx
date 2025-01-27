@@ -8,6 +8,7 @@ import { IconCopy, IconEdit, IconReload } from '@tabler/icons-react';
 import classes from './Estimate.module.css'
 import LoadingState from '@/components/Global/LoadingState';
 import { useState } from 'react';
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 export default function TranscriptionSummary({ job, refresh }: { job: SingleJob, refresh: Function }) {
     const [editMarkdown, setEditMarkdown] = useState(false);
@@ -45,7 +46,7 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
     };
 
     const handleEditSave = async () => {
-        const content = {
+        const content: UpdateJobContent = {
             transcription_summary: markdown
         }
 

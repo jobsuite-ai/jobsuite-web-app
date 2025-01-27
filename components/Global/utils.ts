@@ -19,7 +19,7 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
         case JobStatus.PENDING_ESTIMATE:
             return '#d3d3d3';
         case JobStatus.RLPP_SIGNED:
-            return '#FF9800';
+            return '#4CAF50';
         case JobStatus.RLPP_DECLINED:
             return '#F44336';
         case JobStatus.RLPP_OPENED:

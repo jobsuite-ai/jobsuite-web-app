@@ -29,7 +29,7 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
             : '';
 
     async function buildTemplate() {
-        const result = await remark().use(html).process(job.transcription_summary.S);
+        const result = await remark().use(html).process(job.transcription_summary?.S);
         const htmlString = result.toString();
 
         let lineItems: TemplateDescription[] = [];

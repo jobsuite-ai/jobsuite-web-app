@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCloudUpload, IconDownload, IconPhoto, IconX } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import classes from './styles/VideoUploader.module.css';
+import { JobImage, UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 export default function ImageUpload({ jobID, setImages }: { jobID: string, setImages: Function }) {
     const [loading, setLoading] = useState(false);
@@ -72,11 +73,11 @@ export default function ImageUpload({ jobID, setImages }: { jobID: string, setIm
 
     async function updateJobWithImages(files: FileWithPath[]) {
         if (files) {
-            const content = {
-                images: new Array<any>()
+            const content: UpdateJobContent = {
+                images: new Array<JobImage>()
             }
             files.forEach((file) => {
-                content.images.push({
+                content.images?.push({
                     name: file.name,
                     size: file.size,
                     lastModified: file.lastModified

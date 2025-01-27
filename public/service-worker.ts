@@ -1,3 +1,5 @@
+import { logToCloudWatch } from "./logger";
+
 self.addEventListener('message', (event: MessageEvent) => {
     if (event.data.type === 'UPLOAD_FILE') {
         const { url, fields, file, fileName, contentType } = event.data.payload as {
@@ -28,7 +30,8 @@ self.addEventListener('message', (event: MessageEvent) => {
                     event.ports[0].postMessage({ success: false });
                 }
             })
-            .catch(() => {
+            .catch((error: any) => {
+                logToCloudWatch('Error uploading video to s3: ' + error.stack);
                 event.ports[0].postMessage({ success: false });
             });
     }

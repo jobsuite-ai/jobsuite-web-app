@@ -28,7 +28,6 @@ export function NewJobWorkflow() {
             zip_code: '',
             client_email: '',
             client_phone_number: '',
-            estimate_date: null,
             video: null,
         },
 
@@ -118,7 +117,6 @@ export function NewJobWorkflow() {
                     state: formValues.state,
                     zip_code: formValues.zip_code,
                     client_email: formValues.client_email,
-                    estimate_date: formValues.estimate_date,
                     client_phone_number: formValues.client_phone_number,
                     video: formValues.video
                 }),

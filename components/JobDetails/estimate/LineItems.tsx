@@ -9,6 +9,7 @@ import { LineItem } from './LineItem';
 import { v4 as uuidv4 } from 'uuid';
 import LoadingState from '@/components/Global/LoadingState';
 import classes from './Estimate.module.css'
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
@@ -27,7 +28,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
         setIsUploading(true);
         const formValues = form.getValues();
 
-        const content = {
+        const content: UpdateJobContent = {
             line_item: {
                 header: formValues.header,
                 description: formValues.description,
@@ -48,7 +49,7 @@ export default function LineItems({ job }: { job: SingleJob }) {
 
         const { Attributes } = await response.json();
 
-        job.line_items = {
+        job.line_items ?? {
             L: []
         };
 
@@ -73,10 +74,10 @@ export default function LineItems({ job }: { job: SingleJob }) {
     return (
         <div>
             <Paper shadow='sm' radius='md' withBorder p='lg' className={classes.estimateWrapper}>
-                {job.line_items ? 
+                {job.line_items && job.line_items.L.length > 0 ? 
                     <>
-                        {job.line_items.L.map((item) => (
-                            <LineItem lineItemDetails={item.M} key={uuidv4()}/>
+                        {job.line_items.L.map((item, index) => (
+                            <LineItem jobID={job.id.S} lineItemDetails={item.M} key={uuidv4()} index={index} />
                         ))}
                     </>
                     :

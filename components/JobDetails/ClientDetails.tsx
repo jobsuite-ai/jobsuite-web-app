@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { DatePickerInput, DateValue } from '@mantine/dates';
 import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 export default function ClientDetails({ job }: { job: SingleJob }) {
     const [jobStatus, setJobStateStatus] = useState(job.job_status.S);
@@ -20,7 +21,7 @@ export default function ClientDetails({ job }: { job: SingleJob }) {
     }
 
     const setEstimateDate = async (estimateDate: DateValue) => {
-        const content = {
+        const content: UpdateJobContent = {
             estimate_date: estimateDate
         }
     
