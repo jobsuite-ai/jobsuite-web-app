@@ -3,6 +3,7 @@ import { JobStatus } from '@/components/Global/model';
 export type UpdateJobContent = {
     line_item?: JobLineItem,
     delete_line_item?: number,
+    delete_image?: boolean,
     video?: JobVideo,
     images?: JobImage[],
     job_status?: JobStatus,

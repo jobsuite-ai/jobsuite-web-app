@@ -88,6 +88,7 @@ export async function PUT(request: Request) {
         typedContent.delete_line_item
     );
     typedContent.estimate_hours && await setEstimateHours(jobID, typedContent.estimate_hours);
+    typedContent.delete_image && await deleteAllImages(jobID);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -277,6 +278,23 @@ async function addImages(jobID: string, images: JobImage[]) {
             TableName: 'job',
             UpdateExpression: 'SET images = :i',
         });
+        const { Attributes } = await client.send(updateItemCommand);
+
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function deleteAllImages(jobID: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            Key: { id: { S: jobID } },
+            TableName: 'job',
+            UpdateExpression: 'REMOVE images',
+            ReturnValues: 'UPDATED_NEW',
+        });
+
         const { Attributes } = await client.send(updateItemCommand);
 
         return Response.json({ Attributes });

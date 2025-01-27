@@ -9,10 +9,11 @@ import { useRef, useState } from 'react';
 import classes from './styles/VideoUploader.module.css';
 import { JobImage, UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
-export default function ImageUpload({ jobID, setImages }: { jobID: string, setImages: Function }) {
+export default function ImageUpload({ jobID, setImage, setShowModal }: { 
+    jobID: string, setImage: Function, setShowModal: Function 
+}) {
     const [loading, setLoading] = useState(false);
     const [uploadFailure, setUploadFailure] = useState(false);
-    const [localImages, setLocalImages] = useState<FileWithPath[]>();
     const openRef = useRef<() => void>(null);
 
     const handleVideoDrop = (files: FileWithPath[]) => {
@@ -26,8 +27,8 @@ export default function ImageUpload({ jobID, setImages }: { jobID: string, setIm
         const _ = await Promise.all(filePromises);
         setLoading(false);
 
-        setLocalImages(files);
-        setImages(files.map((file) => file.name));
+        setShowModal(false);
+        setImage(files[0].name);
 
         if (uploadFailure) {
             notifications.show({
@@ -99,40 +100,13 @@ export default function ImageUpload({ jobID, setImages }: { jobID: string, setIm
         }
     }
 
-    function roundToTwoDecimals(num: number): number {
-        return Math.round((num + Number.EPSILON) * 100) / 100;
-    }
-
-    const getFileSizeFromBytes = (size: number): string => {
-        if (size > 50 * 1024 ** 2) {
-            return 'This file is too large to upload';
-        }
-
-        let step = 0;
-        let adjustedSize = size;
-        while (adjustedSize > 1024) {
-            adjustedSize = adjustedSize/1024;
-            step += 1;
-        }
-
-        const roundedSize = roundToTwoDecimals(adjustedSize);
-
-        switch (step) {
-            case 0:
-                return roundedSize + ' bytes';
-            case 1:
-                return roundedSize + ' KB';
-            default:
-                return roundedSize + ' MB';
-        }
-    }
-
     return (
         <div className={classes.imageWrapper}>
             <div style={{ width: '100%' }}>
                 <Dropzone
                     loading={loading}
                     openRef={openRef}
+                    maxFiles={1}
                     onDrop={(vids) => handleVideoDrop(vids)}
                     maxSize={150 * 1024 * 1024}
                     accept={[MIME_TYPES.pdf, MIME_TYPES.heic, MIME_TYPES.heif, MIME_TYPES.png, MIME_TYPES.jpeg]}
@@ -158,28 +132,13 @@ export default function ImageUpload({ jobID, setImages }: { jobID: string, setIm
                     <Text ta="center" fz="lg" mt="xl">
                         <Dropzone.Accept>Drop files here</Dropzone.Accept>
                         <Dropzone.Reject>Files less than 50mb</Dropzone.Reject>
-                        <Dropzone.Idle>Upload pictures of the house</Dropzone.Idle>
+                        <Dropzone.Idle>Upload a picture of the house</Dropzone.Idle>
                     </Text>
                     <Text ta="center" fz="sm" mt="xs" c="dimmed">
-                        Drag and drop files here to upload. We can only accept files that
+                        Drag and drop an image here to upload. We can only accept files that
                         are less than 50mb in size.
                     </Text>
                 </Dropzone>
-                {localImages && (
-                    <>
-                        {localImages.map((image) => (
-                            <div key={image.name} className={classes.videoWrapper}>
-                                <div className={classes.videoBox}>
-                                    <IconPhoto size={40} />
-                                    <div className={classes.videoDetails}>
-                                        <Text size="sm" fw={600}>{image.name}</Text>
-                                        <Text size="xs">{getFileSizeFromBytes(image.size)}</Text>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </>
-                )}
             </div>
         </div>
     );

@@ -25,14 +25,33 @@
     margin-bottom: var(--mantine-spacing-lg);
     width: 930px; /* Fixed width for web version */
 }
+
+
+.imageAndHoverContainer {
+    display: flex;
+    flex-direction: row;
+    gap: var(--mantine-spacing-md); /* Matches 'md' gap in Mantine */
+    align-items: stretch; /* Align items to stretch */
+    width: 930px; /* Fixed width for web version */
+}
+
 .videoFrame {
     width: 100%;
     height: 100%;
 }
 
+.hoverIntegration {
+  flex-grow: 2;
+  text-align: center;
+}
+
 /* Media query for mobile screens */
 @media (max-width: 768px) {
     .flexContainer {
+        flex-direction: column; /* Stack items vertically */
+        width: 100%; /* Use full width for mobile */
+    }
+    .imageAndHoverContainer {
         flex-direction: column; /* Stack items vertically */
         width: 100%; /* Use full width for mobile */
     }

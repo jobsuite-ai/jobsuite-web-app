@@ -1,14 +1,14 @@
 "use client";
 
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
-import { Flex } from '@mantine/core';
+import { Flex, Paper, Text } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 import { SingleJob } from '../Global/model';
 import ClientDetails from './ClientDetails';
-import ImageCarousel from './ImageCarousel';
+import JobImage from './JobImage';
 import JobComments from './comments/JobComments';
 import EstimateDetails from './estimate/EstimateDetails';
 import TranscriptionSummary from './estimate/TranscriptionSummary';
@@ -88,15 +88,15 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         setImages(job?.images ? job?.images.L.map((image) => image.M.name.S) : undefined)
     }
 
-    const fileNamesFromDynamo = job?.images ? job?.images.L.map((image) => image.M.name.S) : [];
+    const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';
     interface OverviewDetailsProps {
         job: SingleJob | undefined;
         loading: boolean;
         jobID: string;
-        fileNamesFromDynamo: string[]; // Assuming this is an array of strings
+        fileNameFromDynamo: string;
     }
 
-    const OverviewDetails = ({ job, loading, jobID, fileNamesFromDynamo }: OverviewDetailsProps) => (
+    const OverviewDetails = ({ job, loading, jobID, fileNameFromDynamo }: OverviewDetailsProps) => (
         <>
             {loading ? <LoadingState /> : <>
                 <div className={classes.jobDetailsWrapper}>
@@ -115,7 +115,18 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                             </div>
                             <Flex direction='column' gap='md' className={classes.jobFieldWrapper}>
                                 <DescriptionOfWork job={job} />
-                                <ImageCarousel jobID={jobID} imageNames={fileNamesFromDynamo} />
+                                <div className={classes.imageAndHoverContainer}>
+                                    <div style={{ flexGrow: '2' }}>
+                                        <JobImage jobID={jobID} imageName={fileNameFromDynamo} />
+                                    </div>
+                                    <Paper className={classes.hoverIntegration} shadow='sm' radius='md' withBorder>
+                                        <Flex h='100%' justify='center' align='center'>
+                                            <Text py={20}>
+                                                Hover Integration Coming Soon...
+                                            </Text>
+                                        </Flex>
+                                    </Paper>
+                                </div>
                                 <LineItems job={job} />
                                 <TranscriptionSummary job={job} refresh={getJob} />
                                 <SpanishTranscription job={job} refresh={getJob} />
@@ -135,7 +146,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                     job={job}
                     loading={loading}
                     jobID={jobID}
-                    fileNamesFromDynamo={fileNamesFromDynamo}
+                    fileNameFromDynamo={fileNameFromDynamo}
                 />);
             case 'estimate':
                 return (<EstimateDetails job={job} />);
@@ -146,7 +157,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                     job={job}
                     loading={loading}
                     jobID={jobID}
-                    fileNamesFromDynamo={fileNamesFromDynamo}
+                    fileNameFromDynamo={fileNameFromDynamo}
                 />);
         }
     }
@@ -156,6 +167,6 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         job={job}
         loading={loading}
         jobID={jobID}
-        fileNamesFromDynamo={fileNamesFromDynamo}
+        fileNameFromDynamo={fileNameFromDynamo}
     />)
 }

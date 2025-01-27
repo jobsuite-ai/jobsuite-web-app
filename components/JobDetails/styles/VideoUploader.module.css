@@ -21,8 +21,13 @@
   margin-bottom: 20px;
 }
 
-.carousel {
-  width: 930px;
+.jobImageWrapper {
+  align-items: center;
+}
+
+.jobImage {
+  width: 500px;
+  justify-self: center;
   padding: 10px;
 }
 
@@ -40,7 +45,7 @@
     --paper-radius: var(--mantine-radius-md);
   }
 
-  .carousel {
+  .jobImage {
     width: 100%;
     padding: 10px;
   }
