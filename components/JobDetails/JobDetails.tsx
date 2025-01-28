@@ -1,7 +1,7 @@
 "use client";
 
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
-import { Flex, Paper, Text } from '@mantine/core';
+import { Center, Flex, Paper, Text } from '@mantine/core';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import LoadingState from '../Global/LoadingState';
@@ -17,6 +17,8 @@ import SpanishTranscription from './estimate/SpanishTranscription';
 import LineItems from './estimate/LineItems';
 import DescriptionOfWork from './DescriptionOfWork';
 import VideoUploader from './VideoUploader';
+import { IconPencil, IconSignature } from '@tabler/icons-react';
+import ResourceLink from './ResourceLink';
 
 export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
@@ -88,6 +90,10 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         setImages(job?.images ? job?.images.L.map((image) => image.M.name.S) : undefined)
     }
 
+    const handleOpenDocusealLink = () => {
+        window.open(job?.docuseal_link.S, '_blank'); 
+    };
+
     const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';
     interface OverviewDetailsProps {
         job: SingleJob | undefined;
@@ -130,6 +136,20 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                 <LineItems job={job} />
                                 <TranscriptionSummary job={job} refresh={getJob} />
                                 <SpanishTranscription job={job} refresh={getJob} />
+                                <Center mt='lg'>
+                                    <Text size="lg">
+                                        Resource Links
+                                    </Text>
+                                </Center>
+                                <Flex direction='row' justify='center' gap='xl' >
+                                    {job.docuseal_link &&
+                                        <ResourceLink
+                                            handler={handleOpenDocusealLink}
+                                            icon={IconPencil}
+                                            label='Docuseal'
+                                        />
+                                    }
+                                </Flex>
                             </Flex>
                         </> : <UniversalError message='Unable to access job details' />
                     }

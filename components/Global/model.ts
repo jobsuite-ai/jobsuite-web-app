@@ -47,6 +47,7 @@ export type SingleJob = {
     client_name: TypedDynamoStringReturn;
     client_phone_number: TypedDynamoStringReturn;
     description: TypedDynamoStringReturn;
+    docuseal_link: TypedDynamoStringReturn;
     estimate_date: TypedDynamoStringReturn;
     estimate_hours: TypedDynamoNumberReturn;
     id: TypedDynamoStringReturn;

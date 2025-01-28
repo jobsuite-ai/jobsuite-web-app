@@ -1,8 +1,11 @@
+import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+
 const axios = require('axios').default;
+const client = new DynamoDBClient({});
 
 export async function POST(request: Request) {
     try {
-        const { template_id, client_email } = await request.json();
+        const { template_id, jobID, client_email } = await request.json();
 
         const options = {
             method: 'POST',
@@ -21,6 +24,18 @@ export async function POST(request: Request) {
 
         return axios.request(options).then((response: any) => {
             const output = response.data;
+            const docusealLink = `https://docuseal.com/submissions/${output[0].submission_id}`;
+
+            const updateItemCommand = new UpdateItemCommand({
+                ExpressionAttributeValues: { ':link': { S: docusealLink } },
+                Key: { id: { S: jobID } },
+                ReturnValues: 'UPDATED_NEW',
+                TableName: 'job',
+                UpdateExpression: 'SET docuseal_link = :link',
+            });
+        
+            client.send(updateItemCommand);
+
             return Response.json({ output });
         }).catch((error: any) => Response.json({ error: error.message }));
     } catch (error: any) {
