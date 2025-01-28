@@ -28,6 +28,7 @@ export function NewJobWorkflow() {
             zip_code: '',
             client_email: '',
             client_phone_number: '',
+            job_type: '',
             video: null,
         },
 
@@ -38,6 +39,11 @@ export function NewJobWorkflow() {
                     client_address: values.client_address === '' ? 'Must enter client address' : null,
                     client_email: /^\S+@\S+$/.test(values.client_email) ? null : 'Invalid email',
                     client_phone_number: values.client_phone_number === '' ? 'Must enter client phone number' : null,
+                }
+            }
+            if (active === 1) {
+                return {
+                    job_type: values.job_type === '' ? 'Must enter job type' : null,
                 }
             }
             return {};
@@ -118,7 +124,8 @@ export function NewJobWorkflow() {
                     zip_code: formValues.zip_code,
                     client_email: formValues.client_email,
                     client_phone_number: formValues.client_phone_number,
-                    video: formValues.video
+                    video: formValues.video,
+                    job_type: formValues.job_type
                 }),
             }
         )
@@ -177,7 +184,12 @@ export function NewJobWorkflow() {
                         Back
                     </Button>
                 )}
-                {active !== NUMBER_OF_STEPS && <Button onClick={nextStep}>Next step</Button>}
+                {active !== NUMBER_OF_STEPS && (
+                    active === 1 ? 
+                    <Button onClick={nextStep}>Submit</Button>
+                    :
+                    <Button onClick={nextStep}>Next step</Button>
+                )}
             </Group>
         </div>
     );

@@ -1,6 +1,6 @@
 "use client";
 
-import { ActionIcon, Badge, Card, Flex, Group, Menu, rem, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Badge, Card, Center, Flex, Group, Menu, rem, Text, Tooltip } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { Job, JobStatus } from "../Global/model";
 import { useRouter } from "next/navigation";
@@ -111,6 +111,11 @@ export default function JobsList() {
                                         style={{ cursor: 'pointer' }}
                                         onClick={() => router.push(`/jobs/${job.id}`)}
                                     >
+                                        <Center>
+                                            {job.job_type &&
+                                                <Text size="sm" fw={700}>{job.job_type}</Text>
+                                            }
+                                        </Center>
                                         <Group justify="space-between" mt="md" mb="xs">
                                             <Text fw={500}>{job.client_name}</Text>
                                             <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>

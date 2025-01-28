@@ -8,10 +8,13 @@ export function NewJobWorkInformation({form}: {form: UseFormReturnType<any>}) {
     return (
         <div className={classes.wrapper}>
             <Select
+                withAsterisk
+                clearable
                 label="Job type"
                 placeholder="Pick job type"
                 key={form.key('job_type')}
                 data={['Interior', 'Exterior']}
+                {...form.getInputProps('job_type')}
             />
         </div>
     );

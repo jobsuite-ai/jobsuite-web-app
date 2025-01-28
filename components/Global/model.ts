@@ -12,6 +12,7 @@ export type Job = {
     user_id: string;
     video: any;
     job_status: JobStatus;
+    job_type: string;
 }
 
 export type Client = {
@@ -55,6 +56,7 @@ export type SingleJob = {
     job_status: {
         S: JobStatus;
     };
+    job_type: TypedDynamoStringReturn;
     line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
     spanish_transcription: TypedDynamoStringReturn;
     state: TypedDynamoStringReturn; 

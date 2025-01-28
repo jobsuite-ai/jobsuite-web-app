@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     try {
         const {
             jobID,
+            job_type,
             client_id,
             client_name,
             client_address,
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
                 user_id: process.env.RLPP_USER_ID,
                 id: jobID,
                 job_status: JobStatus.ESTIMATE_NOT_SCHEDULED,
+                job_type,
                 client_id,
                 client_name,
                 client_address,
