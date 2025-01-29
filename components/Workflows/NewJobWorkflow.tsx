@@ -2,7 +2,7 @@
 
 import { Button, Group, Stepper } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
 import { NewJobWorkInformation } from '../Forms/NewJobForm/NewJobWorkInformation';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +13,12 @@ const NUMBER_OF_STEPS = 2;
 
 export function NewJobWorkflow() {
     const [active, setActive] = useState(0);
+    const [today, setToday] = useState(0);
     const router = useRouter();
+
+    useEffect(() => {
+        setToday(Date.now());
+    }, []);
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -62,7 +67,7 @@ export function NewJobWorkflow() {
             const content = {
                 job: {
                     jobID: formValues.jobID,
-                    timestamp: Date.now()
+                    timestamp: today
                 }
             }
 

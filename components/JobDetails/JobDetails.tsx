@@ -116,7 +116,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                     }
                                 </div>
                                 <div className={classes.detailsWrapper}>
-                                    <ClientDetails job={job} />
+                                    <ClientDetails initialJob={job} />
                                 </div>
                             </div>
                             <Flex direction='column' gap='md' className={classes.jobFieldWrapper}>

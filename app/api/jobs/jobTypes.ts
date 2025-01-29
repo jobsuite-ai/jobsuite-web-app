@@ -10,6 +10,17 @@ export type UpdateJobContent = {
     transcription_summary?: string,
     estimate_date?: any,
     estimate_hours?: string,
+    update_client_details?: UpdateClientDetailsInput,
+};
+
+export type UpdateClientDetailsInput = {
+    client_name: string,
+    client_address: string,
+    city: string,
+    state: string,
+    zip_code: string,
+    client_email: string,
+    client_phone_number: string,
 };
 
 export type JobVideo = {

@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { JobStatus } from '@/components/Global/model';
-import { JobImage, JobLineItem, JobVideo, UpdateJobContent } from './jobTypes';
+import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateJobContent } from './jobTypes';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -91,6 +91,10 @@ export async function PUT(request: Request) {
     );
     typedContent.estimate_hours && await setEstimateHours(jobID, typedContent.estimate_hours);
     typedContent.delete_image && await deleteAllImages(jobID);
+    typedContent.update_client_details && await updateClientDetails(
+        jobID,
+        typedContent.update_client_details
+    );
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -159,6 +163,37 @@ async function addLineItem(jobID: string, lineItem: JobLineItem) {
 
         const { Attributes } = await client.send(updateItemCommand);
 
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updateClientDetails(jobID: string, clientDetails: UpdateClientDetailsInput) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: {
+                ':cn': { S: clientDetails.client_name },
+                ':city': { S: clientDetails.city },
+                ':zc': { S: clientDetails.zip_code },
+                ':ce': { S: clientDetails.client_email },
+                ':cpn': { S: clientDetails.client_phone_number },
+                ':ca': { S: clientDetails.client_address },
+            },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: `
+                SET client_name = :cn, 
+                city = :city, 
+                zip_code = :zc, 
+                client_email = :ce, 
+                client_phone_number = :cpn, 
+                client_address = :ca
+            `,
+        });
+
+        const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });
     } catch (error: any) {
         return Response.json({ error: error.message });

@@ -2,12 +2,19 @@ import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 import { DynamoLineItem } from '@/components/Global/model';
 import { Card, Group, Text } from '@mantine/core';
 import { IconX } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
 export function LineItem({ lineItemDetails, jobID, index, removeLineItem }: { 
     lineItemDetails: DynamoLineItem, jobID: string, index: number, removeLineItem: Function
 }) {
-    const price = +lineItemDetails.price.N; 
+    const [price, setPrice] = useState('');
+
+    useEffect(() => {
+        const priceStr = +lineItemDetails.price.N;
+        setPrice(priceStr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }, []);
+
 
     const deleteLineItem = async () => {
         const content: UpdateJobContent = {
@@ -45,7 +52,7 @@ export function LineItem({ lineItemDetails, jobID, index, removeLineItem }: {
                 />
                 <Group style={{ justifyContent: 'space-between', marginRight: '30px' }}>
                     <Text size="lg" pl='md'><strong>{lineItemDetails.header.S}</strong></Text>
-                    <Text size="sm">$ {price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                    <Text size="sm">${price}</Text>
                 </Group>
                 <Text pl='md' pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
             </Card>

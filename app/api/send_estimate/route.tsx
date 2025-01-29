@@ -1,6 +1,7 @@
-import { DynamoDBClient, UpdateItemCommand } from "@aws-sdk/client-dynamodb";
+import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 
 const axios = require('axios').default;
+
 const client = new DynamoDBClient({});
 
 export async function POST(request: Request) {
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
                 TableName: 'job',
                 UpdateExpression: 'SET docuseal_link = :link',
             });
-        
+
             client.send(updateItemCommand);
 
             return Response.json({ output });

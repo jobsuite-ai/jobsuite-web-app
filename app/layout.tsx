@@ -12,7 +12,7 @@ import { Shell } from '@/components/Shell/Shell';
 
 export default function RootLayout({ children }: { children: any }) {
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker
         .register('/service-worker.js')
         .catch((error) => {
