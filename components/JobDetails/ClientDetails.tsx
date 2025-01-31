@@ -80,7 +80,10 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             ...prevJob,
             estimate_date: { S: estimateDate?.toISOString() as string }
         }));
-        setJobStatus(JobStatus.PENDING_ESTIMATE);
+
+        if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
+            setJobStatus(JobStatus.PENDING_ESTIMATE);
+        }
     }
 
     const setEstimateHours = async (event: React.ChangeEvent<HTMLInputElement>) => {
