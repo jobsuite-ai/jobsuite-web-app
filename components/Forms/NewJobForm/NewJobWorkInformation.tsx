@@ -16,6 +16,15 @@ export function NewJobWorkInformation({form}: {form: UseFormReturnType<any>}) {
                 data={['Interior', 'Exterior']}
                 {...form.getInputProps('job_type')}
             />
+            <Select
+                withAsterisk
+                clearable
+                label="Season"
+                placeholder="Pick a season"
+                key={form.key('season')}
+                data={['Winter', 'Summer']}
+                {...form.getInputProps('season')}
+            />
         </div>
     );
 }

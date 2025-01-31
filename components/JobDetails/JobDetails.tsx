@@ -19,6 +19,7 @@ import DescriptionOfWork from './DescriptionOfWork';
 import VideoUploader from './VideoUploader';
 import { IconPencil, IconSignature } from '@tabler/icons-react';
 import ResourceLink from './ResourceLink';
+import HoursAndRate from './HoursAndRate';
 
 export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
@@ -121,6 +122,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                             </div>
                             <Flex direction='column' gap='md' className={classes.jobFieldWrapper}>
                                 <DescriptionOfWork job={job} />
+                                <HoursAndRate job={job}/>
                                 <div className={classes.imageAndHoverContainer}>
                                     <div style={{ flexGrow: '2' }}>
                                         <JobImage jobID={jobID} imageName={fileNameFromDynamo} />

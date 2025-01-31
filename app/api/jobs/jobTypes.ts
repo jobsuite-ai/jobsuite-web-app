@@ -11,6 +11,12 @@ export type UpdateJobContent = {
     estimate_date?: any,
     estimate_hours?: string,
     update_client_details?: UpdateClientDetailsInput,
+    update_hours_and_rate?: UpdateHoursAndRateInput,
+};
+
+export type UpdateHoursAndRateInput = {
+    hours: string,
+    rate: string,
 };
 
 export type UpdateClientDetailsInput = {

@@ -34,6 +34,7 @@ export function NewJobWorkflow() {
             client_email: '',
             client_phone_number: '',
             job_type: '',
+            season: '',
             video: null,
         },
 
@@ -49,6 +50,8 @@ export function NewJobWorkflow() {
             if (active === 1) {
                 return {
                     job_type: values.job_type === '' ? 'Must enter job type' : null,
+                    season: values.season === '' ? 
+                        'Must enter seasonal rate, this can be edited later on' : null,
                 }
             }
             return {};
@@ -112,6 +115,7 @@ export function NewJobWorkflow() {
 
     async function createJobRecord() {
         const formValues = form.getValues();
+        const hourly_rate = formValues.season === 'Winter' ? 96 : 106;
         const response = await fetch(
             '/api/jobs',
             {
@@ -130,7 +134,8 @@ export function NewJobWorkflow() {
                     client_email: formValues.client_email,
                     client_phone_number: formValues.client_phone_number,
                     video: formValues.video,
-                    job_type: formValues.job_type
+                    job_type: formValues.job_type,
+                    hourly_rate: hourly_rate,
                 }),
             }
         )

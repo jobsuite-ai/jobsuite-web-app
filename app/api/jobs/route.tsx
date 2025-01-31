@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { JobStatus } from '@/components/Global/model';
-import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateJobContent } from './jobTypes';
+import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from './jobTypes';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
@@ -24,6 +24,7 @@ export async function POST(request: Request) {
             client_email,
             client_phone_number,
             video,
+            hourly_rate,
         } = await request.json();
 
         const command = new PutCommand({
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
                 client_email,
                 client_phone_number,
                 video,
+                hourly_rate,
             },
         });
 
@@ -89,12 +91,15 @@ export async function PUT(request: Request) {
         jobID,
         typedContent.delete_line_item
     );
-    typedContent.estimate_hours && await setEstimateHours(jobID, typedContent.estimate_hours);
     typedContent.delete_image && await deleteAllImages(jobID);
     typedContent.update_client_details && await updateClientDetails(
         jobID,
         typedContent.update_client_details
     );
+    typedContent.update_hours_and_rate && await updateHoursAndRate(
+        jobID,
+        typedContent.update_hours_and_rate,
+    )
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -250,14 +255,17 @@ async function updateEstimateDate(jobID: string, estimateDate: any) {
     }
 }
 
-async function setEstimateHours(jobID: string, estimateHours: any) {
+async function updateHoursAndRate(jobID: string, hoursAndRate: UpdateHoursAndRateInput) {
     try {
         const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':estimate_hours': { N: estimateHours } },
+            ExpressionAttributeValues: { 
+                ':eh': { N: hoursAndRate.hours },
+                ':hr': { N: hoursAndRate.rate },
+            },
             Key: { id: { S: jobID } },
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
-            UpdateExpression: 'SET estimate_hours = :estimate_hours',
+            UpdateExpression: 'SET estimate_hours = :eh, hourly_rate = :hr',
         });
         const { Attributes } = await client.send(updateItemCommand);
 

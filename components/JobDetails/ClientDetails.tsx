@@ -16,7 +16,6 @@ import { setDate } from 'date-fns';
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
     const [job, setJob] = useState(initialJob);
-    const [estimateHoursTextInput, setEstimateHoursTextInput] = useState<string>();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimateDate, setEstimateDate] = useState<DateValue | null>(null);
 
@@ -86,35 +85,6 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         }
     }
 
-    const setEstimateHours = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        setEstimateHoursTextInput(event.target.value);
-    }
-
-    const handleKeyDown = async (event: React.KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === 'Enter' && estimateHoursTextInput) {
-            const content: UpdateJobContent = {
-                estimate_hours: estimateHoursTextInput
-            }
-
-            const response = await fetch(
-                '/api/jobs',
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ content: content, jobID: job.id.S }),
-                }
-            )
-
-            const { Attributes } = await response.json();
-            setJob(prevJob => ({
-                ...prevJob,
-                estimate_hours: { N: estimateHoursTextInput }
-            }));
-        }
-    };
-
     const updateJob = async () => {
         const formValues = form.getValues();
 
@@ -183,17 +153,6 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                 </Flex>
                 <Flex direction='column' gap="lg" mt="md" mb="xs">
                     <Flex direction='column'>
-                        {job.estimate_hours?.N ?
-                            <Text size="sm" mb='sm' fw={700}>Job hours: {job.estimate_hours?.N}</Text>
-                            :
-                            <TextInput
-                                mb='sm'
-                                label='Estimate Hours'
-                                placeholder='Set estimate hours'
-                                onChange={setEstimateHours}
-                                onKeyDown={handleKeyDown}
-                            />
-                        }
                         <Text size="sm" c="dimmed">{job.client_email.S}</Text>
                         <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
                         {estimateDate ? (

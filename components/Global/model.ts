@@ -51,6 +51,7 @@ export type SingleJob = {
     docuseal_link: TypedDynamoStringReturn;
     estimate_date: TypedDynamoStringReturn;
     estimate_hours: TypedDynamoNumberReturn;
+    hourly_rate: TypedDynamoNumberReturn;
     id: TypedDynamoStringReturn;
     images: TypedDynamoListReturn<TypedDynamoMapReturn<JobVideo>[]>;
     job_status: {
@@ -58,6 +59,7 @@ export type SingleJob = {
     };
     job_type: TypedDynamoStringReturn;
     line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
+    season: TypedDynamoStringReturn;
     spanish_transcription: TypedDynamoStringReturn;
     state: TypedDynamoStringReturn; 
     transcription_summary: TypedDynamoStringReturn;
