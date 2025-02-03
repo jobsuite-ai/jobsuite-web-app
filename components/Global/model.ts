@@ -52,6 +52,7 @@ export type SingleJob = {
     hourly_rate: TypedDynamoNumberReturn;
     id: TypedDynamoStringReturn;
     images: TypedDynamoListReturn<TypedDynamoMapReturn<JobVideo>[]>;
+    jira_link: TypedDynamoStringReturn;
     job_status: {
         S: JobStatus;
     };

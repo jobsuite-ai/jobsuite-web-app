@@ -76,32 +76,38 @@ export async function POST(request: Request) {
 }
 
 async function getJobAndCreateTicket(payload: any): Promise<any> {
-  try {
-    await logToCloudWatch(`Attempting to create a JIRA ticket for job: ${payload.data.template.external_id}`);
+  const jobID = payload.data.template.external_id;
 
-    if (payload.data.template.external_id) {
+  try {
+    if (!jobID) {
+      throw Error('Job id must be defined to create jira ticket');
+    }
+    await logToCloudWatch(`Attempting to create a JIRA ticket for job: ${jobID}`);
+
+    if (jobID) {
       const getItemCommand = new GetItemCommand({
         TableName: process.env.JOB_TABLE_NAME,
         Key: {
-          id: { S: payload.data.template.external_id },
+          id: { S: jobID },
         },
       });
       const { Item } = await docClient.send(getItemCommand);
       const response = Response.json({ Item });
       const job = await response.json();
 
-      await logToCloudWatch(`Successfully fetched job: ${payload.data.template.external_id}, job: ${JSON.stringify(job.Item)}`);
+      await logToCloudWatch(`Successfully fetched job: ${jobID}, job: ${JSON.stringify(job.Item)}`);
       await createJiraTicket(
-        'JOBS',
+        'PAINTING',
         `${job.Item.client_name.S} bid on ${job.Item.estimate_date.S.split('T')[0]}`,
         `${job.Item.transcription_summary.S}`,
+        jobID,
         'Task'
       );
     }
 
     throw Error('JobID must be defined to get a job');
   } catch (error: any) {
-    await logToCloudWatch(`Failed to create a JIRA ticket for job: ${payload.data.template.external_id}, error: ${error.stack}`);
+    await logToCloudWatch(`Failed to create a JIRA ticket for job: ${jobID}, error: ${error.stack}`);
     return Response.json({ error: error.message });
   }
 }
