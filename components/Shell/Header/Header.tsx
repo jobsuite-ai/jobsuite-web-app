@@ -5,9 +5,10 @@ import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, rem } fr
 import { IconSearch, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MouseEvent } from 'react';
+import { MouseEvent, useEffect, useState } from 'react';
 import { RLPPLogo } from '../../Global/RLPPLogo';
 import classes from './Header.module.css';
+import { Client } from "@/components/Global/model";
 
 
 const links = [
@@ -17,8 +18,22 @@ const links = [
 ];
 
 export function Header() {
+  const [clients, setClients] = useState<Record<string, Client>>();
+  const [data, setData] = useState<Array<string>>();
+  const [autocompleteValue, setAutocompleteValue] = useState<string>();
   const router = useRouter();
   const { user } = useUser();
+
+  useEffect(() => {
+    async function getPageData() {
+      await getClients();
+    }
+    if (!clients) {
+      getPageData();
+    } else {
+      setData(Object.keys(clients));
+    }
+  }, [clients]);
 
   const handleNavLinkClick = (event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>, link: string) => {
     event.preventDefault();
@@ -36,37 +51,41 @@ export function Header() {
     </Link>
   ));
 
-  const usersData: Record<string, { email: string }> = {
-    'Emily Johnson': {
-      email: 'emily92@gmail.com',
-    },
-    'Ava Rodriguez': {
-      email: 'ava_rose@gmail.com',
-    },
-    'Olivia Chen': {
-      email: 'livvy_globe@gmail.com',
-    },
-    'Ethan Barnes': {
-      email: 'ethan_explorer@gmail.com',
-    },
-    'Mason Taylor': {
-      email: 'mason_musician@gmail.com',
-    },
-  };
+  async function getClients() {
+      const response = await fetch(
+          '/api/clients',
+          {
+              method: 'GET',
+              headers: {
+                  'Content-Type': 'application/json',
+              }
+          }
+      )
+
+      const { Items }: { Items: Client[] } = await response.json();
+      setClients(
+        Items.reduce((acc, client) => {
+          acc[client.email] = client;
+          return acc;
+        }, {} as Record<string, Client>)
+      );
+  }
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
     <Group gap="sm">
-      <Avatar src={'/black-circle-user-symbol.png'} size={36} radius="xl" />
-      <div>
-        <Text size="sm">{option.value}</Text>
-        <Text size="xs" opacity={0.5}>
-          {usersData[option.value].email}
-        </Text>
-      </div>
+      {clients &&
+        <>
+        <Avatar src={'/black-circle-user-symbol.png'} size={36} radius="xl" />
+        <div>
+          <Text size="sm">{clients[option.value].client_name}</Text>
+          <Text size="xs" opacity={0.5}>
+            {clients[option.value].email}
+          </Text>
+        </div>
+        </>
+      }
     </Group>
   );
-
-  const data = Object.keys(usersData);
 
   return (
     <header className={classes.header}>
@@ -89,10 +108,18 @@ export function Header() {
             style={{ marginRight: rem(12) }}
             className={classes.search}
             placeholder='Search by client name'
+            value={autocompleteValue}
             leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
             renderOption={renderAutocompleteOption}
             data={data}
             visibleFrom="xs"
+            onChange={(item) => {
+              setAutocompleteValue(item);
+              if (clients && data?.includes(item)) {
+                router.push(`/clients/${clients[item].id}`)
+                setAutocompleteValue('');
+              }
+            }}
           />
           <Divider orientation="vertical" />
           <Link
