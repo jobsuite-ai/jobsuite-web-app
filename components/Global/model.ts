@@ -22,6 +22,7 @@ export type Client = {
     zip_code: string;
     email: string;
     name: string;
+    client_name: string;
     phone_number: string;
     user_id: string;
     id: string;
@@ -29,12 +30,8 @@ export type Client = {
 }
 
 export type DynamoClient = {
-    address: TypedDynamoStringReturn; 
-    city: TypedDynamoStringReturn;
-    state: TypedDynamoStringReturn;
-    zip_code: TypedDynamoStringReturn;
     email: TypedDynamoStringReturn;
-    name: TypedDynamoStringReturn;
+    client_name: TypedDynamoStringReturn;
     phone_number: TypedDynamoStringReturn;
     user_id: TypedDynamoStringReturn;
     id: TypedDynamoStringReturn;
@@ -45,6 +42,7 @@ export type SingleJob = {
     city: TypedDynamoStringReturn; 
     client_address: TypedDynamoStringReturn; 
     client_email: TypedDynamoStringReturn;
+    client_id: TypedDynamoStringReturn;
     client_name: TypedDynamoStringReturn;
     client_phone_number: TypedDynamoStringReturn;
     description: TypedDynamoStringReturn;

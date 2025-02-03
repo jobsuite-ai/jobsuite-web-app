@@ -99,7 +99,7 @@ export async function PUT(request: Request) {
     typedContent.update_hours_and_rate && await updateHoursAndRate(
         jobID,
         typedContent.update_hours_and_rate,
-    )
+    );
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -178,22 +178,16 @@ async function updateClientDetails(jobID: string, clientDetails: UpdateClientDet
     try {
         const updateItemCommand = new UpdateItemCommand({
             ExpressionAttributeValues: {
-                ':cn': { S: clientDetails.client_name },
                 ':city': { S: clientDetails.city },
                 ':zc': { S: clientDetails.zip_code },
-                ':ce': { S: clientDetails.client_email },
-                ':cpn': { S: clientDetails.client_phone_number },
                 ':ca': { S: clientDetails.client_address },
             },
             Key: { id: { S: jobID } },
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
             UpdateExpression: `
-                SET client_name = :cn, 
-                city = :city, 
-                zip_code = :zc, 
-                client_email = :ce, 
-                client_phone_number = :cpn, 
+                SET city = :city,
+                zip_code = :zc,
                 client_address = :ca
             `,
         });
@@ -258,14 +252,15 @@ async function updateEstimateDate(jobID: string, estimateDate: any) {
 async function updateHoursAndRate(jobID: string, hoursAndRate: UpdateHoursAndRateInput) {
     try {
         const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { 
+            ExpressionAttributeValues: {
                 ':eh': { N: hoursAndRate.hours },
                 ':hr': { N: hoursAndRate.rate },
+                ':d': { S: hoursAndRate.date },
             },
             Key: { id: { S: jobID } },
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
-            UpdateExpression: 'SET estimate_hours = :eh, hourly_rate = :hr',
+            UpdateExpression: 'SET estimate_hours = :eh, hourly_rate = :hr, estimate_date = :d',
         });
         const { Attributes } = await client.send(updateItemCommand);
 

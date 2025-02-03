@@ -1,8 +1,8 @@
 "use client";
 
-import { Badge, Button, Card, Center, Flex, Group, Modal, Select, Text, TextInput } from '@mantine/core';
+import { Badge, Button, Card, Center, Flex, Modal, Select, Text, TextInput } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
-import { JobStatus, SingleJob } from '../Global/model';
+import { DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import { getBadgeColor, getFormattedStatus } from "../Global/utils";
 import { useEffect, useState } from 'react';
@@ -11,41 +11,47 @@ import '@mantine/core/styles.css'
 import '@mantine/dates/styles.css'
 import { UpdateClientDetailsInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
 import { useForm } from '@mantine/form';
-import { USStatesMap } from '../Global/usStates';
-import { setDate } from 'date-fns';
+import { useRouter } from 'next/navigation';
+import LoadingState from '../Global/LoadingState';
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
     const [job, setJob] = useState(initialJob);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [estimateDate, setEstimateDate] = useState<DateValue | null>(null);
+    const [client, setClient] = useState<DynamoClient>();
+    const router = useRouter();
 
     useEffect(() => {
-        // Synchronize estimate_date after the first render to avoid mismatch
-        if (initialJob.estimate_date?.S && !estimateDate) {
-            setEstimateDate(new Date(initialJob.estimate_date.S));
+        const loadClientDetails = async () => {
+            const response = await fetch(
+                `/api/clients/${job.client_id.S}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }
+            )
+    
+            const { Item } = await response.json();
+            setClient(Item);
         }
-    }, [initialJob.estimate_date?.S, estimateDate]);
+        if (!client) {
+            loadClientDetails();
+        }
+    }, [client]);
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            client_name: job.client_name.S,
             client_address: job.client_address.S,
             city: job.city.S,
-            state: job.state.S,
             zip_code: job.zip_code.S,
-            client_email: job.client_email.S,
-            client_phone_number: job.client_phone_number.S,
         },
         validate: (values) => {
             return {
-                client_name: values.client_name === '' ? 'Must enter client name' : null,
                 client_address: values.client_address === '' ? 'Must enter client address' : null,
-                client_email: /^\S+@\S+$/.test(values.client_email) ? null : 'Invalid email',
-                client_phone_number: values.client_phone_number === '' ? 'Must enter client phone number' : null,
                 zip_code: values.zip_code === '' ? 'Must enter zip code' : null,
                 city: values.city === '' ? 'Must enter city' : null,
-                state: values.state === '' ? 'Must enter state' : null,
             }
         },
     });
@@ -74,7 +80,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             }
         )
 
-        const { Attributes } = await response.json();
+        await response.json();
         setJob(prevJob => ({
             ...prevJob,
             estimate_date: { S: estimateDate?.toISOString() as string }
@@ -89,12 +95,8 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         const formValues = form.getValues();
 
         const updateJobContent: UpdateClientDetailsInput = {
-            client_name: formValues.client_name,
             city: formValues.city,
-            state: formValues.state,
             zip_code: formValues.zip_code,
-            client_email: formValues.client_email,
-            client_phone_number: formValues.client_phone_number,
             client_address: formValues.client_address,
         }
 
@@ -113,16 +115,12 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             }
         )
 
-        const { Attributes } = await response.json();
+        await response.json();
 
         setJob(prevJob => ({
             ...prevJob,
-            client_name: { S: formValues.client_name },
             city: { S: formValues.city },
-            state: { S: formValues.state },
             zip_code: { S: formValues.zip_code },
-            client_email: { S: formValues.client_email },
-            client_phone_number: { S: formValues.client_phone_number },
             client_address: { S: formValues.client_address }
         }));
         setIsModalOpen(false);
@@ -130,65 +128,58 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
 
     return (
         <>
-            <Card
-                shadow="sm"
-                padding="lg"
-                radius="md"
-                withBorder
-                style={{ height: '99%' }}
-            >
-                <div style={{ position: 'relative' }}>
-                    <IconEdit
-                        onClick={() => setIsModalOpen(true)}
-                        style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
-                    />
-                </div>
-                <Flex direction='column' gap="lg">
-                    <Text fw={500}>{job.client_name.S}</Text>
-                    <Flex direction='row' gap={5}>
-                        <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status.S)} mr='10px'>
-                            {getFormattedStatus(job.job_status.S)}
-                        </Badge>
+            {client ?
+                <Card
+                    shadow="sm"
+                    padding="lg"
+                    radius="md"
+                    withBorder
+                    style={{ height: '99%' }}
+                >
+                    <div style={{ position: 'relative' }}>
+                        <IconEdit
+                            onClick={() => setIsModalOpen(true)}
+                            style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
+                        />
+                    </div>
+                    <Flex direction='column' gap="lg">
+                        <Text 
+                            fw={500}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => router.push(`/clients/${job.client_id.S}`)}
+                        >
+                            {job.client_name.S}
+                        </Text>
+                        <Flex direction='row' gap={5}>
+                            <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status.S)} mr='10px'>
+                                {getFormattedStatus(job.job_status.S)}
+                            </Badge>
+                        </Flex>
                     </Flex>
-                </Flex>
-                <Flex direction='column' gap="lg" mt="md" mb="xs">
-                    <Flex direction='column'>
-                        <Text size="sm" c="dimmed">{job.client_email.S}</Text>
-                        <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
-                        {estimateDate ? (
-                            <Text size="sm" c="dimmed">Estimate date: {estimateDate.toISOString().split('T')[0]}</Text>
-                        ) : (
-                            <DatePickerInput
-                                label='Estimate Date'
-                                value={estimateDate}
-                                valueFormat='MMM DD, YYYY'
-                                placeholder='Set estimate date'
-                                onChange={handleEstimateDateChange}
-                            />
-                        )}
+                    <Flex direction='column' gap="lg" mt="md" mb="xs">
+                        <Flex direction='column'>
+                            <Text size="sm" c="dimmed">{job.client_email.S}</Text>
+                            <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
+                        </Flex>
+                        <Flex direction='column'>
+                            <Text size="sm" c="dimmed">{job.client_address.S}</Text>
+                            <Text size="sm" c="dimmed">{job.city.S}, {job.state.S}</Text>
+                            <Text size="sm" c="dimmed">{job.zip_code.S}</Text>
+                        </Flex>
                     </Flex>
-                    <Flex direction='column'>
-                        <Text size="sm" c="dimmed">{job.client_address.S}</Text>
-                        <Text size="sm" c="dimmed">{job.city.S}, {job.state.S}</Text>
-                        <Text size="sm" c="dimmed">{job.zip_code.S}</Text>
-                    </Flex>
-                </Flex>
-            </Card>
+                </Card> : <LoadingState />
+            }
             {isModalOpen &&
                 <Modal
                     opened={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
-                    title="Update Client Details"
+                    title={<Text fz={24} fw={700}>Update Client Details</Text>}
                     size="lg"
                 >
-                    <div>
-                        <TextInput
-                            withAsterisk
-                            label="Name"
-                            placeholder="Client name"
-                            key={form.key('client_name')}
-                            {...form.getInputProps('client_name')}
-                        />
+                    <Text fz={12} c='dimmed'>
+                        To update client contact information, please go to the client tab
+                    </Text>
+                    <div style={{ marginTop: '10px' }}>
                         <TextInput
                             withAsterisk
                             label="Address"
@@ -203,36 +194,12 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                             key={form.key('city')}
                             {...form.getInputProps('city')}
                         />
-                        <Select
-                            withAsterisk
-                            clearable
-                            searchable
-                            data={USStatesMap}
-                            label="State"
-                            placeholder="State"
-                            key={form.key('state')}
-                            {...form.getInputProps('state')}
-                        />
                         <TextInput
                             withAsterisk
                             label="Zip Code"
                             placeholder="Zip Code"
                             key={form.key('zip_code')}
                             {...form.getInputProps('zip_code')}
-                        />
-                        <TextInput
-                            withAsterisk
-                            label="Email"
-                            placeholder="Client email"
-                            key={form.key('client_email')}
-                            {...form.getInputProps('client_email')}
-                        />
-                        <TextInput
-                            withAsterisk
-                            label="Phone Number"
-                            placeholder="Client phone number"
-                            key={form.key('client_phone_number')}
-                            {...form.getInputProps('client_phone_number')}
                         />
 
                         <Center mt="md">

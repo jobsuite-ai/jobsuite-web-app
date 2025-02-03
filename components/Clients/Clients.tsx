@@ -72,9 +72,11 @@ export default function ClientsList() {
                                     radius="md"
                                     withBorder
                                     w='85%'
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => router.push(`/clients/${client.id}`)}
                                 >
                                     <Group justify="space-between" mt="md" mb="xs">
-                                        <Text fw={500}>{client.name}</Text>
+                                        <Text fw={500}>{client.client_name}</Text>
                                     </Group>
 
                                     <Flex direction='row' justify='space-between' gap="lg" mt="md" mr='lg' ml='lg' mb="xs">

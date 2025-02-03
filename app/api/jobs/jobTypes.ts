@@ -17,16 +17,13 @@ export type UpdateJobContent = {
 export type UpdateHoursAndRateInput = {
     hours: string,
     rate: string,
+    date: string,
 };
 
 export type UpdateClientDetailsInput = {
-    client_name: string,
     client_address: string,
     city: string,
-    state: string,
     zip_code: string,
-    client_email: string,
-    client_phone_number: string,
 };
 
 export type JobVideo = {
