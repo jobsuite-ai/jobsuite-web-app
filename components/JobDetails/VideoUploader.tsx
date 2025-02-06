@@ -14,6 +14,7 @@ interface PresignedPostData {
 }
 
 async function requestPresignedPost(file: File, jobID: string): Promise<PresignedPostData> {
+    const parsedFileName = file.name.replace(' ', '_');
     const response = await fetch(
         '/api/videos',
         {
@@ -21,7 +22,7 @@ async function requestPresignedPost(file: File, jobID: string): Promise<Presigne
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ filename: file.name, contentType: file.type, jobID: jobID }),
+            body: JSON.stringify({ filename: parsedFileName, contentType: file.type, jobID: jobID }),
         }
     )
 
