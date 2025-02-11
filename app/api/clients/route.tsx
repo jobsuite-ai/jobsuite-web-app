@@ -12,7 +12,7 @@ export async function POST(request: Request) {
         const {
             id,
             jobs,
-            name,
+            client_name,
             address,
             city,
             state,
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
                 user_id: process.env.RLPP_USER_ID,
                 id,
                 jobs,
-                name,
+                client_name,
                 address,
                 city,
                 state,

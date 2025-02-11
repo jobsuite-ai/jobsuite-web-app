@@ -98,7 +98,7 @@ export function NewJobWorkflow() {
                     body: JSON.stringify({
                         id: formValues.client_id,
                         jobs: [formValues.jobID],
-                        name: formValues.client_name,
+                        client_name: formValues.client_name,
                         address: formValues.client_address,
                         city: formValues.city,
                         state: formValues.state,
