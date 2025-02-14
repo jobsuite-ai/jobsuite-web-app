@@ -1,15 +1,22 @@
 "use client";
 
-import { Flex, Paper, Text } from "@mantine/core";
+import { Button, Center, Flex, Modal, Paper, Text } from "@mantine/core";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import ReactPlayer from "react-player";
 import classes from './styles/JobDetails.module.css';
+import { UpdateJobContent } from "@/app/api/jobs/jobTypes";
+import { SingleJob } from "../Global/model";
 
 
-export function VideoFrame({ name }: { name: string }) {
+export function VideoFrame({ name, jobID, refresh }: { 
+    name: string, 
+    jobID: string, 
+    refresh: Function
+}) {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [objectExists, setObjectExists] = useState(true);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const { job_id } = useParams();
 
     useEffect(() => {
@@ -44,26 +51,72 @@ export function VideoFrame({ name }: { name: string }) {
         }
     }
 
-    return (
-        <Paper shadow='sm' radius='md' withBorder className={classes.videoFrame}>
-            {objectExists ?
-                <>
-                    {isMobile ? (
-                        <ReactPlayer url={baseCloudFrontURL + key} controls={true} width='100%' height='auto' />
-                    ) : (
-                        <ReactPlayer url={baseCloudFrontURL + key} controls={true} width='640px' height='360px' />
-                    )}
-                </>
-                :
-                <Flex direction="column" justify='center' align="center" p="lg" h="100%">
-                    <Text ta="center" fz="lg">
-                        Your video is uploading
-                    </Text>
-                    <Text ta="center" fz="sm" mt="xs" c="dimmed">
-                        If this process takes longer than 10 minutes, please reach out to support.
-                    </Text>
-                </Flex>
+    const deleteVideo = async () => {
+        const content: UpdateJobContent = {
+            delete_video: true
+        }
+    
+        const response = await fetch(
+            '/api/jobs',
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content, jobID }),
             }
-        </Paper>
+        )
+    
+        const { Attributes } = await response.json();        
+        
+        await refresh();
+        setIsModalOpen(false);
+    }
+
+    return (
+        <>
+            <Paper shadow='sm' radius='md' withBorder className={classes.videoFrame}>
+                {objectExists ?
+                    <>
+                        {isMobile ? (
+                            <ReactPlayer url={baseCloudFrontURL + key} controls={true} width='100%' height='auto' />
+                        ) : (
+                            <ReactPlayer url={baseCloudFrontURL + key} controls={true} width='640px' height='360px' />
+                        )}
+                    </>
+                    :
+                    <Flex direction="column" justify='center' align="center" p="lg" h="100%">
+                        <Text ta="center" fz="lg">
+                            Your video is uploading
+                        </Text>
+                        <Text ta="center" fz="sm" mt="xs" c="dimmed">
+                            If this process takes longer than 10 minutes, please reach out to support.
+                        </Text>
+                    </Flex>
+                }
+                <Center my="md">
+                    <Button onClick={() => setIsModalOpen(true)}>Delete Video</Button>
+                </Center>
+            </Paper>
+
+            <Modal
+                opened={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                size="lg"
+                title={<Text fz={30} fw={700}>Are you sure?</Text>}
+            >
+                <Center mt="md">
+                    <Flex direction='column'>
+                        <Text mb="lg">
+                            This will delete the video, transcription summary and spanish transcription.
+                        </Text>
+                        <Flex direction='row' gap='lg' justify='center' align='cemter'>
+                            <Button type="submit" onClick={deleteVideo}>Confirm</Button>
+                            <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        </Flex>
+                    </Flex>
+                </Center>
+            </Modal>
+        </>
     )
 }

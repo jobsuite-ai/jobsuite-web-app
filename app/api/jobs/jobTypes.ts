@@ -4,6 +4,7 @@ export type UpdateJobContent = {
     line_item?: JobLineItem,
     delete_line_item?: number,
     delete_image?: boolean,
+    delete_video?: boolean,
     video?: JobVideo,
     images?: JobImage[],
     job_status?: JobStatus,

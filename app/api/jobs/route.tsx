@@ -100,6 +100,7 @@ export async function PUT(request: Request) {
         jobID,
         typedContent.update_hours_and_rate,
     );
+    typedContent.delete_video && await deleteVideo(jobID);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -116,6 +117,23 @@ export async function DELETE(request: Request) {
         });
 
         const { Attributes } = await client.send(deleteCommand);
+
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function deleteVideo(jobID: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            Key: { id: { S: jobID } },
+            TableName: 'job',
+            UpdateExpression: `REMOVE video, transcription_summary, spanish_transcription`,
+            ReturnValues: 'UPDATED_NEW',
+        });
+
+        const { Attributes } = await client.send(updateItemCommand);
 
         return Response.json({ Attributes });
     } catch (error: any) {

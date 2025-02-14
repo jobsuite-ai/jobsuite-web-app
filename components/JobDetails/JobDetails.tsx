@@ -91,8 +91,12 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         setImages(job?.images ? job?.images.L.map((image) => image.M.name.S) : undefined)
     }
 
-    const handleOpenDocusealLink = () => {
-        window.open(job?.docuseal_link.S, '_blank'); 
+    const handleOpenExternalLink = (link: string) => {
+        window.open(link, '_blank'); 
+    };
+
+    const handleOpenJiraLink = () => {
+        window.open(job?.jira_link.S, '_blank'); 
     };
 
     const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';
@@ -112,7 +116,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                             <div className={classes.flexContainer}>
                                 <div className={classes.videoWrapper}>
                                     {job.video?.M?.name
-                                        ? <VideoFrame name={job.video.M.name.S} />
+                                        ? <VideoFrame name={job.video.M.name.S} jobID={jobID} refresh={getJob} />
                                         : <VideoUploader jobID={jobID} refresh={getJob} />
                                     }
                                 </div>
@@ -146,7 +150,14 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                 <Flex direction='row' justify='center' gap='xl' >
                                     {job.docuseal_link &&
                                         <ResourceLink
-                                            handler={handleOpenDocusealLink}
+                                            handler={() => handleOpenExternalLink(job.docuseal_link.S)}
+                                            icon={IconPencil}
+                                            label='Docuseal'
+                                        />
+                                    }
+                                    {job.jira_link &&
+                                        <ResourceLink
+                                            handler={() => handleOpenExternalLink(job.jira_link.S)}
                                             icon={IconPencil}
                                             label='Docuseal'
                                         />
