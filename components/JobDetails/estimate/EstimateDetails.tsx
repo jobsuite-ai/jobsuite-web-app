@@ -1,8 +1,8 @@
 "use client";
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
-import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
-import { JobStatus, SingleJob } from '@/components/Global/model';
+import { ClientInfo, TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
+import { DynamoClient, JobStatus, SingleJob } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 import { UploadNewTemplate } from '@/components/JobDetails/estimate/UploadNewTemplate';
 import { Flex, Paper } from '@mantine/core';
@@ -17,12 +17,30 @@ import EstimateTodo from './EstimateTodo';
 export default function EstimateDetails({ job }: { job: SingleJob }) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
+    const [client, setClient] = useState<DynamoClient>();
     const [template, setTemplate] = useState<string>('');
 
     useEffect(() => {
         setLoading(true);
+        const loadClientDetails = async () => {
+            const response = await fetch(
+                `/api/clients/${job.client_id.S}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                }
+            )
+    
+            const { Item } = await response.json();
+            setClient(Item);
+        }
+        if (!client) {
+            loadClientDetails();
+        }
         buildTemplate().finally(() => setLoading(false));
-    }, []);
+    }, [client]);
 
     const imagePath = job.images
             ? "https://rl-peek-job-images.s3.us-west-2.amazonaws.com/" + job.id.S + '/' +job.images.L[0].M.name.S
@@ -41,26 +59,28 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
             }))
         };
 
-        const template: TemplateInput = {
-            client: {
-                name: job.client_name.S,
-                city: job.city.S,
-                state: job.state.S,
-                email: job.client_email.S,
-                address: job.client_address.S,
-                phone: job.client_phone_number.S
-            },
-            items: lineItems,
-            image: imagePath,
-            notes: htmlString,
-            estimateNumber: uuidv4().split('-')[0],
-        };
-
-        setTemplate(generateTemplate(template));
+        if (client) {
+            const template: TemplateInput = {
+                client: {
+                    name: client.client_name.S,
+                    city: job.city.S,
+                    state: job.state.S,
+                    email: client.email.S,
+                    address: job.client_address.S,
+                    phone: client.phone_number.S
+                },
+                items: lineItems,
+                image: imagePath,
+                notes: htmlString,
+                estimateNumber: uuidv4().split('-')[0],
+            };
+    
+            setTemplate(generateTemplate(template));
+        }
     }
 
     return (
-        <>{loading || isSending ? <LoadingState /> :
+        <>{loading || isSending || !client ? <LoadingState /> :
             <div className={classes.jobDetailsWrapper}>
                 {job ? 
                     <>

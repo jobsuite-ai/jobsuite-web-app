@@ -17,7 +17,7 @@ import SpanishTranscription from './estimate/SpanishTranscription';
 import LineItems from './estimate/LineItems';
 import DescriptionOfWork from './DescriptionOfWork';
 import VideoUploader from './VideoUploader';
-import { IconPencil, IconSignature } from '@tabler/icons-react';
+import { IconPencil } from '@tabler/icons-react';
 import ResourceLink from './ResourceLink';
 import HoursAndRate from './HoursAndRate';
 
@@ -93,10 +93,6 @@ export default function JobDetails({ jobID }: { jobID: string }) {
 
     const handleOpenExternalLink = (link: string) => {
         window.open(link, '_blank'); 
-    };
-
-    const handleOpenJiraLink = () => {
-        window.open(job?.jira_link.S, '_blank'); 
     };
 
     const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';

@@ -1,18 +1,16 @@
 "use client";
 
-import { Badge, Button, Card, Center, Flex, Modal, Select, Text, TextInput } from '@mantine/core';
-import { IconEdit } from '@tabler/icons-react';
-import { DynamoClient, JobStatus, SingleJob } from '../Global/model';
-import updateJobStatus from '../Global/updateJobStatus';
-import { getBadgeColor, getFormattedStatus } from "../Global/utils";
-import { useEffect, useState } from 'react';
-import { DatePickerInput, DateValue } from '@mantine/dates';
-import '@mantine/core/styles.css'
-import '@mantine/dates/styles.css'
 import { UpdateClientDetailsInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { Badge, Button, Card, Center, Flex, Modal, Text, TextInput } from '@mantine/core';
+import '@mantine/core/styles.css';
+import '@mantine/dates/styles.css';
 import { useForm } from '@mantine/form';
+import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import LoadingState from '../Global/LoadingState';
+import { DynamoClient, SingleJob } from '../Global/model';
+import { getBadgeColor, getFormattedStatus } from "../Global/utils";
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
     const [job, setJob] = useState(initialJob);
@@ -56,40 +54,40 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         },
     });
 
-    const setJobStatus = (status: JobStatus) => {
-        updateJobStatus(status, job.id.S);
-        setJob(prevJob => ({
-            ...prevJob,
-            job_status: { S: status }
-        }));
-    }
+    // const setJobStatus = (status: JobStatus) => {
+    //     updateJobStatus(status, job.id.S);
+    //     setJob(prevJob => ({
+    //         ...prevJob,
+    //         job_status: { S: status }
+    //     }));
+    // }
 
-    const handleEstimateDateChange = async (estimateDate: DateValue) => {
-        const content: UpdateJobContent = {
-            estimate_date: estimateDate
-        }
+    // const handleEstimateDateChange = async (estimateDate: DateValue) => {
+    //     const content: UpdateJobContent = {
+    //         estimate_date: estimateDate
+    //     }
 
-        const response = await fetch(
-            '/api/jobs',
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ content: content, jobID: job.id.S }),
-            }
-        )
+    //     const response = await fetch(
+    //         '/api/jobs',
+    //         {
+    //             method: 'PUT',
+    //             headers: {
+    //                 'Content-Type': 'application/json',
+    //             },
+    //             body: JSON.stringify({ content: content, jobID: job.id.S }),
+    //         }
+    //     )
 
-        await response.json();
-        setJob(prevJob => ({
-            ...prevJob,
-            estimate_date: { S: estimateDate?.toISOString() as string }
-        }));
+    //     await response.json();
+    //     setJob(prevJob => ({
+    //         ...prevJob,
+    //         estimate_date: { S: estimateDate?.toISOString() as string }
+    //     }));
 
-        if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
-            setJobStatus(JobStatus.PENDING_ESTIMATE);
-        }
-    }
+    //     if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
+    //         setJobStatus(JobStatus.PENDING_ESTIMATE);
+    //     }
+    // }
 
     const updateJob = async () => {
         const formValues = form.getValues();
@@ -158,8 +156,8 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                     </Flex>
                     <Flex direction='column' gap="lg" mt="md" mb="xs">
                         <Flex direction='column'>
-                            <Text size="sm" c="dimmed">{job.client_email.S}</Text>
-                            <Text size="sm" c="dimmed">Client Phone: {job.client_phone_number.S}</Text>
+                            <Text size="sm" c="dimmed">{client.email.S}</Text>
+                            <Text size="sm" c="dimmed">Client Phone: {client.phone_number.S}</Text>
                         </Flex>
                         <Flex direction='column'>
                             <Text size="sm" c="dimmed">{job.client_address.S}</Text>
