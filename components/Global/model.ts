@@ -57,6 +57,7 @@ export type SingleJob = {
         S: JobStatus;
     };
     job_type: TypedDynamoStringReturn;
+    discount_reason: TypedDynamoStringReturn;
     line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
     season: TypedDynamoStringReturn;
     spanish_transcription: TypedDynamoStringReturn;
@@ -104,7 +105,8 @@ export type DynamoLineItem = {
     id: TypedDynamoStringReturn,
     header: TypedDynamoStringReturn,
     description: TypedDynamoStringReturn,
-    price: TypedDynamoNumberReturn
+    price: TypedDynamoNumberReturn,
+    hours: TypedDynamoNumberReturn
 }
 
 export enum JobStatus {

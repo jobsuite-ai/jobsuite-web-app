@@ -5,6 +5,8 @@ import { IconX } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
+const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === "true";
+
 export function LineItem({ lineItemDetails, jobID, index, removeLineItem }: { 
     lineItemDetails: DynamoLineItem, jobID: string, index: number, removeLineItem: Function
 }) {
@@ -52,7 +54,11 @@ export function LineItem({ lineItemDetails, jobID, index, removeLineItem }: {
                 />
                 <Group style={{ justifyContent: 'space-between', marginRight: '30px' }}>
                     <Text size="lg" pl='md'><strong>{lineItemDetails.header.S}</strong></Text>
-                    <Text size="sm">${price}</Text>
+                    {PRICE_BASED ?
+                        <Text size="sm">${price}</Text>
+                        :
+                        <Text size="sm">Hours: {lineItemDetails.hours.N}</Text>
+                    }
                 </Group>
                 <Text pl='md' pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
             </Card>

@@ -56,11 +56,12 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
                 header: item.M.header.S,
                 content: item.M.description.S,
                 price: +item.M.price.N,
+                hours: +item.M.hours.N,
             }))
         };
 
         if (client) {
-            const template: TemplateInput = {
+            const templateInput: TemplateInput = {
                 client: {
                     name: client.client_name.S,
                     city: job.city.S,
@@ -72,10 +73,12 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
                 items: lineItems,
                 image: imagePath,
                 notes: htmlString,
+                discountReason: 'Winter Discount',
                 estimateNumber: uuidv4().split('-')[0],
+                rate: Number(job.hourly_rate.N)
             };
     
-            setTemplate(generateTemplate(template));
+            setTemplate(generateTemplate(templateInput));
         }
     }
 

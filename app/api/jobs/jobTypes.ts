@@ -20,6 +20,7 @@ export type UpdateHoursAndRateInput = {
     hours: string,
     rate: string,
     date: string,
+    discount_reason: string,
 };
 
 export type UpdateClientDetailsInput = {
@@ -45,4 +46,5 @@ export type JobLineItem = {
     header: string;
     description: string;
     price: number;
+    hours: number;
 };

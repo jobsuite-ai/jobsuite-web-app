@@ -11,9 +11,12 @@ import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import classes from './styles/HoursAndRate.module.css';
 
+const FULL_RATE = process.env.NEXT_PUBLIC_FULL_RATE ? Number(process.env.NEXT_PUBLIC_FULL_RATE) : 106;
+
 export default function HoursAndRate({ job }: { job: SingleJob }) {
     const [hours, setHours] = useState(job.estimate_hours?.N ?? 0);
     const [rate, setRate] = useState(job.hourly_rate?.N ?? 106);
+    const [discountReason, setDiscountReason] = useState(job.discount_reason?.S ?? "Winter Discount");
     const [date, setDate] = useState(job.estimate_date?.S.split('T')[0] ?? 
         new Date().toISOString().split('T')[0]
     );
@@ -34,6 +37,10 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         setRate(event.target.value);
     }
 
+    const setEstimateDiscountReason = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        setDiscountReason(event.target.value);
+    }
+
     const setEstimateDate = async (estimateDate: DateValue) => {
         setEstimateDateState(estimateDate);
         setDate((estimateDate?.toISOString() as string).split('T')[0]);
@@ -47,7 +54,8 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         const updateJobContent: UpdateHoursAndRateInput = {
             hours: hours,
             rate: rate,
-            date: date
+            date: date,
+            discount_reason: discountReason,
         }
 
         const content: UpdateJobContent = {
@@ -97,6 +105,14 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                         value={rate}
                         onChange={setEstimateRate}
                     />
+                    {Number(rate) != FULL_RATE &&
+                        <TextInput
+                            label='Discount Reason'
+                            placeholder='Set discount reason'
+                            value={discountReason}
+                            onChange={setEstimateDiscountReason}
+                        /> 
+                    }
                     <DatePickerInput
                         label='Estimate Date'
                         valueFormat='MMM DD, YYYY'
@@ -111,6 +127,9 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                     <Text size="sm" mr='lg' fw={700}>Job hours: {hours}</Text>
                     <Text size="sm" fw={700}>Job rate: ${rate}</Text>
                 </div>
+                <Center mb="md">
+                    {Number(rate) != FULL_RATE && <Text size="sm">Discount reason: {discountReason}</Text>}
+                </Center>
                 <Center>
                     <Text size="sm">Estimate date: {date}</Text>
                 </Center>

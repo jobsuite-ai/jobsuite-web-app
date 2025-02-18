@@ -11,6 +11,8 @@ import LoadingState from '@/components/Global/LoadingState';
 import classes from './Estimate.module.css'
 import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
+const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === "true";
+
 export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -22,55 +24,67 @@ export default function LineItems({ job }: { job: SingleJob }) {
             header: '',
             description: 'Please see the description above',
             price: 0,
+            hours: 0,
+        },
+        validate: (values) => {
+            return {
+                header: values.header === '' ? 'Must enter header' : null
+            }
         },
     });
 
     async function addLineItem() {
-        setIsUploading(true);
-        const formValues = form.getValues();
-        const lineItemID = uuidv4();
+        if (!form.validate().hasErrors) {
+            setIsUploading(true);
+            const formValues = form.getValues();
+            const lineItemID = uuidv4();
 
-        const content: UpdateJobContent = {
-            line_item: {
-                id: lineItemID,
-                header: formValues.header,
-                description: formValues.description,
-                price: formValues.price
-            }
-        }
-
-        const response = await fetch(
-            `/api/jobs`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ content: content, jobID: job.id.S }),
-            }
-        )
-
-        const { Attributes } = await response.json();
-
-        setLineItems([...lineItems, {
-            M: {
-                id: {
-                    S: lineItemID
-                },
-                header: {
-                    S: formValues.header
-                },
-                description: {
-                    S: formValues.description
-                },
-                price: {
-                    N: formValues.price.toString()
+            const content: UpdateJobContent = {
+                line_item: {
+                    id: lineItemID,
+                    header: formValues.header,
+                    description: formValues.description,
+                    price: formValues.price,
+                    hours: formValues.hours,
                 }
             }
-        }]);
 
-        setIsUploading(false);
-        setOpened(false);
+            const response = await fetch(
+                `/api/jobs`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content: content, jobID: job.id.S }),
+                }
+            )
+
+            const { Attributes } = await response.json();
+
+            setLineItems([...lineItems, {
+                M: {
+                    id: {
+                        S: lineItemID
+                    },
+                    header: {
+                        S: formValues.header
+                    },
+                    description: {
+                        S: formValues.description
+                    },
+                    price: {
+                        N: formValues.price.toString()
+                    },
+                    hours: {
+                        N: formValues.hours.toString()
+                    }
+                }
+            }]);
+
+            setIsUploading(false);
+            setOpened(false);
+        }
     }
 
     const removeLineItem = (id: string) => {
@@ -126,21 +140,34 @@ export default function LineItems({ job }: { job: SingleJob }) {
                             key={form.key('description')}
                             {...form.getInputProps('description')}
                         />
-
-                        <NumberInput
-                            defaultValue={1000}
-                            prefix='$'
-                            thousandsGroupStyle='thousand'
-                            decimalScale={2}
-                            allowLeadingZeros={false}
-                            allowNegative={false}
-                            fixedDecimalScale={true}
-                            withAsterisk
-                            label="Price"
-                            placeholder="Enter the price"
-                            key={form.key('price')}
-                            {...form.getInputProps('price')}
-                        />
+                        {PRICE_BASED ? 
+                            <NumberInput
+                                defaultValue={1000}
+                                prefix='$'
+                                thousandsGroupStyle='thousand'
+                                decimalScale={2}
+                                allowLeadingZeros={false}
+                                allowNegative={false}
+                                fixedDecimalScale={true}
+                                withAsterisk
+                                label="Price"
+                                placeholder="Enter the price"
+                                key={form.key('price')}
+                                {...form.getInputProps('price')}
+                            />
+                            :
+                            <NumberInput
+                                defaultValue={0}
+                                allowLeadingZeros={false}
+                                allowNegative={false}
+                                fixedDecimalScale={true}
+                                withAsterisk
+                                label="Hours"
+                                placeholder="Enter the job hours"
+                                key={form.key('hours')}
+                                {...form.getInputProps('hours')}
+                            />
+                        }
 
                         <Group mt="md">
                             <Button type="submit" onClick={addLineItem}>Add Line Item</Button>

@@ -3,12 +3,15 @@ export type TemplateInput = {
     items: TemplateDescription[];
     notes: string;
     image: string;
+    discountReason: string;
     estimateNumber: string;
+    rate: number;
 };
 
 export type TemplateDescription = {
     header: string;
     price: number;
+    hours: number;
     content: string;
 };
 
