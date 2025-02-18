@@ -12,7 +12,7 @@ export type TemplateDescription = {
     content: string;
 };
 
-type ClientInfo = {
+export type ClientInfo = {
     name: string;
     city: string;
     state: string;

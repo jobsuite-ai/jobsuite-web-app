@@ -77,8 +77,6 @@ export async function GET() {
 export async function PUT(request: Request) {
     const { jobID, content } = await request.json();
     const typedContent: UpdateJobContent = content as UpdateJobContent;
-    console.log(typedContent);
-    console.log(jobID);
 
     typedContent.video && await setVideoFields(jobID, typedContent.video);
     typedContent.images && await addImages(jobID, typedContent.images);
@@ -99,7 +97,7 @@ export async function PUT(request: Request) {
         typedContent.update_client_details
     );
     typedContent.update_client_name && await updateClientName(
-        jobID, 
+        jobID,
         typedContent.update_client_name
     );
     typedContent.update_hours_and_rate && await updateHoursAndRate(
@@ -135,7 +133,7 @@ async function deleteVideo(jobID: string) {
         const updateItemCommand = new UpdateItemCommand({
             Key: { id: { S: jobID } },
             TableName: 'job',
-            UpdateExpression: `REMOVE video, transcription_summary, spanish_transcription`,
+            UpdateExpression: 'REMOVE video, transcription_summary, spanish_transcription',
             ReturnValues: 'UPDATED_NEW',
         });
 
@@ -201,14 +199,12 @@ async function addLineItem(jobID: string, lineItem: JobLineItem) {
 async function updateClientName(jobID: string, clientName: string) {
     try {
         const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {':name': { S: clientName }},
+            ExpressionAttributeValues: { ':name': { S: clientName } },
             Key: { id: { S: jobID } },
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
-            UpdateExpression: `SET client_name = :name`,
+            UpdateExpression: 'SET client_name = :name',
         });
-
-        console.log(updateItemCommand);
 
         const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });

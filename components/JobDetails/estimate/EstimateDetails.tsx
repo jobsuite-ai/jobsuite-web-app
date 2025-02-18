@@ -1,11 +1,11 @@
 "use client";
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
-import { ClientInfo, TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
+import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
 import { DynamoClient, JobStatus, SingleJob } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 import { UploadNewTemplate } from '@/components/JobDetails/estimate/UploadNewTemplate';
-import { Flex, Paper } from '@mantine/core';
+import { Paper } from '@mantine/core';
 import classes from '../styles/JobDetails.module.css';
 import { remark } from 'remark';
 import html from 'remark-html';
