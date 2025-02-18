@@ -131,8 +131,6 @@ export function NewJobWorkflow() {
                     city: formValues.city,
                     state: formValues.state,
                     zip_code: formValues.zip_code,
-                    client_email: formValues.client_email,
-                    client_phone_number: formValues.client_phone_number,
                     video: formValues.video,
                     job_type: formValues.job_type,
                     hourly_rate: hourly_rate,

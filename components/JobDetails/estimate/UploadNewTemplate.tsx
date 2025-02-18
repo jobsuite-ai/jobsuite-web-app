@@ -5,7 +5,12 @@ import { JobStatus, SingleJob } from '../../Global/model';
 import updateJobStatus from '@/components/Global/updateJobStatus';
 import { notifications } from '@mantine/notifications';
 
-export function UploadNewTemplate({ template, job, setLoading }: { template: string, job: SingleJob, setLoading: Function }) {
+export function UploadNewTemplate({ template, job, clientEmail, setLoading }: { 
+    template: string,
+    job: SingleJob,
+    clientEmail: string,
+    setLoading: Function
+}) {
     async function createAndSendTemplate() {
         setLoading(true);
         const templateResponse = await fetch(
@@ -28,7 +33,7 @@ export function UploadNewTemplate({ template, job, setLoading }: { template: str
                 body: JSON.stringify({
                     template_id: templateData.out.id,
                     jobID: job.id.S,
-                    client_email: job.client_email.S,
+                    client_email: clientEmail,
                 })
             }
         );
