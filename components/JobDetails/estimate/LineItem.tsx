@@ -54,10 +54,10 @@ export function LineItem({ lineItemDetails, jobID, index, removeLineItem }: {
                 />
                 <Group style={{ justifyContent: 'space-between', marginRight: '30px' }}>
                     <Text size="lg" pl='md'><strong>{lineItemDetails.header.S}</strong></Text>
-                    {PRICE_BASED ?
-                        <Text size="sm">${price}</Text>
-                        :
+                    {!PRICE_BASED && lineItemDetails.hours ?
                         <Text size="sm">Hours: {lineItemDetails.hours.N}</Text>
+                        :
+                        <Text size="sm">${price}</Text>
                     }
                 </Group>
                 <Text pl='md' pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
