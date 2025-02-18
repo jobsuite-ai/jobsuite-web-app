@@ -5,25 +5,22 @@ const FULL_RATE = +RATE;
 
 const getPrice = (description: TemplateDescription) => {
     if (description.hours) {
-        return getPriceFromNumber(Number(description.hours)*FULL_RATE);
-    } else {
-        return getPriceFromNumber(description.price);
+        return getPriceFromNumber(Number(description.hours) * FULL_RATE);
     }
-}
+        return getPriceFromNumber(description.price);
+};
 
-const getDiscountedPrice = (hours: number, rate: number) => {
-    return getPriceFromNumber(hours*rate);
-}
+const getDiscountedPrice = (hours: number, rate: number) => getPriceFromNumber(hours * rate);
 
 const getDiscountedSubtotal = (price: number, rate: number) => {
-    const multiplier = rate/FULL_RATE;
-    return getPriceFromNumber(price*multiplier);
-}
+    const multiplier = rate / FULL_RATE;
+    return getPriceFromNumber(price * multiplier);
+};
 
 const getDiscountedTotal = (total: number, rate: number) => {
-    const hours = total/FULL_RATE;
-    return getPriceFromNumber(hours*(FULL_RATE-rate));
-}
+    const hours = total / FULL_RATE;
+    return getPriceFromNumber(hours * (FULL_RATE - rate));
+};
 
 const generateDescriptions = (descriptions: TemplateDescription[]) => {
     let output = '';
@@ -45,18 +42,22 @@ const generateDescriptions = (descriptions: TemplateDescription[]) => {
     return output;
 };
 
-const generateTotals = (descriptions: TemplateDescription[], discountReason: string, rate: number) => {
+const generateTotals = (
+    descriptions: TemplateDescription[],
+    discountReason: string,
+    rate: number
+) => {
     let output = '';
     let total = 0;
     const hasHours = Boolean(descriptions[0]?.hours);
-    const percentDiscount = 100 - (Math.round((rate/FULL_RATE)*100));
+    const percentDiscount = 100 - (Math.round((rate / FULL_RATE) * 100));
 
     descriptions.forEach((description) => {
-        total += hasHours ? Number(description.hours)*FULL_RATE : description.price;
+        total += hasHours ? Number(description.hours) * FULL_RATE : description.price;
         const html = `
             <div class="subtotal">
                 <div>${description.header}</div>
-                ${rate == FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPrice(description)}</div>`
+                ${rate === FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPrice(description)}</div>`
                     : `
                         <div style="display: flex; flex-direction: column">
                             <div style="font-weight: normal; text-decoration: line-through;">${getPrice(description)}</div>
@@ -69,11 +70,10 @@ const generateTotals = (descriptions: TemplateDescription[], discountReason: str
         output += html;
     });
 
-
     const subAndTotal = `
         <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
             <div>Subtotal</div>
-            ${rate == FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPriceFromNumber(total)}</div>`
+            ${rate === FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPriceFromNumber(total)}</div>`
                 : `
                     <div style="display: flex; flex-direction: column">
                         <div style="font-weight: normal; text-decoration: line-through;">${getPriceFromNumber(total)}</div>
@@ -82,7 +82,7 @@ const generateTotals = (descriptions: TemplateDescription[], discountReason: str
                 `
             }
         </div>
-        ${rate == FULL_RATE || !hasHours ? `` : `
+        ${rate === FULL_RATE || !hasHours ? '' : `
             <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
                 <div style="color: green;">${discountReason} (${percentDiscount}%)</div>
                 <div style="font-weight: normal; color: green">${getDiscountedTotal(total, rate)}</div>
@@ -90,7 +90,7 @@ const generateTotals = (descriptions: TemplateDescription[], discountReason: str
         `}
         <div class="total">
             <p>Total</p>
-            <p>${rate == FULL_RATE || !hasHours ? getPriceFromNumber(total) : getDiscountedSubtotal(total, rate)}</p>
+            <p>${rate === FULL_RATE || !hasHours ? getPriceFromNumber(total) : getDiscountedSubtotal(total, rate)}</p>
         </div>
     `;
 
