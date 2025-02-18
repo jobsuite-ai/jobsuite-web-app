@@ -11,7 +11,7 @@ export type TemplateInput = {
 export type TemplateDescription = {
     header: string;
     price: number;
-    hours: number;
+    hours?: number;
     content: string;
 };
 
