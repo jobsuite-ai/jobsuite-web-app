@@ -84,6 +84,7 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
             padding="lg"
             radius="md"
             withBorder
+            mt="md"
         >
             <div style={{ position: 'relative' }}>
                 <IconEdit
@@ -123,16 +124,12 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                 </div>
             :
             <>
-                <div className={classes.flexContainer}>
+                <Flex justify='center' direction='column' gap='md' >
                     <Text size="sm" mr='lg' fw={700}>Job hours: {hours}</Text>
                     <Text size="sm" fw={700}>Job rate: ${rate}</Text>
-                </div>
-                <Center mb="md">
                     {Number(rate) != FULL_RATE && <Text size="sm">Discount reason: {discountReason}</Text>}
-                </Center>
-                <Center>
                     <Text size="sm">Estimate date: {date}</Text>
-                </Center>
+                </Flex>
             </>
             }
             {edit && 

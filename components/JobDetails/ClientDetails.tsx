@@ -54,41 +54,6 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         },
     });
 
-    // const setJobStatus = (status: JobStatus) => {
-    //     updateJobStatus(status, job.id.S);
-    //     setJob(prevJob => ({
-    //         ...prevJob,
-    //         job_status: { S: status }
-    //     }));
-    // }
-
-    // const handleEstimateDateChange = async (estimateDate: DateValue) => {
-    //     const content: UpdateJobContent = {
-    //         estimate_date: estimateDate
-    //     }
-
-    //     const response = await fetch(
-    //         '/api/jobs',
-    //         {
-    //             method: 'PUT',
-    //             headers: {
-    //                 'Content-Type': 'application/json',
-    //             },
-    //             body: JSON.stringify({ content: content, jobID: job.id.S }),
-    //         }
-    //     )
-
-    //     await response.json();
-    //     setJob(prevJob => ({
-    //         ...prevJob,
-    //         estimate_date: { S: estimateDate?.toISOString() as string }
-    //     }));
-
-    //     if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
-    //         setJobStatus(JobStatus.PENDING_ESTIMATE);
-    //     }
-    // }
-
     const updateJob = async () => {
         const formValues = form.getValues();
 
@@ -132,7 +97,6 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                     padding="lg"
                     radius="md"
                     withBorder
-                    style={{ height: '99%' }}
                 >
                     <div style={{ position: 'relative' }}>
                         <IconEdit

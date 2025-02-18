@@ -118,11 +118,11 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                 </div>
                                 <div className={classes.detailsWrapper}>
                                     <ClientDetails initialJob={job} />
+                                    <HoursAndRate job={job}/>
                                 </div>
                             </div>
                             <Flex direction='column' gap='md' className={classes.jobFieldWrapper}>
                                 <DescriptionOfWork job={job} />
-                                <HoursAndRate job={job}/>
                                 <div className={classes.imageAndHoverContainer}>
                                     <div style={{ flexGrow: '2' }}>
                                         <JobImage jobID={jobID} imageName={fileNameFromDynamo} />
