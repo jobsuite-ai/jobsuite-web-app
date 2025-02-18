@@ -9,6 +9,7 @@ import { getBadgeColor, getFormattedStatus } from "../Global/utils";
 import classes from './Clients.module.css';
 import { IconEdit } from "@tabler/icons-react";
 import { useForm } from "@mantine/form";
+import { UpdateJobContent } from "@/app/api/jobs/jobTypes";
 
 export default function SingleClient({ initialClient }: { initialClient: DynamoClient }) {
     const [client, setClient] = useState(initialClient);
@@ -77,6 +78,24 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
         )
 
         await response.json();
+
+        const jobPromises = client.jobs.L.map(async (job) => {
+            const content: UpdateJobContent = {
+                update_client_name: formValues.client_name
+            };
+        
+            const jobsResponse = await fetch('/api/jobs', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content: content, jobID: job.S }),
+            });
+        
+            return jobsResponse.json();
+        });
+        
+        await Promise.all(jobPromises);
 
         setClient(prevClient => ({
             ...prevClient,

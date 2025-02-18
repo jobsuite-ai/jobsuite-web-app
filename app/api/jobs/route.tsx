@@ -77,6 +77,8 @@ export async function GET() {
 export async function PUT(request: Request) {
     const { jobID, content } = await request.json();
     const typedContent: UpdateJobContent = content as UpdateJobContent;
+    console.log(typedContent);
+    console.log(jobID);
 
     typedContent.video && await setVideoFields(jobID, typedContent.video);
     typedContent.images && await addImages(jobID, typedContent.images);
@@ -95,6 +97,10 @@ export async function PUT(request: Request) {
     typedContent.update_client_details && await updateClientDetails(
         jobID,
         typedContent.update_client_details
+    );
+    typedContent.update_client_name && await updateClientName(
+        jobID, 
+        typedContent.update_client_name
     );
     typedContent.update_hours_and_rate && await updateHoursAndRate(
         jobID,
@@ -186,6 +192,25 @@ async function addLineItem(jobID: string, lineItem: JobLineItem) {
 
         const { Attributes } = await client.send(updateItemCommand);
 
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updateClientName(jobID: string, clientName: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: {':name': { S: clientName }},
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: `SET client_name = :name`,
+        });
+
+        console.log(updateItemCommand);
+
+        const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });
     } catch (error: any) {
         return Response.json({ error: error.message });
