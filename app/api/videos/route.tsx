@@ -1,5 +1,6 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+
 import { logToCloudWatch } from '@/public/logger';
 
 export async function POST(request: Request) {

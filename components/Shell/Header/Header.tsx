@@ -1,15 +1,17 @@
-"use client";
+'use client';
 
-import { useUser } from "@auth0/nextjs-auth0/client";
+import { MouseEvent, useEffect, useState } from 'react';
+
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, rem } from '@mantine/core';
 import { IconSearch, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { MouseEvent, useEffect, useState } from 'react';
-import { RLPPLogo } from '../../Global/RLPPLogo';
-import classes from './Header.module.css';
-import { Client } from "@/components/Global/model";
 
+import classes from './Header.module.css';
+import { RLPPLogo } from '../../Global/RLPPLogo';
+
+import { Client } from '@/components/Global/model';
 
 const links = [
   { link: '/jobs', label: 'Jobs' },
@@ -35,10 +37,13 @@ export function Header() {
     }
   }, [clients]);
 
-  const handleNavLinkClick = (event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>, link: string) => {
+  const handleNavLinkClick = (
+    event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
+    link: string
+  ) => {
     event.preventDefault();
     router.push(link);
-  }
+  };
 
   const items = links.map((link) => (
     <Link
@@ -58,9 +63,9 @@ export function Header() {
               method: 'GET',
               headers: {
                   'Content-Type': 'application/json',
-              }
+              },
           }
-      )
+      );
 
       const { Items }: { Items: Client[] } = await response.json();
       setClients(
@@ -75,7 +80,7 @@ export function Header() {
     <Group gap="sm">
       {clients &&
         <>
-        <Avatar src={'/black-circle-user-symbol.png'} size={36} radius="xl" />
+        <Avatar src="/black-circle-user-symbol.png" size={36} radius="xl" />
         <div>
           <Text size="sm">{clients[option.value].client_name}</Text>
           <Text size="xs" opacity={0.5}>
@@ -91,8 +96,8 @@ export function Header() {
     <header className={classes.header}>
       <div className={classes.inner}>
         <Link
-          key={'Home'}
-          href={'/'}
+          key="Home"
+          href="/"
           onClick={(event) => handleNavLinkClick(event, '/')}
         >
           <RLPPLogo />
@@ -107,7 +112,7 @@ export function Header() {
           <Autocomplete
             style={{ marginRight: rem(12) }}
             className={classes.search}
-            placeholder='Search by client name'
+            placeholder="Search by client name"
             value={autocompleteValue}
             leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
             renderOption={renderAutocompleteOption}
@@ -116,7 +121,7 @@ export function Header() {
             onChange={(item) => {
               setAutocompleteValue(item);
               if (clients && data?.includes(item)) {
-                router.push(`/clients/${clients[item].id}`)
+                router.push(`/clients/${clients[item].id}`);
                 setAutocompleteValue('');
               }
             }}
@@ -124,11 +129,11 @@ export function Header() {
           <Divider orientation="vertical" />
           <Link
             style={{ marginTop: rem(5) }}
-            key={'Profile'}
-            href={'/profile'}
+            key="Profile"
+            href="/profile"
             onClick={(event) => handleNavLinkClick(event, '/profile')}
           >
-            <IconUser color='black' size={28} radius="xl" />
+            <IconUser color="black" size={28} radius="xl" />
           </Link>
         </Group>
       </div>

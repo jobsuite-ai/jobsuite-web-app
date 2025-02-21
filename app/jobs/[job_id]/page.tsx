@@ -1,8 +1,10 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+
 import { useUser } from '@auth0/nextjs-auth0/client';
+import { useParams, useRouter } from 'next/navigation';
+
 import JobDetails from '@/components/JobDetails/JobDetails';
 
 export default function Job() {

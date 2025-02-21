@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect } from 'react';
+
+import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import '@mantine/carousel/styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
-import { UserProvider } from '@auth0/nextjs-auth0/client';
 
 import { Shell } from '@/components/Shell/Shell';
 

@@ -1,11 +1,13 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
 import { useUser } from '@auth0/nextjs-auth0/client';
+import { useParams, useRouter } from 'next/navigation';
+
 import SingleClient from '@/components/Clients/Client';
-import { DynamoClient } from '@/components/Global/model';
 import LoadingState from '@/components/Global/LoadingState';
+import { DynamoClient } from '@/components/Global/model';
 
 export default function Clients() {
     const [client, setClient] = useState<DynamoClient>();

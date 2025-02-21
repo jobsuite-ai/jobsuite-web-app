@@ -1,9 +1,10 @@
-"use client";
+'use client';
 
-import { useUser } from "@auth0/nextjs-auth0/client";
-import { SignupButton } from "@/components/AuthButtons/signup-button";
-import { LoginButton } from "@/components/AuthButtons/login-button";
-import { LogoutButton } from "@/components/AuthButtons/logout-button";
+import { useUser } from '@auth0/nextjs-auth0/client';
+
+import { LoginButton } from '@/components/AuthButtons/login-button';
+import { LogoutButton } from '@/components/AuthButtons/logout-button';
+import { SignupButton } from '@/components/AuthButtons/signup-button';
 
 export default function AuthButtons() {
   const { user } = useUser();
@@ -23,4 +24,4 @@ export default function AuthButtons() {
       )}
     </div>
   );
-};
+}

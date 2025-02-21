@@ -1,14 +1,15 @@
-"use client";
+'use client';
 
-import AuthButtons from "@/components/Navigation/AuthButtons";
-import { useUser } from "@auth0/nextjs-auth0/client";
-import { Loader, rem } from "@mantine/core";
+import { useUser } from '@auth0/nextjs-auth0/client';
+import { Loader, rem } from '@mantine/core';
+
+import AuthButtons from '@/components/Navigation/AuthButtons';
 
 export default function ProfilePage() {
     const { user, error, isLoading } = useUser();
 
-    if (isLoading) return <Loader color="blue" size="xl" style={{ display: 'flex', justifySelf: 'center', marginTop: rem(150) }} />
-    if (error) return <h1 style={{ textAlign: 'center' }}>{error.message}</h1>
+    if (isLoading) return <Loader color="blue" size="xl" style={{ display: 'flex', justifySelf: 'center', marginTop: rem(150) }} />;
+    if (error) return <h1 style={{ textAlign: 'center' }}>{error.message}</h1>;
 
     return (
         <>
@@ -24,4 +25,4 @@ export default function ProfilePage() {
             <AuthButtons />
         </>
     );
-};
+}

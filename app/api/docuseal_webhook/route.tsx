@@ -1,8 +1,9 @@
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+
+import createJiraTicket from '@/components/Global/createJiraTicket';
 import { JobStatus } from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
-import createJiraTicket from '@/components/Global/createJiraTicket';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);

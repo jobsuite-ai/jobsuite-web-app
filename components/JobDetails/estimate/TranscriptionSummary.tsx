@@ -1,16 +1,22 @@
-"use client";
+'use client';
+
+import { useState } from 'react';
 
 import { Button, Group, Paper, Text } from '@mantine/core';
-import MarkdownRenderer from '../../Global/MarkdownRenderer';
-import { SingleJob } from '../../Global/model';
 import { notifications } from '@mantine/notifications';
 import { IconCopy, IconEdit, IconReload } from '@tabler/icons-react';
-import classes from './Estimate.module.css'
-import LoadingState from '@/components/Global/LoadingState';
-import { useState } from 'react';
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
-export default function TranscriptionSummary({ job, refresh }: { job: SingleJob, refresh: Function }) {
+import classes from './Estimate.module.css';
+import MarkdownRenderer from '../../Global/MarkdownRenderer';
+import { SingleJob } from '../../Global/model';
+
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import LoadingState from '@/components/Global/LoadingState';
+
+export default function TranscriptionSummary({ job, refresh }: {
+    job: SingleJob,
+    refresh: Function
+}) {
     const [editMarkdown, setEditMarkdown] = useState(false);
     const [markdown, setMarkdown] = useState(job.transcription_summary?.S ?? '');
     const [loading, setLoading] = useState(false);
@@ -42,29 +48,29 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
     };
 
     const handleMarkdownChange = (event: any) => {
-        setMarkdown(event.target.value); 
+        setMarkdown(event.target.value);
     };
 
     const handleEditSave = async () => {
         const content: UpdateJobContent = {
-            transcription_summary: markdown
-        }
+            transcription_summary: markdown,
+        };
 
         const response = await fetch(
-            `/api/jobs`,
+            '/api/jobs',
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content: content, jobID: job.id.S }),
+                body: JSON.stringify({ content, jobID: job.id.S }),
             }
-        )
+        );
 
-        const { Attributes } = await response.json();
+        await response.json();
         job.transcription_summary.S = markdown;
         setEditMarkdown(false);
-    }
+    };
 
     const reload = async () => {
         setLoading(true);
@@ -74,15 +80,15 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
     return (
         <>
             {job.video?.M?.name &&
-                <Paper shadow='sm' radius='md' withBorder p='lg' className={classes.estimateWrapper}>
-                    {job.transcription_summary?.S ? 
+                <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.estimateWrapper}>
+                    {job.transcription_summary?.S ?
                         <>
                             {editMarkdown ?
                                 <>
                                     <textarea
-                                        value={markdown}
-                                        onChange={handleMarkdownChange}
-                                        style={{
+                                      value={markdown}
+                                      onChange={handleMarkdownChange}
+                                      style={{
                                             width: '100%',
                                             height: '300px',
                                             padding: '10px',
@@ -91,7 +97,7 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
                                             border: '1px solid #ccc',
                                             borderRadius: '5px',
                                         }}
-                                        placeholder={markdown}
+                                      placeholder={markdown}
                                     />
                                     <Group justify="center" mt="lg">
                                         <Button onClick={handleEditSave}>Save</Button>
@@ -101,19 +107,19 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
                                 <>
                                     <div style={{ position: 'relative' }}>
                                         <IconCopy
-                                            onClick={() => copyToClipboard()}
-                                            style={{ cursor: 'pointer', position: 'absolute', top: '20px', right: '0px' }}
+                                          onClick={() => copyToClipboard()}
+                                          style={{ cursor: 'pointer', position: 'absolute', top: '20px', right: '0px' }}
                                         />
                                         <IconEdit
-                                            onClick={() => handleEdit()}
-                                            style={{ cursor: 'pointer', position: 'absolute', top: '20px', right: '35px' }}
+                                          onClick={() => handleEdit()}
+                                          style={{ cursor: 'pointer', position: 'absolute', top: '20px', right: '35px' }}
                                         />
                                     </div>
                                     <MarkdownRenderer markdown={job.transcription_summary.S} />
                                 </>
                             }
                         </>
-                        : 
+                        :
                         <>
                             {loading ?
                                 <LoadingState size="sm" />
@@ -121,8 +127,8 @@ export default function TranscriptionSummary({ job, refresh }: { job: SingleJob,
                                 <>
                                     <div style={{ position: 'relative' }}>
                                         <IconReload
-                                            onClick={() => reload()}
-                                            style={{ cursor: 'pointer', position: 'absolute', right: '0px' }}
+                                          onClick={() => reload()}
+                                          style={{ cursor: 'pointer', position: 'absolute', right: '0px' }}
                                         />
                                     </div>
                                     <Text>The transcription summary is still processing.</Text>

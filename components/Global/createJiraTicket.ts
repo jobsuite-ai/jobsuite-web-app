@@ -1,6 +1,7 @@
-import { logToCloudWatch } from '@/public/logger';
 import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import axios from 'axios';
+
+import { logToCloudWatch } from '@/public/logger';
 
 const client = new DynamoDBClient({});
 
@@ -23,7 +24,7 @@ export default async function createJiraTicket(
       project: {
         key: projectKey,
       },
-      summary: summary,
+      summary,
       description: {
         type: 'doc',
         version: 1,
@@ -64,7 +65,7 @@ export default async function createJiraTicket(
 
     await client.send(updateItemCommand);
 
-    await logToCloudWatch(`Job updated with Jira link successfully`);
+    await logToCloudWatch('Job updated with Jira link successfully');
     return response.data; // Return the response from Jira
   } catch (error: any) {
     logToCloudWatch(`Error creating Jira ticket: ${JSON.stringify(error.response?.data) || error.message}, stack: ${error.stack}`);

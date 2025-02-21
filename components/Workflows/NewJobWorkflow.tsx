@@ -1,13 +1,15 @@
-"use client";
+'use client';
+
+import { useEffect, useState } from 'react';
 
 import { Button, Group, Stepper } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useEffect, useState } from 'react';
-import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
-import { NewJobWorkInformation } from '../Forms/NewJobForm/NewJobWorkInformation';
-import { v4 as uuidv4 } from 'uuid';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
+
+import { NewJobBasicInformation } from '../Forms/NewJobForm/NewJobBasicInformation';
+import { NewJobWorkInformation } from '../Forms/NewJobForm/NewJobWorkInformation';
 
 const NUMBER_OF_STEPS = 2;
 
@@ -45,14 +47,14 @@ export function NewJobWorkflow() {
                     client_address: values.client_address === '' ? 'Must enter client address' : null,
                     client_email: /^\S+@\S+$/.test(values.client_email) ? null : 'Invalid email',
                     client_phone_number: values.client_phone_number === '' ? 'Must enter client phone number' : null,
-                }
+                };
             }
             if (active === 1) {
                 return {
                     job_type: values.job_type === '' ? 'Must enter job type' : null,
-                    season: values.season === '' ? 
+                    season: values.season === '' ?
                         'Must enter seasonal rate, this can be edited later on' : null,
-                }
+                };
             }
             return {};
         },
@@ -70,20 +72,20 @@ export function NewJobWorkflow() {
             const content = {
                 job: {
                     jobID: formValues.jobID,
-                    timestamp: today
-                }
-            }
+                    timestamp: today,
+                },
+            };
 
             const response = await fetch(
-                `/api/clients`,
+                '/api/clients',
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content: content, clientID: formValues.client_id }),
+                    body: JSON.stringify({ content, clientID: formValues.client_id }),
                 }
-            )
+            );
 
             await response.json();
         } else {
@@ -105,11 +107,11 @@ export function NewJobWorkflow() {
                         zip_code: formValues.zip_code,
                         email: formValues.client_email,
                         phone_number: formValues.client_phone_number,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     }),
                 }
-            )
-            const out = await response.json();
+            );
+            await response.json();
         }
     }
 
@@ -133,10 +135,10 @@ export function NewJobWorkflow() {
                     zip_code: formValues.zip_code,
                     video: formValues.video,
                     job_type: formValues.job_type,
-                    hourly_rate: hourly_rate,
+                    hourly_rate,
                 }),
             }
-        )
+        );
 
         if (response.ok) {
             notifications.show({
@@ -183,7 +185,7 @@ export function NewJobWorkflow() {
 
             <Group justify="flex-end" mt="xl">
                 {active === NUMBER_OF_STEPS && (
-                    <Button style={{ margin: "auto" }} onClick={goToJobList}>
+                    <Button style={{ margin: 'auto' }} onClick={goToJobList}>
                         Go to Job List
                     </Button>
                 )}
@@ -193,7 +195,7 @@ export function NewJobWorkflow() {
                     </Button>
                 )}
                 {active !== NUMBER_OF_STEPS && (
-                    active === 1 ? 
+                    active === 1 ?
                     <Button onClick={nextStep}>Submit</Button>
                     :
                     <Button onClick={nextStep}>Next step</Button>

@@ -1,17 +1,19 @@
+import { useState } from 'react';
+
 import {
   IconArrowLeft,
   IconClockQuestion,
   IconListTree,
-  IconMessage2
+  IconMessage2,
 } from '@tabler/icons-react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+
 import classes from './JobDetailsSideNav.module.css';
 
 const data = [
   { link: 'overview', label: 'Overview', icon: IconListTree },
   { link: 'estimate', label: 'Estimate Preview', icon: IconClockQuestion },
-  { link: 'comments', label: 'Comments', icon: IconMessage2 }
+  { link: 'comments', label: 'Comments', icon: IconMessage2 },
 ];
 
 export function JobDetailsSideNav() {
@@ -28,7 +30,7 @@ export function JobDetailsSideNav() {
       onClick={(event) => {
         event.preventDefault();
         setActive(item.label);
-        router.push(`?page=${item.link}`)
+        router.push(`?page=${item.link}`);
       }}
     >
       <item.icon className={classes.linkIcon} stroke={1.5} />
@@ -39,12 +41,15 @@ export function JobDetailsSideNav() {
   return (
     <aside className={classes.navbar}>
       <div className={classes.header}>
-        <a href="#" className={classes.link} onClick={(event) => {
+        <a
+          href="#"
+          className={classes.link}
+          onClick={(event) => {
           event.preventDefault();
           const pathSegments = pathname.split('/');
           pathSegments.pop();
           const newPath = pathSegments.join('/');
-          router.push(newPath)
+          router.push(newPath);
         }}>
           <IconArrowLeft className={classes.linkIcon} stroke={1.5} />
           <span>Back To Jobs</span>
