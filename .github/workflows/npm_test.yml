@@ -1,13 +1,9 @@
-name: npm test
+name: CI Checks
 
 on:
   pull_request:
     branches:
       - '**'
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
 
 jobs:
   test_pull_request:
@@ -20,8 +16,10 @@ jobs:
           cache: 'yarn'
           cache-dependency-path: '**/yarn.lock'
       - name: Install dependencies
-        run: yarn
-      - name: Run build
-        run: npm run build
-      - name: Run tests
-        run: npm test
+        run: npm ci
+      - name: Run ESLint
+        run: npm run lint # Runs ESLint to check for linting issues
+      - name: Run Tests
+        run: npm test # Runs tests (e.g., Jest, Vitest)
+      - name: Build Project
+        run: npm run build # Ensures the project builds without errors
