@@ -1,13 +1,13 @@
 {
-  "name": "aws-amplify-gen2",
-  "version": "0.1.0",
+  "name": "mantine-next-template",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint && npm run lint:stylelint",
+    "lint": "npm run lint",
     "lint:stylelint": "stylelint '**/*.css' --cache",
     "jest": "jest --passWithNoTests",
     "jest:watch": "jest --watch",
@@ -18,11 +18,44 @@
     "storybook:build": "storybook build"
   },
   "dependencies": {
-    "@aws-amplify/ui-react": "^6.5.5",
-    "aws-amplify": "^6.6.6",
-    "next": "14.2.10",
-    "react": "^18",
-    "react-dom": "^18"
+    "@auth0/nextjs-auth0": "^3.5.0",
+    "@aws-sdk/client-cloudwatch-logs": "^3.731.1",
+    "@aws-sdk/client-dynamodb": "^3.696.0",
+    "@aws-sdk/client-s3": "^3.696.0",
+    "@aws-sdk/lib-dynamodb": "^3.696.0",
+    "@aws-sdk/lib-storage": "^3.696.0",
+    "@aws-sdk/s3-presigned-post": "^3.696.0",
+    "@aws-sdk/s3-request-presigner": "^3.696.0",
+    "@mantine/carousel": "^7.14.1",
+    "@mantine/core": "^7.14.1",
+    "@mantine/dates": "^7.14.1",
+    "@mantine/dropzone": "^7.14.1",
+    "@mantine/form": "^7.14.1",
+    "@mantine/hooks": "^7.14.1",
+    "@mantine/notifications": "^7.14.1",
+    "@next/bundle-analyzer": "^15.0.3",
+    "@tabler/icons-react": "^3.22.0",
+    "aws-amplify": "^6.8.2",
+    "aws-sdk": "^2.1692.0",
+    "axios": "^1.7.7",
+    "c": "^1.1.1",
+    "cloudconvert": "^2.3.7",
+    "date-fns": "^4.1.0",
+    "dayjs": "^1.11.13",
+    "dotenv": "^16.4.5",
+    "embla-carousel-react": "^7.1.0",
+    "next": "^15.1.4",
+    "react": "^18.3.1",
+    "react-dom": "18.3.1",
+    "react-intl": "^7.0.1",
+    "react-markdown": "^9.0.1",
+    "react-player": "^2.16.0",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.0",
+    "remark-html": "^16.0.1",
+    "swr": "^2.2.5",
+    "uuid": "^11.0.3",
+    "@aws-amplify/ui-react": "^6.5.5"
   },
   "devDependencies": {
     "@aws-amplify/backend": "^1.5.1",
@@ -36,5 +69,9 @@
     "esbuild": "^0.23.1",
     "tsx": "^4.19.0",
     "typescript": "^5.6.2"
-  }
+  },
+  "lint-staged": {
+    "**/*.{js,ts,jsx,tsx}": "eslint --fix"
+  },
+  "packageManager": "npm@10.9.0"
 }
