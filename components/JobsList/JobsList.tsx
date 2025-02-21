@@ -154,10 +154,18 @@ export default function JobsList() {
                                 </Group>
                             </Flex>
                             {filteredJobs.length ?
-                                <Flex direction="column" mb="lg" gap="md" justify="center" align="center" w="100%">
+                                <Flex
+                                  direction="column"
+                                  mb="lg"
+                                  gap="md"
+                                  justify="center"
+                                  align="center"
+                                  w="100%"
+                                  key="filtered-jobs-list"
+                                >
                                     {filteredJobs.map((job) => (
                                         <>
-                                            <div style={{ position: 'relative' }} key="tooltip">
+                                            <div style={{ position: 'relative' }} key={`tooltip-${job.id}`}>
                                                 <Tooltip
                                                   label="Archive Job"
                                                   position="top"

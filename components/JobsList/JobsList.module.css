@@ -44,6 +44,7 @@
         flex-direction: column;
         margin-bottom: var(--mantine-spacing-lg);
     }
+
     .archiveIcon {
         cursor: pointer;
         position: absolute;
@@ -62,6 +63,7 @@
         flex-direction: column;
         margin-bottom: var(--mantine-spacing-lg);
     }
+    
     .archiveIcon {
         cursor: pointer;
         position: absolute;
