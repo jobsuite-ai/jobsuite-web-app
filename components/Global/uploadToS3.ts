@@ -1,5 +1,5 @@
 export async function uploadToS3(
-    
+
     file: File,
     presignedPostData: { url: string; fields: Record<string, string> }
 ): Promise<Response> {

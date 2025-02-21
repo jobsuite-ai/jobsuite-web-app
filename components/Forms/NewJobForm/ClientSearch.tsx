@@ -1,13 +1,18 @@
-"use client";
+'use client';
+
+import { useEffect, useState } from 'react';
 
 import { Autocomplete, AutocompleteProps, Avatar, ComboboxStringItem, Group, Text, rem } from '@mantine/core';
-import { IconSearch } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
-import { Client } from '@/components/Global/model';
-import LoadingState from '@/components/Global/LoadingState';
 import { UseFormReturnType } from '@mantine/form';
+import { IconSearch } from '@tabler/icons-react';
 
-export function ClientSearch({ form, setExistingClientSelected }: { form: UseFormReturnType<any>, setExistingClientSelected: Function }) {
+import LoadingState from '@/components/Global/LoadingState';
+import { Client } from '@/components/Global/model';
+
+export function ClientSearch({ form, setExistingClientSelected }: {
+    form: UseFormReturnType<any>,
+    setExistingClientSelected: Function
+}) {
     const [loading, setLoading] = useState(true);
     const [clientData, setClientData] = useState<Record<string, Client>>({});
     const [clientDataKeys, setClientDataKeys] = useState<string[]>([]);
@@ -24,9 +29,9 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
             }
-        )
+        );
 
         const { Items }: { Items: Client[] } = await response.json();
 
@@ -51,7 +56,7 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
             state: client.state,
             zip_code: client.zip_code,
             client_email: client.email,
-            client_phone_number: client.phone_number
+            client_phone_number: client.phone_number,
         }));
 
         setExistingClientSelected(true);
@@ -59,7 +64,7 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
 
     const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
         <Group gap="sm" onClick={() => populateFormWithExistingClient(option)}>
-            <Avatar src={'/black-circle-user-symbol.png'} size={36} radius="xl" />
+            <Avatar src="/black-circle-user-symbol.png" size={36} radius="xl" />
             <div>
                 <Text size="sm">{option.value}</Text>
                 <Text size="xs" opacity={0.5}>
@@ -72,13 +77,13 @@ export function ClientSearch({ form, setExistingClientSelected }: { form: UseFor
     return (<>
         {loading ? <LoadingState /> :
             <Autocomplete
-                style={{ marginRight: rem(12) }}
-                placeholder='Search by client name'
-                leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
-                renderOption={renderAutocompleteOption}
-                data={clientDataKeys}
-                visibleFrom="xs"
+              style={{ marginRight: rem(12) }}
+              placeholder="Search by client name"
+              leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
+              renderOption={renderAutocompleteOption}
+              data={clientDataKeys}
+              visibleFrom="xs"
             />
         }
-    </>);
+            </>);
 }

@@ -2,6 +2,7 @@
     display: flex;
     margin-bottom: 30px;
 }
+
 .jobDetailsWrapper {
     display: flex;
     width: 100%;
@@ -9,9 +10,11 @@
     align-items: center;
     margin-bottom: 30px;
 }
+
 .videoWrapper {
     width: 70%;
 }
+
 .detailsWrapper {
     width: 30%;
 }
@@ -25,7 +28,6 @@
     margin-bottom: var(--mantine-spacing-lg);
     width: 930px; /* Fixed width for web version */
 }
-
 
 .imageAndHoverContainer {
     display: flex;
@@ -51,20 +53,25 @@
         flex-direction: column; /* Stack items vertically */
         width: 100%; /* Use full width for mobile */
     }
+
     .imageAndHoverContainer {
         flex-direction: column; /* Stack items vertically */
         width: 100%; /* Use full width for mobile */
     }
+
     .videoWrapper {
         width: 100%;
     }
+
     .videoFrame {
         margin-top: 70px;
         justify-self: center;
     }
+
     .detailsWrapper {
         width: 100%;
     }
+    
     .jobFieldWrapper {
         width: 100%;
     }

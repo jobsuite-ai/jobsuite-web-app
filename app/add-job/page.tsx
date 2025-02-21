@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import { useUser } from '@auth0/nextjs-auth0/client';
+import { useRouter } from 'next/navigation';
+
 import { NewJobWorkflow } from '@/components/Workflows/NewJobWorkflow';
 
 export default function AddJob() {

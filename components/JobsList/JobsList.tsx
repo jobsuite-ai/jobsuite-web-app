@@ -1,15 +1,17 @@
-"use client";
+'use client';
 
-import { ActionIcon, Badge, Card, Center, Checkbox, Flex, Group, Menu, rem, Text, Tooltip } from "@mantine/core";
-import { useEffect, useState } from "react";
-import { Job, JobStatus } from "../Global/model";
-import { useRouter } from "next/navigation";
-import { getBadgeColor, getFormattedStatus } from "../Global/utils";
-import UniversalError from "../Global/UniversalError";
-import LoadingState from "../Global/LoadingState";
-import { IconArchive, IconFilter, IconSelect, IconX } from "@tabler/icons-react";
+import { useEffect, useState } from 'react';
+
+import { ActionIcon, Badge, Card, Center, Checkbox, Flex, Group, Menu, Text, Tooltip } from '@mantine/core';
+import { IconArchive, IconFilter, IconSelect, IconX } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+
 import classes from './JobsList.module.css';
-import updateJobStatus from "../Global/updateJobStatus";
+import LoadingState from '../Global/LoadingState';
+import { Job, JobStatus } from '../Global/model';
+import UniversalError from '../Global/UniversalError';
+import updateJobStatus from '../Global/updateJobStatus';
+import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 const FILTER_STATUSES = [
     JobStatus.ESTIMATE_ACCEPTED,
@@ -26,7 +28,7 @@ const FILTER_STATUSES = [
 export default function JobsList() {
     const [checkedStatusMap, setCheckedStatusMap] = useState<Record<JobStatus, boolean>>(
         Object.values(FILTER_STATUSES).reduce(
-          (acc, status) => ({ ...acc, [status.valueOf()]: JobStatus.ESTIMATE_DECLINED === status ? false : true}),
+          (acc, status) => ({ ...acc, [status.valueOf()]: JobStatus.ESTIMATE_DECLINED !== status }),
           {} as Record<JobStatus, boolean>
         )
     );
@@ -40,8 +42,11 @@ export default function JobsList() {
         getJobs().finally(() => setLoading(false));
     }, []);
 
-    useEffect(() => setFilteredJobs(jobs.filter((job) => checkedStatusMap[job.job_status])), [checkedStatusMap]);
-  
+    useEffect(() =>
+        setFilteredJobs(jobs.filter((job) => checkedStatusMap[job.job_status])),
+        [checkedStatusMap]
+    );
+
     async function getJobs() {
         const response = await fetch(
             '/api/jobs',
@@ -49,9 +54,9 @@ export default function JobsList() {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
             }
-        )
+        );
 
         const { Items }: { Items: Job[] } = await response.json();
 
@@ -65,22 +70,22 @@ export default function JobsList() {
 
     const clearAll = () => {
         setCheckedStatusMap(Object.values(FILTER_STATUSES).reduce(
-            (acc, status) => ({ ...acc, [status.valueOf()]: false}),
+            (acc, status) => ({ ...acc, [status.valueOf()]: false }),
             {} as Record<JobStatus, boolean>
         ));
-    }
+    };
 
     const selectAll = () => {
         setCheckedStatusMap(Object.values(FILTER_STATUSES).reduce(
-            (acc, status) => ({ ...acc, [status.valueOf()]: true}),
+            (acc, status) => ({ ...acc, [status.valueOf()]: true }),
             {} as Record<JobStatus, boolean>
         ));
-    }
+    };
 
     const archiveJob = (jobID: string) => {
         updateJobStatus(JobStatus.ARCHIVED, jobID);
         filteredJobs && setFilteredJobs(filteredJobs.filter((job) => job.id !== jobID));
-    }
+    };
 
     return (
         <>
@@ -88,59 +93,59 @@ export default function JobsList() {
                 <div className={classes.flexWrapper}>
                     {filteredJobs ? (
                         <>
-                            <Flex direction='row' justify='space-between' align='center' w='85%'>
+                            <Flex direction="row" justify="space-between" align="center" w="85%">
                                 <h1>Jobs List</h1>
 
                                 <Group>
                                     <Menu shadow="md" width={250} closeOnItemClick={false}>
                                         <Menu.Target>
                                             <Tooltip
-                                                label="Filter list by job status"
-                                                transitionProps={{ transition: 'scale-y', duration: 500 }}
-                                                withArrow
+                                              label="Filter list by job status"
+                                              transitionProps={{ transition: 'scale-y', duration: 500 }}
+                                              withArrow
                                             >
-                                                <ActionIcon variant='transparent' pb='2px'>
+                                                <ActionIcon variant="transparent" pb="2px">
                                                     <IconFilter color="#000000" size={30} />
                                                 </ActionIcon>
                                             </Tooltip>
                                         </Menu.Target>
                                         <Menu.Dropdown>
                                             <Menu.Label>Status</Menu.Label>
-                                            <div style={{ position: 'relative' }} key='tooltip'>
+                                            <div style={{ position: 'relative' }} key="tooltip">
                                                 <Tooltip
-                                                    label={'Clear all'}
-                                                    position="top"
-                                                    withArrow
+                                                  label="Clear all"
+                                                  position="top"
+                                                  withArrow
                                                 >
                                                     <IconX
-                                                        color="#858E96"
-                                                        onClick={() => clearAll()}
-                                                        className={classes.clearAllIcon}
+                                                      color="#858E96"
+                                                      onClick={() => clearAll()}
+                                                      className={classes.clearAllIcon}
                                                     />
                                                 </Tooltip>
                                                 <Tooltip
-                                                    label={'Select all'}
-                                                    position="top"
-                                                    withArrow
+                                                  label="Select all"
+                                                  position="top"
+                                                  withArrow
                                                 >
                                                     <IconSelect
-                                                        color="#858E96"
-                                                        onClick={() => selectAll()}
-                                                        className={classes.selectAllIcon}
+                                                      color="#858E96"
+                                                      onClick={() => selectAll()}
+                                                      className={classes.selectAllIcon}
                                                     />
                                                 </Tooltip>
                                             </div>
                                             {FILTER_STATUSES.map((status) => (
-                                                <Menu.Item 
-                                                    key={status} 
-                                                    style={{ cursor: 'pointer' }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                                <Menu.Item
+                                                  key={status}
+                                                  style={{ cursor: 'pointer' }}
+                                                  onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <Checkbox
-                                                        style={{ cursor: 'pointer' }}
-                                                        label={getFormattedStatus(status)}
-                                                        checked={checkedStatusMap[status]}
-                                                        onChange={(event) => toggleFilter(status)}
+                                                      style={{ cursor: 'pointer' }}
+                                                      label={getFormattedStatus(status)}
+                                                      checked={checkedStatusMap[status]}
+                                                      onChange={() => toggleFilter(status)}
                                                     />
                                                 </Menu.Item>
                                             ))}
@@ -149,30 +154,38 @@ export default function JobsList() {
                                 </Group>
                             </Flex>
                             {filteredJobs.length ?
-                                <Flex direction='column' mb='lg' gap='md' justify='center' align='center' w='100%'>
+                                <Flex
+                                  direction="column"
+                                  mb="lg"
+                                  gap="md"
+                                  justify="center"
+                                  align="center"
+                                  w="100%"
+                                  key="filtered-jobs-list"
+                                >
                                     {filteredJobs.map((job) => (
                                         <>
-                                            <div style={{ position: 'relative' }} key='tooltip'>
+                                            <div style={{ position: 'relative' }} key={`tooltip-${job.id}`}>
                                                 <Tooltip
-                                                    label={'Archive Job'}
-                                                    position="top"
-                                                    withArrow
+                                                  label="Archive Job"
+                                                  position="top"
+                                                  withArrow
                                                 >
                                                     <IconArchive
-                                                        onClick={() => archiveJob(job.id)}
-                                                        className={classes.archiveIcon}
+                                                      onClick={() => archiveJob(job.id)}
+                                                      className={classes.archiveIcon}
                                                     />
                                                 </Tooltip>
                                             </div>
                                             <Card
-                                                key={job.id}
-                                                shadow="sm"
-                                                padding="lg"
-                                                radius="md"
-                                                w='85%'
-                                                withBorder
-                                                style={{ cursor: 'pointer' }}
-                                                onClick={() => router.push(`/jobs/${job.id}`)}
+                                              key={job.id}
+                                              shadow="sm"
+                                              padding="lg"
+                                              radius="md"
+                                              w="85%"
+                                              withBorder
+                                              style={{ cursor: 'pointer' }}
+                                              onClick={() => router.push(`/jobs/${job.id}`)}
                                             >
                                                 <Center>
                                                     {job.job_type &&
@@ -186,7 +199,7 @@ export default function JobsList() {
                                                     </Badge>
                                                 </Group>
 
-                                                <Flex direction='column' align='flex-start'>
+                                                <Flex direction="column" align="flex-start">
                                                     <Text size="sm" c="dimmed">{job.client_address}</Text>
                                                     <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
                                                     <Text size="sm" c="dimmed">{job.zip_code}</Text>
@@ -196,14 +209,14 @@ export default function JobsList() {
                                     ))}
                                 </Flex>
                                 :
-                                <Flex direction='column' mb='lg' gap='md' justify='center' align='center' w='100%'>
+                                <Flex direction="column" mb="lg" gap="md" justify="center" align="center" w="100%">
                                     <Card
-                                        key='no-jobs'
-                                        shadow="sm"
-                                        padding="lg"
-                                        radius="md"
-                                        w='85%'
-                                        withBorder
+                                      key="no-jobs"
+                                      shadow="sm"
+                                      padding="lg"
+                                      radius="md"
+                                      w="85%"
+                                      withBorder
                                     >
                                         <Group justify="space-between" mt="md" mb="xs">
                                             <Text fw={500}>0 Jobs</Text>
@@ -216,8 +229,8 @@ export default function JobsList() {
                             }
                         </>
                     ) : (
-                        <div style={{ marginTop: '100px' }} >
-                            <UniversalError message='Unable to access list of jobs' />
+                        <div style={{ marginTop: '100px' }}>
+                            <UniversalError message="Unable to access list of jobs" />
                         </div>
                     )}
                 </div>}

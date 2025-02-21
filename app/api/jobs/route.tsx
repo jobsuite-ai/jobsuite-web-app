@@ -4,8 +4,10 @@ import {
     UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
-import { JobStatus } from '@/components/Global/model';
+
 import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from './jobTypes';
+
+import { JobStatus } from '@/components/Global/model';
 
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);

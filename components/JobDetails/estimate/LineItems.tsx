@@ -1,17 +1,20 @@
-"use client";
+'use client';
 
-import { SingleJob } from '@/components/Global/model';
-import { Button, Group, Modal, NumberInput, Paper, Text, Textarea, TextInput } from '@mantine/core';
-import '@mantine/dropzone/styles.css';
-import { useForm } from '@mantine/form';
 import { useState } from 'react';
-import { LineItem } from './LineItem';
-import { v4 as uuidv4 } from 'uuid';
-import LoadingState from '@/components/Global/LoadingState';
-import classes from './Estimate.module.css'
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
-const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === "true";
+import { Button, Group, Modal, NumberInput, Paper, Text, Textarea, TextInput } from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { v4 as uuidv4 } from 'uuid';
+
+import '@mantine/dropzone/styles.css';
+import classes from './Estimate.module.css';
+import { LineItem } from './LineItem';
+
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import LoadingState from '@/components/Global/LoadingState';
+import { SingleJob } from '@/components/Global/model';
+
+const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === 'true';
 
 export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
@@ -26,11 +29,9 @@ export default function LineItems({ job }: { job: SingleJob }) {
             price: 0,
             hours: 0,
         },
-        validate: (values) => {
-            return {
-                header: values.header === '' ? 'Must enter header' : null
-            }
-        },
+        validate: (values) => ({
+                header: values.header === '' ? 'Must enter header' : null,
+            }),
     });
 
     async function addLineItem() {
@@ -46,40 +47,40 @@ export default function LineItems({ job }: { job: SingleJob }) {
                     description: formValues.description,
                     price: formValues.price,
                     hours: formValues.hours,
-                }
-            }
+                },
+            };
 
             const response = await fetch(
-                `/api/jobs`,
+                '/api/jobs',
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content: content, jobID: job.id.S }),
+                    body: JSON.stringify({ content, jobID: job.id.S }),
                 }
-            )
+            );
 
-            const { Attributes } = await response.json();
+            await response.json();
 
             setLineItems([...lineItems, {
                 M: {
                     id: {
-                        S: lineItemID
+                        S: lineItemID,
                     },
                     header: {
-                        S: formValues.header
+                        S: formValues.header,
                     },
                     description: {
-                        S: formValues.description
+                        S: formValues.description,
                     },
                     price: {
-                        N: formValues.price.toString()
+                        N: formValues.price.toString(),
                     },
                     hours: {
-                        N: formValues.hours.toString()
-                    }
-                }
+                        N: formValues.hours.toString(),
+                    },
+                },
             }]);
 
             setIsUploading(false);
@@ -89,20 +90,20 @@ export default function LineItems({ job }: { job: SingleJob }) {
 
     const removeLineItem = (id: string) => {
         setLineItems((prevItems: any) => prevItems.filter((item: any) => item.M.id?.S !== id));
-    }
+    };
 
     return (
         <div>
-            <Paper shadow='sm' radius='md' withBorder p='lg' className={classes.estimateWrapper}>
-                {lineItems && lineItems.length > 0 ? 
+            <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.estimateWrapper}>
+                {lineItems && lineItems.length > 0 ?
                     <>
                         {lineItems.map((item, index) => (
-                            <LineItem 
-                                jobID={job.id.S} 
-                                lineItemDetails={item.M} 
-                                key={uuidv4()} 
-                                index={index} 
-                                removeLineItem={removeLineItem} 
+                            <LineItem
+                              jobID={job.id.S}
+                              lineItemDetails={item.M}
+                              key={uuidv4()}
+                              index={index}
+                              removeLineItem={removeLineItem}
                             />
                         ))}
                     </>
@@ -118,54 +119,54 @@ export default function LineItems({ job }: { job: SingleJob }) {
             </Paper>
 
             <Modal
-                opened={opened}
-                onClose={() => setOpened(false)}
-                title="Add Line Item"
-                size="lg"
+              opened={opened}
+              onClose={() => setOpened(false)}
+              title="Add Line Item"
+              size="lg"
             >
                 {isUploading ?
                     <LoadingState />
                     :
                     <div>
                         <TextInput
-                            withAsterisk
-                            label="Header"
-                            placeholder="Header"
-                            key={form.key('header')}
-                            {...form.getInputProps('header')}
+                          withAsterisk
+                          label="Header"
+                          placeholder="Header"
+                          key={form.key('header')}
+                          {...form.getInputProps('header')}
                         />
                         <Textarea
-                            label="Description"
-                            placeholder="Enter the description"
-                            key={form.key('description')}
-                            {...form.getInputProps('description')}
+                          label="Description"
+                          placeholder="Enter the description"
+                          key={form.key('description')}
+                          {...form.getInputProps('description')}
                         />
-                        {PRICE_BASED ? 
+                        {PRICE_BASED ?
                             <NumberInput
-                                defaultValue={1000}
-                                prefix='$'
-                                thousandsGroupStyle='thousand'
-                                decimalScale={2}
-                                allowLeadingZeros={false}
-                                allowNegative={false}
-                                fixedDecimalScale={true}
-                                withAsterisk
-                                label="Price"
-                                placeholder="Enter the price"
-                                key={form.key('price')}
-                                {...form.getInputProps('price')}
+                              defaultValue={1000}
+                              prefix="$"
+                              thousandsGroupStyle="thousand"
+                              decimalScale={2}
+                              allowLeadingZeros={false}
+                              allowNegative={false}
+                              fixedDecimalScale
+                              withAsterisk
+                              label="Price"
+                              placeholder="Enter the price"
+                              key={form.key('price')}
+                              {...form.getInputProps('price')}
                             />
                             :
                             <NumberInput
-                                defaultValue={0}
-                                allowLeadingZeros={false}
-                                allowNegative={false}
-                                fixedDecimalScale={true}
-                                withAsterisk
-                                label="Hours"
-                                placeholder="Enter the job hours"
-                                key={form.key('hours')}
-                                {...form.getInputProps('hours')}
+                              defaultValue={0}
+                              allowLeadingZeros={false}
+                              allowNegative={false}
+                              fixedDecimalScale
+                              withAsterisk
+                              label="Hours"
+                              placeholder="Enter the job hours"
+                              key={form.key('hours')}
+                              {...form.getInputProps('hours')}
                             />
                         }
 

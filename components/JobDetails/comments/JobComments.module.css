@@ -6,13 +6,6 @@
     align-items: center;
 }
 
-.jobCommentsWrapper {
-    display: flex;
-    width: 100%;
-    flex-direction: column;
-    align-items: center;
-}
-
 .commentTextArea {
     width: 700px;
 }
@@ -23,6 +16,7 @@
         flex-direction: column; /* Stack items vertically */
         width: 100%; /* Use full width for mobile */
     }
+
     .commentTextArea {
         width: 100%;
     }

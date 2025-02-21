@@ -1,5 +1,6 @@
-import { logToCloudWatch } from "./logger";
+import { logToCloudWatch } from './logger';
 
+// eslint-disable-next-line no-restricted-globals
 self.addEventListener('message', (event: MessageEvent) => {
     if (event.data.type === 'UPLOAD_FILE') {
         const { url, fields, file, fileName, contentType } = event.data.payload as {
@@ -31,7 +32,7 @@ self.addEventListener('message', (event: MessageEvent) => {
                 }
             })
             .catch((error: any) => {
-                logToCloudWatch('Error uploading video to s3: ' + error.stack);
+                logToCloudWatch(`Error uploading video to s3: ${error.stack}`);
                 event.ports[0].postMessage({ success: false });
             });
     }

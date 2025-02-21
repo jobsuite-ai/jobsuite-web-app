@@ -3,11 +3,11 @@ import { IconUser, IconUserPlus } from '@tabler/icons-react';
 
 export default function ClientTypeSelector({ setClientType }: { setClientType: Function }) {
     return (
-        <Flex justify='center' mb='lg'>
+        <Flex justify="center" mb="lg">
             <SegmentedControl
-                onChange={(val) => setClientType(val)}
-                transitionDuration={250}
-                data={[
+              onChange={(val) => setClientType(val)}
+              transitionDuration={250}
+              data={[
                     {
                         value: 'new',
                         label: (
@@ -25,7 +25,7 @@ export default function ClientTypeSelector({ setClientType }: { setClientType: F
                                 <span>Existing Client</span>
                             </Center>
                         ),
-                    }
+                    },
                 ]}
             />
         </Flex>

@@ -1,9 +1,10 @@
-"use client";
+'use client';
+
+import { usePathname } from 'next/navigation';
 
 import { Header } from './Header/Header';
-import classes from './Shell.module.css';
 import { JobDetailsSideNav } from './JobDetailsSideNav';
-import { usePathname } from 'next/navigation';
+import classes from './Shell.module.css';
 
 export function Shell({ children }: { children: any }) {
   const pathname = usePathname();
@@ -12,7 +13,7 @@ export function Shell({ children }: { children: any }) {
     <div className={classes.verticalWrapper}>
       <Header />
       {pathname.match('.*/jobs/.*') && <JobDetailsSideNav />}
-      
+
       <div className={classes.wrapper}>
         <div className={classes.spacer} />
         <div className={classes.main}>

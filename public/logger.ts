@@ -1,12 +1,12 @@
-import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from "@aws-sdk/client-cloudwatch-logs";
+import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from '@aws-sdk/client-cloudwatch-logs';
 
-const REGION = process.env.AWS_REGION || "us-east-1";
+const REGION = process.env.AWS_REGION || 'us-east-1';
 
 const client = new CloudWatchLogsClient({
   region: REGION,
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
   },
 });
 
@@ -22,8 +22,7 @@ export async function logToCloudWatch(message: string, log_stream = process.env.
       })
     );
   } catch (err: any) {
-    if (err.name !== "ResourceAlreadyExistsException") {
-      console.error("Error creating log stream:", err);
+    if (err.name !== 'ResourceAlreadyExistsException') {
       return;
     }
   }
@@ -45,6 +44,6 @@ export async function logToCloudWatch(message: string, log_stream = process.env.
     );
     sequenceToken = response.nextSequenceToken;
   } catch (err) {
-    console.error("Error logging to CloudWatch:", err);
+    // Error logging to cloudwatch
   }
 }

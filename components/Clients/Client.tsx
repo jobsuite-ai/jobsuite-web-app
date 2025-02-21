@@ -1,15 +1,18 @@
-"use client";
+'use client';
 
-import { Badge, Button, Card, Center, Flex, Modal, Paper, Text, TextInput, Title } from "@mantine/core";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import LoadingState from "../Global/LoadingState";
-import { DynamoClient, Job } from "../Global/model";
-import { getBadgeColor, getFormattedStatus } from "../Global/utils";
+import { useEffect, useState } from 'react';
+
+import { Badge, Button, Card, Center, Flex, Modal, Paper, Text, TextInput } from '@mantine/core';
+import { useForm } from '@mantine/form';
+import { IconEdit } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+
 import classes from './Clients.module.css';
-import { IconEdit } from "@tabler/icons-react";
-import { useForm } from "@mantine/form";
-import { UpdateJobContent } from "@/app/api/jobs/jobTypes";
+import LoadingState from '../Global/LoadingState';
+import { DynamoClient, Job } from '../Global/model';
+import { getBadgeColor, getFormattedStatus } from '../Global/utils';
+
+import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
 export default function SingleClient({ initialClient }: { initialClient: DynamoClient }) {
     const [client, setClient] = useState(initialClient);
@@ -26,18 +29,16 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
 
     const form = useForm({
         mode: 'uncontrolled',
-        initialValues: { 
+        initialValues: {
             email: client?.email.S,
             client_name: client?.client_name.S,
             phone_number: client?.phone_number.S,
         },
-        validate: (values) => {
-            return {
+        validate: (values) => ({
                 email: values.email === '' ? 'Must enter client email' : null,
                 phone_number: values.phone_number === '' ? 'Must enter client phone number' : null,
                 client_name: values.client_name === '' ? 'Must enter client name' : null,
-            }
-        },
+            }),
     });
 
     async function getPageData() {
@@ -51,9 +52,9 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
             }
-        )
+        );
 
         const { Items }: { Items: Job[] } = await response.json();
         setJobs(Items);
@@ -61,7 +62,7 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
 
     async function updateClient() {
         const formValues = form.getValues();
-        
+
         const response = await fetch(
             `/api/clients/${client.id.S}`,
             {
@@ -75,26 +76,26 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                     phone_number: formValues.phone_number,
                 }),
             }
-        )
+        );
 
         await response.json();
 
         const jobPromises = client.jobs.L.map(async (job) => {
             const content: UpdateJobContent = {
-                update_client_name: formValues.client_name
+                update_client_name: formValues.client_name,
             };
-        
+
             const jobsResponse = await fetch('/api/jobs', {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content: content, jobID: job.S }),
+                body: JSON.stringify({ content, jobID: job.S }),
             });
-        
+
             return jobsResponse.json();
         });
-        
+
         await Promise.all(jobPromises);
 
         setClient(prevClient => ({
@@ -111,71 +112,72 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
         setIsConfirmationModalOpen(false);
     }
 
-    const getJobsForClient = (clientID: string): Job[] => jobs.filter((job) => job.client_id == clientID);
+    const getJobsForClient = (clientID: string): Job[] => jobs.filter((job) =>
+        job.client_id === clientID);
 
     return (
         <>
             {loading ? <LoadingState /> :
                 <div className={classes.flexWrapper}>
-                    {client && 
+                    {client &&
                     <>
                         <Card
-                            key={client.id.S}
-                            shadow="sm"
-                            padding="lg"
-                            radius="md"
-                            mt="lg"
-                            withBorder
-                            w='85%'
+                          key={client.id.S}
+                          shadow="sm"
+                          padding="lg"
+                          radius="md"
+                          mt="lg"
+                          withBorder
+                          w="85%"
                         >
                             <div style={{ position: 'relative' }}>
                                 <IconEdit
-                                    onClick={() => setIsModalOpen(true)}
-                                    style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
+                                  onClick={() => setIsModalOpen(true)}
+                                  style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
                                 />
                             </div>
                             <Text fz={24} fw={700}>{client.client_name.S}</Text>
 
-                            <Flex direction='row' justify='space-between' gap="lg" mt="md" mr='lg' mb="xs">
-                                <Flex direction='column' justify='space-between' gap="md">
+                            <Flex direction="row" justify="space-between" gap="lg" mt="md" mr="lg" mb="xs">
+                                <Flex direction="column" justify="space-between" gap="md">
                                     <Text size="sm" fw={700}>Job Count: {client.jobs.L.length}</Text>
                                     <Text size="sm" c="dimmed">
                                         Client Email: <a href={`mailto:${client.email.S}`}>
                                             {client.email.S}
-                                        </a>
+                                                      </a>
                                     </Text>
                                     <Text size="sm" c="dimmed">
                                         Client Phone: <a href={`tel:+1${client?.phone_number.S}`}>
                                             {client.phone_number.S}
-                                        </a>
+                                                      </a>
                                     </Text>
                                 </Flex>
                             </Flex>
                         </Card>
 
                         <Card
-                            shadow="sm"
-                            padding="lg"
-                            radius="md"
-                            mt="lg"
-                            withBorder
-                            w='85%'
+                          shadow="sm"
+                          padding="lg"
+                          radius="md"
+                          mt="lg"
+                          withBorder
+                          w="85%"
                         >
                             <Center><Text fz={24} fw={700}>Jobs</Text></Center>
-                            <Flex direction='column' gap='md' justify='center' align='center' mt='xl'>
+                            <Flex direction="column" gap="md" justify="center" align="center" mt="xl">
                                 {getJobsForClient(client.id.S).map((job) => (
                                     <Paper
-                                        key={job.id}
-                                        shadow='sm'
-                                        radius='md'
-                                        w='85%'
-                                        withBorder
-                                        p='lg'
-                                        onClick={() => router.push(`/jobs/${job.id}`)}
-                                        style={{ cursor: 'pointer' }}
+                                      key={job.id}
+                                      shadow="sm"
+                                      radius="md"
+                                      w="85%"
+                                      withBorder
+                                      p="lg"
+                                      onClick={() => router.push(`/jobs/${job.id}`)}
+                                      style={{ cursor: 'pointer' }}
                                     >
-                                        <Flex direction='row' justify='space-between'>
-                                            <Flex direction='column' align='flex-start'>
+                                        <Flex direction="row" justify="space-between">
+                                            <Flex direction="column" align="flex-start">
                                                 <Text size="sm" c="dimmed">{job.client_address}</Text>
                                                 <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
                                                 <Text size="sm" c="dimmed">{job.zip_code}</Text>
@@ -193,32 +195,32 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                 </div>
             }
             <Modal
-                opened={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                title="Update Client Details"
-                size="lg"
+              opened={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              title="Update Client Details"
+              size="lg"
             >
                 <div>
                     <TextInput
-                        withAsterisk
-                        label="Client Name"
-                        placeholder={client?.client_name.S}
-                        key={form.key('client_name')}
-                        {...form.getInputProps('client_name')}
+                      withAsterisk
+                      label="Client Name"
+                      placeholder={client?.client_name.S}
+                      key={form.key('client_name')}
+                      {...form.getInputProps('client_name')}
                     />
                     <TextInput
-                        withAsterisk
-                        label="Email"
-                        placeholder={client?.email.S}
-                        key={form.key('email')}
-                        {...form.getInputProps('email')}
+                      withAsterisk
+                      label="Email"
+                      placeholder={client?.email.S}
+                      key={form.key('email')}
+                      {...form.getInputProps('email')}
                     />
                     <TextInput
-                        withAsterisk
-                        label="Phone Number"
-                        placeholder={client?.phone_number.S}
-                        key={form.key('phone_number')}
-                        {...form.getInputProps('phone_number')}
+                      withAsterisk
+                      label="Phone Number"
+                      placeholder={client?.phone_number.S}
+                      key={form.key('phone_number')}
+                      {...form.getInputProps('phone_number')}
                     />
 
                     <Center mt="md">
@@ -229,18 +231,18 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                 </div>
             </Modal>
             <Modal
-                opened={isConfirmationModalOpen}
-                onClose={() => setIsConfirmationModalOpen(false)}
-                size="lg"
-                title={<Text fz={30} fw={700}>Are you sure?</Text>}
+              opened={isConfirmationModalOpen}
+              onClose={() => setIsConfirmationModalOpen(false)}
+              size="lg"
+              title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
-                    <Flex direction='column'>
+                    <Flex direction="column">
                         <Text mb="lg">
-                            This will update the client details for all jobs associated with this client.
-                            Currently that is {client.jobs.L.length} jobs.
+                            This will update the client details for all jobs associated with
+                            this client. Currently that is {client.jobs.L.length} jobs.
                         </Text>
-                        <Flex direction='row' gap='lg' justify='center' align='cemter'>
+                        <Flex direction="row" gap="lg" justify="center" align="cemter">
                             <Button type="submit" onClick={updateClient}>Confirm</Button>
                             <Button type="submit" onClick={closeModals}>Cancel</Button>
                         </Flex>

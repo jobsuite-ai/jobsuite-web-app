@@ -1,11 +1,13 @@
-"use client";
+'use client';
 
 import { Button, Tooltip } from '@mantine/core';
-import { JobStatus, SingleJob } from '../../Global/model';
-import updateJobStatus from '@/components/Global/updateJobStatus';
 import { notifications } from '@mantine/notifications';
 
-export function UploadNewTemplate({ template, job, clientEmail, setLoading }: { 
+import { JobStatus, SingleJob } from '../../Global/model';
+
+import updateJobStatus from '@/components/Global/updateJobStatus';
+
+export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
     template: string,
     job: SingleJob,
     clientEmail: string,
@@ -18,13 +20,12 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
             {
                 method: 'POST',
                 body: JSON.stringify({
-                    template: template,
+                    template,
                     jobID: job.id.S,
-                })
+                }),
             }
         );
         const templateData = await templateResponse.json();
-
 
         const sendResponse = await fetch(
             '/api/send_estimate',
@@ -34,10 +35,10 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
                     template_id: templateData.out.id,
                     jobID: job.id.S,
                     client_email: clientEmail,
-                })
+                }),
             }
         );
-        const sendData = await sendResponse.json();
+        await sendResponse.json();
 
         await updateJobStatus(JobStatus.ESTIMATE_SENT, job.id.S);
         setLoading(false);
@@ -49,17 +50,22 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
         });
     }
 
-    const isDisabled = !(!!job.video && !!job.images && !!job.transcription_summary && !!job.line_items);
+    const isDisabled = !(
+        !!job.video &&
+        !!job.images &&
+        !!job.transcription_summary &&
+        !!job.line_items
+    );
 
     return (
         <div style={{ marginBottom: 20 }}>
             <Tooltip
-                label={isDisabled ? "Please finish the todo list above to send the estimate" : ""}
-                disabled={!isDisabled}
-                position="top"
-                withArrow
+              label={isDisabled ? 'Please finish the todo list above to send the estimate' : ''}
+              disabled={!isDisabled}
+              position="top"
+              withArrow
             >
-                <Button onClick={createAndSendTemplate} mt='lg' disabled={isDisabled} >
+                <Button onClick={createAndSendTemplate} mt="lg" disabled={isDisabled}>
                     Send Estimate
                 </Button>
             </Tooltip>

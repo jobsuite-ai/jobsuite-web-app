@@ -1,4 +1,4 @@
-import { JobStatus } from './model'
+import { JobStatus } from './model';
 
 export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
@@ -21,9 +21,9 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
         case JobStatus.RLPP_OPENED:
             return '#3F51B5';
         default:
-            return "#d3d3d3";
+            return '#d3d3d3';
     }
-}
+};
 
 export const getFormattedStatus = (jobStatus: JobStatus) => {
     switch (jobStatus) {
@@ -46,6 +46,6 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
         case JobStatus.RLPP_OPENED:
             return 'RLPP Opened';
         default:
-            return "Estimate Not Finished";
+            return 'Estimate Not Finished';
     }
-}
+};

@@ -1,14 +1,17 @@
-"use client";
+'use client';
 
-import LoadingState from '@/components/Global/LoadingState';
+import { useEffect, useState } from 'react';
+
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { Button, Group, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { SingleComment } from '../../Global/model';
+
 import { JobComment } from './JobComment';
 import classes from './JobComments.module.css';
+import { SingleComment } from '../../Global/model';
+
+import LoadingState from '@/components/Global/LoadingState';
 
 export default function JobComments({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
@@ -29,9 +32,9 @@ export default function JobComments({ jobID }: { jobID: string }) {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
-                }
+                },
             }
-        )
+        );
 
         const { Items } = await response.json();
         setJobComments(Items);
@@ -57,7 +60,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
                     timestamp,
                 }),
             }
-        )
+        );
 
         if (response.ok) {
             setCommentInputLoading(false);
@@ -74,8 +77,9 @@ export default function JobComments({ jobID }: { jobID: string }) {
                 commenter,
                 comment_contents: commentContents ?? '',
                 timestamp: timestamp.toISOString(),
-            }
-            jobComments ? setJobComments([...jobComments, newComment]) : setJobComments([newComment]);
+            };
+            jobComments ? setJobComments([...jobComments, newComment])
+                : setJobComments([newComment]);
         } else {
             notifications.show({
                 title: 'Creation Failed',
@@ -90,7 +94,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
         <>
             {(loading || isLoading || !user) ? <LoadingState /> :
                 <>
-                    <div key='comments-wrapper' className={classes.jobCommentsWrapper}>
+                    <div key="comments-wrapper" className={classes.jobCommentsWrapper}>
                         {jobComments?.map((comment) => (
                             <div key={comment.id}>
                                 <JobComment commentDetails={comment} />
@@ -99,18 +103,18 @@ export default function JobComments({ jobID }: { jobID: string }) {
                         {commentInputLoading ? <LoadingState /> :
                         <>
                             <Textarea
-                                className={classes.commentTextArea}
-                                placeholder="Enter comment here"
-                                label="Add comment"
-                                autosize
-                                minRows={2}
-                                onChange={(event) => setCommentContents(event.currentTarget.value)}
-                                value={commentContents}
+                              className={classes.commentTextArea}
+                              placeholder="Enter comment here"
+                              label="Add comment"
+                              autosize
+                              minRows={2}
+                              onChange={(event) => setCommentContents(event.currentTarget.value)}
+                              value={commentContents}
                             />
                             <Group justify="right" mt="md">
                                 <Button onClick={() => postJobComment()}>Post Job Comment</Button>
                             </Group>
-                            </>
+                        </>
                         }
                     </div>
                 </>
