@@ -8,7 +8,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "analyze": "ANALYZE=true next build",
-    "lint": "npm run lint",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "lint:stylelint": "stylelint '**/*.css' --cache",
     "jest": "jest --passWithNoTests",
     "jest:watch": "jest --watch",
