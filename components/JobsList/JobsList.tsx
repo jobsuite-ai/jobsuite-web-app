@@ -3,14 +3,13 @@
 import { useEffect, useState } from 'react';
 
 import { ActionIcon, Badge, Card, Center, Checkbox, Flex, Group, Menu, Text, Tooltip } from '@mantine/core';
-import { IconArchive, IconFilter, IconSelect, IconX } from '@tabler/icons-react';
+import { IconFilter, IconSelect, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Job, JobStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
-import updateJobStatus from '../Global/updateJobStatus';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 const FILTER_STATUSES = [
@@ -80,11 +79,6 @@ export default function JobsList() {
             (acc, status) => ({ ...acc, [status.valueOf()]: true }),
             {} as Record<JobStatus, boolean>
         ));
-    };
-
-    const archiveJob = (jobID: string) => {
-        updateJobStatus(JobStatus.ARCHIVED, jobID);
-        filteredJobs && setFilteredJobs(filteredJobs.filter((job) => job.id !== jobID));
     };
 
     return (
@@ -164,48 +158,34 @@ export default function JobsList() {
                                   key="filtered-jobs-list"
                                 >
                                     {filteredJobs.map((job) => (
-                                        <>
-                                            <div style={{ position: 'relative' }} key={`tooltip-${job.id}`}>
-                                                <Tooltip
-                                                  label="Archive Job"
-                                                  position="top"
-                                                  withArrow
-                                                >
-                                                    <IconArchive
-                                                      onClick={() => archiveJob(job.id)}
-                                                      className={classes.archiveIcon}
-                                                    />
-                                                </Tooltip>
-                                            </div>
-                                            <Card
-                                              key={job.id}
-                                              shadow="sm"
-                                              padding="lg"
-                                              radius="md"
-                                              w="85%"
-                                              withBorder
-                                              style={{ cursor: 'pointer' }}
-                                              onClick={() => router.push(`/jobs/${job.id}`)}
-                                            >
-                                                <Center>
-                                                    {job.job_type &&
-                                                        <Text size="sm" fw={700}>{job.job_type}</Text>
-                                                    }
-                                                </Center>
-                                                <Group justify="space-between" mt="md" mb="xs">
-                                                    <Text fw={500}>{job.client_name}</Text>
-                                                    <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
-                                                        {getFormattedStatus(job.job_status)}
-                                                    </Badge>
-                                                </Group>
+                                        <Card
+                                          key={job.id}
+                                          shadow="sm"
+                                          padding="lg"
+                                          radius="md"
+                                          w="85%"
+                                          withBorder
+                                          style={{ cursor: 'pointer' }}
+                                          onClick={() => router.push(`/jobs/${job.id}`)}
+                                        >
+                                            <Center>
+                                                {job.job_type &&
+                                                    <Text size="sm" fw={700}>{job.job_type}</Text>
+                                                }
+                                            </Center>
+                                            <Group justify="space-between" mt="md" mb="xs">
+                                                <Text fw={500}>{job.client_name}</Text>
+                                                <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
+                                                    {getFormattedStatus(job.job_status)}
+                                                </Badge>
+                                            </Group>
 
-                                                <Flex direction="column" align="flex-start">
-                                                    <Text size="sm" c="dimmed">{job.client_address}</Text>
-                                                    <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
-                                                    <Text size="sm" c="dimmed">{job.zip_code}</Text>
-                                                </Flex>
-                                            </Card>
-                                        </>
+                                            <Flex direction="column" align="flex-start">
+                                                <Text size="sm" c="dimmed">{job.client_address}</Text>
+                                                <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
+                                                <Text size="sm" c="dimmed">{job.zip_code}</Text>
+                                            </Flex>
+                                        </Card>
                                     ))}
                                 </Flex>
                                 :
