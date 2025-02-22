@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Center, Flex, Paper, Text, Button } from '@mantine/core';
 import { IconPencil, IconArchive } from '@tabler/icons-react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 
 import ClientDetails from './ClientDetails';
 import DescriptionOfWork from './DescriptionOfWork';
@@ -29,6 +29,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
     const [job, setJob] = useState<SingleJob>();
     const [objectExists, setObjectExists] = useState(false);
+    const router = useRouter();
 
     const searchParams = useSearchParams();
     const page = searchParams.get('page');
@@ -101,7 +102,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
 
     const archiveJob = () => {
         updateJobStatus(JobStatus.ARCHIVED, jobID);
-        getJob();
+        router.push('/jobs');
     };
 
     const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';
