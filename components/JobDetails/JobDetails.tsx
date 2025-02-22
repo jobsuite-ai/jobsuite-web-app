@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from 'react';
 
-import { Center, Flex, Paper, Text } from '@mantine/core';
-import { IconPencil } from '@tabler/icons-react';
+import { Center, Flex, Paper, Text, Button } from '@mantine/core';
+import { IconPencil, IconArchive } from '@tabler/icons-react';
 import { useSearchParams } from 'next/navigation';
 
 import ClientDetails from './ClientDetails';
 import DescriptionOfWork from './DescriptionOfWork';
 import JobImage from './JobImage';
 import LoadingState from '../Global/LoadingState';
-import { SingleJob } from '../Global/model';
+import { SingleJob, JobStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import JobComments from './comments/JobComments';
 import EstimateDetails from './estimate/EstimateDetails';
@@ -21,6 +21,7 @@ import HoursAndRate from './HoursAndRate';
 import ResourceLink from './ResourceLink';
 import classes from './styles/JobDetails.module.css';
 import VideoUploader from './VideoUploader';
+import updateJobStatus from '../Global/updateJobStatus';
 
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
 
@@ -98,6 +99,11 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         window.open(link, '_blank');
     };
 
+    const archiveJob = () => {
+        updateJobStatus(JobStatus.ARCHIVED, jobID);
+        getJob();
+    };
+
     const fileNameFromDynamo = job?.images ? job?.images.L[0].M.name.S : '';
 
     const OverviewDetails = () => (
@@ -160,6 +166,16 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                           label="Docuseal"
                                         />
                                     }
+                                </Flex>
+                                <Flex direction="row" justify="center">
+                                    <Button
+                                      leftSection={<IconArchive size={20} />}
+                                      variant="filled"
+                                      color="red"
+                                      onClick={archiveJob}
+                                    >
+                                        Archive Job
+                                    </Button>
                                 </Flex>
                             </Flex>
                         </> : <UniversalError message="Unable to access job details" />
