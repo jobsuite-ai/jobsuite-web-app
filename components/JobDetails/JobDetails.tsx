@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Center, Flex, Paper, Text, Button } from '@mantine/core';
-import { IconPencil, IconArchive } from '@tabler/icons-react';
+import { IconPencil, IconArchive, IconFileText } from '@tabler/icons-react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
 import ClientDetails from './ClientDetails';
@@ -163,8 +163,8 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                     {job.jira_link &&
                                         <ResourceLink
                                           handler={() => handleOpenExternalLink(job.jira_link.S)}
-                                          icon={IconPencil}
-                                          label="Docuseal"
+                                          icon={IconFileText}
+                                          label="Jira"
                                         />
                                     }
                                 </Flex>

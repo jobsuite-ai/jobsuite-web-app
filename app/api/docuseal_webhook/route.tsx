@@ -2,7 +2,7 @@ import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/clie
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 import createJiraTicket from '@/components/Global/createJiraTicket';
-import { JobStatus } from '@/components/Global/model';
+import { JobStatus, SingleJob } from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
 
 const client = new DynamoDBClient({});
@@ -94,14 +94,13 @@ async function getJobAndCreateTicket(payload: any): Promise<any> {
       });
       const { Item } = await docClient.send(getItemCommand);
       const response = Response.json({ Item });
-      const job = await response.json();
+      const jobTemp = await response.json();
+      const job = jobTemp.Item as SingleJob;
 
-      await logToCloudWatch(`Successfully fetched job: ${jobID}, job: ${JSON.stringify(job.Item)}`);
+      await logToCloudWatch(`Successfully fetched job: ${jobID}, job: ${JSON.stringify(job)}`);
       await createJiraTicket(
+        job,
         'PAINTING',
-        `${job.Item.client_name.S} bid on ${job.Item.estimate_date.S.split('T')[0]}`,
-        `${job.Item.transcription_summary.S}`,
-        jobID,
         'Task'
       );
     }

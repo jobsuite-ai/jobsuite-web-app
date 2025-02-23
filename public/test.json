@@ -1,0 +1,53 @@
+{
+    "content": [
+        {
+            "content": [
+                {
+                    "content": [
+                        {
+                            "content": [
+                                {
+                                    "text": "First",
+                                    "type": "text"
+                                }
+                            ],
+                            "type": "paragraph"
+                        }
+                    ],
+                    "type": "listItem"
+                },
+                {
+                    "content": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Second",
+                                    "type": "text"
+                                }
+                            ],
+                            "type": "paragraph"
+                        }
+                    ],
+                    "type": "listItem"
+                },
+                {
+                    "content": [
+                        {
+                            "content": [
+                                {
+                                    "text": "Third",
+                                    "type": "text"
+                                }
+                            ],
+                            "type": "paragraph"
+                        }
+                    ],
+                    "type": "listItem"
+                }
+            ],
+            "type": "bulletList"
+        }
+    ],
+    "type": "doc",
+    "version": 1
+}

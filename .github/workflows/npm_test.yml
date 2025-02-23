@@ -23,9 +23,3 @@ jobs:
         run: npm test # Runs tests (e.g., Jest, Vitest)
       - name: Build Project
         run: npm run build # Ensures the project builds without errors
-
-workflows:
-  version: 2
-  test:
-    jobs:
-      - test
