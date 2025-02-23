@@ -155,6 +155,9 @@ export class MarkdownToADFConverter {
       processedText = processedText.replace(/\*(.*?)\*/g, '$1');
     }
 
+    // Handle inline code - just remove the backticks without adding a mark
+    processedText = processedText.replace(/`(.*?)`/g, '$1');
+
     const node: ADFNode = {
       type: 'text',
       text: processedText,
