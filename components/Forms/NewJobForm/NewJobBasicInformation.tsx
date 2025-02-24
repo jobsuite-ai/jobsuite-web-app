@@ -76,6 +76,20 @@ export function NewJobBasicInformation({ form }: { form: UseFormReturnType<any> 
                       key={form.key('client_phone_number')}
                       {...form.getInputProps('client_phone_number')}
                     />
+                    <Select
+                      label="How did the client find us?"
+                      placeholder="Select an option"
+                      data={[
+                        { value: 'past_customer', label: 'Past Customer' },
+                        { value: 'referral', label: 'Referral' },
+                        { value: 'postcard', label: 'Postcard' },
+                        { value: 'trucks', label: 'Saw your trucks in the neighborhood' },
+                        { value: 'google', label: 'Google Search' },
+                        { value: 'yard_sign', label: 'Yard Sign' },
+                      ]}
+                      key={form.key('referral_source')}
+                      {...form.getInputProps('referral_source')}
+                    />
                 </> :
                 <ClientSearch form={form} setExistingClientSelected={setExistingClientSelected} />
             }

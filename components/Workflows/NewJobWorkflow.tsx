@@ -38,6 +38,7 @@ export function NewJobWorkflow() {
             job_type: '',
             season: '',
             video: null,
+            referral_source: '',
         },
 
         validate: (values) => {
@@ -136,6 +137,7 @@ export function NewJobWorkflow() {
                     video: formValues.video,
                     job_type: formValues.job_type,
                     hourly_rate,
+                    referral_source: formValues.referral_source,
                 }),
             }
         );
