@@ -3,7 +3,7 @@ export type TemplateInput = {
     items: TemplateDescription[];
     notes: string;
     image: string;
-    discountReason: string;
+    discountReason?: string;
     estimateNumber: string;
     rate: number;
 };

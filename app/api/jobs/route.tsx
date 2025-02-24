@@ -298,7 +298,7 @@ async function updateHoursAndRate(jobID: string, hoursAndRate: UpdateHoursAndRat
                 ':eh': { N: hoursAndRate.hours },
                 ':hr': { N: hoursAndRate.rate },
                 ':d': { S: hoursAndRate.date },
-                ':dr': { S: hoursAndRate.discount_reason },
+                ':dr': { S: hoursAndRate.discount_reason ?? '' },
             },
             Key: { id: { S: jobID } },
             ReturnValues: 'UPDATED_NEW',

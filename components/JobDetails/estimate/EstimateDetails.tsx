@@ -76,7 +76,7 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
                 items: lineItems,
                 image: imagePath,
                 notes: htmlString,
-                discountReason: job.discount_reason?.S ?? 'Winter Discount',
+                discountReason: job.discount_reason?.S,
                 estimateNumber: uuidv4().split('-')[0],
                 rate: Number(job.hourly_rate.N),
             };

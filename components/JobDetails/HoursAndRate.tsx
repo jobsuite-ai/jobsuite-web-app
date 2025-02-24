@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Card, Flex, Text, TextInput } from '@mantine/core';
+import { Button, Card, Flex, Switch, Text, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { DatePickerInput, DateValue } from '@mantine/dates';
 import { IconEdit } from '@tabler/icons-react';
@@ -14,13 +14,13 @@ import classes from './styles/HoursAndRate.module.css';
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
 
-const FULL_RATE = process.env.NEXT_PUBLIC_FULL_RATE ?
-    Number(process.env.NEXT_PUBLIC_FULL_RATE) : 106;
-
 export default function HoursAndRate({ job }: { job: SingleJob }) {
-    const [hours, setHours] = useState(job.estimate_hours?.N ?? 0);
-    const [rate, setRate] = useState(job.hourly_rate?.N ?? 106);
-    const [discountReason, setDiscountReason] = useState(job.discount_reason?.S ?? 'Winter Discount');
+    const [hours, setHours] = useState((job.estimate_hours?.N ?? 0).toString());
+    const [rate, setRate] = useState<string>((job.hourly_rate?.N ?? 106).toString());
+    const [discountReason, setDiscountReason] = useState<string | undefined>(
+        job.discount_reason?.S
+    );
+    const [hasDiscount, setHasDiscount] = useState(Boolean(job.discount_reason?.S));
     const [date, setDate] = useState(job.estimate_date?.S.split('T')[0] ??
         new Date().toISOString().split('T')[0]
     );
@@ -43,6 +43,13 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
 
     const setEstimateDiscountReason = async (event: React.ChangeEvent<HTMLInputElement>) => {
         setDiscountReason(event.target.value);
+    };
+
+    const toggleDiscount = (checked: boolean) => {
+        setHasDiscount(checked);
+        if (!checked) {
+            setDiscountReason(undefined);
+        }
     };
 
     const setEstimateDate = async (newEstimateDate: DateValue) => {
@@ -110,7 +117,12 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                       value={rate}
                       onChange={setEstimateRate}
                     />
-                    {Number(rate) !== FULL_RATE &&
+                    <Switch
+                      label="Apply Discount"
+                      checked={hasDiscount}
+                      onChange={(event) => toggleDiscount(event.currentTarget.checked)}
+                    />
+                    {hasDiscount &&
                         <TextInput
                           label="Discount Reason"
                           placeholder="Set discount reason"
@@ -131,7 +143,7 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                     <Flex justify="center" direction="column" gap="md">
                         <Text size="sm" mr="lg" fw={700}>Job hours: {hours}</Text>
                         <Text size="sm" fw={700}>Job rate: ${rate}</Text>
-                        {Number(rate) !== FULL_RATE && <Text size="sm">Discount reason: {discountReason}</Text>}
+                        {hasDiscount && <Text size="sm">Discount reason: {discountReason}</Text>}
                         <Text size="sm">Estimate date: {date}</Text>
                     </Flex>
                 </>

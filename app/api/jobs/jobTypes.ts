@@ -20,7 +20,7 @@ export type UpdateHoursAndRateInput = {
     hours: string,
     rate: string,
     date: string,
-    discount_reason: string,
+    discount_reason?: string,
 };
 
 export type UpdateClientDetailsInput = {

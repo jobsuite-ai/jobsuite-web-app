@@ -44,8 +44,8 @@ const generateDescriptions = (descriptions: TemplateDescription[]) => {
 
 const generateTotals = (
     descriptions: TemplateDescription[],
-    discountReason: string,
-    rate: number
+    rate: number,
+    discountReason?: string,
 ) => {
     let output = '';
     let total = 0;
@@ -57,7 +57,7 @@ const generateTotals = (
         const html = `
             <div class="subtotal">
                 <div>${description.header}</div>
-                ${rate === FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPrice(description)}</div>`
+                ${!discountReason || !hasHours ? `<div style="font-weight: normal;">${getPrice(description)}</div>`
                     : `
                         <div style="display: flex; flex-direction: column">
                             <div style="font-weight: normal; text-decoration: line-through;">${getPrice(description)}</div>
@@ -73,7 +73,7 @@ const generateTotals = (
     const subAndTotal = `
         <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
             <div>Subtotal</div>
-            ${rate === FULL_RATE || !hasHours ? `<div style="font-weight: normal;">${getPriceFromNumber(total)}</div>`
+            ${!discountReason || !hasHours ? `<div style="font-weight: normal;">${getPriceFromNumber(total)}</div>`
                 : `
                     <div style="display: flex; flex-direction: column">
                         <div style="font-weight: normal; text-decoration: line-through;">${getPriceFromNumber(total)}</div>
@@ -82,7 +82,7 @@ const generateTotals = (
                 `
             }
         </div>
-        ${rate === FULL_RATE || !hasHours ? '' : `
+        ${!discountReason || !hasHours ? '' : `
             <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
                 <div style="color: green;">${discountReason} (${percentDiscount}%)</div>
                 <div style="font-weight: normal; color: green">${getDiscountedTotal(total, rate)}</div>
@@ -90,7 +90,7 @@ const generateTotals = (
         `}
         <div class="total">
             <p>Total</p>
-            <p>${rate === FULL_RATE || !hasHours ? getPriceFromNumber(total) : getDiscountedSubtotal(total, rate)}</p>
+            <p>${!discountReason || !hasHours ? getPriceFromNumber(total) : getDiscountedSubtotal(total, rate)}</p>
         </div>
     `;
 
@@ -339,7 +339,7 @@ export const generateTemplate = (template: TemplateInput) => `
                     <div class="totals-wrapper">
                         <div class="totals-container"></div>
                         <div class="totals-container">
-                            ${generateTotals(template.items, template.discountReason, template.rate)}
+                            ${generateTotals(template.items, template.rate, template.discountReason)}
                         </div>
                     </div>
                 </div>
