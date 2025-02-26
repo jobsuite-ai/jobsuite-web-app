@@ -38,7 +38,11 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
     };
 
     const setEstimateRate = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        setRate(event.target.value);
+        if (event.target.value === '') {
+            setRate('106');
+        } else {
+            setRate(event.target.value);
+        }
     };
 
     const setEstimateDiscountReason = async (event: React.ChangeEvent<HTMLInputElement>) => {
