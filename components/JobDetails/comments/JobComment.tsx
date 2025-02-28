@@ -2,6 +2,8 @@ import { Card, Group, rem, Text } from '@mantine/core';
 import { IconUser } from '@tabler/icons-react';
 import { format } from 'date-fns';
 
+import classes from './JobComments.module.css';
+
 import { SingleComment } from '@/components/Global/model';
 
 export function JobComment({ commentDetails }: { commentDetails: SingleComment }) {
@@ -14,7 +16,8 @@ export function JobComment({ commentDetails }: { commentDetails: SingleComment }
       padding="lg"
       radius="md"
       withBorder
-      style={{ marginTop: rem(20), marginBottom: rem(20), cursor: 'pointer', width: '700px' }}
+      style={{ marginTop: rem(20), marginBottom: rem(20), cursor: 'pointer' }}
+      className={classes.commentTextArea}
     >
       <Group style={{ justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>

@@ -168,7 +168,8 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                         />
                                     }
                                 </Flex>
-                                <Flex direction="row" justify="center">
+                                <JobComments jobID={jobID} />
+                                <Flex direction="row" justify="center" mt="xl">
                                     <Button
                                       leftSection={<IconArchive size={20} />}
                                       variant="filled"
@@ -193,8 +194,6 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                 return (<OverviewDetails />);
             case 'estimate':
                 return (<EstimateDetails job={job} />);
-            case 'comments':
-                return (<JobComments jobID={jobID} />);
             default:
                 return (<OverviewDetails />);
         }

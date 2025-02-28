@@ -4,7 +4,6 @@ import {
   IconArrowLeft,
   IconClockQuestion,
   IconListTree,
-  IconMessage2,
 } from '@tabler/icons-react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -13,7 +12,6 @@ import classes from './JobDetailsSideNav.module.css';
 const data = [
   { link: 'overview', label: 'Overview', icon: IconListTree },
   { link: 'estimate', label: 'Estimate Preview', icon: IconClockQuestion },
-  { link: 'comments', label: 'Comments', icon: IconMessage2 },
 ];
 
 export function JobDetailsSideNav() {
