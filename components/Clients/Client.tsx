@@ -178,6 +178,11 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                                     >
                                         <Flex direction="row" justify="space-between">
                                             <Flex direction="column" align="flex-start">
+                                                {job.job_type &&
+                                                    <Center>
+                                                        <Text size="sm" fw={700}>{job.job_type}</Text>
+                                                    </Center>
+                                                }
                                                 <Text size="sm" c="dimmed">{job.client_address}</Text>
                                                 <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
                                                 <Text size="sm" c="dimmed">{job.zip_code}</Text>
