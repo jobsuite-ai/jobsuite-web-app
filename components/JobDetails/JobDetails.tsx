@@ -146,29 +146,35 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                 <LineItems job={job} />
                                 <TranscriptionSummary job={job} refresh={getJob} />
                                 <SpanishTranscription job={job} refresh={getJob} />
-                                <Center mt="lg">
-                                    <Text size="lg">
-                                        Resource Links
-                                    </Text>
-                                </Center>
-                                <Flex direction="row" justify="center" gap="xl">
-                                    {job.docuseal_link &&
-                                        <ResourceLink
-                                          handler={() =>
-                                            handleOpenExternalLink(job.docuseal_link.S)}
-                                          icon={IconPencil}
-                                          label="Docuseal"
-                                        />
-                                    }
-                                    {job.jira_link &&
-                                        <ResourceLink
-                                          handler={() => handleOpenExternalLink(job.jira_link.S)}
-                                          icon={IconFileText}
-                                          label="Jira"
-                                        />
-                                    }
-                                </Flex>
                                 <JobComments jobID={jobID} />
+                                {(job.docuseal_link || job.jira_link) &&
+                                <>
+                                    <Center mt="lg">
+                                        <Text size="lg">
+                                            Resource Links
+                                        </Text>
+                                    </Center>
+
+                                    <Flex direction="row" justify="center" gap="xl">
+                                        {job.docuseal_link &&
+                                            <ResourceLink
+                                              handler={() =>
+                                                handleOpenExternalLink(job.docuseal_link.S)}
+                                              icon={IconPencil}
+                                              label="Docuseal"
+                                            />
+                                        }
+                                        {job.jira_link &&
+                                            <ResourceLink
+                                              handler={() =>
+                                                handleOpenExternalLink(job.jira_link.S)}
+                                              icon={IconFileText}
+                                              label="Jira"
+                                            />
+                                        }
+                                    </Flex>
+                                </>
+                                }
                                 <Flex direction="row" justify="center" mt="xl">
                                     <Button
                                       leftSection={<IconArchive size={20} />}

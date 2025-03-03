@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Button, Center, Group, Text, Textarea } from '@mantine/core';
+import { Button, Center, Group, Paper, Text, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -93,8 +93,8 @@ export default function JobComments({ jobID }: { jobID: string }) {
     return (
         <>
             {(loading || isLoading || !user) ? <LoadingState /> :
-                <>
-                    <Center mt="lg">
+                <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.commentTextArea}>
+                    <Center mt="sm">
                         <Text size="lg">
                             Comments
                         </Text>
@@ -108,7 +108,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
                         {commentInputLoading ? <LoadingState /> :
                         <>
                             <Textarea
-                              className={classes.commentTextArea}
+                              w="100%"
                               placeholder="Enter comment here"
                               label="Add comment"
                               autosize
@@ -122,7 +122,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
                         </>
                         }
                     </div>
-                </>
+                </Paper>
             }
         </>
     );
