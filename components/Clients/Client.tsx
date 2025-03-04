@@ -176,21 +176,28 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                                       onClick={() => router.push(`/jobs/${job.id}`)}
                                       style={{ cursor: 'pointer' }}
                                     >
-                                        <Flex direction="row" justify="space-between">
-                                            <Flex direction="column" align="flex-start">
-                                                {job.job_type &&
-                                                    <Center>
-                                                        <Text size="sm" fw={700}>{job.job_type}</Text>
-                                                    </Center>
-                                                }
-                                                <Text size="sm" c="dimmed">{job.client_address}</Text>
-                                                <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
-                                                <Text size="sm" c="dimmed">{job.zip_code}</Text>
-                                                {job.estimate_date && <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>}
+                                        <Flex direction="column" justify="space-between">
+                                            {job.job_title &&
+                                                <Center>
+                                                    <Text size="md" fw={700}>{job.job_title}</Text>
+                                                </Center>
+                                            }
+                                            <Flex direction="row" justify="space-between">
+                                                <Flex direction="column" align="flex-start">
+                                                    {job.job_type &&
+                                                        <Center>
+                                                            <Text size="sm" fw={700}>{job.job_type}</Text>
+                                                        </Center>
+                                                    }
+                                                    <Text size="sm" c="dimmed">{job.client_address}</Text>
+                                                    <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
+                                                    <Text size="sm" c="dimmed">{job.zip_code}</Text>
+                                                    {job.estimate_date && <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>}
+                                                </Flex>
+                                                <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
+                                                    {getFormattedStatus(job.job_status)}
+                                                </Badge>
                                             </Flex>
-                                            <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
-                                                {getFormattedStatus(job.job_status)}
-                                            </Badge>
                                         </Flex>
                                     </Paper>
                                 ))}

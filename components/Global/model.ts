@@ -13,6 +13,7 @@ export type Job = {
     video: any;
     job_status: JobStatus;
     job_type: string;
+    job_title: string;
 };
 
 export type Client = {

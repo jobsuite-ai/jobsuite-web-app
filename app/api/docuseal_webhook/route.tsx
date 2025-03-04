@@ -80,12 +80,8 @@ async function getJobAndCreateTicket(payload: any): Promise<any> {
   const jobID = payload.data.template.external_id;
 
   try {
-    if (!jobID) {
-      throw Error('Job id must be defined to create jira ticket');
-    }
-    await logToCloudWatch(`Attempting to create a JIRA ticket for job: ${jobID}`);
-
     if (jobID) {
+      await logToCloudWatch(`Attempting to create a JIRA ticket for job: ${jobID}`);
       const getItemCommand = new GetItemCommand({
         TableName: process.env.JOB_TABLE_NAME,
         Key: {
@@ -98,14 +94,15 @@ async function getJobAndCreateTicket(payload: any): Promise<any> {
       const job = jobTemp.Item as SingleJob;
 
       await logToCloudWatch(`Successfully fetched job: ${jobID}, job: ${JSON.stringify(job)}`);
-      await createJiraTicket(
+      const jiraTicket = await createJiraTicket(
         job,
         'PAINTING',
         'Task'
       );
+      return Response.json({ jiraTicket });
     }
 
-    throw Error('JobID must be defined to get a job');
+    throw Error('Job id must be defined to create jira ticket');
   } catch (error: any) {
     await logToCloudWatch(`Failed to create a JIRA ticket for job: ${jobID}, error: ${error.stack}`);
     return Response.json({ error: error.message });
