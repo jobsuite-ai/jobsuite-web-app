@@ -2,39 +2,39 @@
 
 import { useEffect, useState } from 'react';
 
-import { Center, Flex, Paper, Text, Button } from '@mantine/core';
-import { IconPencil, IconArchive, IconFileText } from '@tabler/icons-react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Button, Center, Flex, Paper, Text } from '@mantine/core';
+import { IconArchive, IconFileText, IconPencil } from '@tabler/icons-react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import ClientDetails from './ClientDetails';
-import DescriptionOfWork from './DescriptionOfWork';
-import JobImage from './JobImage';
 import LoadingState from '../Global/LoadingState';
-import { SingleJob, JobStatus } from '../Global/model';
+import { JobStatus, SingleJob } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
+import updateJobStatus from '../Global/updateJobStatus';
 import JobComments from './comments/JobComments';
+import DescriptionOfWork from './DescriptionOfWork';
 import EstimateDetails from './estimate/EstimateDetails';
 import LineItems from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import TranscriptionSummary from './estimate/TranscriptionSummary';
 import HoursAndRate from './HoursAndRate';
+import JobImage from './JobImage';
+import JobTitle from './JobTitle';
 import ResourceLink from './ResourceLink';
 import classes from './styles/JobDetails.module.css';
 import VideoUploader from './VideoUploader';
-import updateJobStatus from '../Global/updateJobStatus';
 
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
 
 export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
-    const [job, setJob] = useState<SingleJob>();
     const [objectExists, setObjectExists] = useState(false);
+    const [job, setJob] = useState<SingleJob>();
     const router = useRouter();
 
     const searchParams = useSearchParams();
     const page = searchParams.get('page');
 
-    // Start polling when component mounts, and stop if video is available
     useEffect(() => {
         if (!job) {
             setLoading(true);
@@ -48,10 +48,10 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                 } else {
                     clearInterval(videoExists);
                 }
-            }, 5000); // Poll every 5 seconds
+            }, 5000);
 
             return () => {
-                clearInterval(videoExists); // Clear interval when component unmounts
+                clearInterval(videoExists);
             };
         }
 
@@ -66,7 +66,10 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ bucketName: process.env.AWS_BUCKET_NAME, objectKey: `${jobID}/${job?.video?.M?.name.S}` }),
+                body: JSON.stringify({
+                    bucketName: process.env.AWS_BUCKET_NAME,
+                    objectKey: `${jobID}/${job?.video?.M?.name.S}`,
+                }),
             }
         );
 
@@ -113,6 +116,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                 <div className={classes.jobDetailsWrapper}>
                     {job ?
                         <>
+                            <JobTitle initialTitle={job.job_title?.S || ''} jobID={jobID} onSave={getJob} />
                             <div className={classes.flexContainer}>
                                 <div className={classes.videoWrapper}>
                                     {job.video?.M?.name ?
@@ -159,7 +163,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                         {job.docuseal_link &&
                                             <ResourceLink
                                               handler={() =>
-                                                handleOpenExternalLink(job.docuseal_link.S)}
+                                                    handleOpenExternalLink(job.docuseal_link.S)}
                                               icon={IconPencil}
                                               label="Docuseal"
                                             />
@@ -167,7 +171,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                         {job.jira_link &&
                                             <ResourceLink
                                               handler={() =>
-                                                handleOpenExternalLink(job.jira_link.S)}
+                                                    handleOpenExternalLink(job.jira_link.S)}
                                               icon={IconFileText}
                                               label="Jira"
                                             />
@@ -189,8 +193,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                         </> : <UniversalError message="Unable to access job details" />
                     }
                 </div>
-                                          </>
-            }
+                                          </>}
         </>
     );
 

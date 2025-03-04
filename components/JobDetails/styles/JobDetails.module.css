@@ -76,3 +76,23 @@
         width: 100%;
     }
 }
+
+.jobTitleContainer {
+    margin: 20px 0 0;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+}
+
+.jobTitle {
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: color 0.3s ease;
+}
+
+/* Make this more specific to ensure it overrides any other styles */
+.jobTitle:hover {
+    color: var(--mantine-primary-color-filled) !important;
+    background-color: transparent;
+}

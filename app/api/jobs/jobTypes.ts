@@ -1,6 +1,7 @@
 import { JobStatus } from '@/components/Global/model';
 
 export type UpdateJobContent = {
+    job_title?: string,
     line_item?: JobLineItem,
     delete_line_item?: number,
     delete_image?: boolean,

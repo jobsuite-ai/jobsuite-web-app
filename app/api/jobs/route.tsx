@@ -107,6 +107,7 @@ export async function PUT(request: Request) {
         typedContent.update_hours_and_rate,
     );
     typedContent.delete_video && await deleteVideo(jobID);
+    typedContent.job_title && await updateJobTitle(jobID, typedContent.job_title);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -381,6 +382,22 @@ async function deleteAllImages(jobID: string) {
 
         const { Attributes } = await client.send(updateItemCommand);
 
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updateJobTitle(jobID: string, jobTitle: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: { ':title': { S: jobTitle } },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET job_title = :title',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });
     } catch (error: any) {
         return Response.json({ error: error.message });
