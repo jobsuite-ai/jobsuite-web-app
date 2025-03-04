@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Button, Group, Modal, NumberInput, Paper, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
@@ -20,6 +20,8 @@ export default function LineItems({ job }: { job: SingleJob }) {
     const [opened, setOpened] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [lineItems, setLineItems] = useState(job.line_items?.L ?? []);
+    const [date] = useState(job.estimate_date?.S ?? new Date().toISOString());
+    const isFirstRender = useRef(true);
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -33,6 +35,43 @@ export default function LineItems({ job }: { job: SingleJob }) {
                 header: values.header === '' ? 'Must enter header' : null,
             }),
     });
+
+    useEffect(() => {
+        async function updateHours() {
+            await setTotalHours();
+        }
+
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+        } else {
+            updateHours();
+        }
+    }, [lineItems]);
+
+    async function setTotalHours() {
+        // Update job hours based on line items
+        const totalHours = lineItems.reduce((acc, item) => acc + +item.M.hours.N, 0);
+        const content: UpdateJobContent = {
+            update_hours_and_rate: {
+                hours: totalHours.toString(),
+                rate: job.hourly_rate?.N,
+                date,
+            },
+        };
+
+        const response = await fetch(
+            '/api/jobs',
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content, jobID: job.id.S }),
+            }
+        );
+
+        await response.json();
+    }
 
     async function addLineItem() {
         if (!form.validate().hasErrors) {
