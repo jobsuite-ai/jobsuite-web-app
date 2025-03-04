@@ -2,23 +2,25 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Button, Card, Center, Flex, Modal, Text, TextInput } from '@mantine/core';
+import { Badge, Button, Card, Center, Flex, Menu, Modal, Text, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { useForm } from '@mantine/form';
-import { IconEdit } from '@tabler/icons-react';
+import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
-import { DynamoClient, SingleJob } from '../Global/model';
+import { DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 import { UpdateClientDetailsInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
     const [job, setJob] = useState(initialJob);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [client, setClient] = useState<DynamoClient>();
+    const [menuOpened, setMenuOpened] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -90,6 +92,50 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         setIsModalOpen(false);
     };
 
+    const updateJobStatus = async (status: JobStatus) => {
+        const content: UpdateJobContent = {
+            job_status: status,
+        };
+
+        try {
+            const response = await fetch(
+                '/api/jobs',
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content, jobID: job.id.S }),
+                }
+            );
+
+            await response.json();
+
+            // Update local state
+            setJob(prevJob => ({
+                ...prevJob,
+                job_status: { S: status },
+            }));
+
+            setMenuOpened(false);
+        } catch (error) {
+            logToCloudWatch(`Failed to update job status: ${error}`);
+        }
+    };
+
+    const statusOptions = Object.values(JobStatus).filter(
+        status => status !== job.job_status.S
+    );
+
+    const statusDropdownOptions = statusOptions.map((status) => (
+        <Menu.Item
+          key={status}
+          onClick={() => updateJobStatus(status)}
+        >
+            {getFormattedStatus(status)}
+        </Menu.Item>
+    ));
+
     return (
         <>
             {client ?
@@ -114,9 +160,33 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                             {job.client_name.S}
                         </Text>
                         <Flex direction="row" gap={5}>
-                            <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status.S)} mr="10px">
-                                {getFormattedStatus(job.job_status.S)}
-                            </Badge>
+                            <Menu
+                              opened={menuOpened}
+                              onChange={setMenuOpened}
+                              width={200}
+                              position="bottom-start"
+                            >
+                                <Menu.Target>
+                                    <Badge
+                                      style={{
+                                            color: '#ffffff',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '5px',
+                                        }}
+                                      color={getBadgeColor(job.job_status.S)}
+                                      mr="10px"
+                                      rightSection={<IconChevronDown size={12} />}
+                                    >
+                                        {getFormattedStatus(job.job_status.S)}
+                                    </Badge>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                    <Menu.Label>Change Status</Menu.Label>
+                                    {statusDropdownOptions}
+                                </Menu.Dropdown>
+                            </Menu>
                         </Flex>
                     </Flex>
                     <Flex direction="column" gap="lg" mt="md" mb="xs">

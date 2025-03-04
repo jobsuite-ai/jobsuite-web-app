@@ -20,6 +20,8 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
             return '#F44336';
         case JobStatus.RLPP_OPENED:
             return '#3F51B5';
+        case JobStatus.JOB_COMPLETE:
+            return '#4CAF50';
         default:
             return '#d3d3d3';
     }
@@ -45,6 +47,10 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
             return 'RLPP Declined';
         case JobStatus.RLPP_OPENED:
             return 'RLPP Opened';
+        case JobStatus.JOB_COMPLETE:
+            return 'Job Complete';
+        case JobStatus.ARCHIVED:
+            return 'Archived';
         default:
             return 'Estimate Not Finished';
     }

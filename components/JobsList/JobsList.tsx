@@ -25,12 +25,16 @@ const FILTER_STATUSES = [
 ];
 
 export default function JobsList() {
-    const [checkedStatusMap, setCheckedStatusMap] = useState<Record<JobStatus, boolean>>(
-        Object.values(FILTER_STATUSES).reduce(
-          (acc, status) => ({ ...acc, [status.valueOf()]: JobStatus.ESTIMATE_DECLINED !== status }),
-          {} as Record<JobStatus, boolean>
-        )
-    );
+    const [checkedStatusMap, setCheckedStatusMap] = useState<Record<JobStatus, boolean>>(() => {
+        const initialMap = {} as Record<JobStatus, boolean>;
+
+        [...FILTER_STATUSES, JobStatus.JOB_COMPLETE].forEach(status => {
+            initialMap[status] = status !== JobStatus.ESTIMATE_DECLINED;
+        });
+
+        return initialMap;
+    });
+
     const [jobs, setJobs] = useState(new Array<Job>());
     const [filteredJobs, setFilteredJobs] = useState(new Array<Job>());
     const [loading, setLoading] = useState(true);
@@ -43,7 +47,7 @@ export default function JobsList() {
 
     useEffect(() =>
         setFilteredJobs(jobs.filter((job) => checkedStatusMap[job.job_status])),
-        [checkedStatusMap]
+        [checkedStatusMap, jobs]
     );
 
     async function getJobs() {
@@ -68,17 +72,21 @@ export default function JobsList() {
     };
 
     const clearAll = () => {
-        setCheckedStatusMap(Object.values(FILTER_STATUSES).reduce(
-            (acc, status) => ({ ...acc, [status.valueOf()]: false }),
-            {} as Record<JobStatus, boolean>
-        ));
+        setCheckedStatusMap(
+            [...FILTER_STATUSES, JobStatus.JOB_COMPLETE].reduce(
+                (acc, status) => ({ ...acc, [status]: false }),
+                {} as Record<JobStatus, boolean>
+            )
+        );
     };
 
     const selectAll = () => {
-        setCheckedStatusMap(Object.values(FILTER_STATUSES).reduce(
-            (acc, status) => ({ ...acc, [status.valueOf()]: true }),
-            {} as Record<JobStatus, boolean>
-        ));
+        setCheckedStatusMap(
+            [...FILTER_STATUSES, JobStatus.JOB_COMPLETE].reduce(
+                (acc, status) => ({ ...acc, [status]: true }),
+                {} as Record<JobStatus, boolean>
+            )
+        );
     };
 
     return (
@@ -129,7 +137,10 @@ export default function JobsList() {
                                                     />
                                                 </Tooltip>
                                             </div>
-                                            {FILTER_STATUSES.map((status) => (
+                                            {[
+                                                JobStatus.JOB_COMPLETE,
+                                                ...FILTER_STATUSES,
+                                            ].map((status) => (
                                                 <Menu.Item
                                                   key={status}
                                                   style={{ cursor: 'pointer' }}
@@ -138,7 +149,7 @@ export default function JobsList() {
                                                     <Checkbox
                                                       style={{ cursor: 'pointer' }}
                                                       label={getFormattedStatus(status)}
-                                                      checked={checkedStatusMap[status]}
+                                                      checked={checkedStatusMap[status] || false}
                                                       onChange={() => toggleFilter(status)}
                                                     />
                                                 </Menu.Item>
