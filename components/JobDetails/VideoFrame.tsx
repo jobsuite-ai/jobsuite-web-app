@@ -94,11 +94,11 @@ export function VideoFrame({ name, jobID, refresh }: {
                             If this process takes longer than 10 minutes,
                             please reach out to support.
                         </Text>
+                        <Center my="md">
+                            <Button onClick={() => setIsModalOpen(true)}>Retry Upload</Button>
+                        </Center>
                     </Flex>
                 }
-                <Center my="md">
-                    <Button onClick={() => setIsModalOpen(true)}>Delete Video</Button>
-                </Center>
             </Paper>
 
             <Modal
@@ -109,10 +109,6 @@ export function VideoFrame({ name, jobID, refresh }: {
             >
                 <Center mt="md">
                     <Flex direction="column">
-                        <Text mb="lg">
-                            This will delete the video,
-                            transcription summary and spanish transcription.
-                        </Text>
                         <Flex direction="row" gap="lg" justify="center" align="cemter">
                             <Button type="submit" onClick={deleteVideo}>Confirm</Button>
                             <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
