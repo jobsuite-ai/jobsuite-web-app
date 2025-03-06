@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Center, Flex, Paper, Text } from '@mantine/core';
+import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
 import { IconArchive, IconFileText, IconPencil } from '@tabler/icons-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -29,6 +29,7 @@ import { VideoFrame } from '@/components/JobDetails/VideoFrame';
 export default function JobDetails({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
     const [objectExists, setObjectExists] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [job, setJob] = useState<SingleJob>();
     const router = useRouter();
 
@@ -184,7 +185,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                       leftSection={<IconArchive size={20} />}
                                       variant="filled"
                                       color="red"
-                                      onClick={archiveJob}
+                                      onClick={() => setIsModalOpen(true)}
                                     >
                                         Archive Job
                                     </Button>
@@ -194,6 +195,25 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                     }
                 </div>
                                           </>}
+            <Modal
+              opened={isModalOpen}
+              onClose={() => setIsModalOpen(false)}
+              size="lg"
+              title={<Text fz={30} fw={700}>Are you sure?</Text>}
+            >
+                <Center mt="md">
+                    <Flex direction="column">
+                        <Text mb="lg">
+                            This will archive the job, a process that can be reversed but will
+                            require manual intervention.
+                        </Text>
+                        <Flex direction="row" gap="lg" justify="center" align="cemter">
+                            <Button type="submit" onClick={archiveJob}>Confirm</Button>
+                            <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        </Flex>
+                    </Flex>
+                </Center>
+            </Modal>
         </>
     );
 
