@@ -35,6 +35,7 @@ const ARCHIVE_STATUSES = [
   JobStatus.RLPP_SIGNED,
   JobStatus.JOB_COMPLETE,
   JobStatus.ARCHIVED,
+  JobStatus.STALE_ESTIMATE,
 ];
 
 export default function JobsList() {
@@ -164,8 +165,8 @@ export default function JobsList() {
                               gap="md"
                               mt="lg"
                             >
-                                {renderColumn(columnOneJobs, 'New & Scheduled')}
-                                {renderColumn(columnTwoJobs, 'In Progress')}
+                                {renderColumn(columnOneJobs, 'Estimate Pipeline')}
+                                {renderColumn(columnTwoJobs, 'Estimate Follow-up')}
                             </Flex>
 
                             {/* Archive section */}

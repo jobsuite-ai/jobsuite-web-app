@@ -59,11 +59,14 @@ export async function POST(request: Request) {
     }
 
     const updateItemCommand = new UpdateItemCommand({
-      ExpressionAttributeValues: { ':status': { S: jobStatusEnum } },
+      ExpressionAttributeValues: {
+        ':status': { S: jobStatusEnum },
+        ':updated_at': { S: Date.now().toString() },
+      },
       Key: { id: { S: payload.data.template.external_id } },
       ReturnValues: 'UPDATED_NEW',
       TableName: 'job',
-      UpdateExpression: 'SET job_status = :status',
+      UpdateExpression: 'SET job_status = :status, updated_at = :updated_at',
     });
 
     const { Attributes } = await client.send(updateItemCommand);
