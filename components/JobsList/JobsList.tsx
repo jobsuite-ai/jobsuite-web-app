@@ -23,10 +23,10 @@ const COLUMN_ONE_STATUSES = [
 const COLUMN_TWO_STATUSES = [
   JobStatus.NEEDS_FOLLOW_UP,
   JobStatus.RLPP_OPENED,
+  JobStatus.ESTIMATE_ACCEPTED,
   JobStatus.RLPP_DECLINED,
   JobStatus.ESTIMATE_SENT,
   JobStatus.ESTIMATE_OPENED,
-  JobStatus.ESTIMATE_ACCEPTED,
 ];
 
 // Archive column statuses
