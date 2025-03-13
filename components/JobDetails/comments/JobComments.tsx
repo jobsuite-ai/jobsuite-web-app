@@ -95,7 +95,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
             {(loading || isLoading || !user) ? <LoadingState /> :
                 <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.commentTextArea}>
                     <Center mt="sm">
-                        <Text size="lg">
+                        <Text size="lg" mb="md">
                             Comments
                         </Text>
                     </Center>

@@ -1,27 +1,41 @@
 import { JobStatus } from './model';
 
+export const BADGE_COLORS = {
+    SUCCESS: '#7DBA84',
+    WARNING: '#EAC67A',
+    ERROR: '#E58D8D',
+    INFO: '#72A1D1',
+    ALERT: '#E0A56D',
+  } as const;
+
 export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
+        case JobStatus.NEW_LEAD:
+            return BADGE_COLORS.ERROR;
         case JobStatus.ESTIMATE_NOT_SCHEDULED:
-            return '#3F51B5';
+            return BADGE_COLORS.WARNING;
+        case JobStatus.ESTIMATE_SCHEDULED:
+            return BADGE_COLORS.ALERT;
+        case JobStatus.ESTIMATE_IN_PROGRESS:
+            return BADGE_COLORS.SUCCESS;
+        case JobStatus.NEEDS_FOLLOW_UP:
+            return BADGE_COLORS.ERROR;
         case JobStatus.ESTIMATE_ACCEPTED:
-            return '#FF9800';
+            return BADGE_COLORS.SUCCESS;
         case JobStatus.ESTIMATE_DECLINED:
-            return '#F44336';
+            return BADGE_COLORS.ERROR;
         case JobStatus.ESTIMATE_SENT:
-            return '#FFC107';
+            return BADGE_COLORS.WARNING;
         case JobStatus.ESTIMATE_OPENED:
-            return '#3F51B5';
-        case JobStatus.PENDING_ESTIMATE:
-            return '#d3d3d3';
+            return BADGE_COLORS.INFO;
         case JobStatus.RLPP_SIGNED:
-            return '#4CAF50';
+            return BADGE_COLORS.SUCCESS;
         case JobStatus.RLPP_DECLINED:
-            return '#F44336';
+            return BADGE_COLORS.ERROR;
         case JobStatus.RLPP_OPENED:
-            return '#3F51B5';
+            return BADGE_COLORS.ERROR;
         case JobStatus.JOB_COMPLETE:
-            return '#4CAF50';
+            return BADGE_COLORS.SUCCESS;
         default:
             return '#d3d3d3';
     }
@@ -29,8 +43,16 @@ export const getBadgeColor = (jobStatus: JobStatus) => {
 
 export const getFormattedStatus = (jobStatus: JobStatus) => {
     switch (jobStatus) {
+        case JobStatus.NEW_LEAD:
+            return 'New Lead';
+        case JobStatus.ESTIMATE_SCHEDULED:
+            return 'Estimate Scheduled';
+        case JobStatus.ESTIMATE_IN_PROGRESS:
+            return 'Estimate In Progress';
+        case JobStatus.NEEDS_FOLLOW_UP:
+            return 'Needs Follow Up';
         case JobStatus.ESTIMATE_NOT_SCHEDULED:
-            return 'Estimate Not Scheduled';
+            return 'Needs Scheduling';
         case JobStatus.ESTIMATE_ACCEPTED:
             return 'Needs RLPP Signature';
         case JobStatus.ESTIMATE_DECLINED:
@@ -39,8 +61,6 @@ export const getFormattedStatus = (jobStatus: JobStatus) => {
             return 'Estimate Sent';
         case JobStatus.ESTIMATE_OPENED:
             return 'Client Opened Estimate';
-        case JobStatus.PENDING_ESTIMATE:
-            return 'Estimate Not Finished';
         case JobStatus.RLPP_SIGNED:
             return 'Estimate Finished';
         case JobStatus.RLPP_DECLINED:

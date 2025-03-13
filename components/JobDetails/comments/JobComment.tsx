@@ -14,7 +14,7 @@ export function JobComment({ commentDetails }: { commentDetails: SingleComment }
       padding="lg"
       radius="md"
       withBorder
-      style={{ marginTop: rem(20), marginBottom: rem(20), cursor: 'pointer' }}
+      style={{ marginBottom: rem(20), cursor: 'pointer' }}
     >
       <Group style={{ justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center' }}>

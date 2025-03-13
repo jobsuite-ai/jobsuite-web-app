@@ -61,7 +61,7 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         setDate((newEstimateDate?.toISOString() as string).split('T')[0]);
 
         if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
-            updateJobStatus(JobStatus.PENDING_ESTIMATE, job.id.S);
+            updateJobStatus(JobStatus.ESTIMATE_IN_PROGRESS, job.id.S);
         }
     };
 

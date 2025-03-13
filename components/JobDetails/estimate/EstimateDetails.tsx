@@ -90,7 +90,7 @@ export default function EstimateDetails({ job }: { job: SingleJob }) {
             <div className={classes.jobDetailsWrapper}>
                 {job ?
                     <>
-                        {job.job_status.S === JobStatus.PENDING_ESTIMATE ?
+                        {job.job_status.S === JobStatus.ESTIMATE_IN_PROGRESS ?
                             <h1 style={{ marginTop: '30px' }}>Estimate Preview</h1>
                             :
                             <h1 style={{ marginTop: '30px' }}>Estimate Has Been Sent</h1>

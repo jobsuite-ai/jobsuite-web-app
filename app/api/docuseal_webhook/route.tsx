@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
 
-    let jobStatusEnum = JobStatus.PENDING_ESTIMATE;
+    let jobStatusEnum = JobStatus.ESTIMATE_IN_PROGRESS;
     const jobStatus = payload.event_type.split('.')[1];
 
     await logToCloudWatch(`Handling new job status: ${jobStatus}`);
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
           break;
         default:
           logToCloudWatch(`Unknown job status: ${jobStatus}`);
-          jobStatusEnum = JobStatus.PENDING_ESTIMATE;
+          jobStatusEnum = JobStatus.ESTIMATE_IN_PROGRESS;
           break;
       }
     } else {

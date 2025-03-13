@@ -10,7 +10,7 @@ import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
-import { DynamoClient, JobStatus, SingleJob } from '../Global/model';
+import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 import { UpdateClientDetailsInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
@@ -123,7 +123,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         }
     };
 
-    const statusOptions = Object.values(JobStatus).filter(
+    const statusOptions = Object.values(DropdownJobStatus).filter(
         status => status !== job.job_status.S
     );
 
