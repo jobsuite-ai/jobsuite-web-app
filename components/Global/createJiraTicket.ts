@@ -1,7 +1,7 @@
 import { DynamoDBClient, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import axios from 'axios';
 
-import { SingleJob } from './model';
+import { SingleJob, DynamoClient } from './model';
 
 import { logToCloudWatch } from '@/public/logger';
 import { MarkdownToADFConverter } from '@/public/MarkdownToAdfConverter';
@@ -10,6 +10,7 @@ const client = new DynamoDBClient({});
 
 export default async function createJiraTicket(
   job: SingleJob,
+  jobClient: DynamoClient,
   projectKey: string,
   issueType: string = 'Task',
 ) {
@@ -17,19 +18,18 @@ export default async function createJiraTicket(
   const jiraApiToken = process.env.JIRA_API_TOKEN;
   const jiraEmail = process.env.JIRA_EMAIL;
 
-  const key = `${job.id.S}/${job.video.M.name.S}`;
+  const key = `${job.id?.S}/${job.video?.M?.name?.S}`;
   const baseCloudFrontURL = 'https://rl-peek-job-videos.s3.us-west-2.amazonaws.com/';
 
-  const summary = `${job.client_name.S} bid on ${job.estimate_date.S.split('T')[0]}`;
-  const description = `## Job Hours\n${job.estimate_hours.N}
-${job.transcription_summary.S}\n
-## Spanish Details\n${job.spanish_transcription.S}\n
+  const summary = `${job.client_name?.S} bid on ${job.estimate_date?.S.split('T')[0]}`;
+  const description = `${job.transcription_summary?.S}\n
+## Spanish Details\n${job.spanish_transcription?.S}\n
 ## Paint Can Image\n
 ## Color Usage Details\n
 `;
 
   const videoLink = baseCloudFrontURL + key;
-  const jobLink = `https://admin.rlpeekpainting.com/jobs/${job.id.S}`;
+  const jobLink = `https://admin.rlpeekpainting.com/jobs/${job.id?.S}`;
 
   const converter = new MarkdownToADFConverter(description);
   const adfDescription = converter.convert().content;
@@ -114,6 +114,11 @@ ${job.transcription_summary.S}\n
       issuetype: {
         name: issueType,
       },
+      customfield_10132: parseFloat(job.estimate_hours?.N),
+      customfield_10165: 0,
+      customfield_10166: parseFloat(job.estimate_hours?.N),
+      customfield_10198: parseFloat(jobClient.phone_number?.S),
+      customfield_10199: parseFloat(jobClient.email?.S),
     },
   };
 
@@ -129,7 +134,7 @@ ${job.transcription_summary.S}\n
     const jiraTicketUrl = `${jiraBaseUrl}/browse/${response.data.key}`;
     const updateItemCommand = new UpdateItemCommand({
         ExpressionAttributeValues: { ':link': { S: jiraTicketUrl } },
-        Key: { id: { S: job.id.S } },
+        Key: { id: { S: job.id?.S } },
         ReturnValues: 'UPDATED_NEW',
         TableName: 'job',
         UpdateExpression: 'SET jira_link = :link',
