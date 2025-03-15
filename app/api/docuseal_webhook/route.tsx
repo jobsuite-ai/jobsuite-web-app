@@ -82,7 +82,6 @@ export async function POST(request: Request) {
         TableName: 'job',
         UpdateExpression: 'SET job_status = :status, updated_at = :updated_at',
       });
-
       const { Attributes } = await client.send(updateItemCommand);
 
       logToCloudWatch(`Successfully processed webhook for job: ${payload.data.template.external_id}, status: ${jobStatusEnum}`);
@@ -124,12 +123,14 @@ async function getJobAndCreateTicket(job: SingleJob): Promise<any> {
         'PAINTING',
         'Task'
       );
+
+      await logToCloudWatch(`Successfully created JIRA ticket for job: ${jobID}, jira ticket: ${jiraTicket}`);
       return Response.json({ jiraTicket });
     }
 
     throw Error('Job id must be defined to create jira ticket');
   } catch (error: any) {
-    await logToCloudWatch(`Failed to create a JIRA ticket for job: ${jobID}, error: ${error.stack}`);
+    await logToCloudWatch(`[JIRA_TICKET_CREATION_FAILED] Failed to create a JIRA ticket for job: ${jobID}, error: ${error.stack}`);
     return Response.json({ error: error.message });
   }
 }
