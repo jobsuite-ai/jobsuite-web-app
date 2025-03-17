@@ -5,9 +5,7 @@ const msalConfig = {
   auth: {
     clientId: '5b525ee8-bed9-4442-9248-c4d5e43880a1',
     authority: 'https://login.microsoftonline.com/organizations',
-    redirectUri: `${typeof window !== 'undefined' ?
-      window.location.origin : ''
-    }/api/auth/microsoft-callback`,
+    redirectUri: `${process.env.NEXT_PUBLIC_AUTH_LOGOUT_URI}/api/auth/microsoft-callback`,
   },
   cache: {
     cacheLocation: 'sessionStorage',
@@ -79,7 +77,7 @@ export async function logout() {
 
   const logoutRequest = {
     account: instance.getActiveAccount() || instance.getAllAccounts()[0],
-    postLogoutRedirectUri: `${typeof window !== 'undefined' ? window.location.origin : ''}/api/auth/microsoft-logout`,
+    postLogoutRedirectUri: `${process.env.NEXT_PUBLIC_AUTH_LOGOUT_URI}/api/auth/microsoft-logout`,
   };
 
   try {
