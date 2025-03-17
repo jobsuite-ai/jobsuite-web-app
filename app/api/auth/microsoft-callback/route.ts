@@ -6,8 +6,11 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const code = url.searchParams.get('code');
 
+    // Get the base URL from environment or request
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || url.origin;
+
     if (!code) {
-      return NextResponse.redirect(new URL('/auth-error?error=no_code', request.url));
+      return NextResponse.redirect(`${baseUrl}/auth-error?error=no_code`);
     }
 
     // In a real implementation, you would:
@@ -44,6 +47,8 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error('Error in Microsoft callback:', error);
-    return NextResponse.redirect(new URL('/auth-error', request.url));
+    // Use absolute URL for error redirect
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || new URL(request.url).origin;
+    return NextResponse.redirect(`${baseUrl}/auth-error`);
   }
 }
