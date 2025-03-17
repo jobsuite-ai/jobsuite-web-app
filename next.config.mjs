@@ -18,7 +18,6 @@ export default withBundleAnalyzer({
     AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME || "rl-peek-job-videos",
     AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || "AKIARZDBH2LKBSAFNPL7",
     AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || "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",
-    BASE_URL: process.env.BASE_URL || "http://localhost:3000",
     JOB_TABLE_NAME: process.env.JOB_TABLE_NAME || "job",
 
     DOCU_SEAL_KEY: process.env.DOCU_SEAL_KEY || "HVUdoF47kb8oTFA4x3AAz3unoqBkUZ8TCHGhVtPfXBX",
