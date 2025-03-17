@@ -10,9 +10,6 @@ export default withBundleAnalyzer({
     ignoreDuringBuilds: true,
   },
   env: {
-    NEXT_PUBLIC_BASE_URL: process.env.BASE_URL || "localhost",
-    NEXT_PUBLIC_PORT: process.env.PORT || "3000",
-    /**👇 I forgot to add this here**/
     GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || "",
     AWS_REGION: process.env.AWS_REGION || "us-west-2",
     AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME || "rl-peek-job-videos",
