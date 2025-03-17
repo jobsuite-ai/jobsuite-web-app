@@ -5,9 +5,10 @@ import { useEffect, useState } from 'react';
 import { Button, Card, Flex, Switch, Text, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { DatePickerInput, DateValue } from '@mantine/dates';
-import { IconEdit } from '@tabler/icons-react';
+import { IconEdit, IconCalendarEvent } from '@tabler/icons-react';
 import '@mantine/dates/styles.css';
 
+import ScheduleOutlookEvent from './ScheduleOutlookEvent';
 import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import classes from './styles/HoursAndRate.module.css';
@@ -93,6 +94,10 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         setEdit(false);
     };
 
+    const handleEventCreated = (eventUrl: string) => {
+        window.open(eventUrl, '_blank');
+    };
+
     return (
         <Card
           shadow="sm"
@@ -148,7 +153,28 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                         <Text size="sm" mr="lg" fw={700}>Job hours: {hours}</Text>
                         <Text size="sm" fw={700}>Job rate: ${rate}</Text>
                         {hasDiscount && <Text size="sm">Discount reason: {discountReason}</Text>}
-                        <Text size="sm">Estimate date: {date}</Text>
+
+                        <Flex align="center" gap="md" direction="column">
+                            {job.outlook_event_url?.S && (
+                                <Button
+                                  component="a"
+                                  href={job.outlook_event_url.S}
+                                  target="_blank"
+                                  variant="subtle"
+                                  leftSection={<IconCalendarEvent size={16} />}
+                                >
+                                    View Scheduled Event
+                                </Button>
+                            )}
+                            <ScheduleOutlookEvent
+                              existingEvent={Boolean(job.outlook_event_url?.S)}
+                              jobId={job.id.S}
+                              clientId={job.client_id.S}
+                              clientName={job.client_name?.S}
+                              jobTitle={job.job_title?.S}
+                              onEventCreated={handleEventCreated}
+                            />
+                        </Flex>
                     </Flex>
                 </>
             }

@@ -34,7 +34,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
     const router = useRouter();
 
     const searchParams = useSearchParams();
-    const page = searchParams.get('page');
+    const page = searchParams?.get('page');
 
     useEffect(() => {
         if (!job) {

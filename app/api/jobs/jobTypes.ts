@@ -15,6 +15,13 @@ export type UpdateJobContent = {
     update_client_details?: UpdateClientDetailsInput,
     update_client_name?: string,
     update_hours_and_rate?: UpdateHoursAndRateInput,
+    update_calendar_event?: UpdateCalendarEventInput,
+};
+
+export type UpdateCalendarEventInput = {
+    outlook_event_id: string,
+    outlook_event_url: string,
+    estimate_date: string,
 };
 
 export type UpdateHoursAndRateInput = {

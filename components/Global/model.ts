@@ -68,6 +68,11 @@ export type SingleJob = {
     user_id: TypedDynamoStringReturn;
     video: TypedDynamoMapReturn<JobVideo>;
     zip_code: TypedDynamoStringReturn;
+    outlook_event_id?: TypedDynamoStringReturn;
+    outlook_event_url?: TypedDynamoStringReturn;
+    calendly_event_uri?: TypedDynamoStringReturn;
+    calendly_event_url?: TypedDynamoStringReturn;
+    calendly_invitee_email?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {
