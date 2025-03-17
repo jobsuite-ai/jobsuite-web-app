@@ -3,8 +3,8 @@ import * as msal from '@azure/msal-browser';
 // MSAL configuration
 const msalConfig = {
   auth: {
-    clientId: '5b525ee8-bed9-4442-9248-c4d5e43880a1',
-    authority: 'https://login.microsoftonline.com/organizations',
+    clientId: process.env.NEXT_PUBLIC_OUTLOOK_CLIENT_ID || '5b525ee8-bed9-4442-9248-c4d5e43880a1',
+    authority: `https://login.microsoftonline.com/${process.env.NEXT_PUBLIC_OUTLOOK_TENANT_ID || 'organizations'}`,
     redirectUri: `${process.env.NEXT_PUBLIC_BASE_URL}/api/auth/microsoft-callback`,
   },
   cache: {

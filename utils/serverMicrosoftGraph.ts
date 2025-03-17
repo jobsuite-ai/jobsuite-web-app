@@ -9,6 +9,10 @@ export async function getServerGraphClient() {
   const clientSecret = process.env.OUTLOOK_CLIENT_SECRET!;
   const tenantId = process.env.OUTLOOK_TENANT_ID!;
 
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing Microsoft Graph API credentials');
+  }
+
   if (!tenantId || tenantId === 'organizations') {
     throw new Error('A specific tenant ID must be provided for client credentials flow');
   }
