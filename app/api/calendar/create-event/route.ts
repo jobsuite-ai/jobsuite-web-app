@@ -45,13 +45,15 @@ export async function POST(request: Request) {
           ':outlook_event_id': { S: eventId },
           ':outlook_event_url': { S: eventUrl },
           ':estimate_date': { S: startDateTime },
+          ':job_status': { S: 'ESTIMATE_SCHEDULED' },
         },
         Key: { id: { S: jobId } },
         ReturnValues: 'UPDATED_NEW',
         TableName: 'job',
         UpdateExpression: `SET outlook_event_id = :outlook_event_id,
           outlook_event_url = :outlook_event_url,
-          estimate_date = :estimate_date
+          estimate_date = :estimate_date,
+          job_status = :job_status
         `,
     });
     await client.send(updateItemCommand);
