@@ -84,6 +84,11 @@ export function VideoFrame({ name, jobID, refresh }: {
                         ) : (
                             <ReactPlayer url={baseCloudFrontURL + key} controls width="640px" height="360px" />
                         )}
+                        <Flex direction="column" align="center" p="md">
+                            <Center>
+                                <Button onClick={() => setIsModalOpen(true)}>Delete Video</Button>
+                            </Center>
+                        </Flex>
                     </>
                     :
                     <Flex direction="column" justify="center" align="center" p="lg" h="100%">

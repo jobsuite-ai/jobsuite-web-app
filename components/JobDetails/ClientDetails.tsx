@@ -144,6 +144,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                   padding="lg"
                   radius="md"
                   withBorder
+                  flex-grow={1}
                 >
                     <div style={{ position: 'relative' }}>
                         <IconEdit
