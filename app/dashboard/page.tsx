@@ -50,7 +50,8 @@ interface DashboardMetrics {
   conversionRate: number;
   averageBidAmount: number;
   statusCounts: Record<string, number>;
-  revenueByMonth: TimeDataPoint[];
+  revenueByWeek: TimeDataPoint[];
+  jobsByWeek: TimeDataPoint[];
   bidToSoldData: CategoryValue[];
   statusTrend: StatusTrendPoint[];
 }
@@ -66,7 +67,8 @@ export default function Dashboard() {
     conversionRate: 0,
     averageBidAmount: 0,
     statusCounts: {},
-    revenueByMonth: [],
+    revenueByWeek: [],
+    jobsByWeek: [],
     bidToSoldData: [],
     statusTrend: [],
   });
@@ -120,8 +122,10 @@ export default function Dashboard() {
     const filteredJobs = timeFrame === 'all'
       ? jobs
       : jobs.filter(job => {
-          const createdAtStr = job.createdAt?.S;
-          const estimateDateStr = job.estimate_date?.S;
+          // Handle both direct job objects and DynamoDB Items
+          const jobData = job.Item || job;
+          const createdAtStr = jobData.createdAt?.S || jobData.createdAt;
+          const estimateDateStr = jobData.estimate_date?.S || jobData.estimate_date;
           const jobDate = createdAtStr ? new Date(createdAtStr)
                        : estimateDateStr ? new Date(estimateDateStr)
                        : new Date();
@@ -171,8 +175,11 @@ export default function Dashboard() {
       totalBidValue += finalJobValue;
     });
 
-    // Generate monthly revenue data
-    const monthlyData = generateMonthlyData(filteredJobs);
+    // Generate weekly revenue data
+    const weeklyRevenueData = generateWeeklyRevenueData(filteredJobs);
+
+    // Generate weekly jobs data
+    const weeklyData = generateWeeklyData(filteredJobs);
 
     // Generate status trend data
     const statusTrendData = generateStatusTrendData(filteredJobs);
@@ -185,7 +192,8 @@ export default function Dashboard() {
       conversionRate: filteredJobs.length > 0 ? (soldJobsCount / filteredJobs.length) * 100 : 0,
       averageBidAmount: filteredJobs.length > 0 ? totalBidValue / filteredJobs.length : 0,
       statusCounts,
-      revenueByMonth: monthlyData,
+      revenueByWeek: weeklyRevenueData,
+      jobsByWeek: weeklyData,
       bidToSoldData: [
         { category: 'Total Bids', value: filteredJobs.length },
         { category: 'Sold Jobs', value: soldJobsCount },
@@ -197,44 +205,174 @@ export default function Dashboard() {
     setMetrics(newMetrics);
   };
 
-  // Helper function to generate monthly revenue data
-  const generateMonthlyData = (jobs: any[]): TimeDataPoint[] => {
-    const months: Record<string, number> = {};
-    const lastSixMonths: string[] = [];
+  // Helper function to generate weekly revenue data
+  const generateWeeklyRevenueData = (jobs: any[]): TimeDataPoint[] => {
+    const weeks: Record<string, number> = {};
+    const timePoints: string[] = [];
 
-    // Create entries for the last 6 months
-    for (let i = 0; i < 6; i += 1) {
+    // Helper function to get the start of the week for a given date
+    const getWeekStart = (date: Date): Date => {
+      const result = new Date(date);
+      result.setHours(0, 0, 0, 0);
+      result.setDate(result.getDate() - result.getDay()); // Set to Sunday
+      return result;
+    };
+
+    // Helper function to format date consistently
+    const formatWeekKey = (date: Date): string => {
+      const month = date.toLocaleString('default', { month: 'short' });
+      const day = date.getDate();
+      return `${month} ${day}`;
+    };
+
+    // Calculate number of weeks to show based on timeFrame
+    let numberOfWeeks = 12; // default
+    if (timeFrame === '7') {
+      numberOfWeeks = 1;
+    } else if (timeFrame === '30') {
+      numberOfWeeks = 4;
+    } else if (timeFrame === '90') {
+      numberOfWeeks = 13;
+    } else if (timeFrame === '365') {
+      numberOfWeeks = 52;
+    } else if (timeFrame === 'all') {
+      // For all time, find the earliest job date and calculate weeks from there
+      const earliestDate = jobs.reduce((earliest, jobObject) => {
+        const job = jobObject.Item || jobObject;
+        const jobDate = new Date(job.estimate_date?.S || job.createdAt?.S || job.createdAt);
+        return jobDate < earliest ? jobDate : earliest;
+      }, new Date());
+
+      const weekDiff = Math.ceil(
+        (new Date().getTime() - earliestDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+      );
+      numberOfWeeks = Math.max(12, weekDiff); // At least 12 weeks
+    }
+
+    // Create entries for the weeks
+    for (let i = 0; i < numberOfWeeks; i += 1) {
       const date = new Date();
-      date.setMonth(date.getMonth() - i);
-      const monthKey = date.toLocaleString('default', { month: 'short', year: '2-digit' });
-      months[monthKey] = 0;
-      lastSixMonths.unshift(monthKey);
+      date.setDate(date.getDate() - (i * 7));
+      const weekStart = getWeekStart(date);
+      const weekKey = formatWeekKey(weekStart);
+      weeks[weekKey] = 0;
+      timePoints.unshift(weekKey);
     }
 
     // Populate with actual data
     jobs.forEach(jobObject => {
       const job = jobObject.Item || jobObject;
-      if (SOLD_STAGES.includes(job.job_status?.S || job.job_status)) {
-        const jobDate = new Date(job.estimate_date?.S || job.createdAt?.S || job.createdAt);
-        const monthKey = jobDate.toLocaleString('default', { month: 'short', year: '2-digit' });
+      const status = job.job_status?.S || job.job_status;
+      if (SOLD_STAGES.includes(status)) {
+        const createdAtStr = job.createdAt?.S || job.createdAt;
+        const estimateDateStr = job.estimate_date?.S || job.estimate_date;
+        const jobDate = createdAtStr ? new Date(createdAtStr)
+                     : estimateDateStr ? new Date(estimateDateStr)
+                     : new Date();
+        const weekStart = getWeekStart(jobDate);
+        const weekKey = formatWeekKey(weekStart);
 
-        // Calculate job value
-        const lineItems = job.line_items?.L || [];
-        const jobValue = lineItems.reduce((total: number, item: any) => {
-          const price = parseFloat(item.M?.price?.N || '0');
+        // Calculate job value from line items
+        const lineItems = job.line_items?.L || job.line_items || [];
+        let jobValue = lineItems.reduce((total: number, item: any) => {
+          const price = parseFloat(item.M?.price?.N || item.price || '0');
           return total + price;
         }, 0);
 
-        if (months[monthKey] !== undefined) {
-          months[monthKey] += jobValue;
+        if (jobValue === 0) {
+          // Alternative calculation if no line items but has hours and rate
+          const hours = parseFloat(job.estimate_hours?.N || job.estimate_hours || '0');
+          const rate = parseFloat(job.hourly_rate?.N || job.hourly_rate || '0');
+          jobValue = hours * rate;
+        }
+
+        if (weeks[weekKey] !== undefined) {
+          weeks[weekKey] += jobValue;
         }
       }
     });
 
     // Convert to array format needed for chart
-    return lastSixMonths.map(month => ({
-      date: month,
-      value: months[month],
+    return timePoints.map(week => ({
+      date: week,
+      value: weeks[week],
+    }));
+  };
+
+  // Helper function to generate weekly job data
+  const generateWeeklyData = (jobs: any[]): TimeDataPoint[] => {
+    const weeks: Record<string, number> = {};
+    const timePoints: string[] = [];
+
+    // Helper function to get the start of the week for a given date
+    const getWeekStart = (date: Date): Date => {
+      const result = new Date(date);
+      result.setHours(0, 0, 0, 0);
+      result.setDate(result.getDate() - result.getDay()); // Set to Sunday
+      return result;
+    };
+
+    // Helper function to format date consistently
+    const formatWeekKey = (date: Date): string => {
+      const month = date.toLocaleString('default', { month: 'short' });
+      const day = date.getDate();
+      return `${month} ${day}`;
+    };
+
+    // Calculate number of weeks to show based on timeFrame
+    let numberOfWeeks = 12; // default
+    if (timeFrame === '7') {
+      numberOfWeeks = 1;
+    } else if (timeFrame === '30') {
+      numberOfWeeks = 4;
+    } else if (timeFrame === '90') {
+      numberOfWeeks = 13;
+    } else if (timeFrame === '365') {
+      numberOfWeeks = 52;
+    } else if (timeFrame === 'all') {
+      // For all time, find the earliest job date and calculate weeks from there
+      const earliestDate = jobs.reduce((earliest, jobObject) => {
+        const job = jobObject.Item || jobObject;
+        const jobDate = new Date(job.estimate_date?.S || job.createdAt?.S || job.createdAt);
+        return jobDate < earliest ? jobDate : earliest;
+      }, new Date());
+
+      const weekDiff = Math.ceil(
+        (new Date().getTime() - earliestDate.getTime()) / (7 * 24 * 60 * 60 * 1000)
+      );
+      numberOfWeeks = Math.max(12, weekDiff); // At least 12 weeks
+    }
+
+    // Create entries for the weeks
+    for (let i = 0; i < numberOfWeeks; i += 1) {
+      const date = new Date();
+      date.setDate(date.getDate() - (i * 7));
+      const weekStart = getWeekStart(date);
+      const weekKey = formatWeekKey(weekStart);
+      weeks[weekKey] = 0;
+      timePoints.unshift(weekKey);
+    }
+
+    // Populate with actual data
+    jobs.forEach(jobObject => {
+      const job = jobObject.Item || jobObject;
+      const createdAtStr = job.createdAt?.S || job.createdAt;
+      const estimateDateStr = job.estimate_date?.S || job.estimate_date;
+      const jobDate = createdAtStr ? new Date(createdAtStr)
+                   : estimateDateStr ? new Date(estimateDateStr)
+                   : new Date();
+      const weekStart = getWeekStart(jobDate);
+      const weekKey = formatWeekKey(weekStart);
+
+      if (weeks[weekKey] !== undefined) {
+        weeks[weekKey] += 1;
+      }
+    });
+
+    // Convert to array format needed for chart
+    return timePoints.map(week => ({
+      date: week,
+      value: weeks[week],
     }));
   };
 
@@ -377,6 +515,7 @@ export default function Dashboard() {
               <Tabs defaultValue="revenue">
                 <Tabs.List>
                   <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
+                  <Tabs.Tab value="weekly">Weekly Jobs</Tabs.Tab>
                   <Tabs.Tab value="status">Status Distribution</Tabs.Tab>
                   <Tabs.Tab value="conversion">Bid to Sale Conversion</Tabs.Tab>
                 </Tabs.List>
@@ -385,7 +524,19 @@ export default function Dashboard() {
                   <Paper withBorder p="md" radius="md">
                     <Title order={3}>Revenue Trend Over Time</Title>
                     <LineChart
-                      data={metrics.revenueByMonth.map(item => ({
+                      data={metrics.revenueByWeek.map(item => ({
+                        date: item.date || '',
+                        value: item.value || 0,
+                      }))}
+                    />
+                  </Paper>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="weekly" pt="md">
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Jobs Created by Week</Title>
+                    <LineChart
+                      data={metrics.jobsByWeek.map(item => ({
                         date: item.date || '',
                         value: item.value || 0,
                       }))}
