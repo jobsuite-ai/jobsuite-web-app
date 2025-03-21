@@ -374,12 +374,24 @@ export default function Dashboard() {
 
             {/* Charts Tabs */}
             <Grid.Col span={12}>
-              <Tabs defaultValue="status">
+              <Tabs defaultValue="revenue">
                 <Tabs.List>
+                  <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
                   <Tabs.Tab value="status">Status Distribution</Tabs.Tab>
                   <Tabs.Tab value="conversion">Bid to Sale Conversion</Tabs.Tab>
-                  <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
                 </Tabs.List>
+
+                <Tabs.Panel value="revenue" pt="md">
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Revenue Trend Over Time</Title>
+                    <LineChart
+                      data={metrics.revenueByMonth.map(item => ({
+                        date: item.date || '',
+                        value: item.value || 0,
+                      }))}
+                    />
+                  </Paper>
+                </Tabs.Panel>
 
                 <Tabs.Panel value="status" pt="md">
                   <Grid>
@@ -431,18 +443,6 @@ export default function Dashboard() {
                       </Paper>
                     </Grid.Col>
                   </Grid>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="revenue" pt="md">
-                  <Paper withBorder p="md" radius="md">
-                    <Title order={3}>Revenue Trend Over Time</Title>
-                    <LineChart
-                      data={metrics.revenueByMonth.map(item => ({
-                        date: item.date || '',
-                        value: item.value || 0,
-                      }))}
-                    />
-                  </Paper>
                 </Tabs.Panel>
               </Tabs>
             </Grid.Col>
