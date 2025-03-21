@@ -12,7 +12,7 @@ export function Shell({ children }: { children: any }) {
   return (
     <div className={classes.verticalWrapper}>
       <Header />
-      {pathname.match('.*/jobs/.*') && <JobDetailsSideNav />}
+      {pathname?.match('.*/jobs/.*') && <JobDetailsSideNav />}
 
       <div className={classes.wrapper}>
         <div className={classes.spacer} />

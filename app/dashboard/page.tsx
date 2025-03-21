@@ -121,7 +121,7 @@ export default function Dashboard() {
           const jobDate = job.estimate_date?.S ? new Date(job.estimate_date.S) : new Date();
           return jobDate >= cutoffDate;
         });
-
+    
     const statusCounts: Record<string, number> = {};
     let totalBidValue = 0;
     let totalSoldValue = 0;
@@ -129,8 +129,9 @@ export default function Dashboard() {
     let activeBidsCount = 0;
 
     // Count jobs by status and calculate values
-    filteredJobs.forEach(job => {
-      const status = job.job_status?.S || job.job_status;
+    filteredJobs.forEach(jobObject => {
+      const job = jobObject.Item;
+      const status = job.job_status?.S;
 
       // Count by status
       statusCounts[status] = (statusCounts[status] || 0) + 1;
