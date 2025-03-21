@@ -1,6 +1,5 @@
 /* General styles for the Image component */
 .image {
-    position: fixed;
     top: 10px;
     width: auto;
     height: 60px;
