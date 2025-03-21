@@ -3,34 +3,21 @@
 import { useState, useEffect } from 'react';
 
 import { Text, Box, Center, Loader } from '@mantine/core';
-import dynamic from 'next/dynamic';
-import type {
-  PieProps,
-  BarProps,
-  LineProps,
-  XAxisProps,
-  YAxisProps,
-  TooltipProps,
-  LegendProps,
-  CartesianGridProps,
-  CellProps,
-  ResponsiveContainerProps,
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  BarChart as RechartsBarChart,
+  Bar,
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
 } from 'recharts';
-
-// Dynamically import recharts components to avoid SSR issues
-const DynamicPieChart = dynamic(() => import('./DynamicCharts/PieChart'), { ssr: false }) as any;
-const DynamicPie = dynamic(() => import('./DynamicCharts/Pie'), { ssr: false }) as React.ComponentType<PieProps>;
-const DynamicBarChart = dynamic(() => import('./DynamicCharts/BarChart'), { ssr: false }) as any;
-const DynamicBar = dynamic(() => import('./DynamicCharts/Bar'), { ssr: false }) as React.ComponentType<BarProps>;
-const DynamicLineChart = dynamic(() => import('./DynamicCharts/LineChart'), { ssr: false }) as any;
-const DynamicLine = dynamic(() => import('./DynamicCharts/Line'), { ssr: false }) as React.ComponentType<LineProps>;
-const DynamicXAxis = dynamic(() => import('./DynamicCharts/XAxis'), { ssr: false }) as React.ComponentType<XAxisProps>;
-const DynamicYAxis = dynamic(() => import('./DynamicCharts/YAxis'), { ssr: false }) as React.ComponentType<YAxisProps>;
-const DynamicTooltip = dynamic(() => import('./DynamicCharts/Tooltip'), { ssr: false }) as React.ComponentType<TooltipProps<any, any>>;
-const DynamicLegend = dynamic(() => import('./DynamicCharts/Legend'), { ssr: false }) as React.ComponentType<LegendProps>;
-const DynamicCartesianGrid = dynamic(() => import('./DynamicCharts/CartesianGrid'), { ssr: false }) as React.ComponentType<CartesianGridProps>;
-const DynamicCell = dynamic(() => import('./DynamicCharts/Cell'), { ssr: false }) as React.ComponentType<CellProps>;
-const DynamicResponsiveContainer = dynamic(() => import('./DynamicCharts/ResponsiveContainer'), { ssr: false }) as React.ComponentType<ResponsiveContainerProps>;
 
 // Color palette for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#FF6347'];
@@ -65,29 +52,33 @@ export function PieChart({ data }: PieChartProps) {
 
   return (
     <Box h={300}>
-      <DynamicResponsiveContainer width="100%" height={300}>
-        <DynamicPieChart>
-          <DynamicPie
+      <ResponsiveContainer width="100%" height={300}>
+        <RechartsPieChart>
+          <Pie
             data={data}
             cx="50%"
             cy="50%"
-            labelLine={false}
-            outerRadius={80}
+            labelLine
+            outerRadius={100}
+            innerRadius={60}
             fill="#8884d8"
             dataKey="count"
             nameKey="status"
-            label={({ status, percent }: { status: string; percent: number }) =>
-              status && percent ? `${status}: ${(percent * 100).toFixed(0)}%` : ''
-            }
+            label={({ percent }) => percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''}
           >
             {data.map((entry, index) => (
-              <DynamicCell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
-          </DynamicPie>
-          <DynamicTooltip />
-          <DynamicLegend />
-        </DynamicPieChart>
-      </DynamicResponsiveContainer>
+          </Pie>
+          <Tooltip formatter={(value, name) => [`${value} jobs`, name]} />
+          <Legend
+            layout="vertical"
+            align="right"
+            verticalAlign="middle"
+            formatter={(value) => value.replace(/_/g, ' ')}
+          />
+        </RechartsPieChart>
+      </ResponsiveContainer>
     </Box>
   );
 }
@@ -122,19 +113,19 @@ export function BarChart({ data }: BarChartProps) {
 
   return (
     <Box h={300}>
-      <DynamicResponsiveContainer width="100%" height={300}>
-        <DynamicBarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-          <DynamicCartesianGrid strokeDasharray="3 3" />
-          <DynamicXAxis dataKey="category" />
-          <DynamicYAxis />
-          <DynamicTooltip />
-          <DynamicBar dataKey="value" fill="#8884d8">
+      <ResponsiveContainer width="100%" height={300}>
+        <RechartsBarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="category" />
+          <YAxis />
+          <Tooltip />
+          <Bar dataKey="value" fill="#8884d8">
             {data.map((entry, index) => (
-              <DynamicCell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
-          </DynamicBar>
-        </DynamicBarChart>
-      </DynamicResponsiveContainer>
+          </Bar>
+        </RechartsBarChart>
+      </ResponsiveContainer>
     </Box>
   );
 }
@@ -142,8 +133,8 @@ export function BarChart({ data }: BarChartProps) {
 // Line Chart Component
 interface TimeDataPoint {
   date: string;
-  value: number;
-  [key: string]: string | number; // Allow any string key with number value for multiple lines
+  value?: number;
+  [key: string]: string | number | undefined;
 }
 
 interface LineChartProps {
@@ -166,21 +157,19 @@ export function LineChart({ data, multiLine = false }: LineChartProps) {
     );
   }
 
-  // If no data, display placeholder data for demonstration
-  const demoData = !data || data.length === 0 ? [
-    { date: 'Jan', value: 4000 },
-    { date: 'Feb', value: 3000 },
-    { date: 'Mar', value: 5000 },
-    { date: 'Apr', value: 2780 },
-    { date: 'May', value: 1890 },
-    { date: 'Jun', value: 2390 },
-  ] : data;
+  if (!data || data.length === 0) {
+    return (
+      <Center h={300}>
+        <Text c="dimmed">No data available</Text>
+      </Center>
+    );
+  }
 
   // For multi-line charts, we need to render a line for each key except 'date'
   const renderLines = () => {
-    if (!multiLine || !data || data.length === 0) {
+    if (!multiLine) {
       return (
-        <DynamicLine
+        <Line
           type="monotone"
           dataKey="value"
           stroke="#8884d8"
@@ -193,7 +182,7 @@ export function LineChart({ data, multiLine = false }: LineChartProps) {
     const keys = Object.keys(data[0]).filter(key => key !== 'date');
 
     return keys.map((key, index) => (
-      <DynamicLine
+      <Line
         key={key}
         type="monotone"
         dataKey={key}
@@ -205,16 +194,16 @@ export function LineChart({ data, multiLine = false }: LineChartProps) {
 
   return (
     <Box h={300}>
-      <DynamicResponsiveContainer width="100%" height={300}>
-        <DynamicLineChart data={demoData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <DynamicCartesianGrid strokeDasharray="3 3" />
-          <DynamicXAxis dataKey="date" />
-          <DynamicYAxis />
-          <DynamicTooltip />
-          <DynamicLegend />
+      <ResponsiveContainer width="100%" height={300}>
+        <RechartsLineChart data={data} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="date" />
+          <YAxis />
+          <Tooltip />
+          <Legend />
           {renderLines()}
-        </DynamicLineChart>
-      </DynamicResponsiveContainer>
+        </RechartsLineChart>
+      </ResponsiveContainer>
     </Box>
   );
 }

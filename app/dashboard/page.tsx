@@ -32,12 +32,14 @@ interface CategoryValue {
 interface TimeDataPoint {
   date: string;
   value: number;
-  [key: string]: number | string;
 }
 
 interface StatusTrendPoint {
   date: string;
-  [key: string]: number | string;
+  New: number;
+  InProgress: number;
+  Completed: number;
+  [key: string]: string | number;
 }
 
 interface DashboardMetrics {
@@ -120,12 +122,12 @@ export default function Dashboard() {
       : jobs.filter(job => {
           const createdAtStr = job.createdAt?.S;
           const estimateDateStr = job.estimate_date?.S;
-          const jobDate = createdAtStr ? new Date(createdAtStr) 
+          const jobDate = createdAtStr ? new Date(createdAtStr)
                        : estimateDateStr ? new Date(estimateDateStr)
                        : new Date();
           return jobDate >= cutoffDate;
         });
-    
+
     const statusCounts: Record<string, number> = {};
     let totalBidValue = 0;
     let totalSoldValue = 0;
@@ -134,8 +136,9 @@ export default function Dashboard() {
 
     // Count jobs by status and calculate values
     filteredJobs.forEach(jobObject => {
-      const job = jobObject.Item;
-      const status = job.job_status?.S;
+      // Handle both direct job objects and DynamoDB Items
+      const job = jobObject.Item || jobObject;
+      const status = job.job_status?.S || job.job_status;
 
       // Count by status
       statusCounts[status] = (statusCounts[status] || 0) + 1;
@@ -143,13 +146,13 @@ export default function Dashboard() {
       // Calculate job value from line items
       const lineItems = job.line_items?.L || [];
       const jobValue = lineItems.reduce((total: number, item: any) => {
-        const price = item.M?.price?.N ? parseFloat(item.M.price.N) : 0;
+        const price = parseFloat(item.M?.price?.N || '0');
         return total + price;
       }, 0);
 
       // Alternative calculation if no line items but has hours and rate
-      const hours = job.estimate_hours?.N ? parseFloat(job.estimate_hours.N) : 0;
-      const rate = job.hourly_rate?.N ? parseFloat(job.hourly_rate.N) : 0;
+      const hours = parseFloat(job.estimate_hours?.N || '0');
+      const rate = parseFloat(job.hourly_rate?.N || '0');
       const alternativeValue = hours * rate;
 
       const finalJobValue = jobValue > 0 ? jobValue : alternativeValue;
@@ -168,13 +171,13 @@ export default function Dashboard() {
       totalBidValue += finalJobValue;
     });
 
-    // Generate monthly revenue data (simplified)
+    // Generate monthly revenue data
     const monthlyData = generateMonthlyData(filteredJobs);
 
     // Generate status trend data
-    const statusTrendData = generateStatusTrendData();
+    const statusTrendData = generateStatusTrendData(filteredJobs);
 
-    setMetrics({
+    const newMetrics = {
       totalJobs: filteredJobs.length,
       activeBids: activeBidsCount,
       totalBidValue,
@@ -189,7 +192,9 @@ export default function Dashboard() {
         { category: 'Active Bids', value: activeBidsCount },
       ],
       statusTrend: statusTrendData,
-    });
+    };
+
+    setMetrics(newMetrics);
   };
 
   // Helper function to generate monthly revenue data
@@ -208,15 +213,15 @@ export default function Dashboard() {
 
     // Populate with actual data
     jobs.forEach(jobObject => {
-      const job = jobObject.Item;
+      const job = jobObject.Item || jobObject;
       if (SOLD_STAGES.includes(job.job_status?.S || job.job_status)) {
-        const jobDate = job.estimate_date?.S ? new Date(job.estimate_date.S) : new Date();
+        const jobDate = new Date(job.estimate_date?.S || job.createdAt?.S || job.createdAt);
         const monthKey = jobDate.toLocaleString('default', { month: 'short', year: '2-digit' });
 
         // Calculate job value
         const lineItems = job.line_items?.L || [];
         const jobValue = lineItems.reduce((total: number, item: any) => {
-          const price = item.M?.price?.N ? parseFloat(item.M.price.N) : 0;
+          const price = parseFloat(item.M?.price?.N || '0');
           return total + price;
         }, 0);
 
@@ -234,18 +239,51 @@ export default function Dashboard() {
   };
 
   // Helper function to generate status trend data
-  const generateStatusTrendData = (): StatusTrendPoint[] =>
-    // Simplified implementation - in a real app, this would use actual date data
-    // For demo purposes, creating a trend over months
-     [
-      { date: 'Jan', New: 4, InProgress: 2, Completed: 1 },
-      { date: 'Feb', New: 6, InProgress: 3, Completed: 2 },
-      { date: 'Mar', New: 5, InProgress: 5, Completed: 3 },
-      { date: 'Apr', New: 8, InProgress: 6, Completed: 4 },
-      { date: 'May', New: 10, InProgress: 7, Completed: 6 },
-      { date: 'Jun', New: 12, InProgress: 9, Completed: 8 },
-    ];
-return (
+  const generateStatusTrendData = (jobs: any[]): StatusTrendPoint[] => {
+    const monthlyStatusCounts: Record<string, Record<string, number>> = {};
+    const lastSixMonths: string[] = [];
+
+    // Initialize last 6 months
+    for (let i = 0; i < 6; i += 1) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthKey = date.toLocaleString('default', { month: 'short' });
+      lastSixMonths.unshift(monthKey);
+      monthlyStatusCounts[monthKey] = {
+        New: 0,
+        InProgress: 0,
+        Completed: 0,
+      };
+    }
+
+    // Count jobs by status per month
+    jobs.forEach(jobObject => {
+      const job = jobObject.Item || jobObject;
+      const status = job.job_status?.S || job.job_status;
+      const jobDate = new Date(job.estimate_date?.S || job.createdAt?.S || job.createdAt);
+      const monthKey = jobDate.toLocaleString('default', { month: 'short' });
+
+      if (monthlyStatusCounts[monthKey]) {
+        if (ESTIMATE_STAGES.slice(0, 2).includes(status)) {
+          monthlyStatusCounts[monthKey].New += 1;
+        } else if (ESTIMATE_STAGES.slice(2).includes(status)) {
+          monthlyStatusCounts[monthKey].InProgress += 1;
+        } else if (SOLD_STAGES.includes(status)) {
+          monthlyStatusCounts[monthKey].Completed += 1;
+        }
+      }
+    });
+
+    // Convert to array format needed for chart
+    return lastSixMonths.map(month => ({
+      date: month,
+      New: monthlyStatusCounts[month].New,
+      InProgress: monthlyStatusCounts[month].InProgress,
+      Completed: monthlyStatusCounts[month].Completed,
+    }));
+  };
+
+  return (
     <Container size="xl" pt="md">
       <Stack gap="lg">
         <Group justify="space-between">
@@ -349,16 +387,21 @@ return (
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Jobs by Status</Title>
                         <PieChart data={Object.entries(metrics.statusCounts).map(
-                          ([status, count]) => ({ status, count }
-                        ))} />
+                          ([status, count]) => ({
+                            status: status || 'Unknown',
+                            count: count || 0,
+                          })
+                        )} />
                       </Paper>
                     </Grid.Col>
 
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Status Trends Over Time</Title>
-                        {/* This would be a stacked area chart in a full implementation */}
-                        <LineChart data={metrics.revenueByMonth} />
+                        <LineChart
+                          data={metrics.statusTrend}
+                          multiLine
+                        />
                       </Paper>
                     </Grid.Col>
                   </Grid>
@@ -369,7 +412,10 @@ return (
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Bid to Sale Comparison</Title>
-                        <BarChart data={metrics.bidToSoldData} />
+                        <BarChart data={metrics.bidToSoldData.map(item => ({
+                          category: item.category || 'Unknown',
+                          value: item.value || 0,
+                        }))} />
                       </Paper>
                     </Grid.Col>
 
@@ -378,8 +424,8 @@ return (
                         <Title order={3}>Value Comparison</Title>
                         <BarChart
                           data={[
-                            { category: 'Bid Value', value: metrics.totalBidValue },
-                            { category: 'Sold Value', value: metrics.totalSoldValue },
+                            { category: 'Bid Value', value: metrics.totalBidValue || 0 },
+                            { category: 'Sold Value', value: metrics.totalSoldValue || 0 },
                           ]}
                         />
                       </Paper>
@@ -390,7 +436,12 @@ return (
                 <Tabs.Panel value="revenue" pt="md">
                   <Paper withBorder p="md" radius="md">
                     <Title order={3}>Revenue Trend Over Time</Title>
-                    <LineChart data={metrics.revenueByMonth} />
+                    <LineChart
+                      data={metrics.revenueByMonth.map(item => ({
+                        date: item.date || '',
+                        value: item.value || 0,
+                      }))}
+                    />
                   </Paper>
                 </Tabs.Panel>
               </Tabs>

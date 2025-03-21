@@ -18,7 +18,7 @@ export function VideoFrame({ name, jobID, refresh }: {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [objectExists, setObjectExists] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const { job_id } = useParams();
+    const { job_id } = useParams() as any;
 
     useEffect(() => {
         setIsMobile(window.innerWidth <= 768);
