@@ -14,6 +14,7 @@ import { RLPPLogo } from '../../Global/RLPPLogo';
 import { Client } from '@/components/Global/model';
 
 const links = [
+  { link: '/dashboard', label: 'Dashboard' },
   { link: '/jobs', label: 'Jobs' },
   { link: '/add-job', label: 'Add Job' },
   { link: '/clients', label: 'Clients' },
