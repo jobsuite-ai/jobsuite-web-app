@@ -207,7 +207,8 @@ export default function Dashboard() {
     }
 
     // Populate with actual data
-    jobs.forEach(job => {
+    jobs.forEach(jobObject => {
+      const job = jobObject.Item;
       if (SOLD_STAGES.includes(job.job_status?.S || job.job_status)) {
         const jobDate = job.estimate_date?.S ? new Date(job.estimate_date.S) : new Date();
         const monthKey = jobDate.toLocaleString('default', { month: 'short', year: '2-digit' });
