@@ -118,7 +118,11 @@ export default function Dashboard() {
     const filteredJobs = timeFrame === 'all'
       ? jobs
       : jobs.filter(job => {
-          const jobDate = job.estimate_date?.S ? new Date(job.estimate_date.S) : new Date();
+          const createdAtStr = job.createdAt?.S;
+          const estimateDateStr = job.estimate_date?.S;
+          const jobDate = createdAtStr ? new Date(createdAtStr) 
+                       : estimateDateStr ? new Date(estimateDateStr)
+                       : new Date();
           return jobDate >= cutoffDate;
         });
     
