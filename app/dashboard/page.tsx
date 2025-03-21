@@ -172,7 +172,9 @@ export default function Dashboard() {
       }
 
       // All jobs contribute to total bid value
-      totalBidValue += finalJobValue;
+      if (status !== JobStatus.ARCHIVED) {
+        totalBidValue += finalJobValue;
+      }
     });
 
     // Generate weekly revenue data
