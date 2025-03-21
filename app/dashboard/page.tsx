@@ -517,7 +517,7 @@ export default function Dashboard() {
               <Tabs defaultValue="revenue">
                 <Tabs.List>
                   <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
-                  <Tabs.Tab value="weekly">Weekly Jobs</Tabs.Tab>
+                  <Tabs.Tab value="weekly">Weekly Estimates</Tabs.Tab>
                   <Tabs.Tab value="status">Status Distribution</Tabs.Tab>
                   <Tabs.Tab value="conversion">Bid to Sale Conversion</Tabs.Tab>
                 </Tabs.List>
@@ -536,7 +536,7 @@ export default function Dashboard() {
 
                 <Tabs.Panel value="weekly" pt="md">
                   <Paper withBorder p="md" radius="md">
-                    <Title order={3}>Jobs Created by Week</Title>
+                    <Title order={3}>Estimates Created by Week</Title>
                     <LineChart
                       data={metrics.jobsByWeek.map(item => ({
                         date: item.date || '',
