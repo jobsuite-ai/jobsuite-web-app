@@ -37,24 +37,26 @@ export default function LineItems({ job }: { job: SingleJob }) {
     });
 
     useEffect(() => {
+        console.log(lineItems);
         async function updateHours() {
             await setTotalHours();
         }
 
-        if (isFirstRender.current) {
-            isFirstRender.current = false;
-        } else {
+        if (!isFirstRender.current) {
             updateHours();
+        } else {
+            isFirstRender.current = false;
         }
     }, [lineItems]);
 
     async function setTotalHours() {
         // Update job hours based on line items
         const totalHours = lineItems.reduce((acc, item) => acc + +item.M.hours.N, 0);
+        console.log(totalHours);
         const content: UpdateJobContent = {
             update_hours_and_rate: {
                 hours: totalHours.toString(),
-                rate: job.hourly_rate?.N,
+                rate: job.hourly_rate?.N ?? '106',
                 date,
             },
         };

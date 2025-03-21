@@ -450,7 +450,7 @@ export default function Dashboard() {
             {/* Top row metrics */}
             <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Total Jobs"
+                title="Total Esitmates"
                 value={metrics.totalJobs.toString()}
                 description="Total number of jobs in system"
               />
@@ -462,7 +462,7 @@ export default function Dashboard() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Total value of all bids"
+                description="Total value of all estimates"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -486,9 +486,9 @@ export default function Dashboard() {
             {/* Second row metrics */}
             <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
-                title="Active Bids"
+                title="Active Estimates"
                 value={metrics.activeBids.toString()}
-                description="Number of bids in progress"
+                description="Number of estimates in progress"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
