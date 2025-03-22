@@ -102,7 +102,15 @@ export default function JobsList() {
           w="100%"
           withBorder
           style={{ cursor: 'pointer' }}
-          onClick={() => router.push(`/jobs/${job.id}`)}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey) {
+              // Open in new tab
+              window.open(`/jobs/${job.id}`, '_blank');
+            } else {
+              // Normal navigation
+              router.push(`/jobs/${job.id}`);
+            }
+          }}
         >
             <Center>
                 {job.job_type &&
