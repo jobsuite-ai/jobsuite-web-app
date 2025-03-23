@@ -11,11 +11,22 @@ import { logToCloudWatch } from '@/public/logger';
 
 // Status groups for analysis
 const ESTIMATE_STAGES = [
-  JobStatus.ESTIMATE_NOT_SCHEDULED,
-  JobStatus.ESTIMATE_SCHEDULED,
-  JobStatus.ESTIMATE_IN_PROGRESS,
   JobStatus.ESTIMATE_SENT,
   JobStatus.ESTIMATE_OPENED,
+  JobStatus.ESTIMATE_DECLINED,
+  JobStatus.NEEDS_FOLLOW_UP,
+  JobStatus.STALE_ESTIMATE,
+];
+
+const IN_PROGRESS_STAGES = [
+  JobStatus.ESTIMATE_IN_PROGRESS,
+  JobStatus.NEW_LEAD,
+  JobStatus.ESTIMATE_NOT_SCHEDULED,
+  JobStatus.ESTIMATE_SCHEDULED,
+  JobStatus.ESTIMATE_SENT,
+  JobStatus.ESTIMATE_OPENED,
+  JobStatus.NEEDS_FOLLOW_UP,
+  JobStatus.STALE_ESTIMATE,
 ];
 
 const SOLD_STAGES = [
@@ -49,6 +60,8 @@ interface DashboardMetrics {
   totalSoldValue: number;
   conversionRate: number;
   averageBidAmount: number;
+  inProgressValue: number;
+  inProgressJobsCount: number;
   statusCounts: Record<string, number>;
   revenueByWeek: TimeDataPoint[];
   jobsByWeek: TimeDataPoint[];
@@ -66,6 +79,8 @@ export default function Dashboard() {
     totalSoldValue: 0,
     conversionRate: 0,
     averageBidAmount: 0,
+    inProgressValue: 0,
+    inProgressJobsCount: 0,
     statusCounts: {},
     revenueByWeek: [],
     jobsByWeek: [],
@@ -137,6 +152,9 @@ export default function Dashboard() {
     let totalSoldValue = 0;
     let soldJobsCount = 0;
     let activeBidsCount = 0;
+    let totalEstimateCount = 0;
+    let inProgressJobsCount = 0;
+    let inProgressValue = 0;
 
     // Count jobs by status and calculate values
     filteredJobs.forEach(jobObject => {
@@ -165,15 +183,18 @@ export default function Dashboard() {
       if (SOLD_STAGES.includes(status)) {
         soldJobsCount += 1;
         totalSoldValue += finalJobValue;
+        totalEstimateCount += 1;
+      }
+
+      if (IN_PROGRESS_STAGES.includes(status)) {
+        inProgressJobsCount += 1;
+        inProgressValue += finalJobValue;
       }
 
       if (ESTIMATE_STAGES.includes(status)) {
         activeBidsCount += 1;
-      }
-
-      // All jobs contribute to total bid value
-      if (status !== JobStatus.ARCHIVED) {
         totalBidValue += finalJobValue;
+        totalEstimateCount += 1;
       }
     });
 
@@ -187,19 +208,21 @@ export default function Dashboard() {
     const statusTrendData = generateStatusTrendData(filteredJobs);
 
     const newMetrics = {
-      totalJobs: filteredJobs.length,
+      totalJobs: totalEstimateCount,
       activeBids: activeBidsCount,
       totalBidValue,
       totalSoldValue,
-      conversionRate: filteredJobs.length > 0 ? (soldJobsCount / filteredJobs.length) * 100 : 0,
-      averageBidAmount: filteredJobs.length > 0 ? totalBidValue / filteredJobs.length : 0,
+      conversionRate: totalEstimateCount > 0 ? (soldJobsCount / totalEstimateCount) * 100 : 0,
+      averageBidAmount: soldJobsCount > 0 ? totalSoldValue / soldJobsCount : 0,
+      inProgressValue,
+      inProgressJobsCount,
       statusCounts,
       revenueByWeek: weeklyRevenueData,
       jobsByWeek: weeklyData,
       bidToSoldData: [
-        { category: 'Total Bids', value: filteredJobs.length },
+        { category: 'Total Bids', value: totalEstimateCount },
         { category: 'Sold Jobs', value: soldJobsCount },
-        { category: 'Active Bids', value: activeBidsCount },
+        { category: 'Sent Or Declined Bids', value: activeBidsCount },
       ],
       statusTrend: statusTrendData,
     };
@@ -450,19 +473,19 @@ export default function Dashboard() {
             {/* Top row metrics */}
             <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Total Esitmates"
+                title="Total Estimates"
                 value={metrics.totalJobs.toString()}
-                description="Total number of jobs in system"
+                description="Number of estimates populating the dashboard"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Total Bid Value"
+                title="Total Estimate Value"
                 value={`$${metrics.totalBidValue.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Total value of all estimates"
+                description="Total value of all finished estimates"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -484,31 +507,38 @@ export default function Dashboard() {
             </Grid.Col>
 
             {/* Second row metrics */}
-            <Grid.Col span={{ base: 12, md: 4 }}>
+            <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Active Estimates"
+                title="Sent Or Declined Estimates"
                 value={metrics.activeBids.toString()}
-                description="Number of estimates in progress"
+                description="Number of declined or no response estimates"
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 4 }}>
+            <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Average Bid Amount"
+                title="Average Job Amount"
                 value={`$${metrics.averageBidAmount.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Average value per bid"
+                description="Average value per sold job"
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 4 }}>
+            <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
                 title="Pipeline Value"
-                value={`$${(metrics.totalBidValue - metrics.totalSoldValue).toLocaleString(undefined, {
+                value={`$${(metrics.inProgressValue).toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
                 description="Value of jobs in pipeline"
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 3 }}>
+              <MetricCard
+                title="Hours Bid to Hours Sold"
+                value={`${((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1)}%`}
+                description="Percentage of hours bid to hours sold"
               />
             </Grid.Col>
 
