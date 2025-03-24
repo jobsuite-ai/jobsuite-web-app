@@ -71,7 +71,7 @@ interface DashboardMetrics {
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
-  const [timeFrame, setTimeFrame] = useState('30'); // Default to last 30 days
+  const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalJobs: 0,
     activeBids: 0,
@@ -136,8 +136,18 @@ export default function Dashboard() {
 
     const filteredJobs = timeFrame === 'all'
       ? jobs
+      : timeFrame === 'ytd'
+      ? jobs.filter(job => {
+          const jobData = job.Item || job;
+          const createdAtStr = jobData.createdAt?.S || jobData.createdAt;
+          const estimateDateStr = jobData.estimate_date?.S || jobData.estimate_date;
+          const jobDate = createdAtStr ? new Date(createdAtStr)
+                       : estimateDateStr ? new Date(estimateDateStr)
+                       : new Date();
+          const yearStart = new Date(new Date().getFullYear(), 0, 1); // January 1st of current year
+          return jobDate >= yearStart;
+        })
       : jobs.filter(job => {
-          // Handle both direct job objects and DynamoDB Items
           const jobData = job.Item || job;
           const createdAtStr = jobData.createdAt?.S || jobData.createdAt;
           const estimateDateStr = jobData.estimate_date?.S || jobData.estimate_date;
@@ -456,6 +466,7 @@ export default function Dashboard() {
             value={timeFrame}
             onChange={(value) => setTimeFrame(value || '30')}
             data={[
+              { value: 'ytd', label: 'Year to Date' },
               { value: '7', label: 'Last 7 Days' },
               { value: '30', label: 'Last 30 Days' },
               { value: '90', label: 'Last 90 Days' },
