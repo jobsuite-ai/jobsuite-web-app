@@ -118,7 +118,6 @@ export default async function createJiraTicket(
       customfield_10165: 0,
       customfield_10166: parseFloat(job.estimate_hours?.N),
       customfield_10198: jobClient.phone_number?.S,
-      customfield_10199: jobClient.email?.S,
       customfield_10231: job.client_address?.S,
     },
   };
