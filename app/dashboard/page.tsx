@@ -547,9 +547,9 @@ export default function Dashboard() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
-                title="Hours Bid to Hours Sold"
+                title="Dollars Bid to Dollars Sold"
                 value={`${((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1)}%`}
-                description="Percentage of hours bid to hours sold"
+                description="Percentage of dollars bid to dollars sold"
               />
             </Grid.Col>
 
