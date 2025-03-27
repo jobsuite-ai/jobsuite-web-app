@@ -14,6 +14,7 @@ export type Job = {
     job_status: JobStatus;
     job_type: string;
     job_title: string;
+    referral_source: string;
 };
 
 export type Client = {
@@ -73,6 +74,7 @@ export type SingleJob = {
     calendly_event_uri?: TypedDynamoStringReturn;
     calendly_event_url?: TypedDynamoStringReturn;
     calendly_invitee_email?: TypedDynamoStringReturn;
+    referral_source?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {

@@ -67,6 +67,7 @@ interface DashboardMetrics {
   jobsByWeek: TimeDataPoint[];
   bidToSoldData: CategoryValue[];
   statusTrend: StatusTrendPoint[];
+  referralSources: CategoryValue[];
 }
 
 export default function Dashboard() {
@@ -86,6 +87,7 @@ export default function Dashboard() {
     jobsByWeek: [],
     bidToSoldData: [],
     statusTrend: [],
+    referralSources: [],
   });
 
   useEffect(() => {
@@ -158,6 +160,7 @@ export default function Dashboard() {
         });
 
     const statusCounts: Record<string, number> = {};
+    const referralSourceCounts: Record<string, number> = {};
     let totalBidValue = 0;
     let totalSoldValue = 0;
     let soldJobsCount = 0;
@@ -171,9 +174,20 @@ export default function Dashboard() {
       // Handle both direct job objects and DynamoDB Items
       const job = jobObject.Item || jobObject;
       const status = job.job_status?.S || job.job_status;
+      const referralSource = job.referral_source?.S || job.referral_source;
+
+      // Skip archived jobs
+      if (status === JobStatus.ARCHIVED) {
+        return;
+      }
 
       // Count by status
       statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+      // Count by referral source if defined
+      if (referralSource) {
+        referralSourceCounts[referralSource] = (referralSourceCounts[referralSource] || 0) + 1;
+      }
 
       // Calculate job value from line items
       const lineItems = job.line_items?.L || [];
@@ -235,6 +249,10 @@ export default function Dashboard() {
         { category: 'Sent Or Declined Bids', value: activeBidsCount },
       ],
       statusTrend: statusTrendData,
+      referralSources: Object.entries(referralSourceCounts).map(([source, count]) => ({
+        category: source,
+        value: count,
+      })),
     };
 
     setMetrics(newMetrics);
@@ -456,6 +474,12 @@ export default function Dashboard() {
     }));
   };
 
+  // Helper function to format labels
+  const formatLabel = (label: string): string => label
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+
   return (
     <Container size="xl" pt="md">
       <Stack gap="lg">
@@ -557,6 +581,7 @@ export default function Dashboard() {
             <Grid.Col span={12}>
               <Tabs defaultValue="revenue">
                 <Tabs.List>
+                  <Tabs.Tab value="referrals">Referral Sources</Tabs.Tab>
                   <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
                   <Tabs.Tab value="weekly">Weekly Estimates</Tabs.Tab>
                   <Tabs.Tab value="status">Status Distribution</Tabs.Tab>
@@ -637,6 +662,18 @@ export default function Dashboard() {
                       </Paper>
                     </Grid.Col>
                   </Grid>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="referrals" pt="md">
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Jobs by Referral Source</Title>
+                    <BarChart
+                      data={metrics.referralSources.map(item => ({
+                        category: formatLabel(item.category || 'Unknown'),
+                        value: item.value || 0,
+                      }))}
+                    />
+                  </Paper>
                 </Tabs.Panel>
               </Tabs>
             </Grid.Col>
