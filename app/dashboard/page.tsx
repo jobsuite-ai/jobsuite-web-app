@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Title, Container, Grid, Paper, Stack, LoadingOverlay, Tabs, Group, Select } from '@mantine/core';
+import { useRouter } from 'next/navigation';
 
 import { BarChart, PieChart, LineChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
@@ -71,6 +73,8 @@ interface DashboardMetrics {
 }
 
 export default function Dashboard() {
+  const { user, isLoading: isUserLoading } = useUser();
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -91,6 +95,11 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
+    if (!isUserLoading && !user) {
+      // Redirect to login page if the user is not logged in
+      router.push('/profile');
+    }
+
     async function fetchJobs() {
       try {
         setLoading(true);
@@ -128,7 +137,7 @@ export default function Dashboard() {
     }
 
     fetchJobs();
-  }, [timeFrame]);
+  }, [timeFrame, isUserLoading, user, router]);
 
   const calculateMetrics = (jobs: any[]) => {
     // Filter for jobs within selected time frame
