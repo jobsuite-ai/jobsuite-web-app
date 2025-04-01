@@ -588,7 +588,7 @@ export default function Dashboard() {
 
             {/* Charts Tabs */}
             <Grid.Col span={12}>
-              <Tabs defaultValue="revenue">
+              <Tabs defaultValue="referrals">
                 <Tabs.List>
                   <Tabs.Tab value="referrals">Referral Sources</Tabs.Tab>
                   <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
