@@ -19,5 +19,5 @@ export default function Job() {
         }
     }, [isLoading, user, router]);
 
-    return (<JobDetails jobID={params.job_id as string} />);
+    return params ? <JobDetails jobID={params.job_id as string} /> : null;
 }

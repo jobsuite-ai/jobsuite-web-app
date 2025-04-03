@@ -198,19 +198,21 @@ export default function Dashboard() {
         referralSourceCounts[referralSource] = (referralSourceCounts[referralSource] || 0) + 1;
       }
 
-      // Calculate job value from line items
-      const lineItems = job.line_items?.L || [];
-      const jobValue = lineItems.reduce((total: number, item: any) => {
-        const price = parseFloat(item.M?.price?.N || '0');
-        return total + price;
-      }, 0);
-
-      // Alternative calculation if no line items but has hours and rate
+      // First try to get hours and rate
       const hours = parseFloat(job.estimate_hours?.N || '0');
       const rate = parseFloat(job.hourly_rate?.N || '0');
-      const alternativeValue = hours * rate;
+      const hoursAndRate = hours * rate;
 
-      const finalJobValue = jobValue > 0 ? jobValue : alternativeValue;
+      let finalJobValue = hoursAndRate;
+      if (finalJobValue === 0) {
+        // Calculate job value from line items if hours and rate are not available
+        const lineItems = job.line_items?.L || [];
+        const jobValue = lineItems.reduce((total: number, item: any) => {
+          const price = parseFloat(item.M?.price?.N || '0');
+          return total + price;
+        }, 0);
+        finalJobValue = jobValue;
+      }
 
       // Track statuses for different metrics
       if (SOLD_STAGES.includes(status)) {
