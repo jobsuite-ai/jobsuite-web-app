@@ -46,9 +46,9 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            client_address: job.client_address.S,
-            city: job.city.S,
-            zip_code: job.zip_code.S,
+            client_address: job.client_address?.S ?? '',
+            city: job.city?.S ?? '',
+            zip_code: job.zip_code?.S ?? '',
         },
         validate: (values) => ({
             client_address: values.client_address === '' ? 'Must enter client address' : null,
@@ -192,13 +192,13 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                     </Flex>
                     <Flex direction="column" gap="lg" mt="md" mb="xs">
                         <Flex direction="column">
-                            <Text size="sm" c="dimmed">{client.email.S}</Text>
-                            <Text size="sm" c="dimmed">Client Phone: {client.phone_number.S}</Text>
+                            <Text size="sm" c="dimmed">{client.email?.S}</Text>
+                            <Text size="sm" c="dimmed">Client Phone: {client.phone_number?.S}</Text>
                         </Flex>
                         <Flex direction="column">
-                            <Text size="sm" c="dimmed">{job.client_address.S}</Text>
-                            <Text size="sm" c="dimmed">{job.city.S}, {job.state.S}</Text>
-                            <Text size="sm" c="dimmed">{job.zip_code.S}</Text>
+                            <Text size="sm" c="dimmed">{job.client_address?.S}</Text>
+                            <Text size="sm" c="dimmed">{job.city?.S}, {job.state?.S}</Text>
+                            <Text size="sm" c="dimmed">{job.zip_code?.S}</Text>
                         </Flex>
                     </Flex>
                 </Card> : <LoadingState />
