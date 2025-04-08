@@ -34,7 +34,7 @@ export async function POST(request: Request) {
             Item: {
                 user_id: process.env.RLPP_USER_ID,
                 id: jobID,
-                job_status: JobStatus.ESTIMATE_NOT_SCHEDULED,
+                job_status: JobStatus.NEW_LEAD,
                 createdAt: new Date().toISOString(),
                 job_type,
                 client_id,

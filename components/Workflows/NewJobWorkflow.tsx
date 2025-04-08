@@ -48,6 +48,7 @@ export function NewJobWorkflow() {
                     client_address: values.client_address === '' ? 'Must enter client address' : null,
                     client_email: /^\S+@\S+$/.test(values.client_email) ? null : 'Invalid email',
                     client_phone_number: values.client_phone_number === '' ? 'Must enter client phone number' : null,
+                    referral_source: values.referral_source === '' ? 'Must enter referral source' : null,
                 };
             }
             if (active === 1) {

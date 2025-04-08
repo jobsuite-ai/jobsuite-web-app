@@ -77,13 +77,15 @@ export function NewJobBasicInformation({ form }: { form: UseFormReturnType<any> 
                       {...form.getInputProps('client_phone_number')}
                     />
                     <Select
+                      withAsterisk
                       label="How did the client find us?"
                       placeholder="Select an option"
                       data={[
                         { value: 'past_customer', label: 'Past Customer' },
                         { value: 'referral', label: 'Referral' },
+                        { value: 'social_media', label: 'Social Media' },
                         { value: 'postcard', label: 'Postcard' },
-                        { value: 'trucks', label: 'Saw your trucks in the neighborhood' },
+                        { value: 'trucks', label: 'Saw your trucks' },
                         { value: 'google', label: 'Google Search' },
                         { value: 'yard_sign', label: 'Yard Sign' },
                       ]}
