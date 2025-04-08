@@ -3,8 +3,8 @@
 import { MouseEvent, useEffect, useState } from 'react';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, rem } from '@mantine/core';
-import { IconSearch, IconUser } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, Menu, rem } from '@mantine/core';
+import { IconSearch, IconUser, IconChevronDown } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -15,9 +15,14 @@ import { Client } from '@/components/Global/model';
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
-  { link: '/jobs', label: 'Jobs' },
-  { link: '/add-job', label: 'Add Job' },
   { link: '/clients', label: 'Clients' },
+  { link: '/add-job', label: 'Add Job' },
+];
+
+const jobLinks = [
+  { link: '/jobs', label: 'In Progress' },
+  { link: '/completed', label: 'Completed' },
+  { link: '/archived', label: 'Archived' },
 ];
 
 export function Header() {
@@ -55,6 +60,15 @@ export function Header() {
     >
       {link.label}
     </Link>
+  ));
+
+  const jobMenuItems = jobLinks.map((link) => (
+    <Menu.Item
+      key={link.label}
+      onClick={() => router.push(link.link)}
+    >
+      {link.label}
+    </Menu.Item>
   ));
 
   async function getClients() {
@@ -108,6 +122,20 @@ export function Header() {
           {user && (
             <Group className={classes.linkWrapper}>
               {items}
+              <Menu shadow="md" width={200}>
+                <Menu.Target>
+                  <Link
+                    href="#"
+                    className={classes.link}
+                    onClick={(event) => event.preventDefault()}
+                  >
+                    Jobs <IconChevronDown size={16} style={{ marginLeft: 4, verticalAlign: 'middle', position: 'relative', top: -1 }} />
+                  </Link>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  {jobMenuItems}
+                </Menu.Dropdown>
+              </Menu>
             </Group>
           )}
           <Autocomplete

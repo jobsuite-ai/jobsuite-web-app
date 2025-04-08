@@ -2,33 +2,15 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Card, Center, Flex, Group, Text } from '@mantine/core';
+import { Flex, Text, Card, Group, Badge, Center } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Job, JobStatus } from '../Global/model';
-import UniversalError from '../Global/UniversalError';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
-// Define column status groups and their order
-const COLUMN_ONE_STATUSES = [
-  JobStatus.NEW_LEAD,
-  JobStatus.ESTIMATE_NOT_SCHEDULED,
-  JobStatus.ESTIMATE_SCHEDULED,
-  JobStatus.ESTIMATE_IN_PROGRESS,
-];
-
-const COLUMN_TWO_STATUSES = [
-  JobStatus.NEEDS_FOLLOW_UP,
-  JobStatus.RLPP_OPENED,
-  JobStatus.ESTIMATE_ACCEPTED,
-  JobStatus.RLPP_DECLINED,
-  JobStatus.ESTIMATE_SENT,
-  JobStatus.ESTIMATE_OPENED,
-];
-
-export default function JobsList() {
+export default function CompletedJobsList() {
     const [jobs, setJobs] = useState(new Array<Job>());
     const [columnOneJobs, setColumnOneJobs] = useState(new Array<Job>());
     const [columnTwoJobs, setColumnTwoJobs] = useState(new Array<Job>());
@@ -43,58 +25,30 @@ export default function JobsList() {
     useEffect(() => {
         // Sort jobs into columns based on status
         const sortedColumnOne = jobs
-            .filter(job => COLUMN_ONE_STATUSES.includes(job.job_status))
-            .sort((a, b) => {
-                // First sort by updated_at (newest first)
-                const timeDiff = new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime();
-                if (timeDiff !== 0) return timeDiff;
-                // Then sort by status order as secondary sort
-                return COLUMN_ONE_STATUSES.indexOf(a.job_status) -
-                    COLUMN_ONE_STATUSES.indexOf(b.job_status);
-            });
+            .filter(job => job.job_status === JobStatus.RLPP_SIGNED)
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
         const sortedColumnTwo = jobs
-            .filter(job => COLUMN_TWO_STATUSES.includes(job.job_status))
-            .sort((a, b) => {
-                // First sort by updated_at (newest first)
-                const timeDiff = new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime();
-                if (timeDiff !== 0) return timeDiff;
-                // Then sort by status order as secondary sort
-                return COLUMN_TWO_STATUSES.indexOf(a.job_status) -
-                    COLUMN_TWO_STATUSES.indexOf(b.job_status);
-            });
+            .filter(job => job.job_status === JobStatus.JOB_COMPLETE)
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
         setColumnOneJobs(sortedColumnOne);
         setColumnTwoJobs(sortedColumnTwo);
     }, [jobs]);
 
     async function getJobs() {
-        // Get jobs for each status group using the index
-        const [columnOneResponse, columnTwoResponse] = await Promise.all([
-            fetch(`/api/jobs/by-status?status=${COLUMN_ONE_STATUSES.join('&status=')}`, {
+        const response = await fetch(
+            `/api/jobs/by-status?status=${JobStatus.RLPP_SIGNED}&status=${JobStatus.JOB_COMPLETE}`,
+            {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-            }),
-            fetch(`/api/jobs/by-status?status=${COLUMN_TWO_STATUSES.join('&status=')}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            }),
-        ]);
-
-        const { Items: columnOneItems } = await columnOneResponse.json();
-        const { Items: columnTwoItems } = await columnTwoResponse.json();
-
-        // Combine and sort all jobs
-        const allJobs = [...columnOneItems, ...columnTwoItems].sort((a, b) =>
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            }
         );
-        setJobs(allJobs);
+
+        const { Items }: { Items: Job[] } = await response.json();
+        setJobs(Items);
     }
 
     // Helper function to render a job card
@@ -168,24 +122,21 @@ export default function JobsList() {
         <>
             {loading ? <LoadingState /> :
                 <div className={classes.flexWrapper}>
-                    {jobs ? (
+                    <Flex direction="column" w="95%" mt="lg">
                         <Flex
                           direction="row"
                           justify="space-between"
                           align="flex-start"
-                          w="95%"
+                          w="100%"
                           gap="md"
-                          mt="lg"
+                          mt="md"
                         >
-                            {renderColumn(columnOneJobs, 'Estimate Pipeline')}
-                            {renderColumn(columnTwoJobs, 'Estimate Follow-up')}
+                            {renderColumn(columnOneJobs, 'Estimate Accepted')}
+                            {renderColumn(columnTwoJobs, 'Job Complete')}
                         </Flex>
-                    ) : (
-                        <div style={{ marginTop: '100px' }}>
-                            <UniversalError message="Unable to access list of jobs" />
-                        </div>
-                    )}
-                </div>}
+                    </Flex>
+                </div>
+            }
         </>
     );
 }

@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       const updateItemCommand = new UpdateItemCommand({
         ExpressionAttributeValues: {
           ':status': { S: jobStatusEnum },
-          ':updated_at': { S: Date.now().toString() },
+          ':updated_at': { S: new Date().toISOString() },
         },
         Key: { id: { S: payload.data.template.external_id } },
         ReturnValues: 'UPDATED_NEW',

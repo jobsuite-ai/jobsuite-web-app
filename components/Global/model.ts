@@ -15,6 +15,7 @@ export type Job = {
     job_type: string;
     job_title: string;
     referral_source: string;
+    updated_at: string;
 };
 
 export type Client = {
