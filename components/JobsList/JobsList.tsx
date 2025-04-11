@@ -45,25 +45,23 @@ export default function JobsList() {
         const sortedColumnOne = jobs
             .filter(job => COLUMN_ONE_STATUSES.includes(job.job_status))
             .sort((a, b) => {
-                // First sort by updated_at (newest first)
-                const timeDiff = new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime();
-                if (timeDiff !== 0) return timeDiff;
-                // Then sort by status order as secondary sort
-                return COLUMN_ONE_STATUSES.indexOf(a.job_status) -
+                // First sort by status order
+                const statusDiff = COLUMN_ONE_STATUSES.indexOf(a.job_status) -
                     COLUMN_ONE_STATUSES.indexOf(b.job_status);
+                if (statusDiff !== 0) return statusDiff;
+                // Then sort by updated_at (newest first) within each status
+                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
             });
 
         const sortedColumnTwo = jobs
             .filter(job => COLUMN_TWO_STATUSES.includes(job.job_status))
             .sort((a, b) => {
-                // First sort by updated_at (newest first)
-                const timeDiff = new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime();
-                if (timeDiff !== 0) return timeDiff;
-                // Then sort by status order as secondary sort
-                return COLUMN_TWO_STATUSES.indexOf(a.job_status) -
+                // First sort by status order
+                const statusDiff = COLUMN_TWO_STATUSES.indexOf(a.job_status) -
                     COLUMN_TWO_STATUSES.indexOf(b.job_status);
+                if (statusDiff !== 0) return statusDiff;
+                // Then sort by updated_at (newest first) within each status
+                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
             });
 
         setColumnOneJobs(sortedColumnOne);
