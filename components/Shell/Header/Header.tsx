@@ -85,7 +85,7 @@ export function Header() {
       const { Items }: { Items: Client[] } = await response.json();
       setClients(
         Items.reduce((acc, client) => {
-          acc[client.email] = client;
+          acc[client.client_name] = client;
           return acc;
         }, {} as Record<string, Client>)
       );
