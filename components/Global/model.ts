@@ -76,6 +76,9 @@ export type SingleJob = {
     calendly_event_url?: TypedDynamoStringReturn;
     calendly_invitee_email?: TypedDynamoStringReturn;
     referral_source?: TypedDynamoStringReturn;
+    keep_same_colors?: TypedDynamoBooleanReturn;
+    has_existing_paint?: TypedDynamoBooleanReturn;
+    paint_details?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {
@@ -94,6 +97,9 @@ export type SingleComment = {
 
 type TypedDynamoStringReturn = {
     S: string;
+};
+type TypedDynamoBooleanReturn = {
+    BOOL: boolean;
 };
 type TypedDynamoNumberReturn = {
     N: string;

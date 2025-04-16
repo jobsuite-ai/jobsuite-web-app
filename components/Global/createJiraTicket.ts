@@ -25,7 +25,7 @@ export default async function createJiraTicket(
   const description = `${job.transcription_summary?.S}\n
 ## Spanish Details\n${job.spanish_transcription?.S}\n
 ## Paint Can Image\n
-## Color Usage Details\n
+## Color Usage Details\n${job.paint_details?.S}
 `;
 
   const videoLink = baseCloudFrontURL + key;
@@ -119,6 +119,8 @@ export default async function createJiraTicket(
       customfield_10166: parseFloat(job.estimate_hours?.N),
       customfield_10198: jobClient.phone_number?.S,
       customfield_10231: job.client_address?.S,
+      customfield_10131: (job.keep_same_colors?.BOOL ? 'Keeping same colors' : '') +
+      (job.has_existing_paint?.BOOL ? '- has paint can' : '- does not have paint can'),
     },
   };
 

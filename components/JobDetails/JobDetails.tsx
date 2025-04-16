@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
+import { Button, Center, Flex, Modal, Text } from '@mantine/core';
 import { IconArchive, IconFileText, IconPencil } from '@tabler/icons-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
@@ -20,6 +20,7 @@ import TranscriptionSummary from './estimate/TranscriptionSummary';
 import HoursAndRate from './HoursAndRate';
 import JobImage from './JobImage';
 import JobTitle from './JobTitle';
+import PaintDetails from './PaintDetails';
 import ResourceLink from './ResourceLink';
 import classes from './styles/JobDetails.module.css';
 import VideoUploader from './VideoUploader';
@@ -140,13 +141,7 @@ export default function JobDetails({ jobID }: { jobID: string }) {
                                     <div style={{ flexGrow: '2' }}>
                                         <JobImage jobID={jobID} imageName={fileNameFromDynamo} />
                                     </div>
-                                    <Paper className={classes.hoverIntegration} shadow="sm" radius="md" withBorder>
-                                        <Flex h="100%" justify="center" align="center">
-                                            <Text py={20}>
-                                                Hover Integration Coming Soon...
-                                            </Text>
-                                        </Flex>
-                                    </Paper>
+                                    <PaintDetails job={job} />
                                 </div>
                                 <LineItems job={job} />
                                 <TranscriptionSummary job={job} refresh={getJob} />

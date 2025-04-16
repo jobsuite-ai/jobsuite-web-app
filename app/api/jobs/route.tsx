@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
-import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from './jobTypes';
+import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent, UpdatePaintDetailsInput } from './jobTypes';
 
 import { JobStatus } from '@/components/Global/model';
 
@@ -109,6 +109,10 @@ export async function PUT(request: Request) {
     );
     typedContent.delete_video && await deleteVideo(jobID);
     typedContent.job_title && await updateJobTitle(jobID, typedContent.job_title);
+    typedContent.update_paint_details && await updatePaintDetails(
+        jobID,
+        typedContent.update_paint_details,
+    );
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -397,6 +401,26 @@ async function updateJobTitle(jobID: string, jobTitle: string) {
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
             UpdateExpression: 'SET job_title = :title',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updatePaintDetails(jobID: string, paintDetails: UpdatePaintDetailsInput) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: {
+                ':keep_same_colors': { BOOL: paintDetails.keep_same_colors },
+                ':has_existing_paint': { BOOL: paintDetails.has_existing_paint },
+                ':paint_details': { S: paintDetails.paint_details },
+            },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET keep_same_colors = :keep_same_colors, has_existing_paint = :has_existing_paint, paint_details = :paint_details',
         });
         const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });

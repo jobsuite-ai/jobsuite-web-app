@@ -16,6 +16,7 @@ export type UpdateJobContent = {
     update_client_name?: string,
     update_hours_and_rate?: UpdateHoursAndRateInput,
     update_calendar_event?: UpdateCalendarEventInput,
+    update_paint_details?: UpdatePaintDetailsInput,
 };
 
 export type UpdateCalendarEventInput = {
@@ -29,6 +30,12 @@ export type UpdateHoursAndRateInput = {
     rate: string,
     date: string,
     discount_reason?: string,
+};
+
+export type UpdatePaintDetailsInput = {
+    keep_same_colors: boolean,
+    has_existing_paint: boolean,
+    paint_details: string,
 };
 
 export type UpdateClientDetailsInput = {
