@@ -11,7 +11,7 @@ const client = new DynamoDBClient({});
 export default async function createJiraTicket(
   job: SingleJob,
   jobClient: DynamoClient,
-  projectKey: string,
+  projectKey: string = 'PAINTING',
   issueType: string = 'Task',
 ) {
   const jiraBaseUrl = process.env.JIRA_BASE_URL;

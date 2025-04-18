@@ -152,4 +152,5 @@ export const DropdownJobStatus = {
     ESTIMATE_SENT: JobStatus.ESTIMATE_SENT,
     JOB_COMPLETE: JobStatus.JOB_COMPLETE,
     ESTIMATE_DECLINED: JobStatus.ESTIMATE_DECLINED,
+    RLPP_SIGNED: JobStatus.RLPP_SIGNED,
 } as const;

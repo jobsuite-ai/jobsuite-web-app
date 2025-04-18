@@ -9,6 +9,7 @@ import { useForm } from '@mantine/form';
 import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import createJiraTicket from '../Global/createJiraTicket';
 import LoadingState from '../Global/LoadingState';
 import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
@@ -116,6 +117,10 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                 ...prevJob,
                 job_status: { S: status },
             }));
+
+            if (status === JobStatus.ESTIMATE_IN_PROGRESS && client) {
+                createJiraTicket(job, client);
+            }
 
             setMenuOpened(false);
         } catch (error) {
