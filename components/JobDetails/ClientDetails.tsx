@@ -118,8 +118,8 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                 job_status: { S: status },
             }));
 
-            if (status === JobStatus.ESTIMATE_IN_PROGRESS && client) {
-                createJiraTicket(job, client);
+            if (status === JobStatus.RLPP_SIGNED && client) {
+                await createJiraTicket(job, client);
             }
 
             setMenuOpened(false);
