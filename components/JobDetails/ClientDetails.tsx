@@ -94,6 +94,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
     };
 
     const updateJobStatus = async (status: JobStatus) => {
+        logToCloudWatch(`Attempting to update job: ${job.id.S} to status: ${status}`);
         const content: UpdateJobContent = {
             job_status: status,
         };
@@ -119,6 +120,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             }));
 
             if (status === JobStatus.RLPP_SIGNED && client) {
+                logToCloudWatch(`Creating jira ticket due to manual action for job: ${job.id.S}`);
                 await createJiraTicket(job, client);
             }
 
