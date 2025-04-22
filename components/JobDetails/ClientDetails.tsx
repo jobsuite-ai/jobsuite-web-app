@@ -9,7 +9,6 @@ import { useForm } from '@mantine/form';
 import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
-import createJiraTicket from '../Global/createJiraTicket';
 import LoadingState from '../Global/LoadingState';
 import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
@@ -94,7 +93,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
     };
 
     const updateJobStatus = async (status: JobStatus) => {
-        logToCloudWatch(`Attempting to update job: ${job.id.S} to status: ${status}`);
+        await logToCloudWatch(`Attempting to update job: ${job.id.S} to status: ${status}`);
         const content: UpdateJobContent = {
             job_status: status,
         };
@@ -120,8 +119,17 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             }));
 
             if (status === JobStatus.RLPP_SIGNED && client) {
-                logToCloudWatch(`Creating jira ticket due to manual action for job: ${job.id.S}`);
-                await createJiraTicket(job, client);
+                const jiraResponse = await fetch('/api/jira', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ job, client }),
+                });
+
+                if (!jiraResponse.ok) {
+                    throw new Error('Failed to create JIRA ticket');
+                }
             }
 
             setMenuOpened(false);

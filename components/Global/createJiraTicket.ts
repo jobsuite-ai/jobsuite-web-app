@@ -119,12 +119,13 @@ export default async function createJiraTicket(
       customfield_10166: parseFloat(job.estimate_hours?.N),
       customfield_10198: jobClient.phone_number?.S,
       customfield_10231: job.client_address?.S,
-      customfield_10131: (job.keep_same_colors?.BOOL ? 'Keeping same colors' : '') +
-      (job.has_existing_paint?.BOOL ? '- has paint can' : '- does not have paint can'),
+      customfield_10131: (job.keep_same_colors?.BOOL ? `Keeping same colors ${job.has_existing_paint?.BOOL ?
+        '- has paint can' : '- does not have paint can'}` : ''),
     },
   };
 
   try {
+    await logToCloudWatch(`Creating Jira ticket with payload: ${JSON.stringify(payload)}`);
     const response = await axios.post(url, payload, {
       headers: {
         Authorization: `Basic ${auth}`,
