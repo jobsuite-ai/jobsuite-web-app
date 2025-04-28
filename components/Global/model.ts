@@ -53,6 +53,7 @@ export type SingleJob = {
     docuseal_link: TypedDynamoStringReturn;
     estimate_date: TypedDynamoStringReturn;
     estimate_hours: TypedDynamoNumberReturn;
+    actual_hours?: TypedDynamoNumberReturn;
     hourly_rate: TypedDynamoNumberReturn;
     id: TypedDynamoStringReturn;
     images: TypedDynamoListReturn<TypedDynamoMapReturn<JobVideo>[]>;

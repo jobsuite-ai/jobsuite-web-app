@@ -113,6 +113,7 @@ export async function PUT(request: Request) {
         jobID,
         typedContent.update_paint_details,
     );
+    typedContent.actual_hours && await updateActualHours(jobID, typedContent.actual_hours);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -421,6 +422,22 @@ async function updatePaintDetails(jobID: string, paintDetails: UpdatePaintDetail
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
             UpdateExpression: 'SET keep_same_colors = :keep_same_colors, has_existing_paint = :has_existing_paint, paint_details = :paint_details',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updateActualHours(jobID: string, actualHours: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: { ':ah': { N: actualHours } },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET actual_hours = :ah',
         });
         const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });

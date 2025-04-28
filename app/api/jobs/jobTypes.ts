@@ -12,6 +12,7 @@ export type UpdateJobContent = {
     transcription_summary?: string,
     estimate_date?: any,
     estimate_hours?: string,
+    actual_hours?: string,
     update_client_details?: UpdateClientDetailsInput,
     update_client_name?: string,
     update_hours_and_rate?: UpdateHoursAndRateInput,

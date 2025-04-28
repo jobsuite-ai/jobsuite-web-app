@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Button, Card, Center, Flex, Menu, Modal, Text, TextInput } from '@mantine/core';
+import { Badge, Button, Card, Center, Flex, Menu, Modal, Text, TextInput, NumberInput, Textarea } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { useForm } from '@mantine/form';
@@ -13,12 +13,13 @@ import LoadingState from '../Global/LoadingState';
 import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
-import { UpdateClientDetailsInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateClientDetailsInput, UpdateJobContent, UpdateHoursAndRateInput } from '@/app/api/jobs/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
     const [job, setJob] = useState(initialJob);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
     const [client, setClient] = useState<DynamoClient>();
     const [menuOpened, setMenuOpened] = useState(false);
     const router = useRouter();
@@ -57,6 +58,19 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         }),
     });
 
+    const completionForm = useForm({
+        initialValues: {
+            actual_hours: job.estimate_hours?.N || '0',
+            additional_hours: 0,
+            add_on_description: '',
+        },
+        validate: {
+            actual_hours: (value: string | number) => (value === '' ? 'Must enter actual hours' : null),
+            add_on_description: (value: string, values: any) =>
+                (values.additional_hours !== 0 && value === '' ? 'Must enter description for additional hours' : null),
+        },
+    });
+
     const updateJob = async () => {
         const formValues = form.getValues();
 
@@ -90,6 +104,74 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             client_address: { S: formValues.client_address },
         }));
         setIsModalOpen(false);
+    };
+
+    const handleJobCompletion = async () => {
+        const formValues = completionForm.getValues();
+
+        // Update job hours
+        const updateHoursAndRateInput: UpdateHoursAndRateInput = {
+            hours: (parseInt(job.estimate_hours?.N, 10) + formValues.additional_hours).toString(),
+            rate: job.hourly_rate?.N || '0',
+            date: new Date().toISOString(),
+            discount_reason: '',
+        };
+
+        const content: UpdateJobContent = {
+            update_hours_and_rate: updateHoursAndRateInput,
+            actual_hours: formValues.actual_hours.toString(),
+        };
+
+        try {
+            // Update job hours
+            const response = await fetch(
+                '/api/jobs',
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ content, jobID: job.id.S }),
+                }
+            );
+
+            await response.json();
+
+            // Add comment about additional hours only if there are additional hours
+            if (formValues.additional_hours !== 0) {
+                const commentContent = `Additional hours: ${formValues.additional_hours}. Description: ${formValues.add_on_description}`;
+
+                const commentResponse = await fetch('/api/job-comments', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        id: crypto.randomUUID(),
+                        job_id: job.id.S,
+                        commenter: 'System',
+                        comment_contents: commentContent,
+                        timestamp: new Date().toISOString(),
+                    }),
+                });
+
+                await commentResponse.json();
+            }
+
+            // Update local state
+            setJob(prevJob => ({
+                ...prevJob,
+                estimate_hours: { N: (
+                    (job.estimate_hours?.N || '0') + formValues.additional_hours.toString()
+                ) },
+                actual_hours: { N: formValues.actual_hours.toString() },
+            }));
+
+            setIsCompletionModalOpen(false);
+            setMenuOpened(false);
+        } catch (error) {
+            logToCloudWatch(`Failed to update job completion details: ${error}`);
+        }
     };
 
     const updateJobStatus = async (status: JobStatus) => {
@@ -132,7 +214,12 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                 }
             }
 
-            setMenuOpened(false);
+            // Open completion modal if status is JOB_COMPLETE
+            if (status === JobStatus.JOB_COMPLETE) {
+                setIsCompletionModalOpen(true);
+            } else {
+                setMenuOpened(false);
+            }
         } catch (error) {
             logToCloudWatch(`Failed to update job status: ${error}`);
         }
@@ -253,6 +340,53 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
 
                         <Center mt="md">
                             <Button type="submit" onClick={updateJob}>Update Client Details</Button>
+                        </Center>
+                    </div>
+                </Modal>
+            }
+            {isCompletionModalOpen &&
+                <Modal
+                  opened={isCompletionModalOpen}
+                  onClose={() => setIsCompletionModalOpen(false)}
+                  title={<Text fz={24} fw={700}>Job Completion Details</Text>}
+                  size="lg"
+                >
+                    <Text fz={14} mb="md">
+                        Please enter the actual hours spent on the job and any additional
+                         hours for work added to the estimate.
+                    </Text>
+                    <div style={{ marginTop: '10px' }}>
+                        <NumberInput
+                          withAsterisk
+                          label="Actual Hours Spent"
+                          placeholder="Enter actual hours"
+                          min={0}
+                          decimalScale={1}
+                          key={completionForm.key('actual_hours')}
+                          {...completionForm.getInputProps('actual_hours')}
+                        />
+                        <NumberInput
+                          withAsterisk
+                          label="Hours Spent on Add-ons"
+                          placeholder="Enter additional hours"
+                          min={0}
+                          decimalScale={1}
+                          key={completionForm.key('additional_hours')}
+                          {...completionForm.getInputProps('additional_hours')}
+                        />
+                        {completionForm.values.additional_hours !== 0 && (
+                          <Textarea
+                            withAsterisk
+                            label="Add-on Description"
+                            placeholder="Describe the additional work"
+                            minRows={3}
+                            key={completionForm.key('add_on_description')}
+                            {...completionForm.getInputProps('add_on_description')}
+                          />
+                        )}
+
+                        <Center mt="md">
+                            <Button type="submit" onClick={handleJobCompletion}>Submit</Button>
                         </Center>
                     </div>
                 </Modal>
