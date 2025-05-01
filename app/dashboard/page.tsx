@@ -61,6 +61,16 @@ interface CrewLeadHours {
   actualHours: number;
 }
 
+interface JobWithHourDifference {
+  id: string;
+  name: string;
+  estimatedHours: number;
+  actualHours: number;
+  difference: number;
+  differencePercentage: number;
+  updatedAt: string;
+}
+
 interface DashboardMetrics {
   totalJobs: number;
   activeBids: number;
@@ -79,6 +89,7 @@ interface DashboardMetrics {
   totalEstimatedHours: number;
   totalActualHours: number;
   crewLeadHours: CrewLeadHours[];
+  jobsWithHourDifferences: JobWithHourDifference[];
 }
 
 export default function Dashboard() {
@@ -104,6 +115,7 @@ export default function Dashboard() {
     totalEstimatedHours: 0,
     totalActualHours: 0,
     crewLeadHours: [],
+    jobsWithHourDifferences: [],
   });
 
   useEffect(() => {
@@ -192,6 +204,7 @@ export default function Dashboard() {
     let totalEstimatedHours = 0;
     let totalActualHours = 0;
     const crewLeadHoursMap: Record<string, { estimatedHours: number; actualHours: number }> = {};
+    const jobsWithHourDifferences: JobWithHourDifference[] = [];
 
     // Count jobs by status and calculate values
     filteredJobs.forEach(jobObject => {
@@ -219,6 +232,31 @@ export default function Dashboard() {
       const actualHours = parseFloat(job.actual_hours?.N || '0');
       const rate = parseFloat(job.hourly_rate?.N || '0');
       const hoursAndRate = hours * rate;
+
+      // Check for significant hour differences in jobs updated in the last month
+      const updatedAt = job.updated_at?.S || job.updated_at;
+      if (updatedAt) {
+        const updatedDate = new Date(updatedAt);
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        if (updatedDate >= oneMonthAgo && hours > 0 && actualHours > 0) {
+          const difference = Math.abs(actualHours - hours);
+          const differencePercentage = Math.abs(difference / hours) * 100;
+
+          if (differencePercentage >= 20) {
+            jobsWithHourDifferences.push({
+              id: job.id?.S || job.id,
+              name: job.name?.S || job.name || 'Unnamed Job',
+              estimatedHours: hours,
+              actualHours,
+              difference,
+              differencePercentage,
+              updatedAt,
+            });
+          }
+        }
+      }
 
       let finalJobValue = hoursAndRate;
       if (finalJobValue === 0) {
@@ -305,6 +343,7 @@ export default function Dashboard() {
       totalEstimatedHours,
       totalActualHours,
       crewLeadHours,
+      jobsWithHourDifferences,
     };
 
     setMetrics(newMetrics);
@@ -788,6 +827,53 @@ export default function Dashboard() {
                         </Table>
                       </Paper>
                     </Grid.Col>
+
+                    {metrics.jobsWithHourDifferences.length > 0 && (
+                      <Grid.Col span={12}>
+                        <Paper withBorder p="md" radius="md">
+                          <Title order={3}>
+                            Jobs with Significant Hour Differences (Last 30 Days)
+                          </Title>
+                          <Text size="sm" c="dimmed" mb="md">
+                            Jobs with 20% or greater difference between estimated and actual hours
+                          </Text>
+                          <Table>
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>Job Name</Table.Th>
+                                <Table.Th>Estimated Hours</Table.Th>
+                                <Table.Th>Actual Hours</Table.Th>
+                                <Table.Th>Difference</Table.Th>
+                                <Table.Th>Difference %</Table.Th>
+                                <Table.Th>Last Updated</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {metrics.jobsWithHourDifferences.map((job) => (
+                                <Table.Tr key={job.id}>
+                                  <Table.Td>{job.name}</Table.Td>
+                                  <Table.Td>{job.estimatedHours.toFixed(1)}</Table.Td>
+                                  <Table.Td>{job.actualHours.toFixed(1)}</Table.Td>
+                                  <Table.Td>
+                                    <Text c={job.difference > 0 ? 'red' : 'green'}>
+                                      {job.difference.toFixed(1)}
+                                    </Text>
+                                  </Table.Td>
+                                  <Table.Td>
+                                    <Text c={job.difference > 0 ? 'red' : 'green'}>
+                                      {job.differencePercentage.toFixed(1)}%
+                                    </Text>
+                                  </Table.Td>
+                                  <Table.Td>
+                                    {new Date(job.updatedAt).toLocaleDateString()}
+                                  </Table.Td>
+                                </Table.Tr>
+                              ))}
+                            </Table.Tbody>
+                          </Table>
+                        </Paper>
+                      </Grid.Col>
+                    )}
                   </Grid>
                 </Tabs.Panel>
               </Tabs>
