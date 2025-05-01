@@ -114,6 +114,7 @@ export async function PUT(request: Request) {
         typedContent.update_paint_details,
     );
     typedContent.actual_hours && await updateActualHours(jobID, typedContent.actual_hours);
+    typedContent.job_crew_lead && await updateJobCrewLead(jobID, typedContent.job_crew_lead);
 
     return Response.json({ error: 'Not handled yet' });
 }
@@ -438,6 +439,22 @@ async function updateActualHours(jobID: string, actualHours: string) {
             ReturnValues: 'UPDATED_NEW',
             TableName: 'job',
             UpdateExpression: 'SET actual_hours = :ah',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function updateJobCrewLead(jobID: string, crewLead: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: { ':cl': { S: crewLead } },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET job_crew_lead = :cl',
         });
         const { Attributes } = await client.send(updateItemCommand);
         return Response.json({ Attributes });

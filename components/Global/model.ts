@@ -80,6 +80,7 @@ export type SingleJob = {
     keep_same_colors?: TypedDynamoBooleanReturn;
     has_existing_paint?: TypedDynamoBooleanReturn;
     paint_details?: TypedDynamoStringReturn;
+    job_crew_lead?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {

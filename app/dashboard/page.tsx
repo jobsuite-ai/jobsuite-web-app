@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Title, Container, Grid, Paper, Stack, LoadingOverlay, Tabs, Group, Select } from '@mantine/core';
+import { Title, Container, Grid, Paper, Stack, LoadingOverlay, Tabs, Group, Select, Text, Table } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 
 import { BarChart, PieChart, LineChart } from '@/components/Dashboard/Charts';
@@ -55,6 +55,12 @@ interface StatusTrendPoint {
   [key: string]: string | number;
 }
 
+interface CrewLeadHours {
+  crewLead: string;
+  estimatedHours: number;
+  actualHours: number;
+}
+
 interface DashboardMetrics {
   totalJobs: number;
   activeBids: number;
@@ -70,6 +76,9 @@ interface DashboardMetrics {
   bidToSoldData: CategoryValue[];
   statusTrend: StatusTrendPoint[];
   referralSources: CategoryValue[];
+  totalEstimatedHours: number;
+  totalActualHours: number;
+  crewLeadHours: CrewLeadHours[];
 }
 
 export default function Dashboard() {
@@ -92,6 +101,9 @@ export default function Dashboard() {
     bidToSoldData: [],
     statusTrend: [],
     referralSources: [],
+    totalEstimatedHours: 0,
+    totalActualHours: 0,
+    crewLeadHours: [],
   });
 
   useEffect(() => {
@@ -177,6 +189,9 @@ export default function Dashboard() {
     let totalEstimateCount = 0;
     let inProgressJobsCount = 0;
     let inProgressValue = 0;
+    let totalEstimatedHours = 0;
+    let totalActualHours = 0;
+    const crewLeadHoursMap: Record<string, { estimatedHours: number; actualHours: number }> = {};
 
     // Count jobs by status and calculate values
     filteredJobs.forEach(jobObject => {
@@ -184,6 +199,7 @@ export default function Dashboard() {
       const job = jobObject.Item || jobObject;
       const status = job.job_status?.S || job.job_status;
       const referralSource = job.referral_source?.S || job.referral_source;
+      const crewLead = job.job_crew_lead?.S || job.job_crew_lead;
 
       // Skip archived jobs
       if (status === JobStatus.ARCHIVED) {
@@ -200,6 +216,7 @@ export default function Dashboard() {
 
       // First try to get hours and rate
       const hours = parseFloat(job.estimate_hours?.N || '0');
+      const actualHours = parseFloat(job.actual_hours?.N || '0');
       const rate = parseFloat(job.hourly_rate?.N || '0');
       const hoursAndRate = hours * rate;
 
@@ -212,6 +229,20 @@ export default function Dashboard() {
           return total + price;
         }, 0);
         finalJobValue = jobValue;
+      }
+
+      // Track hours for completed jobs
+      if (status === JobStatus.JOB_COMPLETE) {
+        totalEstimatedHours += hours;
+        totalActualHours += actualHours;
+
+        if (crewLead) {
+          if (!crewLeadHoursMap[crewLead]) {
+            crewLeadHoursMap[crewLead] = { estimatedHours: 0, actualHours: 0 };
+          }
+          crewLeadHoursMap[crewLead].estimatedHours += hours;
+          crewLeadHoursMap[crewLead].actualHours += actualHours;
+        }
       }
 
       // Track statuses for different metrics
@@ -232,6 +263,13 @@ export default function Dashboard() {
         totalEstimateCount += 1;
       }
     });
+
+    // Convert crew lead hours map to array
+    const crewLeadHours = Object.entries(crewLeadHoursMap).map(([crewLead, hours]) => ({
+      crewLead,
+      estimatedHours: hours.estimatedHours,
+      actualHours: hours.actualHours,
+    }));
 
     // Generate weekly revenue data
     const weeklyRevenueData = generateWeeklyRevenueData(filteredJobs);
@@ -264,6 +302,9 @@ export default function Dashboard() {
         category: source,
         value: count,
       })),
+      totalEstimatedHours,
+      totalActualHours,
+      crewLeadHours,
     };
 
     setMetrics(newMetrics);
@@ -590,8 +631,9 @@ export default function Dashboard() {
 
             {/* Charts Tabs */}
             <Grid.Col span={12}>
-              <Tabs defaultValue="referrals">
+              <Tabs defaultValue="hours">
                 <Tabs.List>
+                  <Tabs.Tab value="hours">Hours</Tabs.Tab>
                   <Tabs.Tab value="referrals">Referral Sources</Tabs.Tab>
                   <Tabs.Tab value="revenue">Revenue Trend</Tabs.Tab>
                   <Tabs.Tab value="weekly">Weekly Estimates</Tabs.Tab>
@@ -685,6 +727,68 @@ export default function Dashboard() {
                       }))}
                     />
                   </Paper>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="hours" pt="md">
+                  <Grid>
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                      <Paper withBorder p="md" radius="md">
+                        <Title order={3}>Total Hours</Title>
+                        <Group justify="space-between" mt="md">
+                          <div>
+                            <Text size="sm" c="dimmed">Estimated Hours</Text>
+                            <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
+                          </div>
+                          <div>
+                            <Text size="sm" c="dimmed">Actual Hours</Text>
+                            <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
+                          </div>
+                          <div>
+                            <Text size="sm" c="dimmed">Variance</Text>
+                            <Text
+                              size="xl"
+                              fw={700}
+                              c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
+                            >
+                              {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
+                            </Text>
+                          </div>
+                        </Group>
+                      </Paper>
+                    </Grid.Col>
+
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                      <Paper withBorder p="md" radius="md">
+                        <Title order={3}>Hours by Crew Lead</Title>
+                        <Table mt="md">
+                          <Table.Thead>
+                            <Table.Tr>
+                              <Table.Th>Crew Lead</Table.Th>
+                              <Table.Th>Estimated</Table.Th>
+                              <Table.Th>Actual</Table.Th>
+                              <Table.Th>Variance</Table.Th>
+                            </Table.Tr>
+                          </Table.Thead>
+                          <Table.Tbody>
+                            {metrics.crewLeadHours.map((lead) => (
+                              <Table.Tr key={lead.crewLead}>
+                                <Table.Td>{lead.crewLead}</Table.Td>
+                                <Table.Td>{lead.estimatedHours.toFixed(1)}</Table.Td>
+                                <Table.Td>{lead.actualHours.toFixed(1)}</Table.Td>
+                                <Table.Td>
+                                  <Text
+                                    c={lead.actualHours > lead.estimatedHours ? 'red' : 'green'}
+                                  >
+                                    {(lead.actualHours - lead.estimatedHours).toFixed(1)}
+                                  </Text>
+                                </Table.Td>
+                              </Table.Tr>
+                            ))}
+                          </Table.Tbody>
+                        </Table>
+                      </Paper>
+                    </Grid.Col>
+                  </Grid>
                 </Tabs.Panel>
               </Tabs>
             </Grid.Col>

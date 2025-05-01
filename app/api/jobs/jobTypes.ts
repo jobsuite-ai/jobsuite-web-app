@@ -18,6 +18,7 @@ export type UpdateJobContent = {
     update_hours_and_rate?: UpdateHoursAndRateInput,
     update_calendar_event?: UpdateCalendarEventInput,
     update_paint_details?: UpdatePaintDetailsInput,
+    job_crew_lead?: string,
 };
 
 export type UpdateCalendarEventInput = {

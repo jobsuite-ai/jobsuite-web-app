@@ -63,11 +63,13 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             actual_hours: job.estimate_hours?.N || '0',
             additional_hours: 0,
             add_on_description: '',
+            job_crew_lead: job.job_crew_lead?.S || '',
         },
         validate: {
             actual_hours: (value: string | number) => (value === '' ? 'Must enter actual hours' : null),
             add_on_description: (value: string, values: any) =>
                 (values.additional_hours !== 0 && value === '' ? 'Must enter description for additional hours' : null),
+            job_crew_lead: (value: string) => (value === '' ? 'Must enter crew lead name' : null),
         },
     });
 
@@ -120,6 +122,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         const content: UpdateJobContent = {
             update_hours_and_rate: updateHoursAndRateInput,
             actual_hours: formValues.actual_hours.toString(),
+            job_crew_lead: formValues.job_crew_lead.toUpperCase(),
         };
 
         try {
@@ -165,6 +168,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                     (job.estimate_hours?.N || '0') + formValues.additional_hours.toString()
                 ) },
                 actual_hours: { N: formValues.actual_hours.toString() },
+                job_crew_lead: { S: formValues.job_crew_lead.toUpperCase() },
             }));
 
             setIsCompletionModalOpen(false);
@@ -384,7 +388,13 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                             {...completionForm.getInputProps('add_on_description')}
                           />
                         )}
-
+                        <TextInput
+                          withAsterisk
+                          label="Crew Lead"
+                          placeholder="Enter crew lead name"
+                          key={completionForm.key('job_crew_lead')}
+                          {...completionForm.getInputProps('job_crew_lead')}
+                        />
                         <Center mt="md">
                             <Button type="submit" onClick={handleJobCompletion}>Submit</Button>
                         </Center>
