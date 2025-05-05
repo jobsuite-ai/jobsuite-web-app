@@ -241,13 +241,13 @@ export default function Dashboard() {
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
         if (updatedDate >= oneMonthAgo && hours > 0 && actualHours > 0) {
-          const difference = Math.abs(actualHours - hours);
+          const difference = actualHours - hours;
           const differencePercentage = Math.abs(difference / hours) * 100;
 
           if (differencePercentage >= 20) {
             jobsWithHourDifferences.push({
               id: job.id?.S || job.id,
-              name: job.name?.S || job.name || 'Unnamed Job',
+              name: job.client_name?.S || job.name || 'Unnamed Job',
               estimatedHours: hours,
               actualHours,
               difference,
