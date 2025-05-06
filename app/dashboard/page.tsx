@@ -87,6 +87,7 @@ interface DashboardMetrics {
   bidToSoldData: CategoryValue[];
   statusTrend: StatusTrendPoint[];
   referralSources: CategoryValue[];
+  acceptedReferralSources: CategoryValue[];
   totalEstimatedHours: number;
   totalActualHours: number;
   crewLeadHours: CrewLeadHours[];
@@ -113,6 +114,7 @@ export default function Dashboard() {
     bidToSoldData: [],
     statusTrend: [],
     referralSources: [],
+    acceptedReferralSources: [],
     totalEstimatedHours: 0,
     totalActualHours: 0,
     crewLeadHours: [],
@@ -195,6 +197,7 @@ export default function Dashboard() {
 
     const statusCounts: Record<string, number> = {};
     const referralSourceCounts: Record<string, number> = {};
+    const acceptedReferralSourceCounts: Record<string, number> = {};
     let totalBidValue = 0;
     let totalSoldValue = 0;
     let soldJobsCount = 0;
@@ -273,6 +276,12 @@ export default function Dashboard() {
       // Count by referral source if defined
       if (referralSource) {
         referralSourceCounts[referralSource] = (referralSourceCounts[referralSource] || 0) + 1;
+
+        // Also track referral sources for accepted jobs
+        if (SOLD_STAGES.includes(status)) {
+          acceptedReferralSourceCounts[referralSource] =
+          (acceptedReferralSourceCounts[referralSource] || 0) + 1;
+        }
       }
 
       let finalJobValue = hoursAndRate;
@@ -345,6 +354,11 @@ export default function Dashboard() {
       referralSources: Object.entries(referralSourceCounts).map(([source, count]) => ({
         category: source,
         value: count,
+      })),
+      acceptedReferralSources: Object.entries(acceptedReferralSourceCounts).map(
+        ([source, count]) => ({
+          category: source,
+          value: count,
       })),
       totalEstimatedHours,
       totalActualHours,
@@ -763,15 +777,30 @@ export default function Dashboard() {
                 </Tabs.Panel>
 
                 <Tabs.Panel value="referrals" pt="md">
-                  <Paper withBorder p="md" radius="md">
-                    <Title order={3}>Jobs by Referral Source</Title>
-                    <BarChart
-                      data={metrics.referralSources.map(item => ({
-                        category: formatLabel(item.category || 'Unknown'),
-                        value: item.value || 0,
-                      }))}
-                    />
-                  </Paper>
+                  <Grid>
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                      <Paper withBorder p="md" radius="md">
+                        <Title order={3}>All Jobs by Referral Source</Title>
+                        <BarChart
+                          data={metrics.referralSources.map(item => ({
+                            category: formatLabel(item.category || 'Unknown'),
+                            value: item.value || 0,
+                          }))}
+                        />
+                      </Paper>
+                    </Grid.Col>
+                    <Grid.Col span={{ base: 12, md: 6 }}>
+                      <Paper withBorder p="md" radius="md">
+                        <Title order={3}>Accepted Jobs by Referral Source</Title>
+                        <BarChart
+                          data={metrics.acceptedReferralSources.map(item => ({
+                            category: formatLabel(item.category || 'Unknown'),
+                            value: item.value || 0,
+                          }))}
+                        />
+                      </Paper>
+                    </Grid.Col>
+                  </Grid>
                 </Tabs.Panel>
 
                 <Tabs.Panel value="hours" pt="md">
