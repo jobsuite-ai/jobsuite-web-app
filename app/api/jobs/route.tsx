@@ -116,6 +116,15 @@ export async function PUT(request: Request) {
     typedContent.actual_hours && await updateActualHours(jobID, typedContent.actual_hours);
     typedContent.job_crew_lead && await updateJobCrewLead(jobID, typedContent.job_crew_lead);
 
+    const updateItemCommand = new UpdateItemCommand({
+        ExpressionAttributeValues: { ':updated_at': { S: new Date().toISOString() } },
+        Key: { id: { S: jobID } },
+        ReturnValues: 'UPDATED_NEW',
+        TableName: 'job',
+        UpdateExpression: 'SET updated_at = :updated_at',
+    });
+    await client.send(updateItemCommand);
+
     return Response.json({ error: 'Not handled yet' });
 }
 

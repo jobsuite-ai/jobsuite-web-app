@@ -315,7 +315,7 @@ export default function Dashboard() {
     });
 
     // Sort jobs with hour differences by percentage difference in descending order
-    jobsWithHourDifferences.sort((a, b) => b.differencePercentage - a.differencePercentage);
+    jobsWithHourDifferences.sort((a, b) => b.difference - a.difference);
 
     // Convert crew lead hours map to array
     const crewLeadHours = Object.entries(crewLeadHoursMap).map(([crewLead, hours]) => ({
