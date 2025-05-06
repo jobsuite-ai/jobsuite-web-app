@@ -69,6 +69,7 @@ interface JobWithHourDifference {
   difference: number;
   differencePercentage: number;
   updatedAt: string;
+  crewLead: string;
 }
 
 interface DashboardMetrics {
@@ -241,6 +242,7 @@ export default function Dashboard() {
               difference,
               differencePercentage,
               updatedAt,
+              crewLead,
             });
           }
         }
@@ -302,6 +304,9 @@ export default function Dashboard() {
         totalEstimateCount += 1;
       }
     });
+
+    // Sort jobs with hour differences by percentage difference in descending order
+    jobsWithHourDifferences.sort((a, b) => b.differencePercentage - a.differencePercentage);
 
     // Convert crew lead hours map to array
     const crewLeadHours = Object.entries(crewLeadHoursMap).map(([crewLead, hours]) => ({
@@ -847,6 +852,7 @@ export default function Dashboard() {
                                 <Table.Th>Difference</Table.Th>
                                 <Table.Th>Difference %</Table.Th>
                                 <Table.Th>Last Updated</Table.Th>
+                                <Table.Th>Crew Lead</Table.Th>
                               </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
@@ -868,6 +874,7 @@ export default function Dashboard() {
                                   <Table.Td>
                                     {new Date(job.updatedAt).toLocaleDateString()}
                                   </Table.Td>
+                                  <Table.Td>{job.crewLead}</Table.Td>
                                 </Table.Tr>
                               ))}
                             </Table.Tbody>
