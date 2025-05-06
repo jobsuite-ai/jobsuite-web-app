@@ -213,9 +213,10 @@ export default function Dashboard() {
       const status = job.job_status?.S || job.job_status;
       const referralSource = job.referral_source?.S || job.referral_source;
       const crewLead = job.job_crew_lead?.S || job.job_crew_lead;
+      const isExcluded = job.is_excluded?.BOOL || job.is_excluded;
 
-      // Skip archived jobs
-      if (status === JobStatus.ARCHIVED) {
+      // Skip archived jobs and excluded jobs
+      if (status === JobStatus.ARCHIVED || isExcluded) {
         return;
       }
 
