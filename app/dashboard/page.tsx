@@ -215,19 +215,6 @@ export default function Dashboard() {
       const crewLead = job.job_crew_lead?.S || job.job_crew_lead;
       const isExcluded = job.is_excluded?.BOOL || job.is_excluded;
 
-      // Skip archived jobs and excluded jobs
-      if (status === JobStatus.ARCHIVED || isExcluded) {
-        return;
-      }
-
-      // Count by status
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-
-      // Count by referral source if defined
-      if (referralSource) {
-        referralSourceCounts[referralSource] = (referralSourceCounts[referralSource] || 0) + 1;
-      }
-
       // First try to get hours and rate
       const hours = parseFloat(job.estimate_hours?.N || '0');
       const actualHours = parseFloat(job.actual_hours?.N || '0');
@@ -259,17 +246,6 @@ export default function Dashboard() {
         }
       }
 
-      let finalJobValue = hoursAndRate;
-      if (finalJobValue === 0) {
-        // Calculate job value from line items if hours and rate are not available
-        const lineItems = job.line_items?.L || [];
-        const jobValue = lineItems.reduce((total: number, item: any) => {
-          const price = parseFloat(item.M?.price?.N || '0');
-          return total + price;
-        }, 0);
-        finalJobValue = jobValue;
-      }
-
       // Track hours for completed jobs
       if (status === JobStatus.JOB_COMPLETE) {
         totalEstimatedHours += hours;
@@ -282,6 +258,30 @@ export default function Dashboard() {
           crewLeadHoursMap[crewLead].estimatedHours += hours;
           crewLeadHoursMap[crewLead].actualHours += actualHours;
         }
+      }
+
+      // Skip archived jobs and excluded jobs
+      if (status === JobStatus.ARCHIVED || isExcluded) {
+        return;
+      }
+
+      // Count by status
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+
+      // Count by referral source if defined
+      if (referralSource) {
+        referralSourceCounts[referralSource] = (referralSourceCounts[referralSource] || 0) + 1;
+      }
+
+      let finalJobValue = hoursAndRate;
+      if (finalJobValue === 0) {
+        // Calculate job value from line items if hours and rate are not available
+        const lineItems = job.line_items?.L || [];
+        const jobValue = lineItems.reduce((total: number, item: any) => {
+          const price = parseFloat(item.M?.price?.N || '0');
+          return total + price;
+        }, 0);
+        finalJobValue = jobValue;
       }
 
       // Track statuses for different metrics
