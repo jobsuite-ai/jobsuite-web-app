@@ -16,6 +16,8 @@ export type Job = {
     job_title: string;
     referral_source: string;
     updated_at: string;
+    estimate_hours: string;
+    actual_hours: string;
 };
 
 export type Client = {

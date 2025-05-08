@@ -82,11 +82,16 @@ export default function CompletedJobsList() {
                     {getFormattedStatus(job.job_status)}
                 </Badge>
             </Group>
-
-            <Flex direction="column" align="flex-start">
-                <Text size="sm" c="dimmed">{job.client_address}</Text>
-                <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
-                <Text size="sm" c="dimmed">{job.zip_code}</Text>
+            <Flex direction="row" justify="space-between" w="100%">
+                <Flex direction="column" align="flex-start">
+                    <Text size="sm" c="dimmed">{job.client_address}</Text>
+                    <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
+                    <Text size="sm" c="dimmed">{job.zip_code}</Text>
+                </Flex>
+                <Flex direction="column" align="flex-end">
+                    <Text size="sm" c="dimmed">Est. Hours: {parseFloat(job.estimate_hours || '0').toFixed(1)}</Text>
+                    <Text size="sm" c="dimmed">Actual Hours: {parseFloat(job.actual_hours || '0').toFixed(1)}</Text>
+                </Flex>
             </Flex>
         </Card>
     );
