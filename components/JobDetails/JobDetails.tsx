@@ -21,6 +21,8 @@ import HoursAndRate from './HoursAndRate';
 import JobImage from './JobImage';
 import JobTitle from './JobTitle';
 import PaintDetails from './PaintDetails';
+import PdfUploader from './PdfUploader';
+import { PdfViewer } from './PdfViewer';
 import ResourceLink from './ResourceLink';
 import classes from './styles/JobDetails.module.css';
 import VideoUploader from './VideoUploader';
@@ -212,12 +214,40 @@ export default function JobDetails({ jobID }: { jobID: string }) {
         </>
     );
 
+    const PdfDetails = () => (
+        <>
+            {loading ? <LoadingState /> : <>
+                <div className={classes.jobDetailsWrapper}>
+                    {job ?
+                        <>
+                            <JobTitle initialTitle={job.job_title?.S || ''} jobID={jobID} onSave={getJob} />
+                            <div className={classes.flexContainer}>
+                                <div className={classes.videoWrapper}>
+                                    {job.pdf?.M?.name ?
+                                        <PdfViewer
+                                          name={job.pdf.M.name.S}
+                                          jobID={jobID}
+                                          refresh={getJob}
+                                        />
+                                        : <PdfUploader jobID={jobID} refresh={getJob} />
+                                    }
+                                </div>
+                            </div>
+                        </> : <UniversalError message="Unable to access job details" />
+                    }
+                </div>
+                                          </>}
+        </>
+    );
+
     if (job) {
         switch (page) {
             case 'overview':
                 return (<OverviewDetails />);
             case 'estimate':
                 return (<EstimateDetails job={job} />);
+            case 'pdf':
+                return (<PdfDetails />);
             default:
                 return (<OverviewDetails />);
         }

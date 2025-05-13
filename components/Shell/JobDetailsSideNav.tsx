@@ -4,6 +4,7 @@ import {
   IconArrowLeft,
   IconClockQuestion,
   IconListTree,
+  IconFileText,
 } from '@tabler/icons-react';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -12,6 +13,7 @@ import classes from './JobDetailsSideNav.module.css';
 const data = [
   { link: 'overview', label: 'Overview', icon: IconListTree },
   { link: 'estimate', label: 'Estimate Preview', icon: IconClockQuestion },
+  { link: 'pdf', label: 'PDF Documents', icon: IconFileText },
 ];
 
 export function JobDetailsSideNav() {
@@ -44,6 +46,7 @@ export function JobDetailsSideNav() {
           className={classes.link}
           onClick={(event) => {
           event.preventDefault();
+          if (!pathname) return;
           const pathSegments = pathname.split('/');
           pathSegments.pop();
           const newPath = pathSegments.join('/');

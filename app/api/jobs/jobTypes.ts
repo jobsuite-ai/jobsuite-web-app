@@ -1,4 +1,4 @@
-import { JobStatus } from '@/components/Global/model';
+import { TypedDynamoStringReturn, TypedDynamoNumberReturn, JobStatus } from '@/components/Global/model';
 
 export type UpdateJobContent = {
     job_title?: string,
@@ -7,6 +7,8 @@ export type UpdateJobContent = {
     delete_image?: boolean,
     delete_video?: boolean,
     video?: JobVideo,
+    pdf?: JobPdf,
+    delete_pdf?: boolean,
     images?: JobImage[],
     job_status?: JobStatus,
     transcription_summary?: string,
@@ -50,6 +52,12 @@ export type JobVideo = {
     name: string;
     size: number;
     lastModified: number;
+};
+
+export type JobPdf = {
+    name: TypedDynamoStringReturn;
+    size: TypedDynamoNumberReturn;
+    lastModified: TypedDynamoNumberReturn;
 };
 
 export type JobImage = {

@@ -5,7 +5,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 
-import { JobImage, JobLineItem, JobVideo, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent, UpdatePaintDetailsInput } from './jobTypes';
+import { JobImage, JobLineItem, JobVideo, JobPdf, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent, UpdatePaintDetailsInput } from './jobTypes';
 
 import { JobStatus } from '@/components/Global/model';
 
@@ -115,6 +115,8 @@ export async function PUT(request: Request) {
     );
     typedContent.actual_hours && await updateActualHours(jobID, typedContent.actual_hours);
     typedContent.job_crew_lead && await updateJobCrewLead(jobID, typedContent.job_crew_lead);
+    typedContent.pdf && await setPdfFields(jobID, typedContent.pdf);
+    typedContent.delete_pdf && await deletePdf(jobID);
 
     const updateItemCommand = new UpdateItemCommand({
         ExpressionAttributeValues: { ':updated_at': { S: new Date().toISOString() } },
@@ -466,6 +468,48 @@ async function updateJobCrewLead(jobID: string, crewLead: string) {
             UpdateExpression: 'SET job_crew_lead = :cl',
         });
         const { Attributes } = await client.send(updateItemCommand);
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function setPdfFields(jobID: string, pdf: JobPdf) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            ExpressionAttributeValues: {
+                ':p': {
+                    M: {
+                        name: pdf.name,
+                        size: pdf.size,
+                        lastModified: pdf.lastModified,
+                    },
+                },
+            },
+            Key: { id: { S: jobID } },
+            ReturnValues: 'UPDATED_NEW',
+            TableName: 'job',
+            UpdateExpression: 'SET pdf = :p',
+        });
+        const { Attributes } = await client.send(updateItemCommand);
+
+        return Response.json({ Attributes });
+    } catch (error: any) {
+        return Response.json({ error: error.message });
+    }
+}
+
+async function deletePdf(jobID: string) {
+    try {
+        const updateItemCommand = new UpdateItemCommand({
+            Key: { id: { S: jobID } },
+            TableName: 'job',
+            UpdateExpression: 'REMOVE pdf',
+            ReturnValues: 'UPDATED_NEW',
+        });
+
+        const { Attributes } = await client.send(updateItemCommand);
+
         return Response.json({ Attributes });
     } catch (error: any) {
         return Response.json({ error: error.message });

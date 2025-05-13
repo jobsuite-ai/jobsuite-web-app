@@ -72,6 +72,7 @@ export type SingleJob = {
     transcription_summary: TypedDynamoStringReturn;
     user_id: TypedDynamoStringReturn;
     video: TypedDynamoMapReturn<JobVideo>;
+    pdf?: TypedDynamoMapReturn<JobPdf>;
     zip_code: TypedDynamoStringReturn;
     outlook_event_id?: TypedDynamoStringReturn;
     outlook_event_url?: TypedDynamoStringReturn;
@@ -99,13 +100,13 @@ export type SingleComment = {
     timestamp: string;
 };
 
-type TypedDynamoStringReturn = {
+export type TypedDynamoStringReturn = {
     S: string;
 };
-type TypedDynamoBooleanReturn = {
+export type TypedDynamoBooleanReturn = {
     BOOL: boolean;
 };
-type TypedDynamoNumberReturn = {
+export type TypedDynamoNumberReturn = {
     N: string;
 };
 export type TypedDynamoMapReturn<T> = {
@@ -116,6 +117,12 @@ export type TypedDynamoListReturn<T> = {
 };
 
 export type JobVideo = {
+    name: TypedDynamoStringReturn,
+    size: TypedDynamoNumberReturn,
+    lastModified: TypedDynamoNumberReturn
+};
+
+export type JobPdf = {
     name: TypedDynamoStringReturn,
     size: TypedDynamoNumberReturn,
     lastModified: TypedDynamoNumberReturn
