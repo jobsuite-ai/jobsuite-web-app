@@ -17,7 +17,7 @@ interface PresignedPostData {
 }
 
 async function requestPresignedPost(file: File, jobID: string): Promise<PresignedPostData> {
-    const parsedFileName = file.name.replace(' ', '_');
+    const parsedFileName = file.name.replaceAll(' ', '_');
     const response = await fetch(
         '/api/pdfs',
         {
@@ -33,7 +33,8 @@ async function requestPresignedPost(file: File, jobID: string): Promise<Presigne
         throw new Error('Failed to generate presigned URL');
     }
 
-    return response.json();
+    const responseJson = await response.json();
+    return responseJson;
 }
 
 export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh: Function }) {
@@ -52,6 +53,17 @@ export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh
             if (navigator.serviceWorker.controller) {
                 const messageChannel = new MessageChannel();
 
+                // Set up a promise to handle the service worker response
+                const uploadPromise = new Promise((resolve, reject) => {
+                    messageChannel.port1.onmessage = (event) => {
+                        if (event.data.success) {
+                            resolve(true);
+                        } else {
+                            reject(new Error('Upload failed in service worker'));
+                        }
+                    };
+                });
+
                 navigator.serviceWorker.controller.postMessage(
                     {
                         type: 'UPLOAD_FILE',
@@ -66,27 +78,46 @@ export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh
                     [messageChannel.port2]
                 );
 
-                notifications.show({
-                    title: 'PDF upload started',
-                    position: 'top-center',
-                    color: 'green',
-                    message: 'Your PDF is uploading.',
-                });
-                updateJobWithPdf(file);
+                try {
+                    await uploadPromise;
+                    notifications.show({
+                        title: 'PDF upload successful',
+                        position: 'top-center',
+                        color: 'green',
+                        message: 'Your PDF has been uploaded successfully.',
+                    });
+                    await updateJobWithPdf(file);
+                } catch (error) {
+                    throw new Error(`Service worker upload failed: ${error}`);
+                }
             } else {
-                notifications.show({
-                    title: 'Upload Failed',
-                    position: 'top-center',
-                    color: 'red',
-                    message: 'The PDF upload failed, please try again.',
-                });
+                // Try to register the service worker if it's not available
+                try {
+                    const registration = await navigator.serviceWorker.register('/service-worker.js');
+                    await navigator.serviceWorker.ready;
+
+                    if (registration.active) {
+                        // Retry the upload with the newly registered service worker
+                        handleFileUpload(files);
+                    } else {
+                        throw new Error('Service worker not active after registration');
+                    }
+                } catch (error) {
+                    notifications.show({
+                        title: 'Upload Failed',
+                        position: 'top-center',
+                        color: 'red',
+                        message: 'Failed to initialize upload service. Please try again.',
+                    });
+                }
             }
         } catch (error: any) {
+            setPdf(null); // Reset the PDF state on error
             notifications.show({
                 title: 'Upload Failed',
                 position: 'top-center',
                 color: 'red',
-                message: `Error during upload: ${error}`,
+                message: `Error during upload: ${error.message || error}`,
             });
         }
     };

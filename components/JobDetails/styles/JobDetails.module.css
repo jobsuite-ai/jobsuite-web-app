@@ -41,6 +41,7 @@
     margin-top: var(--mantine-spacing-lg); /* Matches 'lg' margin */
     margin-bottom: var(--mantine-spacing-lg);
     width: 930px; /* Fixed width for web version */
+    justify-content: center;
 }
 
 .imageAndHoverContainer {

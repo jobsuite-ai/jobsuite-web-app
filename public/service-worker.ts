@@ -24,16 +24,24 @@ self.addEventListener('message', (event: MessageEvent) => {
             method: 'POST',
             body: formData,
         })
-            .then((response) => {
+            .then(async (response) => {
                 if (response.ok) {
                     event.ports[0].postMessage({ success: true });
                 } else {
-                    event.ports[0].postMessage({ success: false });
+                    const errorText = await response.text();
+                    logToCloudWatch(`Failed to upload file to S3: ${errorText}`);
+                    event.ports[0].postMessage({ 
+                        success: false, 
+                        error: `Upload failed with status ${response.status}: ${errorText}` 
+                    });
                 }
             })
             .catch((error: any) => {
-                logToCloudWatch(`Error uploading video to s3: ${error.stack}`);
-                event.ports[0].postMessage({ success: false });
+                logToCloudWatch(`Error uploading file to S3: ${error.stack}`);
+                event.ports[0].postMessage({ 
+                    success: false, 
+                    error: `Upload failed: ${error.message}` 
+                });
             });
     }
 });
