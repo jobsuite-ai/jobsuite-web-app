@@ -17,7 +17,7 @@ interface PresignedPostData {
 }
 
 async function requestPresignedPost(file: File, jobID: string): Promise<PresignedPostData> {
-    const parsedFileName = file.name.replace(' ', '_');
+    const parsedFileName = file.name.replaceAll(' ', '_');
     const response = await fetch(
         '/api/videos',
         {
@@ -70,7 +70,7 @@ export default function VideoUploader({ jobID, refresh }: { jobID: string, refre
                     title: 'Video upload started',
                     position: 'top-center',
                     color: 'green',
-                    message: 'You video is uploading.',
+                    message: 'Your video is uploading.',
                 });
                 updateJobWithVideo(file);
             } else {

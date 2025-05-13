@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 
 import { Button, Center, Flex, Modal, Paper, Text, Loader } from '@mantine/core';
-import { useParams } from 'next/navigation';
 import { Document, Page, pdfjs } from 'react-pdf';
 import { OnDocumentLoadSuccess } from 'react-pdf/dist/cjs/shared/types';
 
@@ -25,13 +24,12 @@ export function PdfViewer({ name, jobID, refresh }: {
     const [pageNumber, setPageNumber] = useState(1);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const { job_id } = useParams() as any;
 
     useEffect(() => {
         checkIfPdfExists();
     }, []);
 
-    const key = `${job_id}/${name}`;
+    const key = `${jobID}/${name}`;
     const baseCloudFrontURL = 'https://rl-peek-job-pdfs.s3.us-west-2.amazonaws.com/';
 
     async function checkIfPdfExists() {
@@ -44,7 +42,7 @@ export function PdfViewer({ name, jobID, refresh }: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        bucketName: process.env.AWS_PDF_BUCKET_NAME,
+                        bucketName: process.env.AWS_PDF_BUCKET_NAME as string,
                         objectKey: key,
                     }),
                 }
@@ -102,9 +100,9 @@ export function PdfViewer({ name, jobID, refresh }: {
         setError(null);
     };
 
-    const onDocumentLoadError = () => {
+    const onDocumentLoadError = (docError: Error) => {
         setIsLoading(false);
-        setError('Failed to load PDF');
+        setError(`Failed to load PDF: ${docError.message}`);
     };
 
     return (

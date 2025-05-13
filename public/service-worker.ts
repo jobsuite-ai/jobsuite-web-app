@@ -30,17 +30,17 @@ self.addEventListener('message', (event: MessageEvent) => {
                 } else {
                     const errorText = await response.text();
                     logToCloudWatch(`Failed to upload file to S3: ${errorText}`);
-                    event.ports[0].postMessage({ 
-                        success: false, 
-                        error: `Upload failed with status ${response.status}: ${errorText}` 
+                    event.ports[0].postMessage({
+                        success: false,
+                        error: `Upload failed with status ${response.status}: ${errorText}`,
                     });
                 }
             })
             .catch((error: any) => {
                 logToCloudWatch(`Error uploading file to S3: ${error.stack}`);
-                event.ports[0].postMessage({ 
-                    success: false, 
-                    error: `Upload failed: ${error.message}` 
+                event.ports[0].postMessage({
+                    success: false,
+                    error: `Upload failed: ${error.message}`,
                 });
             });
     }

@@ -78,6 +78,13 @@ export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh
                     [messageChannel.port2]
                 );
 
+                notifications.show({
+                    title: 'PDF upload started',
+                    position: 'top-center',
+                    color: 'green',
+                    message: 'Your pdf is uploading.',
+                });
+
                 try {
                     await uploadPromise;
                     notifications.show({
@@ -86,30 +93,17 @@ export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh
                         color: 'green',
                         message: 'Your PDF has been uploaded successfully.',
                     });
-                    await updateJobWithPdf(file);
+                    updateJobWithPdf(file);
                 } catch (error) {
                     throw new Error(`Service worker upload failed: ${error}`);
                 }
             } else {
-                // Try to register the service worker if it's not available
-                try {
-                    const registration = await navigator.serviceWorker.register('/service-worker.js');
-                    await navigator.serviceWorker.ready;
-
-                    if (registration.active) {
-                        // Retry the upload with the newly registered service worker
-                        handleFileUpload(files);
-                    } else {
-                        throw new Error('Service worker not active after registration');
-                    }
-                } catch (error) {
-                    notifications.show({
-                        title: 'Upload Failed',
-                        position: 'top-center',
-                        color: 'red',
-                        message: 'Failed to initialize upload service. Please try again.',
-                    });
-                }
+                notifications.show({
+                    title: 'Upload Failed',
+                    position: 'top-center',
+                    color: 'red',
+                    message: 'Failed to initialize upload service. Please try again.',
+                });
             }
         } catch (error: any) {
             setPdf(null); // Reset the PDF state on error
@@ -126,7 +120,7 @@ export default function PdfUploader({ jobID, refresh }: { jobID: string, refresh
         if (newPdf) {
             const content: UpdateJobContent = {
                 pdf: {
-                    name: { S: newPdf.name },
+                    name: { S: newPdf.name.replaceAll(' ', '_') },
                     size: { N: newPdf.size.toString() },
                     lastModified: { N: newPdf.lastModified.toString() },
                 },
