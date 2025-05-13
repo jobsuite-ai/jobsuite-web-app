@@ -2,16 +2,11 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Center, Flex, Modal, Paper, Text, Loader } from '@mantine/core';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { OnDocumentLoadSuccess } from 'react-pdf/dist/cjs/shared/types';
+import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
 
 import classes from './styles/JobDetails.module.css';
 
 import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
-
-// Initialize PDF.js worker with CDN
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 export function PdfViewer({ name, jobID, refresh }: {
     name: string,
@@ -20,9 +15,6 @@ export function PdfViewer({ name, jobID, refresh }: {
 }) {
     const [objectExists, setObjectExists] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [numPages, setNumPages] = useState<number | null>(null);
-    const [pageNumber, setPageNumber] = useState(1);
-    const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -94,17 +86,6 @@ export function PdfViewer({ name, jobID, refresh }: {
         }
     };
 
-    const onDocumentLoadSuccess: OnDocumentLoadSuccess = (document) => {
-        setNumPages(document.numPages);
-        setIsLoading(false);
-        setError(null);
-    };
-
-    const onDocumentLoadError = (docError: Error) => {
-        setIsLoading(false);
-        setError(`Failed to load PDF: ${docError.message}`);
-    };
-
     return (
         <>
             <Paper shadow="sm" radius="md" withBorder className={classes.videoFrame}>
@@ -118,64 +99,17 @@ export function PdfViewer({ name, jobID, refresh }: {
                             minHeight: '500px',
                             position: 'relative',
                         }}>
-                            {isLoading && (
-                                <Center style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }}>
-                                    <Loader size="xl" />
-                                </Center>
-                            )}
-
                             {error && (
                                 <Text color="red" ta="center" mt="md">
                                     {error}
                                 </Text>
                             )}
 
-                            <Document
-                              file={baseCloudFrontURL + key}
-                              onLoadSuccess={onDocumentLoadSuccess}
-                              onLoadError={onDocumentLoadError}
-                              loading={
-                                    <Center>
-                                        <Loader size="xl" />
-                                    </Center>
-                                }
-                              className="pdf-document"
-                            >
-                                <Page
-                                  pageNumber={pageNumber}
-                                  width={Math.min(800, window.innerWidth - 40)}
-                                  renderTextLayer={false}
-                                  renderAnnotationLayer={false}
-                                />
-                            </Document>
-
-                            {numPages && !error && (
-                                <div style={{ marginTop: '1rem', textAlign: 'center', width: '100%' }}>
-                                    <Text size="sm" mb="xs">
-                                        Page {pageNumber} of {numPages}
-                                    </Text>
-                                    <Flex gap="md" justify="center">
-                                        <Button
-                                          onClick={() =>
-                                            setPageNumber(page => Math.max(1, page - 1))
-                                          }
-                                          disabled={pageNumber <= 1}
-                                          variant="light"
-                                        >
-                                            Previous
-                                        </Button>
-                                        <Button
-                                          onClick={() =>
-                                            setPageNumber(page => Math.min(numPages, page + 1))
-                                          }
-                                          disabled={pageNumber >= numPages}
-                                          variant="light"
-                                        >
-                                            Next
-                                        </Button>
-                                    </Flex>
-                                </div>
-                            )}
+                            <iframe
+                              title={`PDF viewer for ${name}`}
+                              src={baseCloudFrontURL + key}
+                              style={{ width: '100%', height: '800px' }}
+                            />
                         </div>
                         <Flex direction="column" align="center" p="md">
                             <Center>
