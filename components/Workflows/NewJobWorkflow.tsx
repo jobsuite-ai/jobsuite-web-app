@@ -78,41 +78,34 @@ export function NewJobWorkflow() {
                 },
             };
 
-            const response = await fetch(
-                '/api/clients',
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ content, clientID: formValues.client_id }),
-                }
-            );
+            const response = await fetch(`/api/clients/${formValues.client_id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ content }),
+            });
 
             await response.json();
         } else {
-            const response = await fetch(
-                '/api/clients',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-
-                    body: JSON.stringify({
-                        id: formValues.client_id,
-                        jobs: [formValues.jobID],
-                        client_name: formValues.client_name,
-                        address: formValues.client_address,
-                        city: formValues.city,
-                        state: formValues.state,
-                        zip_code: formValues.zip_code,
-                        email: formValues.client_email,
-                        phone_number: formValues.client_phone_number,
-                        timestamp: Date.now(),
-                    }),
-                }
-            );
+            const response = await fetch('/api/clients', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    id: formValues.client_id,
+                    jobs: [formValues.jobID],
+                    client_name: formValues.client_name,
+                    address: formValues.client_address,
+                    city: formValues.city,
+                    state: formValues.state,
+                    zip_code: formValues.zip_code,
+                    email: formValues.client_email,
+                    phone_number: formValues.client_phone_number,
+                    timestamp: Date.now(),
+                }),
+            });
             await response.json();
         }
     }

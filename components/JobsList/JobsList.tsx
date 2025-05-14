@@ -71,13 +71,13 @@ export default function JobsList() {
     async function getJobs() {
         // Get jobs for each status group using the index
         const [columnOneResponse, columnTwoResponse] = await Promise.all([
-            fetch(`/api/jobs/by-status?status=${COLUMN_ONE_STATUSES.join('&status=')}`, {
+            fetch(`/api/jobs?status=${COLUMN_ONE_STATUSES.join('&status=')}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',
                 },
             }),
-            fetch(`/api/jobs/by-status?status=${COLUMN_TWO_STATUSES.join('&status=')}`, {
+            fetch(`/api/jobs?status=${COLUMN_TWO_STATUSES.join('&status=')}`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

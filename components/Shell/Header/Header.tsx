@@ -72,23 +72,20 @@ export function Header() {
   ));
 
   async function getClients() {
-      const response = await fetch(
-          '/api/clients',
-          {
-              method: 'GET',
-              headers: {
-                  'Content-Type': 'application/json',
-              },
-          }
-      );
+    const response = await fetch('/api/clients', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-      const { Items }: { Items: Client[] } = await response.json();
-      setClients(
-        Items.reduce((acc, client) => {
-          acc[client.client_name] = client;
-          return acc;
-        }, {} as Record<string, Client>)
-      );
+    const { Items }: { Items: Client[] } = await response.json();
+    setClients(
+      Items.reduce((acc, client) => {
+        acc[client.client_name] = client;
+        return acc;
+      }, {} as Record<string, Client>)
+    );
   }
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (

@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 import { Badge, Card, Flex, Group, Paper, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
-
 import classes from './Clients.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Client, Job } from '../Global/model';

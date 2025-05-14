@@ -4,514 +4,61 @@ import {
     UpdateItemCommand,
 } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { NextResponse } from 'next/server';
 
 import { JobImage, JobLineItem, JobVideo, JobPdf, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent, UpdatePaintDetailsInput } from './jobTypes';
 
 import { JobStatus } from '@/components/Global/model';
 
+// Mock data
+const mockJobs = [
+  {
+    id: 'job1',
+    job_status: 'NEW_LEAD',
+    job_type: 'PAINTING',
+    client_id: 'client1',
+    client_name: 'John Doe',
+    client_address: '123 Main St',
+    city: 'Seattle',
+    state: 'WA',
+    zip_code: '98101',
+    client_email: 'john@example.com',
+    client_phone_number: '555-0123',
+    hourly_rate: 75,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'job2',
+    job_status: 'IN_PROGRESS',
+    job_type: 'PAINTING',
+    client_id: 'client2',
+    client_name: 'Jane Smith',
+    client_address: '456 Oak Ave',
+    city: 'Seattle',
+    state: 'WA',
+    zip_code: '98102',
+    client_email: 'jane@example.com',
+    client_phone_number: '555-0124',
+    hourly_rate: 80,
+    createdAt: new Date().toISOString(),
+  },
+];
+
 const client = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(client);
 
-export async function POST(request: Request) {
-    try {
-        const {
-            jobID,
-            job_type,
-            client_id,
-            client_name,
-            client_address,
-            city,
-            state,
-            zip_code,
-            client_email,
-            client_phone_number,
-            video,
-            hourly_rate,
-        } = await request.json();
-
-        const command = new PutCommand({
-            TableName: process.env.JOB_TABLE_NAME,
-            Item: {
-                user_id: process.env.RLPP_USER_ID,
-                id: jobID,
-                job_status: JobStatus.NEW_LEAD,
-                createdAt: new Date().toISOString(),
-                job_type,
-                client_id,
-                client_name,
-                client_address,
-                city,
-                state,
-                zip_code,
-                client_email,
-                client_phone_number,
-                video,
-                hourly_rate,
-            },
-        });
-
-        const data = await docClient.send(command);
-        return Response.json({ data });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
+export async function GET() {
+    return NextResponse.json({ Items: mockJobs });
 }
 
-export async function GET() {
-    try {
-        const params = {
-            TableName: 'job',
-            IndexName: 'user_id-job_status-index',
-            KeyConditionExpression: 'user_id = :pk',
-            ExpressionAttributeValues: {
-                ':pk': process.env.RLPP_USER_ID,
-            },
-            ScanIndexForward: true,
-        };
-
-        const { Items } = await docClient.send(new QueryCommand(params));
-
-        return Response.json({ Items });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
+export async function POST(request: Request) {
+    return NextResponse.json({ message: 'This API is not implemented' });
 }
 
 export async function PUT(request: Request) {
-    const { jobID, content } = await request.json();
-    const typedContent: UpdateJobContent = content as UpdateJobContent;
-
-    typedContent.video && await setVideoFields(jobID, typedContent.video);
-    typedContent.images && await addImages(jobID, typedContent.images);
-    typedContent.line_item && await addLineItem(jobID, typedContent.line_item);
-    typedContent.job_status && await setJobStatus(jobID, typedContent.job_status);
-    typedContent.transcription_summary && await updateTrascriptionSummary(
-        jobID,
-        typedContent.transcription_summary
-    );
-    typedContent.estimate_date && await updateEstimateDate(jobID, typedContent.estimate_date);
-    typedContent.delete_line_item !== undefined && await deleteLineItem(
-        jobID,
-        typedContent.delete_line_item
-    );
-    typedContent.delete_image && await deleteAllImages(jobID);
-    typedContent.update_client_details && await updateClientDetails(
-        jobID,
-        typedContent.update_client_details
-    );
-    typedContent.update_client_name && await updateClientName(
-        jobID,
-        typedContent.update_client_name
-    );
-    typedContent.update_hours_and_rate && await updateHoursAndRate(
-        jobID,
-        typedContent.update_hours_and_rate,
-    );
-    typedContent.delete_video && await deleteVideo(jobID);
-    typedContent.job_title && await updateJobTitle(jobID, typedContent.job_title);
-    typedContent.update_paint_details && await updatePaintDetails(
-        jobID,
-        typedContent.update_paint_details,
-    );
-    typedContent.actual_hours && await updateActualHours(jobID, typedContent.actual_hours);
-    typedContent.job_crew_lead && await updateJobCrewLead(jobID, typedContent.job_crew_lead);
-    typedContent.pdf && await setPdfFields(jobID, typedContent.pdf);
-    typedContent.delete_pdf && await deletePdf(jobID);
-
-    const updateItemCommand = new UpdateItemCommand({
-        ExpressionAttributeValues: { ':updated_at': { S: new Date().toISOString() } },
-        Key: { id: { S: jobID } },
-        ReturnValues: 'UPDATED_NEW',
-        TableName: 'job',
-        UpdateExpression: 'SET updated_at = :updated_at',
-    });
-    await client.send(updateItemCommand);
-
-    return Response.json({ error: 'Not handled yet' });
+    return NextResponse.json({ message: 'This API is not implemented' });
 }
 
 export async function DELETE(request: Request) {
-    const { jobID } = await request.json();
-
-    try {
-        const deleteCommand = new DeleteItemCommand({
-            TableName: process.env.JOB_TABLE_NAME,
-            Key: {
-                id: { S: jobID },
-            },
-        });
-
-        const { Attributes } = await client.send(deleteCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function deleteVideo(jobID: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            Key: { id: { S: jobID } },
-            TableName: 'job',
-            UpdateExpression: 'REMOVE video, transcription_summary, spanish_transcription',
-            ReturnValues: 'UPDATED_NEW',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function deleteLineItem(jobID: string, index: number) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            Key: { id: { S: jobID } },
-            TableName: 'job',
-            UpdateExpression: `REMOVE line_items[${index}]`,
-            ReturnValues: 'UPDATED_NEW',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function addLineItem(jobID: string, lineItem: JobLineItem) {
-    try {
-        const updatedLineItem = {
-            M: {
-                id: { S: lineItem.id },
-                header: { S: lineItem.header },
-                description: { S: lineItem.description },
-                price: { N: lineItem.price.toString() },
-                hours: { N: lineItem.hours.toString() },
-            },
-        };
-
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':new_line_items': {
-                    L: [updatedLineItem],
-                },
-                ':empty_list': {
-                    L: [],
-                },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET line_items = list_append(if_not_exists(line_items, :empty_list), :new_line_items)',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateClientName(jobID: string, clientName: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':name': { S: clientName } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET client_name = :name',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateClientDetails(jobID: string, clientDetails: UpdateClientDetailsInput) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':city': { S: clientDetails.city },
-                ':zc': { S: clientDetails.zip_code },
-                ':ca': { S: clientDetails.client_address },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: `
-                SET city = :city,
-                zip_code = :zc,
-                client_address = :ca
-            `,
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function setJobStatus(jobID: string, jobStatus: JobStatus) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':status': { S: jobStatus } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET job_status = :status',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateTrascriptionSummary(jobID: string, transcriptionSummary: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':summary': { S: transcriptionSummary } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET transcription_summary = :summary',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateEstimateDate(jobID: string, estimateDate: any) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':estimate_date': { S: estimateDate } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET estimate_date = :estimate_date',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateHoursAndRate(jobID: string, hoursAndRate: UpdateHoursAndRateInput) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':eh': { N: hoursAndRate.hours },
-                ':hr': { N: hoursAndRate.rate },
-                ':d': { S: hoursAndRate.date },
-                ':dr': { S: hoursAndRate.discount_reason ?? '' },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET estimate_hours = :eh, hourly_rate = :hr, estimate_date = :d, discount_reason = :dr',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function setVideoFields(jobID: string, video: JobVideo) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':v': {
-                    M: {
-                        name: { S: video.name.toString() },
-                        size: { N: video.size.toString() },
-                        lastModified: { N: video.lastModified.toString() },
-                    },
-                },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET video = :v',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function addImages(jobID: string, images: JobImage[]) {
-    try {
-        const imageObject = new Array<any>();
-        images.forEach((image: JobImage) => {
-            imageObject.push({
-                M: {
-                    name: { S: image.name.toString() },
-                    size: { N: image.size.toString() },
-                    lastModified: { N: image.lastModified.toString() },
-                },
-            });
-        });
-
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':i': {
-                    L: imageObject,
-                },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET images = :i',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function deleteAllImages(jobID: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            Key: { id: { S: jobID } },
-            TableName: 'job',
-            UpdateExpression: 'REMOVE images',
-            ReturnValues: 'UPDATED_NEW',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateJobTitle(jobID: string, jobTitle: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':title': { S: jobTitle } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET job_title = :title',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updatePaintDetails(jobID: string, paintDetails: UpdatePaintDetailsInput) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':keep_same_colors': { BOOL: paintDetails.keep_same_colors },
-                ':has_existing_paint': { BOOL: paintDetails.has_existing_paint },
-                ':paint_details': { S: paintDetails.paint_details },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET keep_same_colors = :keep_same_colors, has_existing_paint = :has_existing_paint, paint_details = :paint_details',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateActualHours(jobID: string, actualHours: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':ah': { N: actualHours } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET actual_hours = :ah',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function updateJobCrewLead(jobID: string, crewLead: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: { ':cl': { S: crewLead } },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET job_crew_lead = :cl',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function setPdfFields(jobID: string, pdf: JobPdf) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            ExpressionAttributeValues: {
-                ':p': {
-                    M: {
-                        name: pdf.name,
-                        size: pdf.size,
-                        lastModified: pdf.lastModified,
-                    },
-                },
-            },
-            Key: { id: { S: jobID } },
-            ReturnValues: 'UPDATED_NEW',
-            TableName: 'job',
-            UpdateExpression: 'SET pdf = :p',
-        });
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
-}
-
-async function deletePdf(jobID: string) {
-    try {
-        const updateItemCommand = new UpdateItemCommand({
-            Key: { id: { S: jobID } },
-            TableName: 'job',
-            UpdateExpression: 'REMOVE pdf',
-            ReturnValues: 'UPDATED_NEW',
-        });
-
-        const { Attributes } = await client.send(updateItemCommand);
-
-        return Response.json({ Attributes });
-    } catch (error: any) {
-        return Response.json({ error: error.message });
-    }
+    return NextResponse.json({ message: 'This API is not implemented' });
 }
