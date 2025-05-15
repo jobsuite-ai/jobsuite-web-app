@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
+
+import { TextInput, PasswordInput, Button, Paper, Title, Container } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useRouter } from 'next/navigation';
+
 import { encryptPassword } from '@/app/utils/encryption';
 
 export default function LoginPage() {

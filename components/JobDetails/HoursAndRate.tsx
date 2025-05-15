@@ -8,7 +8,6 @@ import { DatePickerInput, DateValue } from '@mantine/dates';
 import { IconEdit, IconCalendarEvent } from '@tabler/icons-react';
 import '@mantine/dates/styles.css';
 
-import ScheduleOutlookEvent from './ScheduleOutlookEvent';
 import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import classes from './styles/HoursAndRate.module.css';
@@ -94,10 +93,6 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         setEdit(false);
     };
 
-    const handleEventCreated = (eventUrl: string) => {
-        window.open(eventUrl, '_blank');
-    };
-
     return (
         <Card
           shadow="sm"
@@ -166,14 +161,6 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                                     View Scheduled Event
                                 </Button>
                             )}
-                            <ScheduleOutlookEvent
-                              existingEvent={Boolean(job.outlook_event_url?.S)}
-                              jobId={job.id.S}
-                              clientId={job.client_id.S}
-                              clientName={job.client_name?.S}
-                              jobTitle={job.job_title?.S}
-                              onEventCreated={handleEventCreated}
-                            />
                         </Flex>
                     </Flex>
                 </>

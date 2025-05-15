@@ -1,14 +1,4 @@
-import {
-    DeleteItemCommand,
-    DynamoDBClient,
-    UpdateItemCommand,
-} from '@aws-sdk/client-dynamodb';
-import { PutCommand, DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { NextResponse } from 'next/server';
-
-import { JobImage, JobLineItem, JobVideo, JobPdf, UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent, UpdatePaintDetailsInput } from './jobTypes';
-
-import { JobStatus } from '@/components/Global/model';
 
 // Mock data
 const mockJobs = [
@@ -44,21 +34,18 @@ const mockJobs = [
   },
 ];
 
-const client = new DynamoDBClient({});
-const docClient = DynamoDBDocumentClient.from(client);
-
 export async function GET() {
     return NextResponse.json({ Items: mockJobs });
 }
 
-export async function POST(request: Request) {
+export async function POST() {
     return NextResponse.json({ message: 'This API is not implemented' });
 }
 
-export async function PUT(request: Request) {
+export async function PUT() {
     return NextResponse.json({ message: 'This API is not implemented' });
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE() {
     return NextResponse.json({ message: 'This API is not implemented' });
 }

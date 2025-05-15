@@ -7,7 +7,7 @@ export async function encryptPassword(password: string): Promise<string> {
   try {
     // Convert the public key from base64 to ArrayBuffer
     const keyData = Buffer.from(PUBLIC_KEY, 'base64');
-    
+
     // Import the public key
     const publicKey = await window.crypto.subtle.importKey(
       'spki',
@@ -38,4 +38,4 @@ export async function encryptPassword(password: string): Promise<string> {
     console.error('Encryption error:', error);
     throw new Error('Failed to encrypt password');
   }
-} 
+}

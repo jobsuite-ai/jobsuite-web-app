@@ -32,7 +32,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       return NextResponse.json(
-        { message: data.message || 'Login failed: ' + data.error },
+        { message: data.message || `Login failed: ${data.error}` },
         { status: response.status }
       );
     }
