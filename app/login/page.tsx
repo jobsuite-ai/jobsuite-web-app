@@ -19,15 +19,12 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Encrypt the password before sending
-      const encryptedPassword = await encryptPassword(password);
-
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password: encryptedPassword }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
