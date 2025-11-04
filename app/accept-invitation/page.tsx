@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
-import { TextInput, PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
+import { Button, Container, Paper, PasswordInput, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { jwtVerify, importSPKI } from 'jose';
+import { importSPKI, jwtVerify } from 'jose';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 interface TokenPayload {
@@ -32,7 +32,7 @@ async function verifyToken(token: string): Promise<TokenPayload> {
   }
 }
 
-export default function AcceptInvitationPage() {
+function AcceptInvitationContent() {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -174,5 +174,17 @@ export default function AcceptInvitationPage() {
         </form>
       </Paper>
     </Container>
+  );
+}
+
+export default function AcceptInvitationPage() {
+  return (
+    <Suspense fallback={
+      <Container size={420} my={40}>
+        <Text ta="center">Loading...</Text>
+      </Container>
+    }>
+      <AcceptInvitationContent />
+    </Suspense>
   );
 }

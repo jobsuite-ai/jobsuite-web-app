@@ -9,7 +9,8 @@
   "editor.codeActionsOnSave": {
     "source.fixAll": "always",
     "source.fixAll.eslint": "always",
-    "source.organizeImports": "explicit"
+    "source.organizeImports": "explicit",
+    "source.fixAll.stylelint": "always"
   },
   "eslint.validate": [
     "javascript",
@@ -17,8 +18,14 @@
     "typescript",
     "typescriptreact"
   ],
-  "editor.autoFixOnSave": true,
   "eslint.enable": true,
+  "eslint.useESLintClass": true,
+  "eslint.experimental.useFlatConfig": false,
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
   "editor.formatOnSave": false,
   "editor.defaultFormatter": "dbaeumer.vscode-eslint",
   "javascript.format.enable": false,
@@ -27,17 +34,30 @@
     "editor.formatOnSave": false
   },
   "[typescript]": {
-    "editor.formatOnSave": false
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
   },
   "[javascriptreact]": {
     "editor.formatOnSave": false
   },
   "[typescriptreact]": {
-    "editor.formatOnSave": false
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
   },
+  "[css]": {
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.stylelint": "always"
+    }
+  },
+  "stylelint.enable": true,
+  "stylelint.validate": [
+    "css",
+    "scss"
+  ],
   "cSpell.words": [
     "pdfs"
   ]
