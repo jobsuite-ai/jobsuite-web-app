@@ -1,9 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+
 import { Container, Title, Text, Tabs, Loader, Center } from '@mantine/core';
+import { useSearchParams, useRouter } from 'next/navigation';
+
 import AcceptInvitation from './accept-invitation/page';
+
 import LoginForm from '@/components/AuthButtons/LoginForm';
 import RegisterForm from '@/components/AuthButtons/RegisterForm';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,7 +23,7 @@ export default function HomePage() {
 
   // Check if user is authenticated and redirect to profile if so
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
-  
+
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated) {
       router.push('/profile');
