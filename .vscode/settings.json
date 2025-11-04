@@ -9,7 +9,7 @@
   "editor.codeActionsOnSave": {
     "source.fixAll": "always",
     "source.fixAll.eslint": "always",
-    "source.organizeImports": "never"
+    "source.organizeImports": "explicit"
   },
   "eslint.validate": [
     "javascript",
