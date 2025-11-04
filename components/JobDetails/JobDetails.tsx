@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import { Button, Center, Flex, Modal, Text } from '@mantine/core';
 import { IconArchive, IconFileText, IconPencil } from '@tabler/icons-react';
@@ -29,7 +29,7 @@ import VideoUploader from './VideoUploader';
 
 import { VideoFrame } from '@/components/JobDetails/VideoFrame';
 
-export default function JobDetails({ jobID }: { jobID: string }) {
+function JobDetailsContent({ jobID }: { jobID: string }) {
     const [loading, setLoading] = useState(true);
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -254,4 +254,12 @@ export default function JobDetails({ jobID }: { jobID: string }) {
     }
 
     return (<OverviewDetails />);
+}
+
+export default function JobDetails({ jobID }: { jobID: string }) {
+    return (
+        <Suspense fallback={<LoadingState />}>
+            <JobDetailsContent jobID={jobID} />
+        </Suspense>
+    );
 }

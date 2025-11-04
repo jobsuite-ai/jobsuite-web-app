@@ -2,10 +2,10 @@
 
 import { Loader, Center } from '@mantine/core';
 
-import JobsList from '@/components/JobsList/JobsList';
+import EstimatesList from '@/components/EstimatesList/EstimatesList';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function Jobs() {
+export default function Estimates() {
     const { isLoading } = useAuth({ requireAuth: true });
 
     if (isLoading) {
@@ -16,5 +16,5 @@ export default function Jobs() {
         );
     }
 
-    return <JobsList />;
+    return <EstimatesList />;
 }

@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 
+const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
+    ? 'https://api.jobsuite.app'
+    : 'https://qa.api.jobsuite.app';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -20,7 +24,8 @@ export async function POST(request: Request) {
     formData.append('client_id', 'string');
     formData.append('client_secret', 'string');
 
-    const response = await fetch('https://qa.api.jobsuite.app/api/v1/auth/login', {
+    const apiBaseUrl = getApiBaseUrl();
+    const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
