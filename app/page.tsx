@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 
-import { Container, Title, Text, Tabs, Loader, Center } from '@mantine/core';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { Center, Container, Loader, Tabs, Text, Title } from '@mantine/core';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 import AcceptInvitation from './accept-invitation/page';
 
@@ -11,7 +11,7 @@ import LoginForm from '@/components/AuthButtons/LoginForm';
 import RegisterForm from '@/components/AuthButtons/RegisterForm';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function HomePage() {
+function HomePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
@@ -62,5 +62,17 @@ export default function HomePage() {
         </Tabs.Panel>
       </Tabs>
     </Container>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <Suspense fallback={
+      <Center style={{ minHeight: '100vh' }}>
+        <Loader size="xl" />
+      </Center>
+    }>
+      <HomePageContent />
+    </Suspense>
   );
 }
