@@ -1,11 +1,10 @@
 'use client';
 
-import { Container, Title, Text, Button, Paper } from '@mantine/core';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Container, Title, Text } from '@mantine/core';
 import { IconExclamationCircle } from '@tabler/icons-react';
+import { useSearchParams } from 'next/navigation';
 
 export default function ErrorPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const message = searchParams.get('message') || 'An error occurred';
 
@@ -20,4 +19,4 @@ export default function ErrorPage() {
       </Text>
     </Container>
   );
-} 
+}

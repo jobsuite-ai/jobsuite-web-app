@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+
 import { TextInput, PasswordInput, Button, Paper, Title, Container, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { useRouter } from 'next/navigation';
 import { jwtVerify, importSPKI } from 'jose';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface TokenPayload {
   exp: number;
@@ -23,9 +23,9 @@ async function verifyToken(token: string): Promise<TokenPayload> {
   try {
     const publicKey = await importSPKI(JWT_PUBLIC_KEY, 'RS256');
     const { payload } = await jwtVerify(token, publicKey, {
-      algorithms: ['RS256']
+      algorithms: ['RS256'],
     });
-    
+
     return payload as unknown as TokenPayload;
   } catch (error) {
     throw new Error(`Invalid token format: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -53,14 +53,14 @@ export default function AcceptInvitationPage() {
       try {
         // Verify the JWT token
         const decoded = await verifyToken(token);
-        
+
         // Check if token is expired
         const expiryDate = new Date(decoded.exp * 1000); // Convert Unix timestamp to milliseconds
         if (expiryDate < new Date()) {
           router.push('/error?message=Invitation token has expired');
           return;
         }
-        
+
         setEmail(decoded.email);
         setFullName(decoded.full_name);
         setTokenValid(true);
@@ -101,7 +101,8 @@ export default function AcceptInvitationPage() {
         throw new Error(data.message || 'Failed to set up password');
       }
 
-      const data = await response.json();
+      await response.json();
+
       notifications.show({
         title: 'Success',
         message: 'Password set up successfully',

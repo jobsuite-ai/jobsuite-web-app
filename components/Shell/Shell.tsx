@@ -6,7 +6,7 @@ import { Header } from './Header/Header';
 import classes from './Shell.module.css';
 
 export function Shell({ children }: { children: any }) {
-  const pathname = usePathname();
+  usePathname();
 
   return (
     <div className={classes.verticalWrapper}>

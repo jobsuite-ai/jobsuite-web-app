@@ -2,8 +2,8 @@
 
 import { Loader, Center } from '@mantine/core';
 
-import { useAuth } from '@/hooks/useAuth';
 import JobsList from '@/components/JobsList/JobsList';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Jobs() {
     const { isLoading } = useAuth({ requireAuth: true });

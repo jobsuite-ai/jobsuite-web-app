@@ -13,10 +13,10 @@ export default function IOSAppRedirectPage() {
       </Text>
 
       <Paper withBorder shadow="md" p={30} mt={30} radius="md">
-        <Button 
-          fullWidth 
-          component="a" 
-          href="https://apps.apple.com/app/jobsuite" 
+        <Button
+          fullWidth
+          component="a"
+          href="https://apps.apple.com/app/jobsuite"
           target="_blank"
           mb="md"
         >
@@ -25,4 +25,4 @@ export default function IOSAppRedirectPage() {
       </Paper>
     </Container>
   );
-} 
+}

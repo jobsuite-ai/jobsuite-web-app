@@ -70,9 +70,8 @@ export default function EstimatesList() {
     async function getJobs() {
         // Get access token from localStorage
         const accessToken = localStorage.getItem('access_token');
-        
+
         if (!accessToken) {
-            console.error('No access token found');
             return;
         }
 
@@ -80,13 +79,12 @@ export default function EstimatesList() {
         const response = await fetch('/api/estimates', {
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                Authorization: `Bearer ${accessToken}`,
                 'Content-Type': 'application/json',
             },
         });
 
         if (!response.ok) {
-            console.error('Failed to fetch estimates:', response.statusText);
             return;
         }
 

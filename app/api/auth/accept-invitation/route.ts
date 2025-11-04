@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const getApiBaseUrl = () => {
-  return process.env.NODE_ENV === 'production'
+const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
     ? 'https://api.jobsuite.app'
     : 'https://qa.api.jobsuite.app';
-};
 
 export async function POST(request: Request) {
   try {
@@ -29,12 +27,6 @@ export async function POST(request: Request) {
 
     // Get the raw text first to check what we're receiving
     const rawText = await response.text();
-    console.log('Backend response:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries()),
-      body: rawText
-    });
 
     let data;
     try {
@@ -45,28 +37,28 @@ export async function POST(request: Request) {
         // Check if the error is an EmailTokenVerificationError
         if (rawText.includes('EmailTokenVerificationError')) {
           return NextResponse.json(
-            { 
+            {
               message: 'Invalid or expired invitation token',
               details: rawText,
-              error: 'TOKEN_VERIFICATION_ERROR'
+              error: 'TOKEN_VERIFICATION_ERROR',
             },
             { status: 400 }
           );
         }
         return NextResponse.json(
-          { 
-            message: 'Backend server error occurred', 
+          {
+            message: 'Backend server error occurred',
             details: rawText,
-            error: 'BACKEND_ERROR'
+            error: 'BACKEND_ERROR',
           },
           { status: 500 }
         );
       }
       return NextResponse.json(
-        { 
-          message: 'Invalid response from server', 
+        {
+          message: 'Invalid response from server',
           rawResponse: rawText,
-          error: 'INVALID_RESPONSE'
+          error: 'INVALID_RESPONSE',
         },
         { status: 500 }
       );
@@ -76,19 +68,19 @@ export async function POST(request: Request) {
       // Handle validation errors (422)
       if (response.status === 422 && data.detail) {
         return NextResponse.json(
-          { 
+          {
             message: data.detail[0]?.msg || 'Invalid password format',
-            error: 'VALIDATION_ERROR'
+            error: 'VALIDATION_ERROR',
           },
           { status: 422 }
         );
       }
-      
+
       // Handle other errors
       return NextResponse.json(
-        { 
+        {
           message: data.message || `Failed to create user: ${data.error}`,
-          error: 'REQUEST_ERROR'
+          error: 'REQUEST_ERROR',
         },
         { status: response.status }
       );

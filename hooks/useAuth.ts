@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+
 import { useRouter } from 'next/navigation';
 
 export interface User {
@@ -27,7 +28,7 @@ export interface UseAuthReturn {
 
 /**
  * Custom hook for handling job engine authentication
- * 
+ *
  * @param options Configuration options
  * @returns Auth state including user, loading, and error states
  */
@@ -52,7 +53,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         // No token
         setIsAuthenticated(false);
         setIsLoading(false);
-        
+
         if (requireAuth) {
           router.push(redirectTo);
         }
@@ -64,7 +65,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         const response = await fetch('/api/auth/me', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         });
@@ -75,7 +76,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
           localStorage.removeItem('refresh_token');
           setIsAuthenticated(false);
           setIsLoading(false);
-          
+
           if (requireAuth) {
             router.push(redirectTo);
           } else {
@@ -96,15 +97,14 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         setIsLoading(false);
       } catch (err) {
         // Error checking token
-        console.error('Error checking auth token:', err);
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setIsAuthenticated(false);
         setIsLoading(false);
-        
+
         const errorMessage = err instanceof Error ? err.message : 'An error occurred while checking authentication';
         setError(errorMessage);
-        
+
         if (requireAuth) {
           router.push(redirectTo);
         }

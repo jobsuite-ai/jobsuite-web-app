@@ -2,8 +2,8 @@
 
 import { Loader, Center } from '@mantine/core';
 
-import { useAuth } from '@/hooks/useAuth';
 import EstimatesList from '@/components/EstimatesList/EstimatesList';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Estimates() {
     const { isLoading } = useAuth({ requireAuth: true });

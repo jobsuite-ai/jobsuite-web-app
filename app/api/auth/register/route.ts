@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 
-const getApiBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_ENV === 'production'
+const getApiBaseUrl = () => process.env.NEXT_PUBLIC_ENV === 'production'
     ? 'https://api.jobsuite.app'
     : 'https://qa.api.jobsuite.app';
-};
 
 export async function POST(request: Request) {
   try {

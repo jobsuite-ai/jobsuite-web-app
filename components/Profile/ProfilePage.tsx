@@ -1,14 +1,14 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { Loader, rem, Container, Title, Text, Paper, Button } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useRouter } from 'next/navigation';
 
 import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, isLoading, error } = useAuth({ 
+  const { user, isLoading, error } = useAuth({
     requireAuth: true,
     fetchUser: true,
   });

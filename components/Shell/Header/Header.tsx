@@ -1,6 +1,7 @@
 'use client';
 
 import { MouseEvent, useEffect, useState } from 'react';
+
 import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, Menu, rem } from '@mantine/core';
 import { IconSearch, IconUser, IconChevronDown } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -88,7 +89,7 @@ export function Header() {
       const response = await fetch('/api/clients', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
         },
       });
@@ -166,7 +167,9 @@ export function Header() {
                 className={classes.search}
                 placeholder="Search by client name"
                 value={autocompleteValue}
-                leftSection={<IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />}
+                leftSection={
+                  <IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />
+                }
                 renderOption={renderAutocompleteOption}
                 data={data}
                 visibleFrom="xs"

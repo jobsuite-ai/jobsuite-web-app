@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 
-const getApiBaseUrl = () => {
-  return process.env.NODE_ENV === 'production'
+const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
     ? 'https://api.jobsuite.app'
     : 'https://qa.api.jobsuite.app';
-};
 
 export async function GET(request: Request) {
   try {
     // Get the access token from the Authorization header
     const authHeader = request.headers.get('Authorization');
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { message: 'Authorization header missing or invalid' },
@@ -21,12 +19,12 @@ export async function GET(request: Request) {
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     const apiBaseUrl = getApiBaseUrl();
-    
+
     // Get user info to obtain contractor_id
     const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -76,7 +74,7 @@ export async function GET(request: Request) {
     const estimatesResponse = await fetch(estimatesUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -106,7 +104,7 @@ export async function POST(request: Request) {
   try {
     // Get the access token from the Authorization header
     const authHeader = request.headers.get('Authorization');
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { message: 'Authorization header missing or invalid' },
@@ -116,12 +114,12 @@ export async function POST(request: Request) {
 
     const token = authHeader.substring(7);
     const apiBaseUrl = getApiBaseUrl();
-    
+
     // Get user info to obtain contractor_id
     const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
@@ -158,7 +156,7 @@ export async function POST(request: Request) {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -176,7 +174,6 @@ export async function POST(request: Request) {
     const estimate = await createResponse.json();
     return NextResponse.json(estimate, { status: 201 });
   } catch (error) {
-    console.error('Create estimate error:', error);
     return NextResponse.json(
       { message: 'An error occurred while creating estimate' },
       { status: 500 }
@@ -184,10 +181,10 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT() {
   return NextResponse.json({ message: 'PUT method not implemented. Use POST with estimate_id in path' }, { status: 501 });
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE() {
   return NextResponse.json({ message: 'DELETE method not implemented. Use DELETE with estimate_id in path' }, { status: 501 });
 }
