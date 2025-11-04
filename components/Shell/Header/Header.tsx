@@ -2,8 +2,8 @@
 
 import { MouseEvent, useEffect, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Text, Menu, rem } from '@mantine/core';
-import { IconSearch, IconUser, IconChevronDown } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Menu, rem, Text } from '@mantine/core';
+import { IconChevronDown, IconSearch, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -19,6 +19,7 @@ interface Client {
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
   { link: '/clients', label: 'Clients' },
+  { link: '/estimates', label: 'Estimates' },
   { link: '/add-job', label: 'Add Job' },
 ];
 
@@ -82,32 +83,29 @@ export function Header() {
   ));
 
   async function getClients() {
-    try {
-      const accessToken = localStorage.getItem('access_token');
-      if (!accessToken) return;
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
 
-      const response = await fetch('/api/clients', {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+    const response = await fetch('/api/clients', {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
 
-      if (!response.ok) {
-        console.error('Failed to fetch clients');
-        return;
-      }
+    if (!response.ok) {
+      return;
+    }
 
-      const { Items }: { Items: Client[] } = await response.json();
+    const { Items }: { Items: Client[] } = await response.json();
+    if (Items && Items.length > 0) {
       setClients(
         Items.reduce((acc, client) => {
           acc[client.client_name] = client;
           return acc;
         }, {} as Record<string, Client>)
       );
-    } catch (error) {
-      console.error('Error fetching clients:', error);
     }
   }
 
