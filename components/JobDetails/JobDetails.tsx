@@ -6,11 +6,11 @@ import { Button, Center, Flex, Modal, Text } from '@mantine/core';
 import { IconArchive, IconFileText, IconPencil } from '@tabler/icons-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import ClientDetails from './ClientDetails';
 import LoadingState from '../Global/LoadingState';
 import { JobStatus, SingleJob } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import updateJobStatus from '../Global/updateJobStatus';
-import ClientDetails from './ClientDetails';
 import JobComments from './comments/JobComments';
 import DescriptionOfWork from './DescriptionOfWork';
 import EstimateDetails from './estimate/EstimateDetails';
