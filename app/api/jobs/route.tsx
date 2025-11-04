@@ -5,7 +5,7 @@ const mockJobs = [
   {
     id: 'job1',
     job_status: 'NEW_LEAD',
-    job_type: 'PAINTING',
+    job_type: 'Exterior',
     client_id: 'client1',
     client_name: 'John Doe',
     client_address: '123 Main St',
@@ -20,7 +20,7 @@ const mockJobs = [
   {
     id: 'job2',
     job_status: 'IN_PROGRESS',
-    job_type: 'PAINTING',
+    job_type: 'Interior',
     client_id: 'client2',
     client_name: 'Jane Smith',
     client_address: '456 Oak Ave',

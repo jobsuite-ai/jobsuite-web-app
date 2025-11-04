@@ -4,9 +4,6 @@ import { Buffer } from 'buffer';
 const PUBLIC_KEY = process.env.NEXT_PUBLIC_ENCRYPTION_KEY || '';
 
 function pemToArrayBuffer(pem: string) {
-  console.log('Input PEM:', pem);
-  console.log('Input PEM length:', pem.length);
-  console.log('Input PEM starts with:', pem.substring(0, 50));
 
   // Extract the base64 content between the markers, handling both single-line and multi-line formats
   const matches = pem.match(/-----BEGIN PUBLIC KEY-----(?:[\r\n]+)?([\s\S]*?)(?:[\r\n]+)?-----END PUBLIC KEY-----/);
@@ -17,14 +14,9 @@ function pemToArrayBuffer(pem: string) {
   // Get the base64 content and remove any whitespace
   const base64 = matches[1].replace(/\s/g, '');
   
-  console.log('Base64 length:', base64.length);
-  console.log('Base64 starts with:', base64.substring(0, 50));
 
   // Decode base64 to binary
   const binary = atob(base64);
-  console.log('Binary length:', binary.length);
-  console.log('First few bytes:', Array.from(binary.slice(0, 10)).map(b => b.charCodeAt(0)));
-
   // Check if the key already has the SPKI wrapper (starts with sequence 0x30)
   const firstByte = binary.charCodeAt(0);
   let finalBinary = binary;
@@ -46,9 +38,6 @@ function pemToArrayBuffer(pem: string) {
     view[i] = finalBinary.charCodeAt(i);
   }
 
-  console.log('Final buffer length:', buffer.byteLength);
-  console.log('First few bytes of buffer:', Array.from(new Uint8Array(buffer.slice(0, 10))));
-
   return buffer;
 }
 
@@ -67,14 +56,12 @@ export async function encryptPassword(password: string): Promise<string> {
     try {
       keyData = pemToArrayBuffer(PUBLIC_KEY);
     } catch (error) {
-      console.error('Key parsing error:', error);
       throw new Error('Invalid encryption key format. Key must be base64 encoded.');
     }
 
     // Import the public key
     let publicKey: CryptoKey;
     try {
-      console.log('Attempting to import key...');
       publicKey = await window.crypto.subtle.importKey(
         'spki',
         keyData,
@@ -85,13 +72,7 @@ export async function encryptPassword(password: string): Promise<string> {
         false,
         ['encrypt']
       );
-      console.log('Key imported successfully');
     } catch (error) {
-      console.error('Key import error details:', error);
-      if (error instanceof Error) {
-        console.error('Error name:', error.name);
-        console.error('Error message:', error.message);
-      }
       throw new Error('Invalid RSA public key format. Key must be in SPKI format.');
     }
 
@@ -110,7 +91,6 @@ export async function encryptPassword(password: string): Promise<string> {
     // Convert the encrypted data to base64
     return Buffer.from(encryptedBuffer).toString('base64');
   } catch (error) {
-    console.error('Encryption error:', error);
     throw error; // Throw the original error for better debugging
   }
 }

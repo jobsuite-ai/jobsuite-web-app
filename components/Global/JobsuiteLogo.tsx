@@ -1,14 +1,14 @@
 import { Image } from '@mantine/core';
 
-import classes from './RLPPLogo.module.css';
+import classes from './JobsuiteLogo.module.css';
 
-export function RLPPLogo() {
+export function JobsuiteLogo() {
   return (
     <Image
       h="60px"
       w="auto"
       className={classes.image}
-      src="/RLPP_logo.png"
+      src="/jobsuite-logo-horizontal.png"
     />
   );
 }
