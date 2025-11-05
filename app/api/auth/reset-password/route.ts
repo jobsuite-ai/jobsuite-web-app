@@ -95,7 +95,3 @@ export async function POST(request: Request) {
     );
   }
 }
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
