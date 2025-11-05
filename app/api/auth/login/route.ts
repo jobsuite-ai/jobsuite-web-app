@@ -7,7 +7,7 @@ const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password: encryptedPassword } = body;
+    const { email, password: encryptedPassword, remember_me } = body;
 
     if (!email || !encryptedPassword) {
       return NextResponse.json(
@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     formData.append('client_secret', 'string');
 
     const apiBaseUrl = getApiBaseUrl();
-    const response = await fetch(`${apiBaseUrl}/api/v1/auth/login`, {
+    // Add remember_me as query parameter
+    const rememberMeParam = remember_me ? '?remember_me=true' : '';
+    const response = await fetch(`${apiBaseUrl}/api/v1/auth/login${rememberMeParam}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',

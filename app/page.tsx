@@ -1,8 +1,8 @@
 'use client';
 
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
-import { Center, Container, Loader, Tabs, Text, Title } from '@mantine/core';
+import { Center, Container, Loader, Title } from '@mantine/core';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import AcceptInvitation from './accept-invitation/page';
@@ -15,6 +15,7 @@ function HomePageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
+  const [showRegister, setShowRegister] = useState(false);
 
   // If there's a token in the URL, show the accept-invitation page
   if (token) {
@@ -40,27 +41,14 @@ function HomePageContent() {
 
   return (
     <Container size={420} my={40}>
-      <Title ta="center" fw={900}>
+      <Title ta="center" fw={700} mb="md">
         Welcome to JobSuite
       </Title>
-      <Text ta="center" c="dimmed" size="sm" mt={5} mb={30}>
-        Log in to your account or create a new contractor account
-      </Text>
-
-      <Tabs defaultValue="login">
-        <Tabs.List>
-          <Tabs.Tab value="login">Log In</Tabs.Tab>
-          <Tabs.Tab value="register">Create Account</Tabs.Tab>
-        </Tabs.List>
-
-        <Tabs.Panel value="login" pt="xl">
-          <LoginForm />
-        </Tabs.Panel>
-
-        <Tabs.Panel value="register" pt="xl">
-          <RegisterForm />
-        </Tabs.Panel>
-      </Tabs>
+      {showRegister ? (
+        <RegisterForm onShowLogin={() => setShowRegister(false)} />
+      ) : (
+        <LoginForm onShowRegister={() => setShowRegister(true)} />
+      )}
     </Container>
   );
 }
