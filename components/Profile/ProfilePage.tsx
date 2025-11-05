@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader, rem, Container, Title, Text, Paper, Button } from '@mantine/core';
+import { Button, Container, Loader, Paper, rem, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
@@ -16,6 +16,8 @@ export default function ProfilePage() {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    // Dispatch custom event to notify other components (e.g., Header)
+    window.dispatchEvent(new Event('localStorageChange'));
     router.push('/');
   };
 

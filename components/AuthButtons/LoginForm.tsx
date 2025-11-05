@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { TextInput, PasswordInput, Button, Paper } from '@mantine/core';
+import { Button, Paper, PasswordInput, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
@@ -46,6 +46,8 @@ export default function LoginForm() {
       // Store tokens in localStorage
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token);
+        // Dispatch custom event to notify other components (e.g., Header)
+        window.dispatchEvent(new Event('localStorageChange'));
       }
       if (data.refresh_token) {
         localStorage.setItem('refresh_token', data.refresh_token);

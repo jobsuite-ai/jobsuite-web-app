@@ -2,10 +2,10 @@
 
 import { MouseEvent, useEffect, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Avatar, Divider, Group, Menu, rem, Text } from '@mantine/core';
-import { IconChevronDown, IconSearch, IconUser } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Avatar, Burger, Divider, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
+import { IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
@@ -18,16 +18,10 @@ interface Client {
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
+  { link: '/proposals', label: 'Proposals' },
+  { link: '/projects', label: 'Projects' },
   { link: '/clients', label: 'Clients' },
-  { link: '/estimates', label: 'Estimates' },
-  { link: '/add-job', label: 'Add Job' },
-];
-
-const jobLinks = [
-  { link: '/jobs', label: 'In Progress' },
-  { link: '/follow-up', label: 'Follow Up' },
-  { link: '/completed', label: 'Completed' },
-  { link: '/archived', label: 'Archived' },
+  { link: '/add-proposal', label: 'Add Proposal' },
 ];
 
 export function Header() {
@@ -35,17 +29,46 @@ export function Header() {
   const [data, setData] = useState<Array<string>>();
   const [autocompleteValue, setAutocompleteValue] = useState<string>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sidebarOpened, setSidebarOpened] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     // Check if user is authenticated
-    const accessToken = localStorage.getItem('access_token');
-    setIsAuthenticated(!!accessToken);
+    const checkAuth = () => {
+      const accessToken = localStorage.getItem('access_token');
+      setIsAuthenticated(!!accessToken);
 
-    // Fetch clients if authenticated
-    if (accessToken) {
-      getClients();
-    }
+      // Fetch clients if authenticated
+      if (accessToken) {
+        getClients();
+      }
+    };
+
+    // Initial check
+    checkAuth();
+
+    // Listen for storage changes (e.g., when login saves token)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'access_token') {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom event for same-origin storage changes
+    // (storage event only fires for changes from other windows/tabs)
+    const handleCustomStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -62,25 +85,25 @@ export function Header() {
     router.push(link);
   };
 
-  const items = links.map((link) => (
-    <Link
-      key={link.label}
-      href={link.link}
-      className={classes.link}
-      onClick={(event) => handleNavLinkClick(event, link.link)}
-    >
-      {link.label}
-    </Link>
-  ));
-
-  const jobMenuItems = jobLinks.map((link) => (
-    <Menu.Item
-      key={link.label}
-      onClick={() => router.push(link.link)}
-    >
-      {link.label}
-    </Menu.Item>
-  ));
+  const navItems = links.map((link) => {
+    // Check if the current pathname matches the link exactly or is a subroute
+    const isActive =
+      pathname === link.link ||
+      (link.link !== '/' && pathname?.startsWith(`${link.link}/`));
+    return (
+      <NavLink
+        key={link.label}
+        component={Link}
+        href={link.link}
+        label={link.label}
+        active={isActive}
+        onClick={(event) => {
+          handleNavLinkClick(event as any, link.link);
+          setSidebarOpened(false); // Close sidebar when navigating
+        }}
+      />
+    );
+  });
 
   async function getClients() {
     const accessToken = localStorage.getItem('access_token');
@@ -128,45 +151,47 @@ export function Header() {
   );
 
   return (
-    <header className={classes.header}>
-      <div className={classes.inner}>
-        <Link
-          key="Home"
-          href="/"
-          onClick={(event) => handleNavLinkClick(event, '/')}
-        >
-          <JobsuiteLogo />
-        </Link>
+    <>
+      <Drawer
+        opened={sidebarOpened}
+        onClose={() => setSidebarOpened(false)}
+        title="Navigation"
+        position="left"
+        size="xs"
+        className={classes.drawer}
+      >
+        <Stack gap="xs">
+          {isAuthenticated && navItems}
+        </Stack>
+      </Drawer>
+      <header className={classes.header}>
+        <div className={classes.inner}>
+          <Group gap="md">
+            {isAuthenticated && (
+              <Burger
+                opened={sidebarOpened}
+                onClick={() => setSidebarOpened(!sidebarOpened)}
+                size="sm"
+                className={classes.burger}
+              />
+            )}
+            <Link
+              key="Home"
+              href="/"
+              onClick={(event) => handleNavLinkClick(event, '/')}
+            >
+              <JobsuiteLogo />
+            </Link>
+          </Group>
 
-        <Group>
-          {isAuthenticated && (
-            <Group className={classes.linkWrapper}>
-              {items}
-              <Menu shadow="md" width={200}>
-                <Menu.Target>
-                  <Link
-                    href="#"
-                    className={classes.link}
-                    onClick={(event) => event.preventDefault()}
-                  >
-                    Jobs <IconChevronDown size={16} style={{ marginLeft: 4, verticalAlign: 'middle', position: 'relative', top: -1 }} />
-                  </Link>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  {jobMenuItems}
-                </Menu.Dropdown>
-              </Menu>
-            </Group>
-          )}
-          {isAuthenticated && clients && (
-            <>
+          <Group className={classes.centerSection}>
+            {isAuthenticated && (
               <Autocomplete
-                style={{ marginRight: rem(12) }}
                 className={classes.search}
                 placeholder="Search by client name"
                 value={autocompleteValue}
                 leftSection={
-                  <IconSearch style={{ width: rem(32), height: rem(16) }} stroke={1.5} />
+                  <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
                 }
                 renderOption={renderAutocompleteOption}
                 data={data}
@@ -179,19 +204,42 @@ export function Header() {
                   }
                 }}
               />
-              <Divider orientation="vertical" />
-            </>
-          )}
-          <Link
-            style={{ marginTop: rem(5) }}
-            key="Profile"
-            href="/profile"
-            onClick={(event) => handleNavLinkClick(event, '/profile')}
-          >
-            <IconUser color="black" size={28} radius="xl" />
-          </Link>
-        </Group>
-      </div>
-    </header>
+            )}
+          </Group>
+
+          <Group gap="sm">
+            {isAuthenticated && <Divider orientation="vertical" />}
+            <Link
+              style={{ marginTop: rem(5) }}
+              key="Settings"
+              href="/settings"
+              onClick={(event) => handleNavLinkClick(event, '/settings')}
+            >
+              <IconSettings color="black" size={18} radius="xl" />
+            </Link>
+            <Link
+              style={{ marginTop: rem(5) }}
+              key="Profile"
+              href="/profile"
+              onClick={(event) => handleNavLinkClick(event, '/profile')}
+            >
+              <IconUser color="black" size={18} radius="xl" />
+            </Link>
+            <Menu shadow="md" width={500} position="bottom-end">
+              <Menu.Target>
+                <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
+                  <IconNotification color="black" size={18} radius="xl" />
+                </div>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item>
+                  <Text size="sm" ta="center">No Notifications</Text>
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
+        </div>
+      </header>
+    </>
   );
 }

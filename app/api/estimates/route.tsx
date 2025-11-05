@@ -89,6 +89,8 @@ export async function GET(request: Request) {
 
     const estimates = await estimatesResponse.json();
 
+    console.log('estimates', estimates);
+
     // Return in the format expected by the frontend (wrapped in Items)
     return NextResponse.json({ Items: estimates });
   } catch (error) {
