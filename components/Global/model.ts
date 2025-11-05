@@ -154,6 +154,71 @@ export enum JobStatus {
     ARCHIVED = 'ARCHIVED',
 }
 
+export enum EstimateStatus {
+    NEW_LEAD = 'NEW_LEAD',
+    ESTIMATE_NOT_SCHEDULED = 'ESTIMATE_NOT_SCHEDULED',
+    ESTIMATE_SCHEDULED = 'ESTIMATE_SCHEDULED',
+    ESTIMATE_IN_PROGRESS = 'ESTIMATE_IN_PROGRESS',
+    NEEDS_FOLLOW_UP = 'NEEDS_FOLLOW_UP',
+    ESTIMATE_SENT = 'ESTIMATE_SENT',
+    ESTIMATE_OPENED = 'ESTIMATE_OPENED',
+    ESTIMATE_DECLINED = 'ESTIMATE_DECLINED',
+    ESTIMATE_ACCEPTED = 'ESTIMATE_ACCEPTED',
+    STALE_ESTIMATE = 'STALE_ESTIMATE',
+    CONTRACTOR_OPENED = 'CONTRACTOR_OPENED',
+    CONTRACTOR_DECLINED = 'CONTRACTOR_DECLINED',
+    CONTRACTOR_SIGNED = 'CONTRACTOR_SIGNED',
+    ARCHIVED = 'ARCHIVED',
+}
+
+export enum EstimateType {
+    INTERIOR = 'INTERIOR',
+    EXTERIOR = 'EXTERIOR',
+    BOTH = 'BOTH',
+}
+
+export type Estimate = {
+    id: string;
+    contractor_id: string;
+    client_id: string;
+    status: EstimateStatus;
+    actual_hours: number;
+    hourly_rate: number;
+    discount_reason?: string;
+    hours_bid: number;
+    estimate_type: EstimateType | string;
+    transcription_summary?: string;
+    spanish_transcription?: string;
+    notes?: string;
+    created_by: string;
+    scheduled_date: string;
+    created_at: string;
+    updated_at: string;
+    discount_percentage?: number;
+    tax_rate?: number;
+    address_street?: string;
+    address_city?: string;
+    address_state?: string;
+    address_zipcode?: string;
+    address_country?: string;
+    client_name?: string; // Added by backend when listing estimates
+};
+
+export type ContractorClient = {
+    id: string;
+    contractor_id: string;
+    name: string;
+    email: string;
+    phone_number: string;
+    address_street?: string;
+    address_city?: string;
+    address_state?: string;
+    address_zipcode?: string;
+    address_country?: string;
+    created_at: string;
+    updated_at: string;
+};
+
 export const DropdownJobStatus = {
     NEW_LEAD: JobStatus.NEW_LEAD,
     ESTIMATE_NOT_SCHEDULED: JobStatus.ESTIMATE_NOT_SCHEDULED,

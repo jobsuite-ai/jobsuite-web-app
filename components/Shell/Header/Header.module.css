@@ -1,17 +1,37 @@
+.drawer {
+    z-index: 1000;
+}
+
 .header {
-    height: rem(84px);
+    height: rem(64px);
     background-color: var(--mantine-color-body);
     border-bottom: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
     padding-right: var(--mantine-spacing-md);
+    position: relative;
+    z-index: 100;
 }
 
 .inner {
-    height: rem(84px);
+    height: rem(64px);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding-left: 10px;
     padding-right: 10px;
+    gap: rem(16);
+}
+
+.centerSection {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.burger {
+    cursor: pointer;
 }
 
 .link {
@@ -29,42 +49,56 @@
     }
 }
 
+.linkActive {
+    background-color: light-dark(var(--mantine-color-blue-0), var(--mantine-color-blue-9));
+    color: light-dark(var(--mantine-color-blue-7), var(--mantine-color-blue-0));
+    font-weight: 600;
+}
+
 .linkWrapper {
     margin-left: 50px;
     gap: 5px;
 }
 
 .search {
-    width: rem(400px);
+    width: 100%;
+    max-width: rem(500px);
 }
 
 /* Media Query for smaller screens */
-@media (max-width: 480px) {
-    .header {
-        padding-right: var(--mantine-spacing-sm); /* Reduce padding */
-        margin-top: 10px;
-        padding-bottom: 20px;
-        border-bottom: none;
+@media (max-width: 768px) {
+    .inner {
+        flex-wrap: wrap;
+        gap: rem(8);
     }
 
-    .inner {
-        flex-direction: column; /* Stack items vertically */
-        align-items: flex-start; /* Align items to the start */
-        height: auto; /* Let the height adjust */
+    .centerSection {
+        order: 3;
+        width: 100%;
+        margin-top: rem(8);
     }
 
     .search {
-        width: 100%; /* Make search box full-width */
-        margin-top: rem(12px); /* Add spacing around search box */
+        max-width: 100%;
     }
 
-    .link {
-        font-size: var(--mantine-font-size-xs); /* Adjust font size for smaller screens */
-        padding: rem(6px) rem(10px); /* Reduce padding */
+    .header {
+        height: auto;
+        min-height: rem(84px);
+        padding-bottom: rem(10);
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding-right: var(--mantine-spacing-sm);
     }
 
-    .linkWrapper {
-        margin-left: 20px; /* Reduce the margin for smaller screens */
-        gap: 10px; /* Increase gap for better spacing */
+    .inner {
+        padding: rem(8);
+    }
+
+    .centerSection {
+        margin-top: rem(8);
     }
 }

@@ -1,11 +1,16 @@
 .flexWrapper {
     display: flex;
     gap: var(--mantine-spacing-md);
-    width: '930px';
-    align-items: center;
-    justify-content: center;
+    width: 90%;
+    max-width: 1400px;
+    height: 100%;
+    align-items: flex-start;
+    justify-content: flex-start;
     flex-direction: column;
-    margin-bottom: var(--mantine-spacing-lg);
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: var(--mantine-spacing-lg) 0;
+    margin: 0 auto;
 }
 
 .archiveIcon {
@@ -32,6 +37,53 @@
     top: -28px;
     right: 30px;
     width: 15px;
+}
+
+.sortableJobCard {
+    cursor: grab;
+}
+
+.badge {
+    color: #fff;
+}
+
+.kanbanColumn {
+    min-width: 300px;
+    max-width: 300px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    border: 0px!important;
+    border-radius: var(--mantine-radius-md)!important;
+}
+
+.kanbanColumnOver {
+    background-color: var(--mantine-color-blue-0)!important;
+    padding: var(--mantine-spacing-xs);
+}
+
+.kanbanColumnNotOver {
+    background-color: var(--mantine-color-gray-0)!important;
+    padding: var(--mantine-spacing-md);
+}
+
+.scrollArea {
+    flex: 1;
+}
+
+.emptyStateCard {
+    opacity: 0.5;
+}
+
+.flexContainer {
+    width: max-content;
+    min-width: 100%;
+}
+
+.dragOverlayCard {
+    opacity: 0.9;
 }
 
 /* Media Query for mobile screens */
