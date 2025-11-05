@@ -201,7 +201,3 @@ export default function ResetPasswordPage() {
     </Suspense>
   );
 }
-<<<<<<< Updated upstream
-=======
-
->>>>>>> Stashed changes
