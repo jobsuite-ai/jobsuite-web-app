@@ -120,7 +120,7 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
           <Group mt="md" justify="center">
             <Anchor
               size="sm"
-              onClick={() => router.push('/reset-password')}
+              onClick={() => router.push('/forgot-password')}
               style={{ cursor: 'pointer' }}
             >
               Can&apos;t log in?
