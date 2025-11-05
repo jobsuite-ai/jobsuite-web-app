@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 
-import { Button, Paper, PasswordInput, TextInput } from '@mantine/core';
+import { Anchor, Button, Paper, PasswordInput, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
 import { encryptPassword } from '@/app/utils/encryption';
 
-export default function RegisterForm() {
+interface RegisterFormProps {
+  onShowLogin?: () => void;
+}
+
+export default function RegisterForm({ onShowLogin }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
@@ -103,6 +107,7 @@ export default function RegisterForm() {
 
   return (
     <Paper withBorder shadow="md" p={30} radius="md">
+      <Title order={4} ta="center" mb="md">Create a new contractor account</Title>
       <form onSubmit={handleSubmit}>
         <TextInput
           label="Full Name"
@@ -156,6 +161,20 @@ export default function RegisterForm() {
         <Button type="submit" fullWidth loading={loading}>
           Create Account
         </Button>
+
+        {onShowLogin && (
+          <Anchor
+            component="button"
+            type="button"
+            size="sm"
+            ta="center"
+            mt="md"
+            onClick={onShowLogin}
+            style={{ cursor: 'pointer', display: 'block' }}
+          >
+            Already have an account? Log in
+          </Anchor>
+        )}
       </form>
     </Paper>
   );

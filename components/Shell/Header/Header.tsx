@@ -2,7 +2,7 @@
 
 import { MouseEvent, useEffect, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Avatar, Burger, Divider, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
+import { Autocomplete, AutocompleteProps, Avatar, Burger, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
 import { IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
@@ -207,37 +207,38 @@ export function Header() {
             )}
           </Group>
 
-          <Group gap="sm">
-            {isAuthenticated && <Divider orientation="vertical" />}
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Settings"
-              href="/settings"
-              onClick={(event) => handleNavLinkClick(event, '/settings')}
-            >
-              <IconSettings color="black" size={18} radius="xl" />
-            </Link>
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Profile"
-              href="/profile"
-              onClick={(event) => handleNavLinkClick(event, '/profile')}
-            >
-              <IconUser color="black" size={18} radius="xl" />
-            </Link>
-            <Menu shadow="md" width={500} position="bottom-end">
-              <Menu.Target>
-                <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
-                  <IconNotification color="black" size={18} radius="xl" />
-                </div>
-              </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Item>
-                  <Text size="sm" ta="center">No Notifications</Text>
-                </Menu.Item>
-              </Menu.Dropdown>
-            </Menu>
-          </Group>
+          {isAuthenticated && (
+            <Group gap="sm">
+              <Link
+                style={{ marginTop: rem(5) }}
+                key="Settings"
+                href="/settings"
+                onClick={(event) => handleNavLinkClick(event, '/settings')}
+              >
+                <IconSettings color="black" size={22} radius="xl" />
+              </Link>
+              <Link
+                style={{ marginTop: rem(5) }}
+                key="Profile"
+                href="/profile"
+                onClick={(event) => handleNavLinkClick(event, '/profile')}
+              >
+                <IconUser color="black" size={22} radius="xl" />
+              </Link>
+              <Menu shadow="md" width={500} position="bottom-end">
+                <Menu.Target>
+                  <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
+                    <IconNotification color="black" size={22} radius="xl" />
+                  </div>
+                </Menu.Target>
+                <Menu.Dropdown>
+                  <Menu.Item>
+                    <Text size="sm" ta="center">No Notifications</Text>
+                  </Menu.Item>
+                </Menu.Dropdown>
+              </Menu>
+            </Group>
+          )}
         </div>
       </header>
     </>

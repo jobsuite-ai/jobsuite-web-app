@@ -2,15 +2,20 @@
 
 import { useState } from 'react';
 
-import { Button, Paper, PasswordInput, TextInput } from '@mantine/core';
+import { Anchor, Button, Checkbox, Divider, Group, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
 import { encryptPassword } from '@/app/utils/encryption';
 
-export default function LoginForm() {
+interface LoginFormProps {
+  onShowRegister?: () => void;
+}
+
+export default function LoginForm({ onShowRegister }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -24,8 +29,6 @@ export default function LoginForm() {
       try {
         passwordToSend = await encryptPassword(password);
       } catch (encryptError) {
-        // If encryption fails (e.g., key not configured), send plain password
-        console.warn('Password encryption failed, sending plain password:', encryptError);
         passwordToSend = password;
       }
 
@@ -34,7 +37,11 @@ export default function LoginForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, password: passwordToSend }),
+        body: JSON.stringify({
+          email,
+          password: passwordToSend,
+          remember_me: rememberMe,
+        }),
       });
 
       const data = await response.json();
@@ -74,6 +81,7 @@ export default function LoginForm() {
 
   return (
     <Paper withBorder shadow="md" p={30} radius="md">
+      <Title order={4} ta="center" mb="md">Log in to continue</Title>
       <form onSubmit={handleSubmit}>
         <TextInput
           label="Email"
@@ -92,13 +100,44 @@ export default function LoginForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          mb="xl"
+          mb="md"
           autoComplete="current-password"
         />
 
+        <Stack gap="xs" mb="xl">
+          <Checkbox
+            label="Remember me"
+            checked={rememberMe}
+            onChange={(e) => setRememberMe(e.currentTarget.checked)}
+          />
+        </Stack>
+
         <Button type="submit" fullWidth loading={loading}>
-          Log In
+          Log in to continue
         </Button>
+
+        {onShowRegister && (
+          <Group mt="md" justify="center">
+            <Anchor
+              size="sm"
+              onClick={() => router.push('/reset-password')}
+              style={{ cursor: 'pointer' }}
+            >
+              Can&apos;t log in?
+            </Anchor>
+            <Divider orientation="vertical" />
+            <Anchor
+              component="button"
+              type="button"
+              size="sm"
+              ta="center"
+              onClick={onShowRegister}
+              style={{ cursor: 'pointer', display: 'block' }}
+            >
+              Create an account
+            </Anchor>
+          </Group>
+        )}
       </form>
     </Paper>
   );
