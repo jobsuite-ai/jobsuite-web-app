@@ -10,7 +10,7 @@ import classes from './Estimate.module.css';
 import MarkdownRenderer from '../../Global/MarkdownRenderer';
 import { SingleJob } from '../../Global/model';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
 
 export default function TranscriptionSummary({ job, refresh }: {

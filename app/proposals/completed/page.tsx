@@ -2,10 +2,10 @@
 
 import { Center, Loader } from '@mantine/core';
 
-import EstimatesList from '@/components/EstimatesList/EstimatesList';
+import CompletedEstimatesList from '@/components/EstimatesList/CompletedEstimatesList';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function Estimates() {
+export default function CompletedEstimates() {
     const { isLoading } = useAuth({ requireAuth: true });
 
     if (isLoading) {
@@ -16,5 +16,5 @@ export default function Estimates() {
         );
     }
 
-    return <EstimatesList />;
+    return <CompletedEstimatesList />;
 }

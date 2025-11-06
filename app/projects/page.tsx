@@ -35,7 +35,6 @@ export default function Jobs() {
           style={{
             height: 'calc(100vh - 60px)',
             overflow: 'hidden',
-            backgroundColor: '#6262C1',
           }}
         >
             <JobsList />

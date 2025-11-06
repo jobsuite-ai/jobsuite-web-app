@@ -8,7 +8,7 @@ import { IconX } from '@tabler/icons-react';
 import ImageUpload from './ImageUpload';
 import classes from './styles/VideoUploader.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 const JobImage = ({ jobID, imageName }: { jobID: string, imageName: string }) => {
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);

@@ -56,9 +56,9 @@ export async function GET(
             );
         }
 
-        // Get specific estimate from backend
-        const estimateResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
+        // Get line items for estimate from backend
+        const lineItemsResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}/line-items`,
             {
                 method: 'GET',
                 headers: {
@@ -68,27 +68,27 @@ export async function GET(
             }
         );
 
-        if (!estimateResponse.ok) {
-            const errorData = await estimateResponse.json();
+        if (!lineItemsResponse.ok) {
+            const errorData = await lineItemsResponse.json();
             return NextResponse.json(
-                { message: errorData.detail || 'Failed to fetch estimate' },
-                { status: estimateResponse.status }
+                { message: errorData.detail || 'Failed to fetch line items' },
+                { status: lineItemsResponse.status }
             );
         }
 
-        const estimate = await estimateResponse.json();
-        return NextResponse.json(estimate);
+        const lineItems = await lineItemsResponse.json();
+        return NextResponse.json(lineItems);
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Get estimate error:', error);
+        console.error('Get line items error:', error);
         return NextResponse.json(
-            { message: 'An error occurred while fetching estimate' },
+            { message: 'An error occurred while fetching line items' },
             { status: 500 }
         );
     }
 }
 
-export async function PUT(
+export async function POST(
     request: Request,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
@@ -143,11 +143,11 @@ export async function PUT(
         // Get request body
         const body = await request.json();
 
-        // Update estimate via backend API
-        const updateResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
+        // Create line item via backend API
+        const createResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}/line-items`,
             {
-                method: 'PUT',
+                method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
@@ -156,105 +156,21 @@ export async function PUT(
             }
         );
 
-        if (!updateResponse.ok) {
-            const errorData = await updateResponse.json();
+        if (!createResponse.ok) {
+            const errorData = await createResponse.json();
             return NextResponse.json(
-                { message: errorData.detail || 'Failed to update estimate' },
-                { status: updateResponse.status }
+                { message: errorData.detail || 'Failed to create line item' },
+                { status: createResponse.status }
             );
         }
 
-        const estimate = await updateResponse.json();
-        return NextResponse.json(estimate);
+        const lineItem = await createResponse.json();
+        return NextResponse.json(lineItem, { status: 201 });
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Update estimate error:', error);
+        console.error('Create line item error:', error);
         return NextResponse.json(
-            { message: 'An error occurred while updating estimate' },
-            { status: 500 }
-        );
-    }
-}
-
-export async function DELETE(
-    request: Request,
-    { params }: { params: Promise<{ estimate_id: string }> }
-) {
-    try {
-        const { estimate_id } = await params;
-
-        // Get the access token from the Authorization header
-        const authHeader = request.headers.get('Authorization');
-
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json(
-                { message: 'Authorization header missing or invalid' },
-                { status: 401 }
-            );
-        }
-
-        const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
-
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
-            return NextResponse.json(
-                { message: 'User does not have a contractor ID' },
-                { status: 400 }
-            );
-        }
-
-        // Delete estimate via backend API
-        const deleteResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
-            {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-
-        if (!deleteResponse.ok) {
-            const errorData = await deleteResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to delete estimate' },
-                { status: deleteResponse.status }
-            );
-        }
-
-        const result = await deleteResponse.json();
-        return NextResponse.json(result);
-    } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Delete estimate error:', error);
-        return NextResponse.json(
-            { message: 'An error occurred while deleting estimate' },
+            { message: 'An error occurred while creating line item' },
             { status: 500 }
         );
     }

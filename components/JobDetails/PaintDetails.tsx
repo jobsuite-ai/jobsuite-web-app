@@ -10,7 +10,7 @@ import LoadingState from '../Global/LoadingState';
 import { SingleJob } from '../Global/model';
 import classes from './styles/PaintDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export default function PaintDetails({ job }: { job: SingleJob }) {
     const [keepSameColors, setKeepSameColors] = useState<boolean>(

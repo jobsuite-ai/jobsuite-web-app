@@ -12,10 +12,10 @@ const SETTINGS_STORAGE_KEY = 'jobsuite_column_settings';
 export function getDefaultColumns(): ColumnConfig[] {
     return [
         {
-            id: 'estimate-needed',
-            title: 'Estimate Needed',
-            statuses: ['ESTIMATE_NEEDED' as JobStatus],
-            defaultStatus: 'ESTIMATE_NEEDED' as JobStatus,
+            id: 'accounting-needed',
+            title: 'Accounting Needed',
+            statuses: ['ACCOUNTING_NEEDED' as JobStatus],
+            defaultStatus: 'ACCOUNTING_NEEDED' as JobStatus,
         },
         {
             id: 'scheduling',
@@ -24,34 +24,34 @@ export function getDefaultColumns(): ColumnConfig[] {
             defaultStatus: 'ESTIMATE_SCHEDULED' as JobStatus,
         },
         {
+            id: 'project-scheduled',
+            title: 'Project Scheduled',
+            statuses: ['PROJECT_SCHEDULED' as JobStatus],
+            defaultStatus: 'PROJECT_SCHEDULED' as JobStatus,
+        },
+        {
             id: 'in-progress',
             title: 'In Progress',
             statuses: ['ESTIMATE_COMPLETED' as JobStatus, 'IN_PROGRESS' as JobStatus],
             defaultStatus: 'ESTIMATE_COMPLETED' as JobStatus,
         },
         {
-            id: 'proposal',
-            title: 'Proposal',
-            statuses: ['PROPOSAL_SENT' as JobStatus, 'PROPOSAL_APPROVED' as JobStatus],
-            defaultStatus: 'PROPOSAL_SENT' as JobStatus,
+            id: 'billing-needed',
+            title: 'Billing Needed',
+            statuses: ['BILLING_NEEDED' as JobStatus],
+            defaultStatus: 'BILLING_NEEDED' as JobStatus,
         },
         {
-            id: 'scheduled',
-            title: 'Scheduled',
-            statuses: ['SCHEDULED' as JobStatus],
-            defaultStatus: 'SCHEDULED' as JobStatus,
+            id: 'invoiced',
+            title: 'Invoiced',
+            statuses: ['INVOICED' as JobStatus],
+            defaultStatus: 'INVOICED' as JobStatus,
         },
         {
-            id: 'completed',
-            title: 'Completed',
-            statuses: ['COMPLETED' as JobStatus, 'INVOICED' as JobStatus, 'PAID' as JobStatus],
-            defaultStatus: 'COMPLETED' as JobStatus,
-        },
-        {
-            id: 'cancelled',
-            title: 'Cancelled',
-            statuses: ['CANCELLED' as JobStatus],
-            defaultStatus: 'CANCELLED' as JobStatus,
+            id: 'historical',
+            title: 'Historical',
+            statuses: ['ARCHIVED' as JobStatus],
+            defaultStatus: 'ARCHIVED' as JobStatus,
         },
     ];
 }

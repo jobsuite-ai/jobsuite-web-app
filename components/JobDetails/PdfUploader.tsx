@@ -9,7 +9,7 @@ import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 
 import classes from './styles/VideoUploader.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 interface PresignedPostData {
     url: string;

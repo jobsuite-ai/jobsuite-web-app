@@ -2,8 +2,8 @@
 
 import { MouseEvent, useEffect, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Avatar, Burger, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
-import { IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Avatar, Burger, Collapse, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
+import { IconChevronDown, IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -18,10 +18,9 @@ interface Client {
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
-  { link: '/proposals', label: 'Proposals' },
-  { link: '/projects', label: 'Projects' },
   { link: '/clients', label: 'Clients' },
   { link: '/add-proposal', label: 'Add Proposal' },
+  { link: '/projects', label: 'Projects' },
 ];
 
 export function Header() {
@@ -30,6 +29,7 @@ export function Header() {
   const [autocompleteValue, setAutocompleteValue] = useState<string>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sidebarOpened, setSidebarOpened] = useState(false);
+  const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -85,6 +85,10 @@ export function Header() {
     router.push(link);
   };
 
+  // Check if Proposals menu should be active
+  const isProposalsActive =
+    pathname === '/proposals' || pathname?.startsWith('/proposals/');
+
   const navItems = links.map((link) => {
     // Check if the current pathname matches the link exactly or is a subroute
     const isActive =
@@ -104,6 +108,72 @@ export function Header() {
       />
     );
   });
+
+  // Add Proposals menu item with nested dropdown
+  const proposalsMenuItem = (
+    <div key="Proposals">
+      <NavLink
+        component="div"
+        label="Proposals"
+        active={isProposalsActive}
+        rightSection={
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setProposalsMenuOpened(!proposalsMenuOpened);
+            }}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              margin: 0,
+            }}
+            aria-label="Toggle proposals menu"
+          >
+            <IconChevronDown
+              size={16}
+              style={{
+                transform: proposalsMenuOpened ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s',
+              }}
+            />
+          </button>
+        }
+        style={{ cursor: 'pointer' }}
+        onClick={(e) => {
+          // Only navigate if not clicking the chevron button
+          const target = e.target as HTMLElement;
+          if (target.closest('button[aria-label="Toggle proposals menu"]')) {
+            return;
+          }
+          // Clicking the main text navigates to /proposals
+          e.preventDefault();
+          router.push('/proposals');
+          setSidebarOpened(false);
+        }}
+      />
+      <Collapse in={proposalsMenuOpened}>
+        <div style={{ paddingLeft: rem(32) }}>
+          <NavLink
+            component={Link}
+            href="/proposals/completed"
+            label="Completed Estimates"
+            active={pathname === '/proposals/completed'}
+            onClick={(e) => {
+              handleNavLinkClick(e as any, '/proposals/completed');
+              setProposalsMenuOpened(false);
+              setSidebarOpened(false);
+            }}
+          />
+        </div>
+      </Collapse>
+    </div>
+  );
 
   async function getClients() {
     const accessToken = localStorage.getItem('access_token');
@@ -161,7 +231,12 @@ export function Header() {
         className={classes.drawer}
       >
         <Stack gap="xs">
-          {isAuthenticated && navItems}
+          {isAuthenticated && (
+            <>
+              {navItems}
+              {proposalsMenuItem}
+            </>
+          )}
         </Stack>
       </Drawer>
       <header className={classes.header}>

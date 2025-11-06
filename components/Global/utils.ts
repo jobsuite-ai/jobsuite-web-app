@@ -8,6 +8,8 @@ export const BADGE_COLORS = {
     ALERT: '#E0A56D',
 } as const;
 
+export const LIST_BACKGROUND_COLOR = '#7DA0F0';
+
 export const getBadgeColor = (jobStatus: JobStatus) => {
     switch (jobStatus) {
         case JobStatus.NEW_LEAD:
@@ -88,9 +90,9 @@ export const getEstimateBadgeColor = (estimateStatus: EstimateStatus) => {
         case EstimateStatus.ESTIMATE_IN_PROGRESS:
             return BADGE_COLORS.SUCCESS;
         case EstimateStatus.NEEDS_FOLLOW_UP:
-            return BADGE_COLORS.ERROR;
+            return BADGE_COLORS.WARNING;
         case EstimateStatus.ESTIMATE_ACCEPTED:
-            return BADGE_COLORS.SUCCESS;
+            return BADGE_COLORS.ERROR;
         case EstimateStatus.ESTIMATE_DECLINED:
             return BADGE_COLORS.ERROR;
         case EstimateStatus.ESTIMATE_SENT:
@@ -98,13 +100,13 @@ export const getEstimateBadgeColor = (estimateStatus: EstimateStatus) => {
         case EstimateStatus.ESTIMATE_OPENED:
             return BADGE_COLORS.INFO;
         case EstimateStatus.CONTRACTOR_OPENED:
-            return BADGE_COLORS.INFO;
+            return BADGE_COLORS.ALERT;
         case EstimateStatus.CONTRACTOR_DECLINED:
             return BADGE_COLORS.ERROR;
         case EstimateStatus.CONTRACTOR_SIGNED:
             return BADGE_COLORS.SUCCESS;
         case EstimateStatus.STALE_ESTIMATE:
-            return BADGE_COLORS.WARNING;
+            return BADGE_COLORS.ALERT;
         case EstimateStatus.ARCHIVED:
             return '#d3d3d3';
         default:
@@ -125,7 +127,7 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
         case EstimateStatus.ESTIMATE_NOT_SCHEDULED:
             return 'Needs Scheduling';
         case EstimateStatus.ESTIMATE_ACCEPTED:
-            return 'Accepted';
+            return 'Needs Contractor Signature';
         case EstimateStatus.ESTIMATE_DECLINED:
             return 'Estimate Declined';
         case EstimateStatus.ESTIMATE_SENT:
@@ -135,7 +137,7 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
         case EstimateStatus.CONTRACTOR_OPENED:
             return 'Contractor Viewed Estimate';
         case EstimateStatus.CONTRACTOR_DECLINED:
-            return 'Contractor Declined';
+            return 'Contractor Rejected';
         case EstimateStatus.CONTRACTOR_SIGNED:
             return 'Contractor Signed';
         case EstimateStatus.STALE_ESTIMATE:

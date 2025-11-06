@@ -10,7 +10,7 @@ import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 
 import classes from './styles/VideoUploader.module.css';
 
-import { JobImage, UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { JobImage, UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export default function ImageUpload({ jobID, setImage, setShowModal }: {
     jobID: string, setImage: Function, setShowModal: Function

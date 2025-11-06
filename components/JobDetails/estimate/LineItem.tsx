@@ -4,7 +4,7 @@ import { Card, Group, Text } from '@mantine/core';
 import { IconX } from '@tabler/icons-react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { DynamoLineItem } from '@/components/Global/model';
 
 const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === 'true';
