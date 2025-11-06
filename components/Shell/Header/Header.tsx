@@ -18,9 +18,9 @@ interface Client {
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
-  { link: '/projects', label: 'Projects' },
   { link: '/clients', label: 'Clients' },
   { link: '/add-proposal', label: 'Add Proposal' },
+  { link: '/projects', label: 'Projects' },
 ];
 
 export function Header() {

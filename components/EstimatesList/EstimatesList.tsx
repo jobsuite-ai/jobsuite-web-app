@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Card, Center, Flex, Group, Paper, ScrollArea, Text } from '@mantine/core';
+import { Badge, Card, Center, Flex, Group, Paper, ScrollArea, Text, Title } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
@@ -168,7 +168,7 @@ export default function EstimatesList() {
           style={{ display: 'flex', flexDirection: 'column' }}
         >
             <Group gap="xs" w="100%" justify="center" mb="md">
-                <Text fw={700} size="lg">{title}</Text>
+                <Title order={5}>{title}</Title>
                 <Badge size="lg" variant="light">{columnEstimates.length}</Badge>
             </Group>
             <ScrollArea style={{ flex: 1 }}>

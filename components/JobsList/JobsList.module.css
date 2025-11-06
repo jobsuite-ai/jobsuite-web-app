@@ -9,7 +9,6 @@
     flex-direction: column;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: var(--mantine-spacing-sm) 0;
     margin: 0 auto;
     padding: 20px 0px;
     scrollbar-width: thin;
