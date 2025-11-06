@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader, Center } from '@mantine/core';
+import { Center, Loader } from '@mantine/core';
 
 import CompletedEstimatesList from '@/components/EstimatesList/CompletedEstimatesList';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,4 +18,3 @@ export default function CompletedEstimates() {
 
     return <CompletedEstimatesList />;
 }
-

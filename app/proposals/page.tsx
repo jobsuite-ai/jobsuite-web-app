@@ -1,6 +1,6 @@
 'use client';
 
-import { Loader, Center } from '@mantine/core';
+import { Center, Loader } from '@mantine/core';
 
 import EstimatesList from '@/components/EstimatesList/EstimatesList';
 import { useAuth } from '@/hooks/useAuth';
