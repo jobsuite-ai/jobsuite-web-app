@@ -8,7 +8,7 @@ import ReactPlayer from 'react-player';
 
 import classes from './styles/JobDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export function VideoFrame({ name, jobID, refresh }: {
     name: string,

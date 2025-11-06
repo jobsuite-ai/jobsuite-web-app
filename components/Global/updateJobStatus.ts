@@ -2,7 +2,7 @@
 
 import { JobStatus } from './model';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 export default async function updateJobStatus(status: JobStatus, jobID: string) {

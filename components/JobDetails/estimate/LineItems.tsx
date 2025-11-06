@@ -10,7 +10,7 @@ import '@mantine/dropzone/styles.css';
 import classes from './Estimate.module.css';
 import { LineItem } from './LineItem';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
 import { SingleJob } from '@/components/Global/model';
 

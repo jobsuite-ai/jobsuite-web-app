@@ -12,7 +12,7 @@ import LoadingState from '../Global/LoadingState';
 import { DynamoClient, Job } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export default function SingleClient({ initialClient }: { initialClient: DynamoClient }) {
     const [client, setClient] = useState(initialClient);

@@ -1,7 +1,7 @@
 .flexWrapper {
     display: flex;
     gap: var(--mantine-spacing-md);
-    width: 90%;
+    width: 100%;
     max-width: 1400px;
     height: 100%;
     align-items: flex-start;
@@ -9,8 +9,34 @@
     flex-direction: column;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: var(--mantine-spacing-lg) 0;
+    padding: var(--mantine-spacing-sm) 0;
     margin: 0 auto;
+    padding: 20px 0px;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+
+.flexWrapper::-webkit-scrollbar {
+    height: 8px;
+}
+
+.flexWrapper::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.flexWrapper::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.flexWrapper:hover::-webkit-scrollbar-thumb,
+.flexWrapper:active::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.flexWrapper:hover {
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 .archiveIcon {
@@ -57,6 +83,24 @@
     flex-shrink: 0;
     border: 0px!important;
     border-radius: var(--mantine-radius-md)!important;
+}
+
+.historicalCollapsed {
+    min-width: 60px;
+    max-width: 60px;
+    width: 60px;
+    padding: var(--mantine-spacing-md) var(--mantine-spacing-xs) !important;
+}
+
+.rotatedTitle {
+    white-space: nowrap;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    margin: 0;
+}
+
+.collapseButton {
+    /* Removed absolute positioning to allow Center component to center it */
 }
 
 .kanbanColumnOver {

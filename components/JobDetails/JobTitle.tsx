@@ -6,7 +6,7 @@ import { Text, TextInput } from '@mantine/core';
 
 import classes from './styles/JobDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function JobTitle({ initialTitle, jobID, onSave }: {

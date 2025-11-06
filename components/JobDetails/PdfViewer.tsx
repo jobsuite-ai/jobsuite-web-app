@@ -6,7 +6,7 @@ import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
 
 import classes from './styles/JobDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export function PdfViewer({ name, jobID, refresh }: {
     name: string,

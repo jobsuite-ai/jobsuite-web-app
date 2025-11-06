@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Button, Card, Center, Flex, Menu, Modal, Text, TextInput, NumberInput, Textarea } from '@mantine/core';
+import { Badge, Button, Card, Center, Flex, Menu, Modal, NumberInput, Text, Textarea, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { useForm } from '@mantine/form';
@@ -13,7 +13,7 @@ import LoadingState from '../Global/LoadingState';
 import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
 import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
-import { UpdateClientDetailsInput, UpdateJobContent, UpdateHoursAndRateInput } from '@/app/api/jobs/jobTypes';
+import { UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {

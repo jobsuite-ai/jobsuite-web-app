@@ -10,29 +10,32 @@ import { Estimate, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
-// Define column status groups and their order
-const PROPOSAL_PIPELINE_STATUSES = [
-    EstimateStatus.NEW_LEAD,
-    EstimateStatus.ESTIMATE_NOT_SCHEDULED,
-    EstimateStatus.ESTIMATE_SCHEDULED,
-    EstimateStatus.ESTIMATE_IN_PROGRESS,
-];
-
-const SENT_PROPOSAL_STATUSES = [
-    EstimateStatus.ESTIMATE_SENT,
-    EstimateStatus.ESTIMATE_OPENED,
-];
-
+// Define completed status groups
 const ACCEPTED_STATUSES = [
-    EstimateStatus.ESTIMATE_ACCEPTED,
-    EstimateStatus.CONTRACTOR_OPENED,
+    EstimateStatus.CONTRACTOR_SIGNED,
 ];
 
-export default function EstimatesList() {
+const NOT_ACCEPTED_STATUSES = [
+    EstimateStatus.ESTIMATE_DECLINED,
+    EstimateStatus.CONTRACTOR_DECLINED,
+];
+
+const FOLLOW_UP_STATUSES = [
+    EstimateStatus.NEEDS_FOLLOW_UP,
+    EstimateStatus.STALE_ESTIMATE,
+];
+
+const ALL_COMPLETED_STATUSES = [
+    ...ACCEPTED_STATUSES,
+    ...NOT_ACCEPTED_STATUSES,
+    ...FOLLOW_UP_STATUSES,
+];
+
+export default function CompletedEstimatesList() {
     const [estimates, setEstimates] = useState(new Array<Estimate>());
-    const [columnOneEstimates, setColumnOneEstimates] = useState(new Array<Estimate>());
-    const [columnTwoEstimates, setColumnTwoEstimates] = useState(new Array<Estimate>());
-    const [columnThreeEstimates, setColumnThreeEstimates] = useState(new Array<Estimate>());
+    const [acceptedEstimates, setAcceptedEstimates] = useState(new Array<Estimate>());
+    const [notAcceptedEstimates, setNotAcceptedEstimates] = useState(new Array<Estimate>());
+    const [followUpEstimates, setFollowUpEstimates] = useState(new Array<Estimate>());
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
@@ -42,43 +45,35 @@ export default function EstimatesList() {
     }, []);
 
     useEffect(() => {
-        // Sort jobs into columns based on status
-        const sortedColumnOne = estimates
-            .filter(estimate => PROPOSAL_PIPELINE_STATUSES.includes(estimate.status))
-            .sort((a, b) => {
-                // First sort by status order
-                const statusDiff = PROPOSAL_PIPELINE_STATUSES.indexOf(a.status) -
-                    PROPOSAL_PIPELINE_STATUSES.indexOf(b.status);
-                if (statusDiff !== 0) return statusDiff;
-                // Then sort by updated_at (newest first) within each status
-                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-            });
-
-        const sortedColumnTwo = estimates
-            .filter(estimate => SENT_PROPOSAL_STATUSES.includes(estimate.status))
-            .sort((a, b) => {
-                // First sort by status order
-                const statusDiff = SENT_PROPOSAL_STATUSES.indexOf(a.status) -
-                    SENT_PROPOSAL_STATUSES.indexOf(b.status);
-                if (statusDiff !== 0) return statusDiff;
-                // Then sort by updated_at (newest first) within each status
-                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
-            });
-
-        const sortedColumnThree = estimates
+        // Filter and sort estimates by status
+        const accepted = estimates
             .filter(estimate => ACCEPTED_STATUSES.includes(estimate.status))
+            .sort((a, b) =>
+                // Sort by updated_at (newest first)
+                 new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            );
+
+        const notAccepted = estimates
+            .filter(estimate => NOT_ACCEPTED_STATUSES.includes(estimate.status))
+            .sort((a, b) =>
+                // Sort by updated_at (newest first)
+                 new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+            );
+
+        const followUp = estimates
+            .filter(estimate => FOLLOW_UP_STATUSES.includes(estimate.status))
             .sort((a, b) => {
                 // First sort by status order
-                const statusDiff = ACCEPTED_STATUSES.indexOf(a.status) -
-                    ACCEPTED_STATUSES.indexOf(b.status);
+                const statusDiff = FOLLOW_UP_STATUSES.indexOf(a.status) -
+                    FOLLOW_UP_STATUSES.indexOf(b.status);
                 if (statusDiff !== 0) return statusDiff;
                 // Then sort by updated_at (newest first) within each status
                 return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
             });
 
-        setColumnOneEstimates(sortedColumnOne);
-        setColumnTwoEstimates(sortedColumnTwo);
-        setColumnThreeEstimates(sortedColumnThree);
+        setAcceptedEstimates(accepted);
+        setNotAcceptedEstimates(notAccepted);
+        setFollowUpEstimates(followUp);
     }, [estimates]);
 
     async function getEstimates() {
@@ -90,7 +85,7 @@ export default function EstimatesList() {
         }
 
         try {
-            // Fetch all estimates (backend will filter if needed, but we filter client-side)
+            // Fetch all estimates and filter client-side for completed statuses
             const response = await fetch('/api/estimates', {
                 method: 'GET',
                 headers: {
@@ -109,7 +104,14 @@ export default function EstimatesList() {
             const data = await response.json();
             // Handle both { Items: [...] } and direct array responses
             const estimatesList = data.Items || data || [];
-            setEstimates(Array.isArray(estimatesList) ? estimatesList : []);
+            const allEstimates = Array.isArray(estimatesList) ? estimatesList : [];
+
+            // Filter to only completed statuses
+            const completedEstimates = allEstimates.filter((estimate: Estimate) =>
+                ALL_COMPLETED_STATUSES.includes(estimate.status)
+            );
+
+            setEstimates(completedEstimates);
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching estimates:', error);
@@ -117,7 +119,7 @@ export default function EstimatesList() {
         }
     }
 
-    // Helper function to render a job card
+    // Helper function to render an estimate card
     const renderEstimateCard = (estimate: Estimate) => (
         <Card
           key={estimate.id}
@@ -199,7 +201,7 @@ export default function EstimatesList() {
     return (
         <>
             {loading ? <LoadingState /> :
-                <div style={{ overflow: 'hidden', padding: '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+                <div style={{ overflow: 'hidden', paddingTop: '20px', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
                     {estimates ? (
                         <Flex
                           direction="row"
@@ -208,13 +210,13 @@ export default function EstimatesList() {
                           w="95%"
                           gap="xl"
                         >
-                            {renderColumn(columnOneEstimates, 'Proposal Pipeline')}
-                            {renderColumn(columnTwoEstimates, 'Sent Proposals')}
-                            {renderColumn(columnThreeEstimates, 'Accepted')}
+                            {renderColumn(acceptedEstimates, 'Accepted')}
+                            {renderColumn(notAcceptedEstimates, 'Not Accepted')}
+                            {renderColumn(followUpEstimates, 'Follow Up')}
                         </Flex>
                     ) : (
                         <div style={{ marginTop: '100px' }}>
-                            <UniversalError message="Unable to access list of estimates" />
+                            <UniversalError message="Unable to access list of completed estimates" />
                         </div>
                     )}
                 </div>}

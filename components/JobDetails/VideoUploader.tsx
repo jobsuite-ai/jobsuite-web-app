@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { Flex, Group, Paper, rem, Text } from '@mantine/core';
 import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
@@ -9,7 +9,7 @@ import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 
 import classes from './styles/VideoUploader.module.css';
 
-import { UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 interface PresignedPostData {
     url: string;

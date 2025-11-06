@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
     DndContext,
@@ -19,8 +19,10 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+    ActionIcon,
     Badge,
     Card,
+    Center,
     Flex,
     Group,
     ScrollArea,
@@ -28,6 +30,7 @@ import {
     Text,
     Title,
 } from '@mantine/core';
+import { IconArrowsMoveHorizontal } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
@@ -66,7 +69,6 @@ function SortableJobCard({ job, onClick }: SortableJobCardProps) {
           radius="md"
           w="100%"
           withBorder={false}
-          mb="md"
           {...attributes}
           {...listeners}
           className={classes.sortableJobCard}
@@ -115,24 +117,97 @@ interface KanbanColumnProps {
     column: ColumnConfig;
     jobs: Job[];
     onJobClick: (job: Job, event?: React.MouseEvent) => void;
+    isCollapsed?: boolean;
+    onToggleCollapse?: () => void;
+    columnRef?: React.RefObject<HTMLDivElement>;
 }
 
-function KanbanColumn({ column, jobs, onJobClick }: KanbanColumnProps) {
+function KanbanColumn({
+    column,
+    jobs,
+    onJobClick,
+    isCollapsed,
+    onToggleCollapse,
+    columnRef,
+}: KanbanColumnProps) {
     const jobIds = jobs.map((job) => job.id);
     const { setNodeRef, isOver } = useDroppable({
         id: column.id,
     });
 
+    const isHistorical = column.id === 'historical';
+
+    if (isHistorical && isCollapsed) {
+        const collapsedClassName = `${classes.kanbanColumn} ${classes.historicalCollapsed} ${
+            isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver
+        }`;
+
+        return (
+            <Card
+              ref={(node) => {
+                  setNodeRef(node);
+                  if (columnRef && node) {
+                      (columnRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+                  }
+              }}
+              withBorder
+              shadow="sm"
+              className={collapsedClassName}
+            >
+                <Stack align="center" gap="md" h="100%" justify="center">
+                    <Title
+                      order={5}
+                      className={classes.rotatedTitle}
+                      ta="center"
+                    >
+                        {column.title}
+                    </Title>
+                    <Badge size="lg" variant="light">{jobs.length}</Badge>
+                    <Center>
+                      <ActionIcon
+                        variant="subtle"
+                        onClick={onToggleCollapse}
+                        className={classes.collapseButton}
+                      >
+                          <IconArrowsMoveHorizontal size={16} />
+                      </ActionIcon>
+                    </Center>
+                </Stack>
+            </Card>
+        );
+    }
+
     return (
         <Card
-          ref={setNodeRef}
+          ref={(node) => {
+              setNodeRef(node);
+              if (columnRef && node) {
+                  (columnRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+              }
+          }}
           withBorder
           shadow="sm"
           className={`${classes.kanbanColumn} ${isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver}`}
         >
-            <Title order={4} mb="md" ta="center">
-                {column.title}
-            </Title>
+            <Flex justify="space-between" align="center" mb="md">
+                <Title order={5} ta="center">
+                    {column.title}
+                </Title>
+                {isHistorical && onToggleCollapse ? (
+                    <Group gap="xs">
+                        <Badge size="lg" variant="light">{jobs.length}</Badge>
+                        <ActionIcon
+                          variant="subtle"
+                          onClick={onToggleCollapse}
+                          size="sm"
+                        >
+                            <IconArrowsMoveHorizontal size={16} />
+                        </ActionIcon>
+                    </Group>
+                ) : (
+                    <Badge size="lg" variant="light">{jobs.length}</Badge>
+                )}
+            </Flex>
             <ScrollArea className={classes.scrollArea}>
                 <SortableContext
                   items={jobIds}
@@ -172,6 +247,12 @@ export default function JobsList() {
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [columns, setColumns] = useState<ColumnConfig[]>(loadColumnSettings());
+    const [isHistoricalCollapsed, setIsHistoricalCollapsed] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        const saved = localStorage.getItem('historical_column_collapsed');
+        return saved === 'true';
+    });
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
 
     // Configure sensors for drag and drop
@@ -204,6 +285,68 @@ export default function JobsList() {
         };
     }, []);
 
+    // Save collapse state to localStorage
+    useEffect(() => {
+        localStorage.setItem('historical_column_collapsed', String(isHistoricalCollapsed));
+    }, [isHistoricalCollapsed]);
+
+    // Scroll to end when historical column is expanded (transitioning from collapsed)
+    const prevCollapsedRef = useRef(isHistoricalCollapsed);
+    const historicalColumnRef = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        // Only scroll if transitioning from collapsed to expanded
+        if (prevCollapsedRef.current && !isHistoricalCollapsed && scrollContainerRef.current) {
+            // Wait for layout to fully update after expansion
+            const scrollToEnd = () => {
+                if (scrollContainerRef.current) {
+                    const container = scrollContainerRef.current;
+
+                    // Try to scroll the historical column into view first
+                    if (historicalColumnRef.current) {
+                        historicalColumnRef.current.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'nearest',
+                            inline: 'end',
+                        });
+                    } else {
+                        // Fallback: calculate max scroll and scroll there
+                        const maxScroll = container.scrollWidth - container.clientWidth;
+                        container.scrollTo({
+                            left: maxScroll,
+                            behavior: 'smooth',
+                        });
+                    }
+
+                    // Double-check after animation completes to ensure we're at the end
+                    setTimeout(() => {
+                        if (scrollContainerRef.current) {
+                            const scrollContainer = scrollContainerRef.current;
+                            const currentMax =
+                                scrollContainer.scrollWidth - scrollContainer.clientWidth;
+                            if (scrollContainer.scrollLeft < currentMax - 1) {
+                                scrollContainer.scrollLeft = currentMax;
+                            }
+                        }
+                    }, 600); // Wait for smooth scroll to complete
+                }
+            };
+
+            // Use multiple requestAnimationFrame calls to ensure layout is updated
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                        setTimeout(scrollToEnd, 200);
+                    });
+                });
+            });
+        }
+        prevCollapsedRef.current = isHistoricalCollapsed;
+    }, [isHistoricalCollapsed, columns]);
+
+    const toggleHistoricalCollapse = () => {
+        setIsHistoricalCollapsed((prev) => !prev);
+    };
+
     async function getJobs() {
         const accessToken = localStorage.getItem('access_token');
 
@@ -212,7 +355,7 @@ export default function JobsList() {
         }
 
         try {
-            const response = await fetch('/api/jobs', {
+            const response = await fetch('/api/projects', {
                 method: 'GET',
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
@@ -229,10 +372,6 @@ export default function JobsList() {
 
             const data = await response.json();
             const jobsList = data.Items || data || [];
-            // eslint-disable-next-line no-console
-            console.log('Fetched jobs:', jobsList);
-            // eslint-disable-next-line no-console
-            console.log('Job statuses:', jobsList.map((j: Job) => ({ id: j.id, status: j.job_status })));
             setJobs(Array.isArray(jobsList) ? jobsList : []);
         } catch (error) {
             // eslint-disable-next-line no-console
@@ -371,7 +510,7 @@ export default function JobsList() {
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
         >
-            <div className={classes.flexWrapper}>
+            <div ref={scrollContainerRef} className={classes.flexWrapper}>
                 <Flex
                   direction="row"
                   justify="flex-start"
@@ -386,6 +525,9 @@ export default function JobsList() {
                           column={column}
                           jobs={getJobsForColumn(column.id)}
                           onJobClick={handleJobClick}
+                          isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
+                          onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
+                          columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
                         />
                     ))}
                 </Flex>

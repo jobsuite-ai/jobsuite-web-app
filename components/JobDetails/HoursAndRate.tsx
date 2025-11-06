@@ -5,14 +5,14 @@ import { useEffect, useState } from 'react';
 import { Button, Card, Flex, Switch, Text, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { DatePickerInput, DateValue } from '@mantine/dates';
-import { IconEdit, IconCalendarEvent } from '@tabler/icons-react';
 import '@mantine/dates/styles.css';
+import { IconCalendarEvent, IconEdit } from '@tabler/icons-react';
 
 import { JobStatus, SingleJob } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import classes from './styles/HoursAndRate.module.css';
 
-import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/jobs/jobTypes';
+import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 
 export default function HoursAndRate({ job }: { job: SingleJob }) {
     const [hours, setHours] = useState((job.estimate_hours?.N ?? 0).toString());

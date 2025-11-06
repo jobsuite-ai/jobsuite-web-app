@@ -3,13 +3,15 @@
     flex-direction: row;
     justify-content: center;
     gap: 10px;
+    flex: 1;
 }
 
 .verticalWrapper {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: stretch;
+    min-height: 100vh;
 }
 
 .spacer {
@@ -18,4 +20,6 @@
 
 .main {
     flex-grow: 2;
+    background-color: #2a3a54;
+    min-height: 100%;
 }
