@@ -4,6 +4,16 @@
     justify-content: center;
     gap: 10px;
     flex: 1;
+    transition: margin-left 0.3s ease;
+    margin-left: 0;
+    margin-top: rem(64px);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.wrapperWithSidebar {
+    margin-left: 250px;
+    width: calc(100% - 250px);
 }
 
 .verticalWrapper {
@@ -12,6 +22,8 @@
     justify-content: flex-start;
     align-items: stretch;
     min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 .spacer {
@@ -22,4 +34,8 @@
     flex-grow: 2;
     background-color: #2a3a54;
     min-height: 100%;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
 }

@@ -130,10 +130,10 @@ export default function EstimatesList() {
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey) {
               // Open in new tab
-              window.open(`/estimates/${estimate.id}`, '_blank');
+              window.open(`/proposals/${estimate.id}`, '_blank');
             } else {
               // Normal navigation
-              router.push(`/estimates/${estimate.id}`);
+              router.push(`/proposals/${estimate.id}`);
             }
           }}
         >
@@ -208,9 +208,9 @@ export default function EstimatesList() {
                           w="95%"
                           gap="xl"
                         >
-                            {renderColumn(columnOneEstimates, 'Proposal Pipeline')}
-                            {renderColumn(columnTwoEstimates, 'Sent Proposals')}
-                            {renderColumn(columnThreeEstimates, 'Accepted')}
+                            {renderColumn(columnOneEstimates, 'In Progress')}
+                            {renderColumn(columnTwoEstimates, 'Sent to Client')}
+                            {renderColumn(columnThreeEstimates, 'Client Accepted')}
                         </Flex>
                     ) : (
                         <div style={{ marginTop: '100px' }}>

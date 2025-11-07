@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { getContractorId } from '../../utils/getContractorId';
 
 const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
     ? 'https://api.jobsuite.app'
     : 'https://qa.api.jobsuite.app';
 
 export async function GET(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
     try {
@@ -24,32 +26,10 @@ export async function GET(
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -58,7 +38,7 @@ export async function GET(
 
         // Get specific estimate from backend
         const estimateResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}`,
             {
                 method: 'GET',
                 headers: {
@@ -89,7 +69,7 @@ export async function GET(
 }
 
 export async function PUT(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
     try {
@@ -108,32 +88,10 @@ export async function PUT(
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -145,7 +103,7 @@ export async function PUT(
 
         // Update estimate via backend API
         const updateResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}`,
             {
                 method: 'PUT',
                 headers: {
@@ -177,7 +135,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
     try {
@@ -196,32 +154,10 @@ export async function DELETE(
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -230,7 +166,7 @@ export async function DELETE(
 
         // Delete estimate via backend API
         const deleteResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}`,
             {
                 method: 'DELETE',
                 headers: {

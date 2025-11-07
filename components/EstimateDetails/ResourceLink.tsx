@@ -1,6 +1,4 @@
-import React from 'react';
-
-import { Text, Flex } from '@mantine/core';
+import { Flex, Text } from '@mantine/core';
 import { TablerIcon } from '@tabler/icons-react';
 
 interface ResourceLinkProps {

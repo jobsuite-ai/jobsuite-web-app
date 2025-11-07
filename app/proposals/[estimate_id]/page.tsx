@@ -5,9 +5,9 @@ import { useEffect } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useParams, useRouter } from 'next/navigation';
 
-import JobDetails from '@/components/EstimateDetails/EstimateDetails';
+import EstimateDetails from '@/components/EstimateDetails/EstimateDetails';
 
-export default function Job() {
+export default function Proposal() {
     const params = useParams();
     const { user, isLoading } = useUser();
     const router = useRouter();
@@ -19,5 +19,5 @@ export default function Job() {
         }
     }, [isLoading, user, router]);
 
-    return params ? <JobDetails jobID={params.job_id as string} /> : null;
+    return params ? <EstimateDetails estimateID={params.estimate_id as string} /> : null;
 }

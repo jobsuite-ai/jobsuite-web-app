@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 
 import { useUser } from '@auth0/nextjs-auth0/client';
-import { Button, Center, Group, Paper, Text, Textarea } from '@mantine/core';
+import { Button, Group, Textarea } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { v4 as uuidv4 } from 'uuid';
 
 import { JobComment } from './JobComment';
-import classes from './JobComments.module.css';
 import { SingleComment } from '../../Global/model';
+import classes from '../styles/EstimateDetails.module.css';
 
 import LoadingState from '@/components/Global/LoadingState';
 
-export default function JobComments({ jobID }: { jobID: string }) {
+export default function JobComments({ estimateID }: { estimateID: string }) {
     const [loading, setLoading] = useState(true);
     const [commentInputLoading, setCommentInputLoading] = useState(false);
     const [jobComments, setJobComments] = useState<SingleComment[]>();
@@ -27,7 +27,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
 
     async function getJobComments() {
         const response = await fetch(
-            `/api/job-comments/${jobID}`,
+            `/api/job-comments/${estimateID}`,
             {
                 method: 'GET',
                 headers: {
@@ -54,7 +54,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
                 },
                 body: JSON.stringify({
                     id,
-                    job_id: jobID,
+                    job_id: estimateID,
                     commenter,
                     comment_contents: commentContents,
                     timestamp,
@@ -73,7 +73,7 @@ export default function JobComments({ jobID }: { jobID: string }) {
             setCommentContents('');
             const newComment: SingleComment = {
                 id,
-                job_id: jobID,
+                job_id: estimateID,
                 commenter,
                 comment_contents: commentContents ?? '',
                 timestamp: timestamp.toISOString(),
@@ -93,36 +93,30 @@ export default function JobComments({ jobID }: { jobID: string }) {
     return (
         <>
             {(loading || isLoading || !user) ? <LoadingState /> :
-                <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.commentTextArea}>
-                    <Center mt="sm">
-                        <Text size="lg" mb="md">
-                            Comments
-                        </Text>
-                    </Center>
-                    <div key="comments-wrapper" className={classes.jobCommentsWrapper}>
-                        {jobComments?.map((comment) => (
-                            <div key={comment.id}>
-                                <JobComment commentDetails={comment} />
-                            </div>
-                        ))}
-                        {commentInputLoading ? <LoadingState /> :
-                        <>
-                            <Textarea
-                              w="100%"
-                              placeholder="Enter comment here"
-                              label="Add comment"
-                              autosize
-                              minRows={2}
-                              onChange={(event) => setCommentContents(event.currentTarget.value)}
-                              value={commentContents}
-                            />
-                            <Group justify="right" mt="md">
-                                <Button onClick={() => postJobComment()}>Post Job Comment</Button>
-                            </Group>
-                        </>
-                        }
-                    </div>
-                </Paper>
+                <div className={classes.commentsContainer}>
+                    {jobComments?.map((comment) => (
+                        <div key={comment.id}>
+                            <JobComment commentDetails={comment} />
+                        </div>
+                    ))}
+                    {commentInputLoading ? <LoadingState /> :
+                    <>
+                        <Textarea
+                          w="100%"
+                          placeholder="Enter comment here"
+                          label="Add comment"
+                          autosize
+                          minRows={2}
+                          onChange={(event) => setCommentContents(event.currentTarget.value)}
+                          value={commentContents}
+                          mt="md"
+                        />
+                        <Group justify="right" mt="md">
+                            <Button onClick={() => postJobComment()}>Post Job Comment</Button>
+                        </Group>
+                    </>
+                    }
+                </div>
             }
         </>
     );

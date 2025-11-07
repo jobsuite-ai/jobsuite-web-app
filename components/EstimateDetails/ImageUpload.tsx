@@ -8,12 +8,12 @@ import { Dropzone, FileWithPath, MIME_TYPES } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 
-import classes from './styles/VideoUploader.module.css';
+import classes from './styles/EstimateDetails.module.css';
 
 import { JobImage, UpdateJobContent } from '@/app/api/projects/jobTypes';
 
-export default function ImageUpload({ jobID, setImage, setShowModal }: {
-    jobID: string, setImage: Function, setShowModal: Function
+export default function ImageUpload({ estimateID, setImage, setShowModal }: {
+    estimateID: string, setImage: Function, setShowModal: Function
 }) {
     const [loading, setLoading] = useState(false);
     const [uploadFailure, setUploadFailure] = useState(false);
@@ -51,7 +51,7 @@ export default function ImageUpload({ jobID, setImage, setShowModal }: {
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ filename: file.name, contentType: file.type, jobID }),
+                body: JSON.stringify({ filename: file.name, contentType: file.type, estimateID }),
             }
         );
 
@@ -89,13 +89,13 @@ export default function ImageUpload({ jobID, setImage, setShowModal }: {
             });
 
             const response = await fetch(
-                '/api/jobs',
+                `/api/estimates/${estimateID}`,
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, jobID }),
+                    body: JSON.stringify(content),
                 }
             );
 
@@ -104,22 +104,22 @@ export default function ImageUpload({ jobID, setImage, setShowModal }: {
     }
 
     return (
-        <div className={classes.imageWrapper}>
-            <div style={{ width: '100%' }}>
-                <Dropzone
-                  loading={loading}
-                  openRef={openRef}
-                  maxFiles={1}
-                  onDrop={(vids) => handleVideoDrop(vids)}
-                  maxSize={150 * 1024 * 1024}
-                  accept={[
-                    MIME_TYPES.pdf,
-                    MIME_TYPES.heic,
-                    MIME_TYPES.heif,
-                    MIME_TYPES.png,
-                    MIME_TYPES.jpeg,
-                  ]}
-                >
+        <div className={classes.sectionContent}>
+            <Dropzone
+              loading={loading}
+              openRef={openRef}
+              maxFiles={1}
+              onDrop={(vids) => handleVideoDrop(vids)}
+              maxSize={150 * 1024 * 1024}
+              accept={[
+                MIME_TYPES.pdf,
+                MIME_TYPES.heic,
+                MIME_TYPES.heif,
+                MIME_TYPES.png,
+                MIME_TYPES.jpeg,
+              ]}
+              style={{ width: '100%' }}
+            >
                     <Group justify="center">
                         <Dropzone.Accept>
                             <IconDownload
@@ -150,8 +150,7 @@ export default function ImageUpload({ jobID, setImage, setShowModal }: {
                         Drag and drop an image here to upload. We can only accept files that
                         are less than 50mb in size.
                     </Text>
-                </Dropzone>
-            </div>
+            </Dropzone>
         </div>
     );
 }

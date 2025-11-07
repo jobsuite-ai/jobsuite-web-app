@@ -91,7 +91,7 @@ export default function SettingsPage() {
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <Title order={1} mb="xl">
+            <Title c="white" order={1} mb="xl">
                 Project Settings
             </Title>
             <Text c="dimmed" mb="xl">
@@ -167,13 +167,14 @@ export default function SettingsPage() {
                 <Group justify="space-between" mt="xl">
                     <Button
                       variant="light"
+                      color="gray.5"
                       leftSection={<IconPlus size={16} />}
                       onClick={handleAddColumn}
                     >
                         Add Column
                     </Button>
                     <Group>
-                        <Button variant="outline" onClick={handleReset}>
+                        <Button variant="outline" color="gray.5" onClick={handleReset}>
                             Reset to Default
                         </Button>
                         <Button onClick={handleSave} disabled={!hasChanges}>

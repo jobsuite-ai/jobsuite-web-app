@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { Button, Group, Modal, NumberInput, Paper, Text, Textarea, TextInput } from '@mantine/core';
+import { Button, Group, Modal, NumberInput, Text, Textarea, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { v4 as uuidv4 } from 'uuid';
 
 import '@mantine/dropzone/styles.css';
-import classes from './Estimate.module.css';
 import { LineItem } from './LineItem';
+import classes from '../styles/EstimateDetails.module.css';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
@@ -60,13 +60,13 @@ export default function LineItems({ job }: { job: SingleJob }) {
         };
 
         const response = await fetch(
-            '/api/jobs',
+            `/api/estimates/${job.id.S}`,
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content, jobID: job.id.S }),
+                body: JSON.stringify(content),
             }
         );
 
@@ -90,13 +90,13 @@ export default function LineItems({ job }: { job: SingleJob }) {
             };
 
             const response = await fetch(
-                '/api/jobs',
+                `/api/estimates/${job.id.S}`,
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, jobID: job.id.S }),
+                    body: JSON.stringify(content),
                 }
             );
 
@@ -132,30 +132,28 @@ export default function LineItems({ job }: { job: SingleJob }) {
     };
 
     return (
-        <div>
-            <Paper shadow="sm" radius="md" withBorder p="lg" className={classes.estimateWrapper}>
-                {lineItems && lineItems.length > 0 ?
-                    <>
-                        {lineItems.map((item, index) => (
-                            <LineItem
-                              jobID={job.id.S}
-                              lineItemDetails={item.M}
-                              key={uuidv4()}
-                              index={index}
-                              removeLineItem={removeLineItem}
-                            />
-                        ))}
-                    </>
-                    :
-                    <Group justify="center" className={classes.estimatePlaceholderText}>
-                        <Text>You do not have any line Items</Text>
-                    </Group>
-                }
+        <div className={classes.lineItemsContainer}>
+            {lineItems && lineItems.length > 0 ?
+                <>
+                    {lineItems.map((item, index) => (
+                        <LineItem
+                          estimateID={job.id.S}
+                          lineItemDetails={item.M}
+                          key={uuidv4()}
+                          index={index}
+                          removeLineItem={removeLineItem}
+                        />
+                    ))}
+                </>
+                :
+                <div className={classes.emptyState}>
+                    <Text>You do not have any line Items</Text>
+                </div>
+            }
 
-                <Group justify="center" mt="lg">
-                    <Button onClick={() => setOpened(true)}>Add Line Item</Button>
-                </Group>
-            </Paper>
+            <Group justify="center" mt="lg">
+                <Button onClick={() => setOpened(true)}>Add Line Item</Button>
+            </Group>
 
             <Modal
               opened={opened}

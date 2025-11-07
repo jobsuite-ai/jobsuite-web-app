@@ -1,5 +1,21 @@
-.drawer {
-    z-index: 1000;
+.sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 250px;
+    height: 100vh;
+    background-color: var(--mantine-color-body);
+    border-right: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 200;
+    overflow-y: auto;
+    padding-top: rem(64px);
+    box-sizing: border-box;
+}
+
+.sidebarOpen {
+    transform: translateX(0);
 }
 
 .header {
@@ -7,8 +23,11 @@
     background-color: var(--mantine-color-body);
     border-bottom: rem(1px) solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
     padding-right: var(--mantine-spacing-md);
-    position: relative;
-    z-index: 100;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 300;
 }
 
 .inner {
@@ -32,6 +51,11 @@
 
 .burger {
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: rem(4px);
+    margin-top: rem(2px);
 }
 
 .link {

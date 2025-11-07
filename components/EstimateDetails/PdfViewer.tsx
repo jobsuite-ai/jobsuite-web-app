@@ -4,13 +4,13 @@ import { useEffect, useState } from 'react';
 
 import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
 
-import classes from './styles/JobDetails.module.css';
+import classes from './styles/EstimateDetails.module.css';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
-export function PdfViewer({ name, jobID, refresh }: {
+export function PdfViewer({ name, estimateID, refresh }: {
     name: string,
-    jobID: string,
+    estimateID: string,
     refresh: Function
 }) {
     const [objectExists, setObjectExists] = useState(true);
@@ -21,7 +21,7 @@ export function PdfViewer({ name, jobID, refresh }: {
         checkIfPdfExists();
     }, []);
 
-    const key = `${jobID}/${name}`;
+    const key = `${estimateID}/${name}`;
     const baseCloudFrontURL = 'https://rl-peek-job-pdfs.s3.us-west-2.amazonaws.com/';
 
     async function checkIfPdfExists() {
@@ -64,16 +64,16 @@ export function PdfViewer({ name, jobID, refresh }: {
                 delete_pdf: true,
             };
 
-            const response = await fetch(
-                '/api/jobs',
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ content, jobID }),
-                }
-            );
+        const response = await fetch(
+            `/api/estimates/${estimateID}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(content),
+            }
+        );
 
             if (!response.ok) {
                 throw new Error('Failed to delete PDF');

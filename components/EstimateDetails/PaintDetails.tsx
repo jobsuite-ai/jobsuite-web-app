@@ -53,13 +53,13 @@ export default function PaintDetails({ job }: { job: SingleJob }) {
 
         try {
             const response = await fetch(
-                '/api/jobs',
+                `/api/estimates/${job.id.S}`,
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, jobID: job.id.S }),
+                    body: JSON.stringify(content),
                 }
             );
 

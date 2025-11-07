@@ -42,10 +42,16 @@ export function getDefaultColumns(): ColumnConfig[] {
             defaultStatus: 'BILLING_NEEDED' as JobStatus,
         },
         {
-            id: 'invoiced',
-            title: 'Invoiced',
+            id: 'accounts-receivable',
+            title: 'Accounts Receivable',
             statuses: ['INVOICED' as JobStatus],
             defaultStatus: 'INVOICED' as JobStatus,
+        },
+        {
+            id: 'payments-received',
+            title: 'Payments Received',
+            statuses: ['PAID' as JobStatus],
+            defaultStatus: 'PAID' as JobStatus,
         },
         {
             id: 'historical',
