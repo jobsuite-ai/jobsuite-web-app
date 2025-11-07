@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { getContractorId } from '../utils/getContractorId';
 
 const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
     ? 'https://api.jobsuite.app'
     : 'https://qa.api.jobsuite.app';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -19,32 +21,10 @@ export async function GET(request: Request) {
         const token = authHeader.substring(7); // Remove 'Bearer ' prefix
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -57,7 +37,7 @@ export async function GET(request: Request) {
         const status = url.searchParams.get('status');
 
         // Build the API URL
-        let jobsUrl = `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/jobs`;
+        let jobsUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/jobs`;
         const queryParams = new URLSearchParams();
         if (clientId) {
             queryParams.append('client_id', clientId);
@@ -100,7 +80,7 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     try {
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -115,32 +95,10 @@ export async function POST(request: Request) {
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -152,7 +110,7 @@ export async function POST(request: Request) {
 
         // Create job via backend API
         const createResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/jobs`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/jobs`,
             {
                 method: 'POST',
                 headers: {

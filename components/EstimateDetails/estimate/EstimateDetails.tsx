@@ -8,14 +8,14 @@ import html from 'remark-html';
 import { v4 as uuidv4 } from 'uuid';
 
 import EstimateTodo from './EstimateTodo';
-import classes from '../styles/JobDetails.module.css';
+import classes from '../styles/EstimateDetails.module.css';
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
+import { UploadNewTemplate } from '@/components/EstimateDetails/estimate/UploadNewTemplate';
 import LoadingState from '@/components/Global/LoadingState';
 import { DynamoClient, JobStatus, SingleJob } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
-import { UploadNewTemplate } from '@/components/JobDetails/estimate/UploadNewTemplate';
 
 export default function EstimateDetails({ job }: { job: SingleJob }) {
     const [loading, setLoading] = useState(true);

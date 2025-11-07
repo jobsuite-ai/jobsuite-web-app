@@ -45,6 +45,8 @@ export async function GET(request: Request) {
 
     const user = await userResponse.json();
 
+    // Include contractor_id in response so client can cache it
+    // The client should cache this in localStorage
     return NextResponse.json(user);
   } catch (error) {
     return NextResponse.json(

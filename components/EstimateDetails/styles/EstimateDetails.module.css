@@ -1,0 +1,384 @@
+.header {
+    display: flex;
+    margin-bottom: 30px;
+}
+
+.jobDetailsWrapper {
+    display: flex;
+    width: 100%;
+    flex-direction: row;
+    gap: var(--mantine-spacing-lg);
+    margin-bottom: 30px;
+    align-items: flex-start;
+}
+
+.twoColumnLayout {
+    display: flex;
+    width: 100%;
+    gap: var(--mantine-spacing-xs);
+    align-items: flex-start;
+    height: calc(100vh - 64px);
+    min-height: calc(100vh - 64px);
+    max-height: calc(100vh - 64px);
+    background-color: white;
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+.mainColumn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    height: 100%;
+    overflow-y: auto;
+    margin-left: var(--mantine-spacing-lg);
+    padding: var(--mantine-spacing-lg);
+    background-color: white;
+    /* Hide scrollbar when not scrolling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.mainColumn::-webkit-scrollbar {
+    width: 8px;
+}
+
+.mainColumn::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.mainColumn::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.mainColumn:hover::-webkit-scrollbar-thumb,
+.mainColumn:focus-within::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.mainColumn:active::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.columnContent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantine-spacing-md);
+    padding-bottom: var(--mantine-spacing-md);
+}
+
+.sidebarColumn {
+    width: 400px;
+    min-width: 400px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+    padding: var(--mantine-spacing-lg);
+    margin-right: var(--mantine-spacing-xs);
+    padding-bottom: var(--mantine-spacing-xs);
+    background-color: white;
+    /* Hide scrollbar when not scrolling */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    border-left: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
+
+.sidebarColumn::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebarColumn::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebarColumn::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.sidebarColumn:hover::-webkit-scrollbar-thumb,
+.sidebarColumn:focus-within::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+}
+
+.sidebarColumn:active::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+.sidebarContent {
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantine-spacing-md);
+}
+
+.mainContent {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantine-spacing-md);
+    max-width: calc(100% - 400px);
+}
+
+.rightSidebar {
+    width: 350px;
+    min-width: 350px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--mantine-spacing-md);
+    position: sticky;
+    top: var(--mantine-spacing-lg);
+    align-self: flex-start;
+}
+
+.videoWrapper {
+    width: 70%;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%; /* Ensure minimum height matches parent */
+}
+
+.videoWrapper > * {
+    flex-grow: 1; /* Make direct children fill the available space */
+}
+
+.detailsWrapper {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%; /* Ensure minimum height matches parent */
+}
+
+.detailsWrapper > * {
+    flex-grow: 1; /* Make direct children fill the available space */
+}
+
+.flexContainer {
+    display: flex;
+    flex-direction: row; /* Default direction for web */
+    gap: var(--mantine-spacing-md); /* Matches 'md' gap in Mantine */
+    align-items: stretch; /* Align items to stretch */
+    margin-top: var(--mantine-spacing-lg); /* Matches 'lg' margin */
+    margin-bottom: var(--mantine-spacing-lg);
+    width: 930px; /* Fixed width for web version */
+    justify-content: center;
+}
+
+.imageAndHoverContainer {
+    display: flex;
+    flex-direction: row;
+    gap: var(--mantine-spacing-md); /* Matches 'md' gap in Mantine */
+    align-items: stretch; /* Align items to stretch */
+    width: 100%; /* Use full width of main content */
+}
+
+.videoFrame {
+    width: 100%;
+    height: 100%;
+}
+
+.hoverIntegration {
+  flex-grow: 2;
+  text-align: center;
+}
+
+/* Media query for mobile screens */
+@media (max-width: 768px) {
+    .twoColumnLayout {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .mainColumn {
+        height: auto;
+        overflow-y: visible;
+        padding-right: 0;
+    }
+
+    .sidebarColumn {
+        width: 100%;
+        min-width: 100%;
+        height: auto;
+        overflow-y: visible;
+        padding-left: 0;
+    }
+
+    .jobDetailsWrapper {
+        flex-direction: column;
+    }
+
+    .mainContent {
+        max-width: 100%;
+    }
+
+    .rightSidebar {
+        width: 100%;
+        min-width: 100%;
+        position: relative;
+        top: 0;
+    }
+
+    .flexContainer {
+        flex-direction: column; /* Stack items vertically */
+        width: 100%; /* Use full width for mobile */
+    }
+
+    .imageAndHoverContainer {
+        flex-direction: column; /* Stack items vertically */
+        width: 100%; /* Use full width for mobile */
+    }
+
+    .videoWrapper {
+        width: 100%;
+    }
+
+    .videoFrame {
+        margin-top: 70px;
+        justify-self: center;
+    }
+
+    .detailsWrapper {
+        width: 100%;
+    }
+    
+    .jobFieldWrapper {
+        width: 100%;
+    }
+}
+
+.jobTitleWrapper {
+    margin: 0 0 var(--mantine-spacing-md) 0;
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.jobTitleContainer {
+    margin: 0;
+    width: auto;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.jobTitle {
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 4px;
+    transition: color 0.3s ease;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* Make this more specific to ensure it overrides any other styles */
+.jobTitle:hover {
+    color: var(--mantine-primary-color-filled) !important;
+    background-color: transparent;
+}
+
+/* Centralized section content styles */
+.sectionContent {
+    width: 100%;
+    padding: var(--mantine-spacing-md);
+    border-radius: var(--mantine-radius-md);
+}
+
+.sectionContentInner {
+    width: 100%;
+}
+
+/* Video and uploader styles */
+.videoContainer {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+.videoPlayerWrapper {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Image gallery styles */
+.imageGalleryContainer {
+    width: 100%;
+}
+
+.imageGrid {
+    width: 100%;
+}
+
+/* Line items container */
+.lineItemsContainer {
+    width: 100%;
+}
+
+.lineItemCard {
+    margin-bottom: var(--mantine-spacing-md);
+}
+
+/* Comments container */
+.commentsContainer {
+    width: 100%;
+}
+
+/* Transcription container */
+.transcriptionContainer {
+    width: 100%;
+}
+
+/* Description container */
+.descriptionContainer {
+    width: 100%;
+    padding: var(--mantine-spacing-xs) 0;
+}
+
+/* Empty state styles */
+.emptyState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    padding: var(--mantine-spacing-lg);
+    text-align: center;
+}
+
+/* Upload state styles */
+.uploadState {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--mantine-spacing-lg);
+    text-align: center;
+}
+
+/* Collapsible section styles */
+.collapsibleSection {
+    margin-bottom: var(--mantine-spacing-md);
+}
+
+.collapsibleSectionHeader {
+    width: 100%;
+    margin-bottom: var(--mantine-spacing-md);
+    display: flex;
+    align-items: center;
+    gap: var(--mantine-spacing-xs);
+    border-bottom: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+    padding-bottom: var(--mantine-spacing-xs);
+}
+
+.collapsibleSectionContent {
+    margin-left: 26px;
+}

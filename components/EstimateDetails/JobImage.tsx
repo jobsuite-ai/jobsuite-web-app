@@ -10,14 +10,14 @@ import classes from './styles/VideoUploader.module.css';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
-const JobImage = ({ jobID, imageName }: { jobID: string, imageName: string }) => {
+const JobImage = ({ estimateID, imageName }: { estimateID: string, imageName: string }) => {
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
     const [imagePath, setImagePath] = useState('');
     const [image, setImage] = useState(imageName);
 
     useEffect(() => {
         if (image) {
-            const key = `${jobID}/${image}`;
+            const key = `${estimateID}/${image}`;
             setImagePath(`https://rl-peek-job-images.s3.us-west-2.amazonaws.com/${key}`);
         }
     }, [image]);
@@ -28,13 +28,13 @@ const JobImage = ({ jobID, imageName }: { jobID: string, imageName: string }) =>
         };
 
         const response = await fetch(
-            '/api/jobs',
+            `/api/estimates/${estimateID}`,
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content, jobID }),
+                body: JSON.stringify(content),
             }
         );
 
@@ -79,7 +79,7 @@ const JobImage = ({ jobID, imageName }: { jobID: string, imageName: string }) =>
               onClose={() => setShowImageUploadModal(false)}
             >
                 <ImageUpload
-                  jobID={jobID}
+                  estimateID={estimateID}
                   setImage={setImage}
                   setShowModal={setShowImageUploadModal}
                 />

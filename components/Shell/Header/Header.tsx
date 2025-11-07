@@ -2,19 +2,13 @@
 
 import { MouseEvent, useEffect, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Avatar, Burger, Collapse, Drawer, Group, Menu, NavLink, rem, Stack, Text } from '@mantine/core';
-import { IconChevronDown, IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Collapse, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconChevronDown, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
-
-interface Client {
-  id: string;
-  client_name: string;
-  email?: string;
-}
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
@@ -23,12 +17,14 @@ const links = [
   { link: '/projects', label: 'Projects' },
 ];
 
-export function Header() {
-  const [clients, setClients] = useState<Record<string, Client>>();
-  const [data, setData] = useState<Array<string>>();
+interface HeaderProps {
+  sidebarOpened: boolean;
+  setSidebarOpened: (opened: boolean) => void;
+}
+
+export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [sidebarOpened, setSidebarOpened] = useState(false);
   const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
@@ -38,11 +34,6 @@ export function Header() {
     const checkAuth = () => {
       const accessToken = localStorage.getItem('access_token');
       setIsAuthenticated(!!accessToken);
-
-      // Fetch clients if authenticated
-      if (accessToken) {
-        getClients();
-      }
     };
 
     // Initial check
@@ -71,12 +62,6 @@ export function Header() {
     };
   }, []);
 
-  useEffect(() => {
-    if (clients) {
-      setData(Object.keys(clients));
-    }
-  }, [clients]);
-
   const handleNavLinkClick = (
     event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
     link: string
@@ -103,7 +88,6 @@ export function Header() {
         active={isActive}
         onClick={(event) => {
           handleNavLinkClick(event as any, link.link);
-          setSidebarOpened(false); // Close sidebar when navigating
         }}
       />
     );
@@ -154,7 +138,6 @@ export function Header() {
           // Clicking the main text navigates to /proposals
           e.preventDefault();
           router.push('/proposals');
-          setSidebarOpened(false);
         }}
       />
       <Collapse in={proposalsMenuOpened}>
@@ -167,7 +150,6 @@ export function Header() {
             onClick={(e) => {
               handleNavLinkClick(e as any, '/proposals/completed');
               setProposalsMenuOpened(false);
-              setSidebarOpened(false);
             }}
           />
         </div>
@@ -175,62 +157,15 @@ export function Header() {
     </div>
   );
 
-  async function getClients() {
-    const accessToken = localStorage.getItem('access_token');
-    if (!accessToken) return;
-
-    const response = await fetch('/api/clients', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      return;
-    }
-
-    const { Items }: { Items: Client[] } = await response.json();
-    if (Items && Items.length > 0) {
-      setClients(
-        Items.reduce((acc, client) => {
-          acc[client.client_name] = client;
-          return acc;
-        }, {} as Record<string, Client>)
-      );
-    }
-  }
-
-  const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => (
+  const renderAutocompleteOption: AutocompleteProps['renderOption'] = () => (
     <Group gap="sm">
-      {clients && (
-        <>
-          <Avatar src="/black-circle-user-symbol.png" size={36} radius="xl" />
-          <div>
-            <Text size="sm">{clients[option.value].client_name}</Text>
-            {clients[option.value].email && (
-              <Text size="xs" opacity={0.5}>
-                {clients[option.value].email}
-              </Text>
-            )}
-          </div>
-        </>
-      )}
     </Group>
   );
 
   return (
     <>
-      <Drawer
-        opened={sidebarOpened}
-        onClose={() => setSidebarOpened(false)}
-        title="Navigation"
-        position="left"
-        size="xs"
-        className={classes.drawer}
-      >
-        <Stack gap="xs">
+      <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
+        <Stack gap="xs" p="md">
           {isAuthenticated && (
             <>
               {navItems}
@@ -238,17 +173,21 @@ export function Header() {
             </>
           )}
         </Stack>
-      </Drawer>
+      </aside>
       <header className={classes.header}>
         <div className={classes.inner}>
           <Group gap="md">
             {isAuthenticated && (
-              <Burger
-                opened={sidebarOpened}
+              <UnstyledButton
                 onClick={() => setSidebarOpened(!sidebarOpened)}
-                size="sm"
                 className={classes.burger}
-              />
+              >
+                {sidebarOpened ? (
+                  <IconLayoutSidebarLeftCollapse size={22} />
+                ) : (
+                  <IconLayoutSidebarLeftExpand size={22} />
+                )}
+              </UnstyledButton>
             )}
             <Link
               key="Home"
@@ -269,14 +208,10 @@ export function Header() {
                   <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
                 }
                 renderOption={renderAutocompleteOption}
-                data={data}
+                data={[]}
                 visibleFrom="xs"
                 onChange={(item) => {
                   setAutocompleteValue(item);
-                  if (clients && data?.includes(item)) {
-                    router.push(`/clients/${clients[item].id}`);
-                    setAutocompleteValue('');
-                  }
                 }}
               />
             )}

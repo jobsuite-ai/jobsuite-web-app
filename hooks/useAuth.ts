@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
+import { getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
+
 export interface User {
   id: string;
   email: string;
@@ -64,10 +66,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       try {
         const response = await fetch('/api/auth/me', {
           method: 'GET',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
+          headers: getApiHeaders(),
         });
 
         if (!response.ok) {
@@ -88,10 +87,16 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         // Token is valid
         setIsAuthenticated(true);
 
+        const userData = await response.json();
+
         if (fetchUser) {
           // Fetch user data
-          const userData = await response.json();
           setUser(userData);
+        }
+
+        // Cache contractor_id in localStorage if available
+        if (userData.contractor_id) {
+          setCachedContractorId(userData.contractor_id);
         }
 
         setIsLoading(false);

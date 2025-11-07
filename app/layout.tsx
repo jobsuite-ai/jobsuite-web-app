@@ -2,14 +2,52 @@
 
 import { useEffect } from 'react';
 
-import { UserProvider } from '@auth0/nextjs-auth0/client';
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import { Notifications } from '@mantine/notifications';
+import { UserProfile, UserProvider } from '@auth0/nextjs-auth0/client';
 import '@mantine/carousel/styles.css';
+import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
+import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 
 import { Shell } from '@/components/Shell/Shell';
+
+// Custom fetcher that includes authentication token
+const authenticatedUserFetcher = async (url: string): Promise<UserProfile | undefined> => {
+  // Check if we're in a browser environment before accessing localStorage
+  if (typeof window === 'undefined') {
+    return undefined;
+  }
+
+  const accessToken = localStorage.getItem('access_token');
+
+  if (!accessToken) {
+    return undefined;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.status === 204) {
+      return undefined;
+    }
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
 
 export default function RootLayout({ children }: { children: any }) {
   useEffect(() => {
@@ -34,7 +72,7 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <MantineProvider>
-          <UserProvider>
+          <UserProvider fetcher={authenticatedUserFetcher}>
             <Notifications />
             <Shell>{children}</Shell>
           </UserProvider>

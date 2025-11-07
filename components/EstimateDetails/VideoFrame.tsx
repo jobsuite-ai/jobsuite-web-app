@@ -2,30 +2,30 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Center, Flex, Modal, Paper, Text } from '@mantine/core';
+import { Button, Center, Flex, Modal, Text } from '@mantine/core';
 import { useParams } from 'next/navigation';
 import ReactPlayer from 'react-player';
 
-import classes from './styles/JobDetails.module.css';
+import classes from './styles/EstimateDetails.module.css';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
-export function VideoFrame({ name, jobID, refresh }: {
+export function VideoFrame({ name, estimateID, refresh }: {
     name: string,
-    jobID: string,
+    estimateID: string,
     refresh: Function
 }) {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [objectExists, setObjectExists] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const { job_id } = useParams() as any;
+    const { estimate_id } = useParams() as any;
 
     useEffect(() => {
         setIsMobile(window.innerWidth <= 768);
         checkIfVideoExists();
     }, []);
 
-    const key = `${job_id}/${name}`;
+    const key = `${estimate_id || estimateID}/${name}`;
     const baseCloudFrontURL = 'https://rl-peek-job-videos.s3.us-west-2.amazonaws.com/';
 
     async function checkIfVideoExists() {
@@ -58,13 +58,13 @@ export function VideoFrame({ name, jobID, refresh }: {
         };
 
         const response = await fetch(
-            '/api/jobs',
+            `/api/estimates/${estimateID}`,
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content, jobID }),
+                body: JSON.stringify(content),
             }
         );
 
@@ -76,14 +76,16 @@ export function VideoFrame({ name, jobID, refresh }: {
 
     return (
         <>
-            <Paper shadow="sm" radius="md" withBorder className={classes.videoFrame}>
+            <div className={classes.videoContainer}>
                 {objectExists ?
                     <>
-                        {isMobile ? (
-                            <ReactPlayer url={baseCloudFrontURL + key} controls width="100%" height="auto" />
-                        ) : (
-                            <ReactPlayer url={baseCloudFrontURL + key} controls width="640px" height="360px" />
-                        )}
+                        <div className={classes.videoPlayerWrapper}>
+                            {isMobile ? (
+                                <ReactPlayer url={baseCloudFrontURL + key} controls width="100%" height="auto" />
+                            ) : (
+                                <ReactPlayer url={baseCloudFrontURL + key} controls width="640px" height="360px" />
+                            )}
+                        </div>
                         <Flex direction="column" align="center" p="md">
                             <Center>
                                 <Button onClick={() => setIsModalOpen(true)}>Delete Video</Button>
@@ -91,7 +93,7 @@ export function VideoFrame({ name, jobID, refresh }: {
                         </Flex>
                     </>
                     :
-                    <Flex direction="column" justify="center" align="center" p="lg" h="100%">
+                    <div className={classes.uploadState}>
                         <Text ta="center" fz="lg">
                             Your video is uploading
                         </Text>
@@ -102,9 +104,9 @@ export function VideoFrame({ name, jobID, refresh }: {
                         <Center my="md">
                             <Button onClick={() => setIsModalOpen(true)}>Retry Upload</Button>
                         </Center>
-                    </Flex>
+                    </div>
                 }
-            </Paper>
+            </div>
 
             <Modal
               opened={isModalOpen}

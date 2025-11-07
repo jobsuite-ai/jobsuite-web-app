@@ -203,6 +203,23 @@ export type Estimate = {
     address_zipcode?: string;
     address_country?: string;
     client_name?: string; // Added by backend when listing estimates
+    // Additional fields that may be present in the API response
+    job_title?: string;
+    video?: any;
+    images?: any;
+    pdf?: any;
+    line_items?: any[];
+    docuseal_link?: string;
+    jira_link?: string;
+    job_crew_lead?: string;
+    // Legacy field names for compatibility
+    estimate_date?: string; // Alias for scheduled_date
+    estimate_hours?: number; // Alias for hours_bid
+    description?: string; // Alias for notes
+    client_address?: string; // Alias for address_street
+    city?: string; // Alias for address_city
+    state?: string; // Alias for address_state
+    zip_code?: string; // Alias for address_zipcode
 };
 
 export type ContractorClient = {

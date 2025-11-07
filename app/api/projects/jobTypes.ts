@@ -12,6 +12,8 @@ export type UpdateJobContent = {
     images?: JobImage[],
     job_status?: JobStatus,
     transcription_summary?: string,
+    spanish_transcription?: string,
+    notes?: string,
     estimate_date?: any,
     estimate_hours?: string,
     actual_hours?: string,

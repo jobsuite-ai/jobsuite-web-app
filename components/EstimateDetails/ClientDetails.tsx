@@ -10,14 +10,14 @@ import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
-import { DropdownJobStatus, DynamoClient, JobStatus, SingleJob } from '../Global/model';
-import { getBadgeColor, getFormattedStatus } from '../Global/utils';
+import { DynamoClient, Estimate, EstimateStatus } from '../Global/model';
+import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
-export default function ClientDetails({ initialJob }: { initialJob: SingleJob }) {
-    const [job, setJob] = useState(initialJob);
+export default function ClientDetails({ initialEstimate }: { initialEstimate: Estimate }) {
+    const [estimate, setEstimate] = useState(initialEstimate);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
     const [client, setClient] = useState<DynamoClient>();
@@ -26,30 +26,52 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
 
     useEffect(() => {
         const loadClientDetails = async () => {
-            const response = await fetch(
-                `/api/clients/${job.client_id.S}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
+            if (!estimate.client_id) {
+                return;
+            }
 
-            const { Item } = await response.json();
-            setClient(Item);
+            const accessToken = localStorage.getItem('access_token');
+            if (!accessToken) {
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    `/api/clients/${estimate.client_id}`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            Authorization: `Bearer ${accessToken}`,
+                        },
+                    }
+                );
+
+                if (!response.ok) {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to load client details:', response.status);
+                    return;
+                }
+
+                const data = await response.json();
+                setClient(data.Item || data);
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error loading client details:', error);
+            }
         };
-        if (!client) {
+
+        if (!client && estimate.client_id) {
             loadClientDetails();
         }
-    }, [client]);
+    }, [estimate.client_id]); // Only depend on client_id, not client state
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            client_address: job.client_address?.S ?? '',
-            city: job.city?.S ?? '',
-            zip_code: job.zip_code?.S ?? '',
+            client_address: estimate.address_street || estimate.client_address || '',
+            city: estimate.address_city || estimate.city || '',
+            zip_code: estimate.address_zipcode || estimate.zip_code || '',
         },
         validate: (values) => ({
             client_address: values.client_address === '' ? 'Must enter client address' : null,
@@ -60,10 +82,10 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
 
     const completionForm = useForm({
         initialValues: {
-            actual_hours: job.estimate_hours?.N || '0',
+            actual_hours: estimate.hours_bid || estimate.estimate_hours || 0,
             additional_hours: 0,
             add_on_description: '',
-            job_crew_lead: job.job_crew_lead?.S || '',
+            job_crew_lead: estimate.job_crew_lead || '',
         },
         validate: {
             actual_hours: (value: string | number) => (value === '' ? 'Must enter actual hours' : null),
@@ -87,23 +109,26 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         };
 
         const response = await fetch(
-            '/api/jobs',
+            `/api/estimates/${estimate.id}`,
             {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ content, jobID: job.id.S }),
+                body: JSON.stringify(content),
             }
         );
 
         await response.json();
 
-        setJob(prevJob => ({
-            ...prevJob,
-            city: { S: formValues.city },
-            zip_code: { S: formValues.zip_code },
-            client_address: { S: formValues.client_address },
+        setEstimate(prevEstimate => ({
+            ...prevEstimate,
+            address_city: formValues.city,
+            address_zipcode: formValues.zip_code,
+            address_street: formValues.client_address,
+            city: formValues.city,
+            zip_code: formValues.zip_code,
+            client_address: formValues.client_address,
         }));
         setIsModalOpen(false);
     };
@@ -111,10 +136,12 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
     const handleJobCompletion = async () => {
         const formValues = completionForm.getValues();
 
-        // Update job hours
+        // Update estimate hours
+        const totalHours = (estimate.hours_bid || estimate.estimate_hours || 0)
+            + formValues.additional_hours;
         const updateHoursAndRateInput: UpdateHoursAndRateInput = {
-            hours: (parseInt(job.estimate_hours?.N, 10) + formValues.additional_hours).toString(),
-            rate: job.hourly_rate?.N || '0',
+            hours: totalHours.toString(),
+            rate: estimate.hourly_rate?.toString() || '0',
             date: new Date().toISOString(),
             discount_reason: '',
         };
@@ -126,15 +153,15 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         };
 
         try {
-            // Update job hours
+            // Update estimate hours
             const response = await fetch(
-                '/api/jobs',
+                `/api/estimates/${estimate.id}`,
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, jobID: job.id.S }),
+                    body: JSON.stringify(content),
                 }
             );
 
@@ -151,7 +178,7 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                     },
                     body: JSON.stringify({
                         id: crypto.randomUUID(),
-                        job_id: job.id.S,
+                        job_id: estimate.id,
                         commenter: 'System',
                         comment_contents: commentContent,
                         timestamp: new Date().toISOString(),
@@ -162,13 +189,17 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
             }
 
             // Update local state
-            setJob(prevJob => ({
-                ...prevJob,
-                estimate_hours: { N: (
-                    (job.estimate_hours?.N || '0') + formValues.additional_hours.toString()
-                ) },
-                actual_hours: { N: formValues.actual_hours.toString() },
-                job_crew_lead: { S: formValues.job_crew_lead.toUpperCase() },
+            const newHoursBid = (estimate.hours_bid || estimate.estimate_hours || 0)
+                + formValues.additional_hours;
+            const actualHoursValue = typeof formValues.actual_hours === 'number'
+                ? formValues.actual_hours
+                : parseFloat(String(formValues.actual_hours));
+            setEstimate(prevEstimate => ({
+                ...prevEstimate,
+                hours_bid: newHoursBid,
+                estimate_hours: newHoursBid,
+                actual_hours: actualHoursValue,
+                job_crew_lead: formValues.job_crew_lead.toUpperCase(),
             }));
 
             setIsCompletionModalOpen(false);
@@ -178,39 +209,36 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
         }
     };
 
-    const updateJobStatus = async (status: JobStatus) => {
-        await logToCloudWatch(`Attempting to update job: ${job.id.S} to status: ${status}`);
-        const content: UpdateJobContent = {
-            job_status: status,
-        };
+    const updateEstimateStatus = async (status: EstimateStatus) => {
+        await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
         try {
             const response = await fetch(
-                '/api/jobs',
+                `/api/estimates/${estimate.id}`,
                 {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ content, jobID: job.id.S }),
+                    body: JSON.stringify({ status }),
                 }
             );
 
             await response.json();
 
             // Update local state
-            setJob(prevJob => ({
-                ...prevJob,
-                job_status: { S: status },
+            setEstimate(prevEstimate => ({
+                ...prevEstimate,
+                status,
             }));
 
-            if (status === JobStatus.RLPP_SIGNED && client) {
+            if (status === EstimateStatus.CONTRACTOR_SIGNED && client) {
                 const jiraResponse = await fetch('/api/jira', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ job, client }),
+                    body: JSON.stringify({ job: estimate, client }),
                 });
 
                 if (!jiraResponse.ok) {
@@ -218,27 +246,28 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                 }
             }
 
-            // Open completion modal if status is JOB_COMPLETE
-            if (status === JobStatus.JOB_COMPLETE) {
+            // Open completion modal if status indicates completion
+            // Note: EstimateStatus doesn't have JOB_COMPLETE, adjust as needed
+            if (status === EstimateStatus.ARCHIVED) {
                 setIsCompletionModalOpen(true);
             } else {
                 setMenuOpened(false);
             }
         } catch (error) {
-            logToCloudWatch(`Failed to update job status: ${error}`);
+            logToCloudWatch(`Failed to update estimate status: ${error}`);
         }
     };
 
-    const statusOptions = Object.values(DropdownJobStatus).filter(
-        status => status !== job.job_status.S
+    const statusOptions = Object.values(EstimateStatus).filter(
+        status => status !== estimate.status
     );
 
     const statusDropdownOptions = statusOptions.map((status) => (
         <Menu.Item
           key={status}
-          onClick={() => updateJobStatus(status)}
+          onClick={() => updateEstimateStatus(status)}
         >
-            {getFormattedStatus(status)}
+            {getFormattedEstimateStatus(status)}
         </Menu.Item>
     ));
 
@@ -262,9 +291,9 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                         <Text
                           fw={500}
                           style={{ cursor: 'pointer' }}
-                          onClick={() => router.push(`/clients/${job.client_id.S}`)}
+                          onClick={() => router.push(`/clients/${estimate.client_id}`)}
                         >
-                            {job.client_name.S}
+                            {estimate.client_name || 'Client'}
                         </Text>
                         <Flex direction="row" gap={5}>
                             <Menu
@@ -282,11 +311,11 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                                             alignItems: 'center',
                                             gap: '5px',
                                         }}
-                                      color={getBadgeColor(job.job_status.S)}
+                                      color={getEstimateBadgeColor(estimate.status)}
                                       mr="10px"
                                       rightSection={<IconChevronDown size={12} />}
                                     >
-                                        {getFormattedStatus(job.job_status.S)}
+                                        {getFormattedEstimateStatus(estimate.status)}
                                     </Badge>
                                 </Menu.Target>
                                 <Menu.Dropdown>
@@ -302,9 +331,9 @@ export default function ClientDetails({ initialJob }: { initialJob: SingleJob })
                             <Text size="sm" c="dimmed">Client Phone: {client.phone_number?.S}</Text>
                         </Flex>
                         <Flex direction="column">
-                            <Text size="sm" c="dimmed">{job.client_address?.S}</Text>
-                            <Text size="sm" c="dimmed">{job.city?.S}, {job.state?.S}</Text>
-                            <Text size="sm" c="dimmed">{job.zip_code?.S}</Text>
+                            <Text size="sm" c="dimmed">{estimate.address_street || estimate.client_address}</Text>
+                            <Text size="sm" c="dimmed">{estimate.address_city || estimate.city}, {estimate.address_state || estimate.state}</Text>
+                            <Text size="sm" c="dimmed">{estimate.address_zipcode || estimate.zip_code}</Text>
                         </Flex>
                     </Flex>
                 </Card> : <LoadingState />
