@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Card, Flex, Group, Paper, Text } from '@mantine/core';
+import { Card, Flex, Group, Paper, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 
 import classes from './Clients.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Client, Job } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
-import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 export default function ClientsList() {
   const [clients, setClients] = useState(new Array<Client>());
@@ -128,9 +127,6 @@ export default function ClientsList() {
                               {job.estimate_date.split('T')[0]}
                             </Text>
                           )}
-                          <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
-                            {getFormattedStatus(job.job_status)}
-                          </Badge>
                         </Flex>
                       </Paper>
                     ))}

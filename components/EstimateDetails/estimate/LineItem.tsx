@@ -1,68 +1,88 @@
-import { useEffect, useState } from 'react';
-
-import { Card, Group, Text } from '@mantine/core';
-import { IconX } from '@tabler/icons-react';
-import { v4 as uuidv4 } from 'uuid';
+import { ActionIcon, Card, Group, Text } from '@mantine/core';
+import { IconEdit, IconTrash } from '@tabler/icons-react';
 
 import classes from '../styles/EstimateDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/projects/jobTypes';
-import { DynamoLineItem } from '@/components/Global/model';
+// Type for EstimateLineItem matching the backend API response
+export type EstimateLineItem = {
+    id: string;
+    estimate_id?: string;
+    contractor_id?: string;
+    title: string;
+    description: string;
+    hours: number;
+    rate: number;
+    created_by?: string;
+    created_at: string;
+};
 
-const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === 'true';
-
-export function LineItem({ lineItemDetails, estimateID, index, removeLineItem }: {
-    lineItemDetails: DynamoLineItem, estimateID: string, index: number, removeLineItem: Function
+export function LineItem({ lineItem, onEdit, onDelete }: {
+    lineItem: EstimateLineItem;
+    onEdit: () => void;
+    onDelete: () => void;
 }) {
-    const [price, setPrice] = useState('');
-
-    useEffect(() => {
-        const priceStr = +lineItemDetails.price.N;
-        setPrice(priceStr.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-    }, []);
-
-    const deleteLineItem = async () => {
-        const content: UpdateJobContent = {
-            delete_line_item: index,
-        };
-        removeLineItem(lineItemDetails.id.S);
-
-        const response = await fetch(
-            `/api/estimates/${estimateID}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(content),
-            }
-        );
-
-        await response.json();
-    };
+    const rate = lineItem.rate || 0;
+    const formattedPrice = rate.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 
     return (
         <Card
-          key={uuidv4()}
           shadow="xs"
           padding="lg"
           radius="md"
           withBorder
           className={classes.lineItemCard}
         >
-            <IconX
-              onClick={() => deleteLineItem()}
-              style={{ cursor: 'pointer', position: 'absolute', right: '5px', top: '5px', width: '20px' }}
-            />
-            <Group style={{ justifyContent: 'space-between', marginRight: '30px' }}>
-                <Text size="lg" pl="md"><strong>{lineItemDetails.header.S}</strong></Text>
-                {!PRICE_BASED && lineItemDetails.hours ?
-                    <Text size="sm">Hours: {lineItemDetails.hours.N}</Text>
-                    :
-                    <Text size="sm">${price}</Text>
-                }
+            <Group justify="space-between" align="flex-start">
+                <div style={{ flex: 1 }}>
+                    <Group justify="space-between" mb="xs">
+                        <Text size="lg" fw={600}>
+                            {lineItem.title || 'Untitled'}
+                        </Text>
+                        <Group gap="xs">
+                            <ActionIcon
+                              variant="subtle"
+                              color="blue"
+                              onClick={onEdit}
+                              aria-label="Edit line item"
+                            >
+                                <IconEdit size={18} />
+                            </ActionIcon>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              onClick={onDelete}
+                              aria-label="Delete line item"
+                            >
+                                <IconTrash size={18} />
+                            </ActionIcon>
+                        </Group>
+                    </Group>
+                    {lineItem.description && (
+                        <Text size="sm" c="dimmed" mb="xs">
+                            {lineItem.description}
+                        </Text>
+                    )}
+                    <Group gap="md" mt="xs" justify="space-between">
+                        <Group gap="md">
+                            <Text size="sm" c="dimmed">
+                                Hours: {lineItem.hours.toFixed(2)}
+                            </Text>
+                            <Text size="sm" c="dimmed">
+                                Rate: ${formattedPrice}
+                            </Text>
+                        </Group>
+                        <Text size="sm" fw={600}>
+                            Total: ${(lineItem.hours * rate).toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                            })}
+                        </Text>
+                    </Group>
+                </div>
             </Group>
-            <Text pl="md" pt="sm" size="sm">Description: {lineItemDetails.description.S}</Text>
         </Card>
     );
 }

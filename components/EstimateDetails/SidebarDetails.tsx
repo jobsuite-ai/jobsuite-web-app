@@ -165,52 +165,6 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     onUpdate();
   };
 
-  const updateHours = async (value: string) => {
-    const updateJobContent: UpdateHoursAndRateInput = {
-      hours: value,
-      rate: estimate.hourly_rate?.toString() || '106',
-      date: estimate.scheduled_date || estimate.estimate_date || new Date().toISOString(),
-      discount_reason: estimate.discount_reason || '',
-    };
-
-    const content: UpdateJobContent = {
-      update_hours_and_rate: updateJobContent,
-    };
-
-    await fetch(`/api/estimates/${estimateID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(content),
-    });
-
-    onUpdate();
-  };
-
-  const updateRate = async (value: string) => {
-    const updateJobContent: UpdateHoursAndRateInput = {
-      hours: (estimate.hours_bid || estimate.estimate_hours || 0).toString(),
-      rate: value,
-      date: estimate.scheduled_date || estimate.estimate_date || new Date().toISOString(),
-      discount_reason: estimate.discount_reason || '',
-    };
-
-    const content: UpdateJobContent = {
-      update_hours_and_rate: updateJobContent,
-    };
-
-    await fetch(`/api/estimates/${estimateID}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(content),
-    });
-
-    onUpdate();
-  };
-
   const updateDiscountReason = async (value: string) => {
     const updateJobContent: UpdateHoursAndRateInput = {
       hours: (estimate.hours_bid || estimate.estimate_hours || 0).toString(),
@@ -363,23 +317,25 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           placeholder="Enter zip code"
         />
 
-        {/* Hours */}
-        <EditableField
-          label="Job Hours"
-          value={estimate.hours_bid || estimate.estimate_hours || 0}
-          onSave={updateHours}
-          type="number"
-          placeholder="Enter hours"
-        />
+        {/* Hours - Read-only */}
+        <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+          <Text size="sm" fw={500} c="dimmed">
+            Job Hours:
+          </Text>
+          <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+            {estimate.estimate_hours || '—'}
+          </Text>
+        </Flex>
 
-        {/* Rate */}
-        <EditableField
-          label="Job Rate"
-          value={estimate.hourly_rate || 106}
-          onSave={updateRate}
-          type="number"
-          placeholder="Enter rate"
-        />
+        {/* Rate - Read-only */}
+        <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+          <Text size="sm" fw={500} c="dimmed">
+            Job Rate:
+          </Text>
+          <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+            {estimate.hourly_rate || '—'}
+          </Text>
+        </Flex>
 
         {/* Discount Reason */}
         {estimate.discount_reason && (

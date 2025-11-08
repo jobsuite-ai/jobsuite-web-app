@@ -2,10 +2,21 @@
 
 import { Suspense, useEffect, useRef, useState } from 'react';
 
-import { Button, Center, Flex, Modal, Text } from '@mantine/core';
+import { ActionIcon, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconArchive, IconCopy, IconEdit, IconFileText, IconPencil } from '@tabler/icons-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import {
+    IconArchive,
+    IconCopy,
+    IconEdit,
+    IconFileText,
+    IconList,
+    IconPencil,
+    IconPhoto,
+    IconPlus,
+    IconVideo,
+    IconWriting,
+} from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
 
 import CollapsibleSection from './CollapsibleSection';
 import LoadingState from '../Global/LoadingState';
@@ -13,14 +24,12 @@ import { Estimate, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
-import EstimateDetailsView from './estimate/EstimateDetails';
-import LineItems from './estimate/LineItems';
+import LineItems, { LineItemsRef } from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import TranscriptionSummary, { TranscriptionSummaryRef } from './estimate/TranscriptionSummary';
 import ImageGallery from './ImageGallery';
+import ImageUpload from './ImageUpload';
 import JobTitle from './JobTitle';
-import PdfUploader from './PdfUploader';
-import { PdfViewer } from './PdfViewer';
 import ResourceLink from './ResourceLink';
 import SidebarDetails from './SidebarDetails';
 import classes from './styles/EstimateDetails.module.css';
@@ -33,11 +42,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
+    const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
+    const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+    const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
+    const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
+    const [lineItemsCount, setLineItemsCount] = useState(0);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
+    const lineItemsRef = useRef<LineItemsRef>(null);
     const router = useRouter();
 
-    const searchParams = useSearchParams();
-    const page = searchParams?.get('page');
+    // const searchParams = useSearchParams();
+    // const page = searchParams?.get('page');
 
     useEffect(() => {
         if (!estimate) {
@@ -197,6 +212,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     };
 
+    // Helper functions to check if sections have data
+    const hasVideo = estimate?.video != null;
+    const hasImages = estimate?.images != null
+        && (Array.isArray(estimate.images) ? estimate.images.length > 0
+            : estimate.images?.L?.length > 0 || estimate.images?.name);
+    const hasDescription = estimate?.transcription_summary
+        && estimate.transcription_summary.trim().length > 0;
+    const hasSpanishTranscription = estimate?.spanish_transcription
+        && estimate.spanish_transcription.trim().length > 0;
+
     const OverviewDetails = () => (
         <>
             {loading ? <LoadingState /> : <>
@@ -206,12 +231,74 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             {/* Column 1: Main Content - Video, Images, Description, Activity */}
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
-                                    <JobTitle initialTitle={estimate.job_title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                    <Flex justify="space-between" align="center" gap="md" w="100%">
+                                        <JobTitle initialTitle={estimate.job_title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                        <Menu shadow="md" width={200} position="bottom-start" offset={5}>
+                                            <Menu.Target>
+                                                <ActionIcon
+                                                  variant="filled"
+                                                  color="blue"
+                                                  size="lg"
+                                                  radius="md"
+                                                >
+                                                    <IconPlus size={20} />
+                                                </ActionIcon>
+                                            </Menu.Target>
+                                            <Menu.Dropdown>
+                                                {!hasVideo && (
+                                                    <Menu.Item
+                                                      leftSection={<IconVideo size={16} />}
+                                                      onClick={() =>
+                                                        setShowVideoUploaderModal(true)
+                                                      }
+                                                    >
+                                                        Add Video
+                                                    </Menu.Item>
+                                                )}
+                                                <Menu.Item
+                                                  leftSection={<IconPhoto size={16} />}
+                                                  onClick={() => setShowImageUploadModal(true)}
+                                                >
+                                                    Add Images
+                                                </Menu.Item>
+                                                <Menu.Item
+                                                  leftSection={<IconList size={16} />}
+                                                  onClick={() =>
+                                                      lineItemsRef.current?.openAddModal()
+                                                  }
+                                                >
+                                                    Add Line Item
+                                                </Menu.Item>
+                                                {!hasDescription && (
+                                                    <Menu.Item
+                                                      leftSection={<IconWriting size={16} />}
+                                                      onClick={() => {
+                                                        setShowDescriptionEditor(true);
+                                                        transcriptionSummaryRef.current
+                                                            ?.handleEdit();
+                                                    }}
+                                                    >
+                                                        Add Description
+                                                    </Menu.Item>
+                                                )}
+                                                {!hasSpanishTranscription && (
+                                                    <Menu.Item
+                                                      leftSection={<IconWriting size={16} />}
+                                                      onClick={() =>
+                                                        setShowSpanishTranscriptionEditor(true)
+                                                    }
+                                                    >
+                                                        Add Spanish Transcription
+                                                    </Menu.Item>
+                                                )}
+                                            </Menu.Dropdown>
+                                        </Menu>
+                                    </Flex>
                                 </div>
                                 <div className={classes.columnContent}>
-                                    {/* Video Section */}
-                                    <CollapsibleSection title="Video" defaultOpen>
-                                        {estimate.video ?
+                                    {/* Video Section - Only show if video exists */}
+                                    {hasVideo && (
+                                        <CollapsibleSection title="Video" defaultOpen>
                                             <VideoFrame
                                               name={
                                                 typeof estimate.video === 'object' && estimate.video?.name
@@ -221,81 +308,116 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               estimateID={estimateID}
                                               refresh={getEstimate}
                                             />
-                                            :
-                                            <VideoUploader
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Image Gallery - Show if images exist */}
+                                    {hasImages && (
+                                        <CollapsibleSection title="Image Gallery" defaultOpen>
+                                            <ImageGallery
+                                              estimateID={estimateID}
+                                              images={estimate.images}
+                                              onUpdate={() => {
+                                                getEstimate();
+                                              }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Transcription Summary - Only show if description exists */}
+                                    {hasDescription && (
+                                        <CollapsibleSection
+                                          title="Description"
+                                          defaultOpen
+                                          headerActions={
+                                            <>
+                                                <IconEdit
+                                                  onClick={handleEditTranscriptionSummary}
+                                                  style={{ cursor: 'pointer' }}
+                                                />
+                                                <IconCopy
+                                                  onClick={handleCopyTranscriptionSummary}
+                                                  style={{ cursor: 'pointer' }}
+                                                />
+                                            </>
+                                          }
+                                        >
+                                            <TranscriptionSummary
+                                              ref={transcriptionSummaryRef}
+                                              estimate={estimate}
                                               estimateID={estimateID}
                                               refresh={getEstimate}
                                             />
-                                        }
-                                    </CollapsibleSection>
+                                        </CollapsibleSection>
+                                    )}
 
-                                    {/* Image Gallery */}
-                                    <CollapsibleSection title="Image Gallery" defaultOpen>
-                                        <ImageGallery
+                                    {/* Show description editor if triggered from menu */}
+                                    {showDescriptionEditor && !hasDescription && (
+                                        <CollapsibleSection title="Description" defaultOpen>
+                                            <TranscriptionSummary
+                                              ref={transcriptionSummaryRef}
+                                              estimate={estimate}
+                                              estimateID={estimateID}
+                                              refresh={() => {
+                                                getEstimate();
+                                                setShowDescriptionEditor(false);
+                                              }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Spanish Transcription - Only show if it exists */}
+                                    {hasSpanishTranscription && (
+                                        <CollapsibleSection
+                                          title="Spanish Transcription"
+                                          defaultOpen
+                                          headerActions={
+                                            <IconCopy
+                                              onClick={handleCopySpanishTranscription}
+                                              style={{ cursor: 'pointer' }}
+                                            />
+                                          }
+                                        >
+                                            <SpanishTranscription
+                                              estimate={estimate}
+                                              refresh={getEstimate}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Show Spanish transcription editor if triggered from menu */}
+                                    {showSpanishTranscriptionEditor && !hasSpanishTranscription && (
+                                        <CollapsibleSection title="Spanish Transcription" defaultOpen>
+                                            <SpanishTranscription
+                                              estimate={estimate}
+                                              refresh={() => {
+                                                getEstimate();
+                                                setShowSpanishTranscriptionEditor(false);
+                                              }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Line Items - Only show if there are line items */}
+                                    {lineItemsCount > 0 && (
+                                        <CollapsibleSection title="Line Items" defaultOpen>
+                                            <LineItems
+                                              ref={lineItemsRef}
+                                              estimateID={estimateID}
+                                              onLineItemsChange={setLineItemsCount}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+                                    {/* Always render LineItems (hidden if empty) for ref access */}
+                                    {lineItemsCount === 0 && (
+                                        <LineItems
+                                          ref={lineItemsRef}
                                           estimateID={estimateID}
-                                          images={estimate.images}
-                                          onUpdate={getEstimate}
+                                          onLineItemsChange={setLineItemsCount}
                                         />
-                                    </CollapsibleSection>
+                                    )}
 
-                                    {/* Transcription Summary */}
-                                    <CollapsibleSection
-                                      title="Description"
-                                      defaultOpen
-                                      headerActions={
-                                        estimate?.transcription_summary
-                                        && estimate.transcription_summary.trim().length > 0
-                                            ? (
-                                                <>
-                                                    <IconEdit
-                                                      onClick={handleEditTranscriptionSummary}
-                                                      style={{ cursor: 'pointer' }}
-                                                    />
-                                                    <IconCopy
-                                                      onClick={handleCopyTranscriptionSummary}
-                                                      style={{ cursor: 'pointer' }}
-                                                    />
-                                                </>
-                                            )
-                                            : undefined
-                                      }
-                                    >
-                                        <TranscriptionSummary
-                                          ref={transcriptionSummaryRef}
-                                          estimate={estimate}
-                                          estimateID={estimateID}
-                                          refresh={getEstimate}
-                                        />
-                                    </CollapsibleSection>
-
-                                    {/* Spanish Transcription */}
-                                    <CollapsibleSection
-                                      title="Spanish Transcription"
-                                      defaultOpen
-                                      headerActions={
-                                        estimate?.spanish_transcription
-                                        && estimate.spanish_transcription.trim().length > 0
-                                            ? (
-                                                <IconCopy
-                                                  onClick={handleCopySpanishTranscription}
-                                                  style={{ cursor: 'pointer' }}
-                                                />
-                                            )
-                                            : undefined
-                                      }
-                                    >
-                                        <SpanishTranscription
-                                          estimate={estimate}
-                                          refresh={getEstimate}
-                                        />
-                                    </CollapsibleSection>
-
-                                    {/* Line Items */}
-                                    <CollapsibleSection title="Line Items" defaultOpen>
-                                        <LineItems job={estimate as any} />
-                                    </CollapsibleSection>
-
-                                    {/* Activity Section */}
+                                    {/* Activity Section - Always show */}
                                     <CollapsibleSection title="Activity" defaultOpen>
                                         <JobComments estimateID={estimateID} />
                                     </CollapsibleSection>
@@ -359,6 +481,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     </> : <UniversalError message="Unable to access estimate details" />
                 }
                                           </>}
+            {/* Archive Confirmation Modal */}
             <Modal
               opened={isModalOpen}
               onClose={() => setIsModalOpen(false)}
@@ -378,51 +501,77 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     </Flex>
                 </Center>
             </Modal>
+
+            {/* Video Upload Modal */}
+            <Modal
+              opened={showVideoUploaderModal}
+              onClose={() => setShowVideoUploaderModal(false)}
+              size="lg"
+              centered
+              title={<Text fz={24} fw={700}>Upload Video</Text>}
+            >
+                <VideoUploader
+                  estimateID={estimateID}
+                  refresh={() => {
+                    getEstimate();
+                    setShowVideoUploaderModal(false);
+                  }}
+                />
+            </Modal>
+
+            {/* Image Upload Modal */}
+            <Modal
+              opened={showImageUploadModal}
+              onClose={() => setShowImageUploadModal(false)}
+              size="lg"
+              centered
+              title={<Text fz={24} fw={700}>Upload Images</Text>}
+            >
+                <ImageUpload
+                  estimateID={estimateID}
+                  setImage={() => {
+                    getEstimate();
+                    setShowImageUploadModal(false);
+                  }}
+                  setShowModal={setShowImageUploadModal}
+                />
+            </Modal>
+
+            {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
     );
 
-    const PdfDetails = () => (
-        <>
-            {loading ? <LoadingState /> : <>
-                <div className={classes.jobDetailsWrapper}>
-                    {estimate ?
-                        <>
-                            <JobTitle initialTitle={estimate.job_title || ''} estimateID={estimateID} onSave={getEstimate} />
-                            <div className={classes.flexContainer}>
-                                <div className={classes.videoWrapper}>
-                                    {estimate.pdf ?
-                                        <PdfViewer
-                                          name={typeof estimate.pdf === 'object' && estimate.pdf?.name ? estimate.pdf.name : estimate.pdf}
-                                          estimateID={estimateID}
-                                          refresh={getEstimate}
-                                        />
-                                        :
-                                        <PdfUploader
-                                          estimateID={estimateID}
-                                          refresh={getEstimate}
-                                        />
-                                    }
-                                </div>
-                            </div>
-                        </> : <UniversalError message="Unable to access estimate details" />
-                    }
-                </div>
-                                          </>}
-        </>
-    );
-
-    if (estimate) {
-        switch (page) {
-            case 'overview':
-                return (<OverviewDetails />);
-            case 'estimate':
-                return (<EstimateDetailsView job={estimate as any} />);
-            case 'pdf':
-                return (<PdfDetails />);
-            default:
-                return (<OverviewDetails />);
-        }
-    }
+    // const PdfDetails = () => (
+    //     <>
+    //         {loading ? <LoadingState /> : <>
+    //             <div className={classes.jobDetailsWrapper}>
+    //                 {estimate ?
+    //                     <>
+    //                         <JobTitle initialTitle={estimate.job_title || ''}
+    // estimateID={estimateID} onSave={getEstimate} />
+    //                         <div className={classes.flexContainer}>
+    //                             <div className={classes.videoWrapper}>
+    //                                 {estimate.pdf ?
+    //                                     <PdfViewer
+    //                                       name={typeof estimate.pdf === 'object' &&
+    // estimate.pdf?.name ? estimate.pdf.name : estimate.pdf}
+    //                                       estimateID={estimateID}
+    //                                       refresh={getEstimate}
+    //                                     />
+    //                                     :
+    //                                     <PdfUploader
+    //                                       estimateID={estimateID}
+    //                                       refresh={getEstimate}
+    //                                     />
+    //                                 }
+    //                             </div>
+    //                         </div>
+    //                     </> : <UniversalError message="Unable to access estimate details" />
+    //                 }
+    //             </div>
+    //                                       </>}
+    //     </>
+    // );
 
     return (<OverviewDetails />);
 }

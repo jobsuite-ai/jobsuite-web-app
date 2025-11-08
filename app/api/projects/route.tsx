@@ -36,9 +36,11 @@ export async function GET(request: NextRequest) {
         const clientId = url.searchParams.get('client_id');
         const status = url.searchParams.get('status');
 
-        // Build the API URL
-        let jobsUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/jobs`;
+        // Build the API URL - use estimates endpoint with is_project=true
+        let estimatesUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates`;
         const queryParams = new URLSearchParams();
+        // Always filter for projects only
+        queryParams.append('is_project', 'true');
         if (clientId) {
             queryParams.append('client_id', clientId);
         }
@@ -46,11 +48,11 @@ export async function GET(request: NextRequest) {
             queryParams.append('status', status);
         }
         if (queryParams.toString()) {
-            jobsUrl += `?${queryParams.toString()}`;
+            estimatesUrl += `?${queryParams.toString()}`;
         }
 
-        // Fetch jobs from backend
-        const jobsResponse = await fetch(jobsUrl, {
+        // Fetch estimates (projects) from backend
+        const estimatesResponse = await fetch(estimatesUrl, {
             method: 'GET',
             headers: {
                 Authorization: `Bearer ${token}`,
@@ -58,18 +60,18 @@ export async function GET(request: NextRequest) {
             },
         });
 
-        if (!jobsResponse.ok) {
-            const errorData = await jobsResponse.json();
+        if (!estimatesResponse.ok) {
+            const errorData = await estimatesResponse.json();
             return NextResponse.json(
-                { message: errorData.detail || 'Failed to fetch jobs' },
-                { status: jobsResponse.status }
+                { message: errorData.detail || 'Failed to fetch projects' },
+                { status: estimatesResponse.status }
             );
         }
 
-        const jobs = await jobsResponse.json();
+        const estimates = await estimatesResponse.json();
 
         // Return in the format expected by the frontend (wrapped in Items)
-        return NextResponse.json({ Items: jobs });
+        return NextResponse.json({ Items: estimates });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get jobs error:', error);

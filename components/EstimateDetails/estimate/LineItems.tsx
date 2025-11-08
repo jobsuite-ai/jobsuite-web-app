@@ -1,218 +1,419 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
-import { Button, Group, Modal, NumberInput, Text, Textarea, TextInput } from '@mantine/core';
+import { Button, Group, Modal, NumberInput, TextInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { v4 as uuidv4 } from 'uuid';
+import { notifications } from '@mantine/notifications';
 
 import '@mantine/dropzone/styles.css';
-import { LineItem } from './LineItem';
+import { EstimateLineItem, LineItem } from './LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
-import { SingleJob } from '@/components/Global/model';
 
-const PRICE_BASED = process.env.NEXT_PUBLIC_PRICE_BASED === 'true';
+export type LineItemsRef = {
+    openAddModal: () => void;
+    getLineItemsCount: () => number;
+};
 
-export default function LineItems({ job }: { job: SingleJob }) {
+const LineItems = forwardRef<LineItemsRef, {
+    estimateID: string;
+    onLineItemsChange?:(count: number) => void;
+}>(({ estimateID, onLineItemsChange }, ref) => {
     const [opened, setOpened] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [lineItems, setLineItems] = useState(job.line_items?.L ?? []);
-    const [date] = useState(job.estimate_date?.S ?? new Date().toISOString());
-    const isFirstRender = useRef(true);
+    const [editingItem, setEditingItem] = useState<EstimateLineItem | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
+    const [isFetching, setIsFetching] = useState(true);
 
     const form = useForm({
         mode: 'uncontrolled',
         initialValues: {
-            header: '',
-            description: 'Please see the description above',
-            price: 0,
+            title: '',
+            description: '',
             hours: 0,
+            rate: 0,
         },
         validate: (values) => ({
-                header: values.header === '' ? 'Must enter header' : null,
-            }),
+            title: values.title === '' ? 'Must enter title' : null,
+            description: values.description === '' ? 'Must enter description' : null,
+            hours: values.hours <= 0 ? 'Hours must be greater than 0' : null,
+            rate: values.rate <= 0 ? 'Rate must be greater than 0' : null,
+        }),
     });
 
+    // Fetch line items on mount
     useEffect(() => {
-        async function updateHours() {
-            await setTotalHours();
+        fetchLineItems();
+    }, [estimateID]);
+
+    async function fetchLineItems() {
+        setIsFetching(true);
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            setIsFetching(false);
+            return;
         }
 
-        if (!isFirstRender.current) {
-            updateHours();
-        } else {
-            isFirstRender.current = false;
-        }
-    }, [lineItems]);
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
 
-    async function setTotalHours() {
-        // Update job hours based on line items
-        const totalHours = lineItems.reduce((acc, item) => acc + +item.M.hours.N, 0);
-        const content: UpdateJobContent = {
-            update_hours_and_rate: {
-                hours: totalHours.toString(),
-                rate: job.hourly_rate?.N ?? '106',
-                date,
-            },
-        };
-
-        const response = await fetch(
-            `/api/estimates/${job.id.S}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(content),
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Error',
+                    message: errorData.message || 'Failed to fetch line items',
+                    color: 'red',
+                });
+                setIsFetching(false);
+                return;
             }
-        );
 
-        await response.json();
+            const items = await response.json();
+            const itemsArray = items || [];
+            setLineItems(itemsArray);
+            onLineItemsChange?.(itemsArray.length);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching line items:', error);
+            notifications.show({
+                title: 'Error',
+                message: 'An error occurred while fetching line items',
+                color: 'red',
+            });
+        } finally {
+            setIsFetching(false);
+        }
     }
 
     async function addLineItem() {
         if (!form.validate().hasErrors) {
-            setIsUploading(true);
+            setIsSubmitting(true);
+            const accessToken = localStorage.getItem('access_token');
+
+            if (!accessToken) {
+                setIsSubmitting(false);
+                return;
+            }
+
             const formValues = form.getValues();
-            const lineItemID = uuidv4();
 
-            const content: UpdateJobContent = {
-                line_item: {
-                    id: lineItemID,
-                    header: formValues.header,
-                    description: formValues.description,
-                    price: formValues.price,
-                    hours: formValues.hours,
-                },
-            };
+            try {
+                const response = await fetch(
+                    `/api/estimates/${estimateID}/line-items`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            title: formValues.title,
+                            description: formValues.description,
+                            hours: formValues.hours,
+                            rate: formValues.rate,
+                        }),
+                    }
+                );
 
-            const response = await fetch(
-                `/api/estimates/${job.id.S}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(content),
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    notifications.show({
+                        title: 'Error',
+                        message: errorData.message || 'Failed to create line item',
+                        color: 'red',
+                    });
+                    setIsSubmitting(false);
+                    return;
                 }
-            );
 
-            await response.json();
-
-            setLineItems([...lineItems, {
-                M: {
-                    id: {
-                        S: lineItemID,
-                    },
-                    header: {
-                        S: formValues.header,
-                    },
-                    description: {
-                        S: formValues.description,
-                    },
-                    price: {
-                        N: formValues.price.toString(),
-                    },
-                    hours: {
-                        N: formValues.hours.toString(),
-                    },
-                },
-            }]);
-
-            setIsUploading(false);
-            setOpened(false);
+                const newItem = await response.json();
+                const updatedItems = [...lineItems, newItem];
+                setLineItems(updatedItems);
+                onLineItemsChange?.(updatedItems.length);
+                form.reset();
+                setOpened(false);
+                notifications.show({
+                    title: 'Success',
+                    message: 'Line item added successfully',
+                    color: 'green',
+                });
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error creating line item:', error);
+                notifications.show({
+                    title: 'Error',
+                    message: 'An error occurred while creating line item',
+                    color: 'red',
+                });
+            } finally {
+                setIsSubmitting(false);
+            }
         }
     }
 
-    const removeLineItem = (id: string) => {
-        setLineItems((prevItems: any) => prevItems.filter((item: any) => item.M.id?.S !== id));
+    async function updateLineItem() {
+        if (!editingItem || form.validate().hasErrors) {
+            return;
+        }
+
+        setIsSubmitting(true);
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            setIsSubmitting(false);
+            return;
+        }
+
+        const formValues = form.getValues();
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items/${editingItem.id}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: formValues.title,
+                        description: formValues.description,
+                        hours: formValues.hours,
+                        rate: formValues.rate,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Error',
+                    message: errorData.message || 'Failed to update line item',
+                    color: 'red',
+                });
+                setIsSubmitting(false);
+                return;
+            }
+
+            const updatedItem = await response.json();
+            const updatedItems = lineItems.map(item =>
+                item.id === updatedItem.id ? updatedItem : item
+            );
+            setLineItems(updatedItems);
+            onLineItemsChange?.(updatedItems.length);
+            form.reset();
+            setEditingItem(null);
+            setOpened(false);
+            notifications.show({
+                title: 'Success',
+                message: 'Line item updated successfully',
+                color: 'green',
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error updating line item:', error);
+            notifications.show({
+                title: 'Error',
+                message: 'An error occurred while updating line item',
+                color: 'red',
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+
+    async function deleteLineItem(id: string) {
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items/${id}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Error',
+                    message: errorData.message || 'Failed to delete line item',
+                    color: 'red',
+                });
+                return;
+            }
+
+            const updatedItems = lineItems.filter(item => item.id !== id);
+            setLineItems(updatedItems);
+            onLineItemsChange?.(updatedItems.length);
+            notifications.show({
+                title: 'Success',
+                message: 'Line item deleted successfully',
+                color: 'green',
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error deleting line item:', error);
+            notifications.show({
+                title: 'Error',
+                message: 'An error occurred while deleting line item',
+                color: 'red',
+            });
+        }
+    }
+
+    const handleEdit = (item: EstimateLineItem) => {
+        setEditingItem(item);
+        form.setValues({
+            title: item.title || '',
+            description: item.description,
+            hours: item.hours,
+            rate: item.rate || 0,
+        });
+        setOpened(true);
     };
+
+    const handleClose = () => {
+        setOpened(false);
+        setEditingItem(null);
+        form.reset();
+    };
+
+    const openAddModal = () => {
+        form.reset();
+        setEditingItem(null);
+        setOpened(true);
+    };
+
+    // Expose methods via ref
+    useImperativeHandle(ref, () => ({
+        openAddModal,
+        getLineItemsCount: () => lineItems.length,
+    }));
+
+    if (isFetching) {
+        return <LoadingState />;
+    }
 
     return (
         <div className={classes.lineItemsContainer}>
             {lineItems && lineItems.length > 0 ?
                 <>
-                    {lineItems.map((item, index) => (
+                    {lineItems.map((item) => (
                         <LineItem
-                          estimateID={job.id.S}
-                          lineItemDetails={item.M}
-                          key={uuidv4()}
-                          index={index}
-                          removeLineItem={removeLineItem}
+                          key={item.id}
+                          lineItem={item}
+                          onEdit={() => handleEdit(item)}
+                          onDelete={() => deleteLineItem(item.id)}
                         />
                     ))}
                 </>
                 :
-                <div className={classes.emptyState}>
-                    <Text>You do not have any line Items</Text>
-                </div>
+                null
             }
 
-            <Group justify="center" mt="lg">
-                <Button onClick={() => setOpened(true)}>Add Line Item</Button>
-            </Group>
+            {lineItems.length > 0 && (
+                <Group justify="center" mt="lg">
+                    <Button onClick={() => {
+                        form.reset();
+                        setEditingItem(null);
+                        setOpened(true);
+                    }}>
+                        Add Line Item
+                    </Button>
+                </Group>
+            )}
 
             <Modal
               opened={opened}
-              onClose={() => setOpened(false)}
-              title="Add Line Item"
+              onClose={handleClose}
+              title={editingItem ? 'Edit Line Item' : 'Add Line Item'}
               size="lg"
+              centered
             >
-                {isUploading ?
+                {isSubmitting ?
                     <LoadingState />
                     :
                     <div>
                         <TextInput
                           withAsterisk
-                          label="Header"
-                          placeholder="Header"
-                          key={form.key('header')}
-                          {...form.getInputProps('header')}
+                          label="Title"
+                          placeholder="Enter the title"
+                          key={form.key('title')}
+                          {...form.getInputProps('title')}
+                          mb="md"
                         />
                         <Textarea
+                          withAsterisk
                           label="Description"
                           placeholder="Enter the description"
                           key={form.key('description')}
                           {...form.getInputProps('description')}
+                          mb="md"
                         />
-                        {PRICE_BASED ?
-                            <NumberInput
-                              defaultValue={1000}
-                              prefix="$"
-                              thousandsGroupStyle="thousand"
-                              decimalScale={2}
-                              allowLeadingZeros={false}
-                              allowNegative={false}
-                              fixedDecimalScale
-                              withAsterisk
-                              label="Price"
-                              placeholder="Enter the price"
-                              key={form.key('price')}
-                              {...form.getInputProps('price')}
-                            />
-                            :
-                            <NumberInput
-                              defaultValue={0}
-                              allowLeadingZeros={false}
-                              allowNegative={false}
-                              fixedDecimalScale
-                              withAsterisk
-                              label="Hours"
-                              placeholder="Enter the job hours"
-                              key={form.key('hours')}
-                              {...form.getInputProps('hours')}
-                            />
-                        }
+                        <NumberInput
+                          withAsterisk
+                          label="Hours"
+                          placeholder="Enter the hours"
+                          min={0}
+                          decimalScale={2}
+                          allowNegative={false}
+                          key={form.key('hours')}
+                          {...form.getInputProps('hours')}
+                          mb="md"
+                        />
+                        <NumberInput
+                          withAsterisk
+                          label="Rate"
+                          placeholder="Enter the rate"
+                          prefix="$"
+                          min={0}
+                          decimalScale={2}
+                          allowNegative={false}
+                          key={form.key('rate')}
+                          {...form.getInputProps('rate')}
+                          mb="md"
+                        />
 
                         <Group mt="md">
-                            <Button type="submit" onClick={addLineItem}>Add Line Item</Button>
+                            <Button
+                              type="submit"
+                              onClick={editingItem ? updateLineItem : addLineItem}
+                            >
+                                {editingItem ? 'Update Line Item' : 'Add Line Item'}
+                            </Button>
+                            <Button variant="outline" onClick={handleClose}>
+                                Cancel
+                            </Button>
                         </Group>
                     </div>
                 }
             </Modal>
         </div>
     );
-}
+    }
+);
+
+LineItems.displayName = 'LineItems';
+
+export default LineItems;
