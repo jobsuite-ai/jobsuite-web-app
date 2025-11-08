@@ -72,7 +72,6 @@ export async function GET(request: NextRequest) {
     // Return in the format expected by the frontend (wrapped in Items)
     return NextResponse.json({ Items: estimates });
   } catch (error) {
-    console.error('Get estimates error:', error);
     return NextResponse.json(
       { message: 'An error occurred while fetching estimates' },
       { status: 500 }

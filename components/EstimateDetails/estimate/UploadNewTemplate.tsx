@@ -3,13 +3,13 @@
 import { Button, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 
-import { JobStatus, SingleJob } from '../../Global/model';
+import { Estimate, EstimateStatus } from '../../Global/model';
 
 import updateJobStatus from '@/components/Global/updateJobStatus';
 
-export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
+export function UploadNewTemplate({ template, estimate, clientEmail, setLoading }: {
     template: string,
-    job: SingleJob,
+    estimate: Estimate,
     clientEmail: string,
     setLoading: Function
 }) {
@@ -21,7 +21,7 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
                 method: 'POST',
                 body: JSON.stringify({
                     template,
-                    jobID: job.id.S,
+                    jobID: estimate.id,
                 }),
             }
         );
@@ -33,14 +33,14 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
                 method: 'POST',
                 body: JSON.stringify({
                     template_id: templateData.out.id,
-                    jobID: job.id.S,
+                    jobID: estimate.id,
                     client_email: clientEmail,
                 }),
             }
         );
         await sendResponse.json();
 
-        await updateJobStatus(JobStatus.ESTIMATE_SENT, job.id.S);
+        await updateJobStatus(EstimateStatus.ESTIMATE_SENT, estimate.id);
         setLoading(false);
         notifications.show({
             title: 'Success!',
@@ -51,10 +51,10 @@ export function UploadNewTemplate({ template, job, clientEmail, setLoading }: {
     }
 
     const isDisabled = !(
-        !!job.video &&
-        !!job.images &&
-        !!job.transcription_summary &&
-        !!job.line_items
+        !!estimate.video &&
+        !!estimate.images &&
+        !!estimate.transcription_summary &&
+        !!estimate.line_items
     );
 
     return (

@@ -2,26 +2,26 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Card, Flex, Switch, Text, TextInput } from '@mantine/core';
+import { Button, Card, Flex, Switch, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { DatePickerInput, DateValue } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCalendarEvent, IconEdit } from '@tabler/icons-react';
+import { IconEdit } from '@tabler/icons-react';
 
-import { JobStatus, SingleJob } from '../Global/model';
+import { Estimate, EstimateStatus } from '../Global/model';
 import updateJobStatus from '../Global/updateJobStatus';
 import classes from './styles/HoursAndRate.module.css';
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 
-export default function HoursAndRate({ job }: { job: SingleJob }) {
-    const [hours, setHours] = useState((job.estimate_hours?.N ?? 0).toString());
-    const [rate, setRate] = useState<string>((job.hourly_rate?.N ?? 106).toString());
+export default function HoursAndRate({ estimate }: { estimate: Estimate }) {
+    const [hours, setHours] = useState((estimate.estimate_hours ?? 0).toString());
+    const [rate, setRate] = useState<string>((estimate.hourly_rate ?? 106).toString());
     const [discountReason, setDiscountReason] = useState<string | undefined>(
-        job.discount_reason?.S
+        estimate.discount_reason
     );
-    const [hasDiscount, setHasDiscount] = useState(Boolean(job.discount_reason?.S));
-    const [date, setDate] = useState(job.estimate_date?.S.split('T')[0] ??
+    const [hasDiscount, setHasDiscount] = useState(Boolean(estimate.discount_reason));
+    const [date, setDate] = useState(estimate.estimate_date?.split('T')[0] ??
         new Date().toISOString().split('T')[0]
     );
     const [edit, setEdit] = useState(false);
@@ -60,8 +60,8 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         setEstimateDateState(newEstimateDate);
         setDate((newEstimateDate?.toISOString() as string).split('T')[0]);
 
-        if (job.job_status.S === JobStatus.ESTIMATE_NOT_SCHEDULED) {
-            updateJobStatus(JobStatus.ESTIMATE_IN_PROGRESS, job.id.S);
+        if (estimate.status === EstimateStatus.ESTIMATE_NOT_SCHEDULED) {
+            updateJobStatus(EstimateStatus.ESTIMATE_IN_PROGRESS, estimate.id);
         }
     };
 
@@ -78,7 +78,7 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
         };
 
         const response = await fetch(
-            `/api/estimates/${job.id.S}`,
+            `/api/estimates/${estimate.id}`,
             {
                 method: 'PUT',
                 headers: {
@@ -107,64 +107,40 @@ export default function HoursAndRate({ job }: { job: SingleJob }) {
                   style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
                 />
             </div>
-            {edit ?
-                <div className={classes.editFlexContainer}>
+            <div className={classes.editFlexContainer}>
+                <TextInput
+                  label="Job Hours"
+                  placeholder="Set job hours"
+                  value={hours}
+                  onChange={setEstimateHours}
+                />
+                <TextInput
+                  label="Job Rate"
+                  placeholder="Set job rate"
+                  value={rate}
+                  onChange={setEstimateRate}
+                />
+                <Switch
+                  label="Apply Discount"
+                  checked={hasDiscount}
+                  onChange={(event) => toggleDiscount(event.currentTarget.checked)}
+                />
+                {hasDiscount &&
                     <TextInput
-                      label="Job Hours"
-                      placeholder="Set job hours"
-                      value={hours}
-                      onChange={setEstimateHours}
+                      label="Discount Reason"
+                      placeholder="Set discount reason"
+                      value={discountReason}
+                      onChange={setEstimateDiscountReason}
                     />
-                    <TextInput
-                      label="Job Rate"
-                      placeholder="Set job rate"
-                      value={rate}
-                      onChange={setEstimateRate}
-                    />
-                    <Switch
-                      label="Apply Discount"
-                      checked={hasDiscount}
-                      onChange={(event) => toggleDiscount(event.currentTarget.checked)}
-                    />
-                    {hasDiscount &&
-                        <TextInput
-                          label="Discount Reason"
-                          placeholder="Set discount reason"
-                          value={discountReason}
-                          onChange={setEstimateDiscountReason}
-                        />
-                    }
-                    <DatePickerInput
-                      label="Estimate Date"
-                      valueFormat="MMM DD, YYYY"
-                      placeholder="Set estimate date"
-                      value={estimateDate}
-                      onChange={setEstimateDate}
-                    />
-                </div>
-                :
-                <>
-                    <Flex justify="center" direction="column" gap="md">
-                        <Text size="sm" mr="lg" fw={700}>Job hours: {hours}</Text>
-                        <Text size="sm" fw={700}>Job rate: ${rate}</Text>
-                        {hasDiscount && <Text size="sm">Discount reason: {discountReason}</Text>}
-
-                        <Flex align="center" gap="md" direction="column">
-                            {job.outlook_event_url?.S && (
-                                <Button
-                                  component="a"
-                                  href={job.outlook_event_url.S}
-                                  target="_blank"
-                                  variant="subtle"
-                                  leftSection={<IconCalendarEvent size={16} />}
-                                >
-                                    View Scheduled Event
-                                </Button>
-                            )}
-                        </Flex>
-                    </Flex>
-                </>
-            }
+                }
+                <DatePickerInput
+                  label="Estimate Date"
+                  valueFormat="MMM DD, YYYY"
+                  placeholder="Set estimate date"
+                  value={estimateDate}
+                  onChange={setEstimateDate}
+                />
+            </div>
             {edit &&
                 <Flex direction="row" justify="center" gap="lg">
                     <Button onClick={() => setEdit(false)}>Cancel</Button>

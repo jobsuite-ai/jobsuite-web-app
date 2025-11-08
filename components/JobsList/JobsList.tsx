@@ -35,17 +35,17 @@ import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
 import LoadingState from '../Global/LoadingState';
-import { Job, JobStatus } from '../Global/model';
+import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
-import { getBadgeColor } from '../Global/utils';
+import { getEstimateBadgeColor } from '../Global/utils';
 
 // Sortable job card component
 interface SortableJobCardProps {
-    job: Job;
+    project: Estimate;
     onClick: () => void;
 }
 
-function SortableJobCard({ job, onClick }: SortableJobCardProps) {
+function SortableJobCard({ project, onClick }: SortableJobCardProps) {
     const {
         attributes,
         listeners,
@@ -53,7 +53,7 @@ function SortableJobCard({ job, onClick }: SortableJobCardProps) {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: job.id });
+    } = useSortable({ id: project.id });
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -82,30 +82,32 @@ function SortableJobCard({ job, onClick }: SortableJobCardProps) {
         >
             <Group justify="space-between" mb="xs">
                 <Text fw={500} size="sm" lineClamp={1}>
-                    {(job as any).job_name || (job as any).client_name || 'Untitled Job'}
+                    {project.job_title || project.client_name || 'Untitled Project'}
                 </Text>
                 <Badge
                   className={classes.badge}
-                  color={getBadgeColor((job.job_status as any) || JobStatus.NEW_LEAD)}
+                  color={getEstimateBadgeColor(
+                    (project.status) || EstimateStatus.NEW_LEAD
+                  )}
                   size="sm"
                 >
-                    {String(job.job_status || 'UNKNOWN')}
+                    {String(project.status || 'UNKNOWN')}
                 </Badge>
             </Group>
 
-            {job.job_type && (
+            {project.estimate_type && (
                 <Text size="xs" c="dimmed" mb="xs">
-                    {job.job_type}
+                    {project.estimate_type}
                 </Text>
             )}
 
             <Stack gap={2}>
                 <Text size="xs" c="dimmed" lineClamp={1}>
-                    {(job as any).address_street || (job as any).client_address || 'No address'}
+                    {project.address_street || project.client_address || 'No address'}
                 </Text>
                 <Text size="xs" c="dimmed">
-                    {(job as any).address_city || job.city}, {(job as any).address_state || job.state}{' '}
-                    {(job as any).address_zipcode || job.zip_code}
+                    {project.address_city || project.city}, {project.address_state || project.state}{' '}
+                    {project.address_zipcode || project.zip_code}
                 </Text>
             </Stack>
         </Card>
@@ -218,7 +220,7 @@ function KanbanColumn({
                             jobs.map((job) => (
                                 <SortableJobCard
                                   key={job.id}
-                                  job={job}
+                                  project={job}
                                   onClick={() => onJobClick(job)}
                                 />
                             ))
@@ -386,17 +388,18 @@ export default function JobsList() {
 
         return jobs
             .filter((job) => {
-                // Handle both string and JobStatus enum values
-                const jobStatus = typeof job.job_status === 'string'
-                    ? job.job_status
-                    : job.job_status;
+                // Handle both string and EstimateStatus enum values
+                const estimate = job as Estimate;
+                const jobStatus = typeof estimate.status === 'string'
+                    ? estimate.status
+                    : estimate.status;
                 return column.statuses.includes(jobStatus as JobStatus);
             })
             .sort((a, b) =>
                 // Sort by updated_at (newest first)
                  (
-                    new Date(b.updated_at).getTime() -
-                    new Date(a.updated_at).getTime()
+                    new Date((b as Estimate).updated_at).getTime() -
+                    new Date((a as Estimate).updated_at).getTime()
                 )
             );
     }
@@ -413,30 +416,30 @@ export default function JobsList() {
 
         if (!over) return;
 
-        const jobId = active.id as string;
+        const estimateId = active.id as string;
         const targetColumnId = over.id as string;
 
-        // Find the job
-        const job = jobs.find((j) => j.id === jobId);
-        if (!job) return;
+        // Find the estimate
+        const estimate = jobs.find((j) => j.id === estimateId) as Estimate | undefined;
+        if (!estimate) return;
 
         // Find the target column
         const targetColumn = columns.find((col) => col.id === targetColumnId);
         if (!targetColumn) return;
 
-        // Check if job is already in this column
-        const currentStatus = String(job.job_status);
+        // Check if estimate is already in this column
+        const currentStatus = String(estimate.status);
         if (targetColumn.statuses.some((status) => String(status) === currentStatus)) {
             return;
         }
 
-        // Update job status
-        const newStatus = targetColumn.defaultStatus;
+        // Update estimate status
+        const newStatus = targetColumn.defaultStatus as EstimateStatus;
 
         // Optimistically update the UI
         setJobs((prevJobs) =>
             prevJobs.map((j) =>
-                j.id === jobId ? { ...j, job_status: newStatus } : j
+                j.id === estimateId ? { ...j, status: newStatus } : j
             )
         );
 
@@ -446,21 +449,21 @@ export default function JobsList() {
             // Revert if no token
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === jobId ? { ...j, job_status: job.job_status } : j
+                    j.id === estimateId ? { ...j, status: estimate.status } : j
                 )
             );
             return;
         }
 
         try {
-            const response = await fetch(`/api/jobs/${jobId}`, {
+            const response = await fetch(`/api/estimates/${estimateId}`, {
                 method: 'PUT',
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    job_status: newStatus,
+                    status: newStatus,
                 }),
             });
 
@@ -468,32 +471,32 @@ export default function JobsList() {
                 // Revert on error
                 setJobs((prevJobs) =>
                     prevJobs.map((j) =>
-                        j.id === jobId
-                            ? { ...j, job_status: job.job_status }
+                        j.id === estimateId
+                            ? { ...j, status: estimate.status }
                             : j
                     )
                 );
                 const errorData = await response.json().catch(() => ({}));
                 // eslint-disable-next-line no-console
-                console.error('Error updating job status:', errorData);
+                console.error('Error updating estimate status:', errorData);
             }
         } catch (error) {
             // Revert on error
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === jobId ? { ...j, job_status: job.job_status } : j
+                    j.id === estimateId ? { ...j, status: estimate.status } : j
                 )
             );
             // eslint-disable-next-line no-console
-            console.error('Error updating job status:', error);
+            console.error('Error updating estimate status:', error);
         }
     }
 
     function handleJobClick(job: Job, event?: React.MouseEvent) {
         if (event?.metaKey || event?.ctrlKey) {
-              window.open(`/jobs/${job.id}`, '_blank');
+              window.open(`/proposals/${job.id}`, '_blank');
             } else {
-              router.push(`/jobs/${job.id}`);
+              router.push(`/proposals/${job.id}`);
             }
     }
 
@@ -545,37 +548,41 @@ export default function JobsList() {
                   >
                     <Group justify="space-between" mb="xs">
                       <Text fw={500} size="sm" lineClamp={1}>
-                        {(activeJob as any).job_name ||
-                            (activeJob as any).client_name ||
-                            'Untitled Job'}
+                        {(activeJob as Estimate).job_title ||
+                            (activeJob as Estimate).client_name ||
+                            'Untitled Project'}
                       </Text>
                       <Badge
                         className={classes.badge}
-                        color={getBadgeColor(
-                          (activeJob.job_status as any) || JobStatus.NEW_LEAD
+                        color={getEstimateBadgeColor(
+                          activeJob.status || EstimateStatus.NEW_LEAD
                         )}
                         size="sm"
                       >
-                        {String(activeJob.job_status || 'UNKNOWN')}
+                        {String(activeJob.status || 'UNKNOWN')}
                       </Badge>
                     </Group>
 
-                    {activeJob.job_type && (
+                    {(activeJob as Estimate).estimate_type && (
                       <Text size="xs" c="dimmed" mb="xs">
-                        {activeJob.job_type}
+                        {(activeJob as Estimate).estimate_type}
                       </Text>
                     )}
 
                     <Stack gap={2}>
                       <Text size="xs" c="dimmed" lineClamp={1}>
-                        {(activeJob as any).address_street ||
-                            (activeJob as any).client_address ||
+                        {(activeJob as Estimate).address_street ||
+                            (activeJob as Estimate).client_address ||
                             'No address'}
                       </Text>
                       <Text size="xs" c="dimmed">
-                        {(activeJob as any).address_city || activeJob.city},{' '}
-                        {(activeJob as any).address_state || activeJob.state}{' '}
-                        {(activeJob as any).address_zipcode || activeJob.zip_code}
+                        {(activeJob as Estimate).address_city ||
+                            (activeJob as Estimate).city}
+                        ,{' '}
+                        {(activeJob as Estimate).address_state ||
+                            (activeJob as Estimate).state}{' '}
+                        {(activeJob as Estimate).address_zipcode ||
+                            (activeJob as Estimate).zip_code}
                       </Text>
                     </Stack>
                   </Card>

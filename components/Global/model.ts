@@ -1,25 +1,3 @@
-export type Job = {
-    client_address: string;
-    city: string;
-    state: string;
-    zip_code: string;
-    client_email: string;
-    client_name: string;
-    client_phone_number: string;
-    estimate_date: string;
-    client_id: string;
-    id: string;
-    user_id: string;
-    video: any;
-    job_status: JobStatus;
-    job_type: string;
-    job_title: string;
-    referral_source: string;
-    updated_at: string;
-    estimate_hours: string;
-    actual_hours: string;
-};
-
 export type Client = {
     address: string;
     city: string;
@@ -60,9 +38,6 @@ export type SingleJob = {
     id: TypedDynamoStringReturn;
     images: TypedDynamoListReturn<TypedDynamoMapReturn<JobVideo>[]>;
     jira_link: TypedDynamoStringReturn;
-    job_status: {
-        S: JobStatus;
-    };
     job_type: TypedDynamoStringReturn;
     discount_reason: TypedDynamoStringReturn;
     line_items: TypedDynamoListReturn<TypedDynamoMapReturn<DynamoLineItem>[]>;
@@ -136,25 +111,6 @@ export type DynamoLineItem = {
     hours: TypedDynamoNumberReturn
 };
 
-export enum JobStatus {
-    ACCOUNTING_NEEDED = 'ACCOUNTING_NEEDED',
-    NEW_LEAD = 'NEW_LEAD',
-    ESTIMATE_NOT_SCHEDULED = 'ESTIMATE_NOT_SCHEDULED',
-    ESTIMATE_SCHEDULED = 'ESTIMATE_SCHEDULED',
-    ESTIMATE_IN_PROGRESS = 'ESTIMATE_IN_PROGRESS',
-    NEEDS_FOLLOW_UP = 'NEEDS_FOLLOW_UP',
-    ESTIMATE_SENT = 'ESTIMATE_SENT',
-    ESTIMATE_OPENED = 'ESTIMATE_OPENED',
-    ESTIMATE_DECLINED = 'ESTIMATE_DECLINED',
-    ESTIMATE_ACCEPTED = 'ESTIMATE_ACCEPTED',
-    STALE_ESTIMATE = 'STALE_ESTIMATE',
-    RLPP_OPENED = 'RLPP_OPENED',
-    RLPP_DECLINED = 'RLPP_DECLINED',
-    RLPP_SIGNED = 'RLPP_SIGNED',
-    JOB_COMPLETE = 'JOB_COMPLETE',
-    ARCHIVED = 'ARCHIVED',
-}
-
 export enum EstimateStatus {
     NEW_LEAD = 'NEW_LEAD',
     ESTIMATE_NOT_SCHEDULED = 'ESTIMATE_NOT_SCHEDULED',
@@ -169,8 +125,23 @@ export enum EstimateStatus {
     CONTRACTOR_OPENED = 'CONTRACTOR_OPENED',
     CONTRACTOR_DECLINED = 'CONTRACTOR_DECLINED',
     CONTRACTOR_SIGNED = 'CONTRACTOR_SIGNED',
+    ACCOUNTING_NEEDED = 'ACCOUNTING_NEEDED',
+    PROJECT_NOT_SCHEDULED = 'PROJECT_NOT_SCHEDULED',
+    PROJECT_SCHEDULED = 'PROJECT_SCHEDULED',
+    PROJECT_IN_PROGRESS = 'PROJECT_IN_PROGRESS',
+    PROJECT_BILLING_NEEDED = 'PROJECT_BILLING_NEEDED',
+    PROJECT_ACCOUNTS_RECEIVABLE = 'PROJECT_ACCOUNTS_RECEIVABLE',
+    PROJECT_PAYMENTS_RECEIVED = 'PROJECT_PAYMENTS_RECEIVED',
+    PROJECT_COMPLETED = 'PROJECT_COMPLETED',
+    PROJECT_CANCELLED = 'PROJECT_CANCELLED',
     ARCHIVED = 'ARCHIVED',
 }
+
+// JobStatus is an alias for EstimateStatus for backward compatibility
+export type JobStatus = EstimateStatus | string;
+
+// Job is an alias for Estimate for backward compatibility
+export type Job = Estimate;
 
 export enum EstimateType {
     INTERIOR = 'INTERIOR',
@@ -236,15 +207,3 @@ export type ContractorClient = {
     created_at: string;
     updated_at: string;
 };
-
-export const DropdownJobStatus = {
-    NEW_LEAD: JobStatus.NEW_LEAD,
-    ESTIMATE_NOT_SCHEDULED: JobStatus.ESTIMATE_NOT_SCHEDULED,
-    ESTIMATE_SCHEDULED: JobStatus.ESTIMATE_SCHEDULED,
-    ESTIMATE_IN_PROGRESS: JobStatus.ESTIMATE_IN_PROGRESS,
-    NEEDS_FOLLOW_UP: JobStatus.NEEDS_FOLLOW_UP,
-    ESTIMATE_SENT: JobStatus.ESTIMATE_SENT,
-    JOB_COMPLETE: JobStatus.JOB_COMPLETE,
-    ESTIMATE_DECLINED: JobStatus.ESTIMATE_DECLINED,
-    RLPP_SIGNED: JobStatus.RLPP_SIGNED,
-} as const;
