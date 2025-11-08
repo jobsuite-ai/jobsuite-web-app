@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Button, Card, Center, Flex, Modal, Paper, Text, TextInput } from '@mantine/core';
+import { Button, Card, Center, Flex, Modal, Paper, Text, TextInput } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
@@ -10,7 +10,6 @@ import { useRouter } from 'next/navigation';
 import classes from './Clients.module.css';
 import LoadingState from '../Global/LoadingState';
 import { DynamoClient, Job } from '../Global/model';
-import { getBadgeColor, getFormattedStatus } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 
@@ -182,22 +181,22 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                                                     <Text size="md" fw={700}>{job.job_title}</Text>
                                                 </Center>
                                             }
-                                            <Flex direction="row" justify="space-between">
+                                            {/* <Flex direction="row" justify="space-between">
                                                 <Flex direction="column" align="flex-start">
                                                     {job.job_type &&
                                                         <Center>
-                                                            <Text size="sm" fw={700}>{job.job_type}</Text>
+            <Text size="sm" fw={700}>{job.job_type}</Text>
                                                         </Center>
                                                     }
-                                                    <Text size="sm" c="dimmed">{job.client_address}</Text>
-                                                    <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
+            <Text size="sm" c="dimmed">{job.client_address}</Text>
+            <Text size="sm" c="dimmed">{job.city}, {job.state}</Text>
                                                     <Text size="sm" c="dimmed">{job.zip_code}</Text>
-                                                    {job.estimate_date && <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>}
+        {job.estimate_date && <Text size="sm" c="dimmed">{job.estimate_date.split('T')[0]}</Text>}
                                                 </Flex>
-                                                <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
+            <Badge style={{ color: '#ffffff' }} color={getBadgeColor(job.job_status)}>
                                                     {getFormattedStatus(job.job_status)}
                                                 </Badge>
-                                            </Flex>
+                                            </Flex> */}
                                         </Flex>
                                     </Paper>
                                 ))}
