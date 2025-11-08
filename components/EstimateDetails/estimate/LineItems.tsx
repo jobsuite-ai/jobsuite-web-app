@@ -7,23 +7,10 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 
 import '@mantine/dropzone/styles.css';
-import { LineItem } from './LineItem';
+import { EstimateLineItem, LineItem } from './LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
 import LoadingState from '@/components/Global/LoadingState';
-
-// Type for EstimateLineItem matching the backend API response
-export type EstimateLineItem = {
-    id: string;
-    estimate_id?: string;
-    contractor_id?: string;
-    title: string;
-    description: string;
-    hours: number;
-    rate: number;
-    created_by?: string;
-    created_at: string;
-};
 
 export type LineItemsRef = {
     openAddModal: () => void;

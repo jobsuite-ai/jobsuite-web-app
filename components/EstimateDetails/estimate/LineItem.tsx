@@ -1,8 +1,20 @@
 import { ActionIcon, Card, Group, Text } from '@mantine/core';
 import { IconEdit, IconTrash } from '@tabler/icons-react';
 
-import { EstimateLineItem } from './LineItems';
 import classes from '../styles/EstimateDetails.module.css';
+
+// Type for EstimateLineItem matching the backend API response
+export type EstimateLineItem = {
+    id: string;
+    estimate_id?: string;
+    contractor_id?: string;
+    title: string;
+    description: string;
+    hours: number;
+    rate: number;
+    created_by?: string;
+    created_at: string;
+};
 
 export function LineItem({ lineItem, onEdit, onDelete }: {
     lineItem: EstimateLineItem;
