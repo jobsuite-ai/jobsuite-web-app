@@ -22,7 +22,7 @@ export type DynamoClient = {
 };
 
 export type SingleJob = {
-    job_title: TypedDynamoStringReturn;
+    title: TypedDynamoStringReturn;
     city: TypedDynamoStringReturn;
     client_address: TypedDynamoStringReturn;
     client_email: TypedDynamoStringReturn;

@@ -38,7 +38,7 @@ export default function JobTitle({ initialTitle, estimateID, onSave }: {
 
     setSaving(true);
     const content: UpdateJobContent = {
-      job_title: title,
+      title,
     };
 
     try {
