@@ -20,11 +20,6 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
     const [commentContents, setCommentContents] = useState<string>();
     const { user, isLoading } = useUser();
 
-    useEffect(() => {
-        setLoading(true);
-        getJobComments().finally(() => setLoading(false));
-    }, []);
-
     async function getJobComments() {
         const response = await fetch(
             `/api/job-comments/${estimateID}`,
@@ -39,6 +34,11 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
         const { Items } = await response.json();
         setJobComments(Items);
     }
+
+    useEffect(() => {
+        setLoading(true);
+        getJobComments().finally(() => setLoading(false));
+    }, [estimateID]);
 
     async function postJobComment() {
         setCommentInputLoading(true);

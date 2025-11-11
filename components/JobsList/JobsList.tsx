@@ -82,7 +82,7 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
         >
             <Group justify="space-between" mb="xs">
                 <Text fw={500} size="sm" lineClamp={1}>
-                    {project.job_title || project.client_name || 'Untitled Project'}
+                    {project.title || project.client_name || 'Untitled Project'}
                 </Text>
                 <Badge
                   className={classes.badge}
@@ -548,7 +548,7 @@ export default function JobsList() {
                   >
                     <Group justify="space-between" mb="xs">
                       <Text fw={500} size="sm" lineClamp={1}>
-                        {(activeJob as Estimate).job_title ||
+                        {(activeJob as Estimate).title ||
                             (activeJob as Estimate).client_name ||
                             'Untitled Project'}
                       </Text>

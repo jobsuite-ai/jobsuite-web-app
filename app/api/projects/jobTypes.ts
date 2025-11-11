@@ -1,7 +1,7 @@
-import { TypedDynamoStringReturn, TypedDynamoNumberReturn, JobStatus } from '@/components/Global/model';
+import { JobStatus, TypedDynamoNumberReturn, TypedDynamoStringReturn } from '@/components/Global/model';
 
 export type UpdateJobContent = {
-    job_title?: string,
+    title?: string,
     line_item?: JobLineItem,
     delete_line_item?: number,
     delete_image?: boolean,

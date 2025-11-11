@@ -9,13 +9,6 @@ import { IconCloudUpload, IconDownload, IconX } from '@tabler/icons-react';
 
 import classes from './styles/EstimateDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/projects/jobTypes';
-
-interface PresignedPostData {
-    url: string;
-    fields: Record<string, string>;
-}
-
 type UploadState = 'idle' | 'preparing' | 'uploading' | 'updating' | 'error';
 
 interface VideoUploaderProps {
@@ -23,26 +16,156 @@ interface VideoUploaderProps {
     refresh: () => void | Promise<void>;
 }
 
-async function requestPresignedPost(file: File, estimateID: string): Promise<PresignedPostData> {
+async function initiateMultipartUpload(file: File, estimateID: string): Promise<any> {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        throw new Error('No access token found');
+    }
+
     const parsedFileName = file.name.replaceAll(' ', '_');
+    const formData = new FormData();
+    formData.append('filename', parsedFileName);
+    formData.append('content_type', file.type);
+    formData.append('resource_type', 'VIDEO');
+
     const response = await fetch(
-        '/api/videos',
+        `/api/estimates/${estimateID}/resources/multipart/initiate`,
         {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                Authorization: `Bearer ${accessToken}`,
             },
-            body: JSON.stringify({ filename: parsedFileName, contentType: file.type, estimateID }),
+            body: formData,
         }
     );
 
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.message || errorData.error || 'Failed to generate presigned URL';
+        const errorMessage = errorData.message || errorData.error || 'Failed to initiate multipart upload';
         throw new Error(errorMessage);
     }
 
     return response.json();
+}
+
+async function getPresignedUrlForPart(
+    estimateID: string,
+    resourceID: string,
+    partNumber: number
+): Promise<string> {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        throw new Error('No access token found');
+    }
+
+    const response = await fetch(
+        `/api/estimates/${estimateID}/resources/${resourceID}/multipart/presigned-url?part_number=${partNumber}`,
+        {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+        }
+    );
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || errorData.error || 'Failed to get presigned URL';
+        throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    return data.presigned_url;
+}
+
+async function uploadFileParts(
+    file: File,
+    estimateID: string,
+    resourceID: string
+): Promise<Array<{ PartNumber: number; ETag: string }>> {
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+    const parts: Array<{ PartNumber: number; ETag: string }> = [];
+
+    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+        const start = (partNumber - 1) * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        // Get presigned URL for this part
+        const presignedUrl = await getPresignedUrlForPart(estimateID, resourceID, partNumber);
+
+        // Upload part directly to S3
+        // Note: Do not set Content-Type header for multipart upload parts
+        // The Content-Type is set during create_multipart_upload
+        const uploadResponse = await fetch(presignedUrl, {
+            method: 'PUT',
+            body: chunk,
+        });
+
+        if (!uploadResponse.ok) {
+            const errorText = await uploadResponse.text().catch(() => 'Unknown error');
+            throw new Error(
+                `Failed to upload part ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText}. ${errorText}`
+            );
+        }
+
+        const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
+        if (!etag) {
+            const availableHeaders: string[] = [];
+            uploadResponse.headers.forEach((value, key) => {
+                availableHeaders.push(`${key}: ${value}`);
+            });
+            // eslint-disable-next-line no-console
+            console.error(
+                `ETag header not available for part ${partNumber}. ` +
+                `Available headers: ${availableHeaders.join(', ')}. ` +
+                'This is likely a CORS configuration issue - the S3 bucket must expose the ETag header.'
+            );
+            throw new Error(
+                `No ETag received for part ${partNumber}. ` +
+                'This is likely a CORS configuration issue. ' +
+                'The S3 bucket must expose the ETag header in its CORS configuration.'
+            );
+        }
+
+        parts.push({
+            PartNumber: partNumber,
+            ETag: etag,
+        });
+    }
+
+    return parts;
+}
+
+async function completeMultipartUpload(
+    estimateID: string,
+    resourceID: string,
+    parts: Array<{ PartNumber: number; ETag: string }>
+): Promise<void> {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        throw new Error('No access token found');
+    }
+
+    const response = await fetch(
+        `/api/estimates/${estimateID}/resources/${resourceID}/multipart/complete`,
+        {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ parts }),
+        }
+    );
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.message || errorData.error || 'Failed to complete multipart upload';
+        throw new Error(errorMessage);
+    }
 }
 
 function formatFileSize(bytes: number): string {
@@ -112,41 +235,12 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             setUploadState('preparing');
             setErrorMessage(null);
 
-            // Request presigned URL
-            const presignedPostData = await requestPresignedPost(file, estimateID);
+            // Initiate multipart upload
+            const resource = await initiateMultipartUpload(file, estimateID);
 
             if (!isMountedRef.current) return;
-
-            // Check if service worker is available
-            if (!navigator.serviceWorker?.controller) {
-                throw new Error(
-                    'Service worker is not available. Please refresh the page and try again.'
-                );
-            }
 
             setUploadState('uploading');
-
-            // Convert file to array buffer
-            const arrayBuffer = await file.arrayBuffer();
-
-            if (!isMountedRef.current) return;
-
-            // Send upload request to service worker
-            const messageChannel = new MessageChannel();
-
-            navigator.serviceWorker.controller.postMessage(
-                {
-                    type: 'UPLOAD_FILE',
-                    payload: {
-                        url: presignedPostData.url,
-                        fields: presignedPostData.fields,
-                        file: arrayBuffer,
-                        fileName: file.name,
-                        contentType: file.type,
-                    },
-                },
-                [messageChannel.port2]
-            );
 
             notifications.show({
                 title: 'Video upload started',
@@ -155,11 +249,19 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
                 message: `Uploading ${file.name} (${formatFileSize(file.size)})...`,
             });
 
-            // Update job with video metadata
-            setUploadState('updating');
-            await updateJobWithVideo(file);
+            // Upload file in parts
+            const parts = await uploadFileParts(file, estimateID, resource.id);
 
             if (!isMountedRef.current) return;
+
+            // Complete multipart upload
+            setUploadState('updating');
+            await completeMultipartUpload(estimateID, resource.id, parts);
+
+            if (!isMountedRef.current) return;
+
+            // Refresh resources list
+            await refresh();
 
             notifications.show({
                 title: 'Upload Successful',
@@ -186,43 +288,6 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             });
         }
     };
-
-    async function updateJobWithVideo(newVideo: FileWithPath) {
-        if (!newVideo) return;
-
-        const content: UpdateJobContent = {
-            video: {
-                name: newVideo.name,
-                size: newVideo.size,
-                lastModified: newVideo.lastModified,
-            },
-        };
-
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimateID}`,
-                {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(content),
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMsg = errorData.message || errorData.error || 'Failed to update estimate with video';
-                throw new Error(errorMsg);
-            }
-
-            await response.json();
-            await refresh();
-        } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : 'Failed to update estimate';
-            throw new Error(`Failed to update estimate: ${errorMsg}`);
-        }
-    }
 
     return (
         <>

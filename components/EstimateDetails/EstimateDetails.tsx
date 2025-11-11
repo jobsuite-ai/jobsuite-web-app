@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ActionIcon, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 
 import CollapsibleSection from './CollapsibleSection';
 import LoadingState from '../Global/LoadingState';
-import { Estimate, EstimateStatus } from '../Global/model';
+import { Estimate, EstimateResource, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
@@ -42,6 +42,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
+    const [resources, setResources] = useState<EstimateResource[]>([]);
     const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
@@ -54,76 +55,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     // const searchParams = useSearchParams();
     // const page = searchParams?.get('page');
 
-    useEffect(() => {
-        if (!estimate) {
-            setLoading(true);
-            getEstimate().finally(() => setLoading(false));
-        }
-
-        if (estimate?.video && !objectExists) {
-            const videoExists = setInterval(() => {
-                if (estimate?.video && !objectExists) {
-                    checkIfVideoExists();
-                } else {
-                    clearInterval(videoExists);
-                }
-            }, 5000);
-
-            return () => {
-                clearInterval(videoExists);
-            };
-        }
-
-        return undefined;
-    }, [estimate?.video, objectExists]);
-
-    async function checkIfVideoExists() {
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
-        const videoName = typeof estimate?.video === 'object' && estimate?.video?.name
-            ? estimate.video.name
-            : estimate?.video;
-
-        if (!videoName) {
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                '/api/s3',
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        bucketName: process.env.AWS_BUCKET_NAME,
-                        objectKey: `${estimateID}/${videoName}`,
-                    }),
-                }
-            );
-
-            if (response.ok) {
-                const { exists } = await response.json();
-                if (exists) {
-                    setObjectExists(exists);
-                    getEstimate();
-                } else {
-                    setObjectExists(false);
-                }
-            }
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error checking if video exists:', error);
-        }
-    }
-
-    async function getEstimate() {
+    const getEstimate = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
 
         if (!accessToken) {
@@ -155,7 +87,87 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             // eslint-disable-next-line no-console
             console.error('Error fetching estimate:', error);
         }
-    }
+    }, [estimateID]);
+
+    const getResources = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/resources`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching resources:', errorData);
+                return;
+            }
+
+            const resourcesData = await response.json();
+            setResources(Array.isArray(resourcesData) ? resourcesData : []);
+
+            // Check if any video resource exists
+            const videoResource = resourcesData.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
+            if (videoResource) {
+                setObjectExists(true);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching resources:', error);
+        }
+    }, [estimateID]);
+
+    useEffect(() => {
+        setLoading(true);
+        Promise.all([getEstimate(), getResources()]).finally(() => setLoading(false));
+    }, [estimateID, getEstimate, getResources]);
+
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const hasUploadingVideoRef = useRef(false);
+
+    // Check if there's an uploading video - memoize to avoid recalculating
+    const hasUploadingVideo = useMemo(() => (
+        resources.some(r => r.resource_type === 'VIDEO' && r.upload_status !== 'COMPLETED') && !objectExists
+    ), [resources, objectExists]);
+
+    useEffect(() => {
+        // Only update polling if the state actually changed
+        if (hasUploadingVideo !== hasUploadingVideoRef.current) {
+            hasUploadingVideoRef.current = hasUploadingVideo;
+
+            // Clear any existing interval
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+
+            // Start polling if there's an uploading video
+            if (hasUploadingVideo) {
+                pollingIntervalRef.current = setInterval(() => {
+                    getResources();
+                }, 5000);
+            }
+        }
+
+        return () => {
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+            }
+        };
+    }, [hasUploadingVideo, getResources]);
 
     const handleOpenExternalLink = (link: string) => {
         window.open(link, '_blank');
@@ -212,17 +224,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     };
 
-    // Helper functions to check if sections have data
-    const hasVideo = estimate?.video != null;
-    const hasImages = estimate?.images != null
-        && (Array.isArray(estimate.images) ? estimate.images.length > 0
-            : estimate.images?.L?.length > 0 || estimate.images?.name);
+    // Helper functions to check if sections have data - memoize to prevent recalculation
+    const videoResources = useMemo(() => (
+        resources.filter(r => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED')
+    ), [resources]);
+    const imageResources = useMemo(() => (
+        resources.filter(r => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED')
+    ), [resources]);
+    const hasVideo = videoResources.length > 0;
+    const hasImages = imageResources.length > 0;
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
         && estimate.spanish_transcription.trim().length > 0;
 
-    const OverviewDetails = () => (
+    const OverviewDetails = useMemo(() => (
         <>
             {loading ? <LoadingState /> : <>
                 {estimate ?
@@ -232,7 +248,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
                                     <Flex justify="space-between" align="center" gap="md" w="100%">
-                                        <JobTitle initialTitle={estimate.job_title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                        <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
                                         <Menu shadow="md" width={200} position="bottom-start" offset={5}>
                                             <Menu.Target>
                                                 <ActionIcon
@@ -300,13 +316,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {hasVideo && (
                                         <CollapsibleSection title="Video" defaultOpen>
                                             <VideoFrame
-                                              name={
-                                                typeof estimate.video === 'object' && estimate.video?.name
-                                                    ? estimate.video.name
-                                                    : estimate.video
-                                              }
+                                              resource={videoResources[0]}
                                               estimateID={estimateID}
-                                              refresh={getEstimate}
+                                              refresh={getResources}
                                             />
                                         </CollapsibleSection>
                                     )}
@@ -316,10 +328,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         <CollapsibleSection title="Image Gallery" defaultOpen>
                                             <ImageGallery
                                               estimateID={estimateID}
-                                              images={estimate.images}
-                                              onUpdate={() => {
-                                                getEstimate();
-                                              }}
+                                              resources={imageResources}
+                                              onUpdate={getResources}
                                             />
                                         </CollapsibleSection>
                                     )}
@@ -398,8 +408,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Line Items - Only show if there are line items */}
-                                    {lineItemsCount > 0 && (
+                                    {/* Line Items - Always render for ref access */}
+                                    {lineItemsCount > 0 ? (
                                         <CollapsibleSection title="Line Items" defaultOpen>
                                             <LineItems
                                               ref={lineItemsRef}
@@ -407,14 +417,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={setLineItemsCount}
                                             />
                                         </CollapsibleSection>
-                                    )}
-                                    {/* Always render LineItems (hidden if empty) for ref access */}
-                                    {lineItemsCount === 0 && (
-                                        <LineItems
-                                          ref={lineItemsRef}
-                                          estimateID={estimateID}
-                                          onLineItemsChange={setLineItemsCount}
-                                        />
+                                    ) : (
+                                        <div style={{ display: 'none' }}>
+                                            <LineItems
+                                              ref={lineItemsRef}
+                                              estimateID={estimateID}
+                                              onLineItemsChange={setLineItemsCount}
+                                            />
+                                        </div>
                                     )}
 
                                     {/* Activity Section - Always show */}
@@ -494,7 +504,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             This will archive the estimate, a process that can be reversed but will
                             require manual intervention.
                         </Text>
-                        <Flex direction="row" gap="lg" justify="center" align="cemter">
+                        <Flex direction="row" gap="lg" justify="center" align="center">
                             <Button type="submit" onClick={archiveEstimate}>Confirm</Button>
                             <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                         </Flex>
@@ -513,7 +523,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 <VideoUploader
                   estimateID={estimateID}
                   refresh={() => {
-                    getEstimate();
+                    getResources();
                     setShowVideoUploaderModal(false);
                   }}
                 />
@@ -530,7 +540,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 <ImageUpload
                   estimateID={estimateID}
                   setImage={() => {
-                    getEstimate();
+                    getResources();
                     setShowImageUploadModal(false);
                   }}
                   setShowModal={setShowImageUploadModal}
@@ -539,7 +549,35 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
             {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
-    );
+    ), [
+        loading,
+        estimate,
+        estimateID,
+        hasVideo,
+        hasImages,
+        hasDescription,
+        hasSpanishTranscription,
+        videoResources,
+        imageResources,
+        showVideoUploaderModal,
+        showImageUploadModal,
+        showDescriptionEditor,
+        showSpanishTranscriptionEditor,
+        lineItemsCount,
+        isModalOpen,
+        getEstimate,
+        getResources,
+        handleOpenExternalLink,
+        handleCopySpanishTranscription,
+        handleEditTranscriptionSummary,
+        handleCopyTranscriptionSummary,
+        archiveEstimate,
+        setIsModalOpen,
+        setShowVideoUploaderModal,
+        setShowImageUploadModal,
+        transcriptionSummaryRef,
+        lineItemsRef,
+    ]);
 
     // const PdfDetails = () => (
     //     <>
@@ -573,7 +611,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     //     </>
     // );
 
-    return (<OverviewDetails />);
+    return OverviewDetails;
 }
 
 export default function EstimateDetails({ estimateID }: { estimateID: string }) {
