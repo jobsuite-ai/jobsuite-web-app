@@ -67,7 +67,6 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     };
 
     loadClientDetails();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estimate?.client_id]);
 
   const updateEstimateStatus = async (status: EstimateStatus) => {
