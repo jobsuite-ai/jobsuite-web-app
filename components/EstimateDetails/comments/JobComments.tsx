@@ -38,7 +38,6 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
     useEffect(() => {
         setLoading(true);
         getJobComments().finally(() => setLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [estimateID]);
 
     async function postJobComment() {
