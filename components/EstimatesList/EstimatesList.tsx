@@ -142,6 +142,9 @@ export default function EstimatesList() {
                     <Text size="sm" fw={700}>{estimate.estimate_type}</Text>
                 }
             </Center>
+            {estimate.title && (
+                <Text fw={600} size="md" mt="xs" mb="xs">{estimate.title}</Text>
+            )}
             <Group justify="space-between" mt="md" mb="xs">
                 <Text fw={500}>{estimate.client_name || 'Unknown Client'}</Text>
                 <Badge style={{ color: '#ffffff' }} color={getEstimateBadgeColor(estimate.status)}>

@@ -3,75 +3,58 @@
 import { useEffect, useState } from 'react';
 
 import { Button, Center, Flex, Modal, Text } from '@mantine/core';
-import { useParams } from 'next/navigation';
 import ReactPlayer from 'react-player';
 
 import classes from './styles/EstimateDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { EstimateResource } from '@/components/Global/model';
 
-export function VideoFrame({ name, estimateID, refresh }: {
-    name: string,
+export function VideoFrame({ resource, estimateID, refresh }: {
+    resource: EstimateResource,
     estimateID: string,
     refresh: Function
 }) {
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [objectExists, setObjectExists] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const { estimate_id } = useParams() as any;
 
     useEffect(() => {
         setIsMobile(window.innerWidth <= 768);
-        checkIfVideoExists();
     }, []);
 
-    const key = `${estimate_id || estimateID}/${name}`;
-    const baseCloudFrontURL = 'https://rl-peek-job-videos.s3.us-west-2.amazonaws.com/';
+    const getVideoBucket = () => {
+        const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+        return `jobsuite-resource-videos-${env}`;
+    };
 
-    async function checkIfVideoExists() {
-        const response = await fetch(
-            '/api/s3',
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ bucketName: process.env.AWS_BUCKET_NAME, objectKey: key }),
-            }
-        );
-
-        if (response.ok) {
-            const { exists, error } = await response.json();
-            if (!error) {
-                setObjectExists(exists);
-            } else {
-                setObjectExists(false);
-            }
-        } else {
-            setObjectExists(false);
-        }
-    }
+    const videoUrl = resource.s3_key
+        ? `https://${getVideoBucket()}.s3.us-west-2.amazonaws.com/${resource.s3_key}`
+        : null;
+    const objectExists = resource.upload_status === 'COMPLETED' && videoUrl !== null;
 
     const deleteVideo = async () => {
-        const content: UpdateJobContent = {
-            delete_video: true,
-        };
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
 
-        const response = await fetch(
-            `/api/estimates/${estimateID}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(content),
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/resources/${resource.id}`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok) {
+                await refresh();
+                setIsModalOpen(false);
             }
-        );
-
-        await response.json();
-
-        await refresh();
-        setIsModalOpen(false);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error deleting video:', error);
+        }
     };
 
     return (
@@ -80,11 +63,11 @@ export function VideoFrame({ name, estimateID, refresh }: {
                 {objectExists ?
                     <>
                         <div className={classes.videoPlayerWrapper}>
-                            {isMobile ? (
-                                <ReactPlayer url={baseCloudFrontURL + key} controls width="100%" height="auto" />
+                            {videoUrl && (isMobile ? (
+                                <ReactPlayer url={videoUrl} controls width="100%" height="auto" />
                             ) : (
-                                <ReactPlayer url={baseCloudFrontURL + key} controls width="640px" height="360px" />
-                            )}
+                                <ReactPlayer url={videoUrl} controls width="640px" height="360px" />
+                            ))}
                         </div>
                         <Flex direction="column" align="center" p="md">
                             <Center>

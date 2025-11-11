@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Badge, Flex, Menu, Paper, Text } from '@mantine/core';
 import { IconChevronDown } from '@tabler/icons-react';
@@ -24,10 +24,16 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const [client, setClient] = useState<DynamoClient>();
   const [menuOpened, setMenuOpened] = useState(false);
   const router = useRouter();
+  const fetchedClientIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const loadClientDetails = async () => {
-      if (!estimate.client_id) {
+      if (!estimate?.client_id) {
+        return;
+      }
+
+      // Don't fetch if we've already fetched this client
+      if (fetchedClientIdRef.current === estimate.client_id) {
         return;
       }
 
@@ -53,16 +59,16 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
         const data = await response.json();
         setClient(data.Item || data);
+        fetchedClientIdRef.current = estimate.client_id;
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Error loading client details:', error);
       }
     };
 
-    if (!client && estimate.client_id) {
-      loadClientDetails();
-    }
-  }, [estimate.client_id, client]);
+    loadClientDetails();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estimate?.client_id]);
 
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);

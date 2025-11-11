@@ -8,66 +8,85 @@ import { IconPlus, IconX } from '@tabler/icons-react';
 import ImageUpload from './ImageUpload';
 import classes from './styles/EstimateDetails.module.css';
 
-import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { EstimateResource } from '@/components/Global/model';
 
 interface ImageGalleryProps {
   estimateID: string;
-  images?: any;
+  resources: EstimateResource[];
   onUpdate?: () => void;
 }
 
-export default function ImageGallery({ estimateID, images, onUpdate }: ImageGalleryProps) {
+export default function ImageGallery({ estimateID, resources, onUpdate }: ImageGalleryProps) {
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
-  const [imagePaths, setImagePaths] = useState<string[]>([]);
+  const [imagePaths, setImagePaths] = useState<Array<{
+    url: string;
+    resource: EstimateResource;
+  }>>([]);
 
   useEffect(() => {
-    if (images) {
-      const paths: string[] = [];
+    const loadImageUrls = async () => {
+      if (resources && resources.length > 0) {
+        const imageResources = resources.filter(
+          (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+        );
 
-      // Handle different image formats
-      if (Array.isArray(images)) {
-        images.forEach((img) => {
-          const imageName = typeof img === 'string' ? img : img?.name || img;
-          if (imageName) {
-            paths.push(`https://rl-peek-job-images.s3.us-west-2.amazonaws.com/${estimateID}/${imageName}`);
+        const getImageBucket = () => {
+          const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+          return `jobsuite-resource-images-${env}`;
+        };
+
+        const paths = imageResources.map((resource) => {
+          // If we have s3_bucket and s3_key, construct the correct S3 URL
+          if (resource.s3_bucket && resource.s3_key) {
+            // Use the bucket from the resource, or fallback to default
+            const bucket = resource.s3_bucket || getImageBucket();
+            const region = 'us-west-2'; // Default region, could be made configurable
+            const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
+            return { url, resource };
           }
+
+          // Legacy fallback: use old format (for resources without s3_bucket/s3_key)
+          // This should only happen for very old resources that were uploaded
+          // before S3 metadata was stored
+          const imageName = resource.resource_location;
+          const url = imageName
+            ? `https://${getImageBucket()}.s3.us-west-2.amazonaws.com/${estimateID}/${imageName}`
+            : null;
+          return { url, resource };
         });
-      } else if (images?.L && Array.isArray(images.L)) {
-        images.L.forEach((item: any) => {
-          const imageName = item?.M?.name?.S || item?.name;
-          if (imageName) {
-            paths.push(`https://rl-peek-job-images.s3.us-west-2.amazonaws.com/${estimateID}/${imageName}`);
-          }
-        });
-      } else if (images?.name) {
-        const imageName = typeof images.name === 'string' ? images.name : (images.name?.S || images.name);
-        if (imageName) {
-          paths.push(`https://rl-peek-job-images.s3.us-west-2.amazonaws.com/${estimateID}/${imageName}`);
-        }
+
+        const validPaths = paths.filter((item) => item.url !== null) as Array<{
+          url: string;
+          resource: EstimateResource;
+        }>;
+        setImagePaths(validPaths);
+      } else {
+        setImagePaths([]);
       }
-
-      setImagePaths(paths);
-    }
-  }, [images, estimateID]);
-
-  const deleteImage = async (imageIndex: number) => {
-    const content: UpdateJobContent = {
-      delete_image: true,
     };
 
+    loadImageUrls();
+  }, [resources, estimateID]);
+
+  const deleteImage = async (resource: EstimateResource) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
+
     try {
-      await fetch(`/api/estimates/${estimateID}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(content),
-      });
+      const response = await fetch(
+        `/api/estimates/${estimateID}/resources/${resource.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-      // Remove from local state
-      setImagePaths((prev) => prev.filter((_, idx) => idx !== imageIndex));
-
-      if (onUpdate) onUpdate();
+      if (response.ok && onUpdate) {
+        onUpdate();
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to delete image:', error);
@@ -91,11 +110,11 @@ export default function ImageGallery({ estimateID, images, onUpdate }: ImageGall
         <Flex direction="column" gap="md">
           {imagePaths.length > 0 ? (
             <Grid className={classes.imageGrid}>
-              {imagePaths.map((path, index) => (
-                <Grid.Col key={index} span={{ base: 12, sm: 6, md: 4 }}>
+              {imagePaths.map((item, index) => (
+                <Grid.Col key={item.resource.id} span={{ base: 12, sm: 6, md: 4 }}>
                   <Card shadow="xs" radius="md" withBorder style={{ position: 'relative' }}>
                     <IconX
-                      onClick={() => deleteImage(index)}
+                      onClick={() => deleteImage(item.resource)}
                       style={{
                         cursor: 'pointer',
                         position: 'absolute',
@@ -110,7 +129,7 @@ export default function ImageGallery({ estimateID, images, onUpdate }: ImageGall
                       }}
                     />
                     <Image
-                      src={path}
+                      src={item.url}
                       alt={`Image ${index + 1}`}
                       radius="md"
                       style={{ width: '100%', height: 'auto' }}

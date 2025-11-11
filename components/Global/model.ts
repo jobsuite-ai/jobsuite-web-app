@@ -173,9 +173,8 @@ export type Estimate = {
     address_state?: string;
     address_zipcode?: string;
     address_country?: string;
+    title?: string;
     client_name?: string; // Added by backend when listing estimates
-    // Additional fields that may be present in the API response
-    job_title?: string;
     video?: any;
     images?: any;
     pdf?: any;
@@ -191,6 +190,23 @@ export type Estimate = {
     city?: string; // Alias for address_city
     state?: string; // Alias for address_state
     zip_code?: string; // Alias for address_zipcode
+};
+
+export type EstimateResource = {
+    id: string;
+    contractor_id: string;
+    resource_location: string;
+    resource_type: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | 'AUDIO' | 'OTHER';
+    estimate_id: string;
+    created_by: string;
+    created_at: string;
+    updated_at: string;
+    upload_status: 'PENDING' | 'UPLOADING' | 'COMPLETED' | 'FAILED';
+    upload_progress: number;
+    error_message?: string;
+    s3_key?: string;
+    s3_bucket?: string;
+    completed_at?: string;
 };
 
 export type ContractorClient = {
