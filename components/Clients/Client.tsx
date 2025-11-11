@@ -176,9 +176,9 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                                       style={{ cursor: 'pointer' }}
                                     >
                                         <Flex direction="column" justify="space-between">
-                                            {job.job_title &&
+                                            {job.title &&
                                                 <Center>
-                                                    <Text size="md" fw={700}>{job.job_title}</Text>
+                                                    <Text size="md" fw={700}>{job.title}</Text>
                                                 </Center>
                                             }
                                             {/* <Flex direction="row" justify="space-between">
