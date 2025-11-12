@@ -6,12 +6,9 @@ frontend:
         - npm ci
         # Set NODE_ENV based on branch (optional - for Next.js .env file loading)
         - |
-          if [ "$AWS_BRANCH" = "main" ]; then
+          if [ "$AWS_BRANCH" = "production" ]; then
             export NODE_ENV=production
             echo "Building for PRODUCTION (main branch)"
-          elif [ "$AWS_BRANCH" = "qa" ] || [ "$AWS_BRANCH" = "staging" ]; then
-            export NODE_ENV=production
-            echo "Building for QA/STAGING ($AWS_BRANCH branch)"
           else
             export NODE_ENV=development
             echo "Building for DEVELOPMENT ($AWS_BRANCH branch)"
