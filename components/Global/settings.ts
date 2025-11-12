@@ -66,18 +66,13 @@ export function loadColumnSettings(): ColumnConfig[] {
     if (typeof window === 'undefined') {
         return getDefaultColumns();
     }
-
-    try {
-        const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            // Validate the structure
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                return parsed as ColumnConfig[];
-            }
+    const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        // Validate the structure
+        if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed as ColumnConfig[];
         }
-    } catch (error) {
-        console.error('Error loading column settings:', error);
     }
 
     return getDefaultColumns();
@@ -88,9 +83,5 @@ export function saveColumnSettings(columns: ColumnConfig[]): void {
         return;
     }
 
-    try {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(columns));
-    } catch (error) {
-        console.error('Error saving column settings:', error);
-    }
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(columns));
 }
