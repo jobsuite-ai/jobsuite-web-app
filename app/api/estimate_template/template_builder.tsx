@@ -1,4 +1,4 @@
-import { TemplateInput, TemplateDescription } from './template_model';
+import { TemplateDescription, TemplateInput } from './template_model';
 
 const RATE = process.env.FULL_RATE as string ?? 106;
 const FULL_RATE = +RATE;
@@ -310,7 +310,7 @@ export const generateTemplate = (template: TemplateInput) => `
 
                     <div class="client-contact">
                         <p><strong>Date:</strong> ${getTodaysDate()}</p>
-                        <p><strong>Estimate ID:</strong> 8a57d91694e3</p>
+                        <p><strong>Estimate ID:</strong> ${template.estimateNumber}</p>
                         <h3 style="margin-top: 60px;">Prepared For</h3>
                         <p>${template.client.name}</p>
                         <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
@@ -392,7 +392,7 @@ export const generateTemplate = (template: TemplateInput) => `
                 </div>
 
                 <div class="footer">
-                    <p>© 2024 R L Peek Painting. All rights reserved.</p>
+                    <p>© 2025 R.L. Peek Painting. All rights reserved.</p>
                 </div>
             </div>
         </div>

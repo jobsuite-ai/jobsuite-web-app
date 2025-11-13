@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
-    ? 'https://api.jobsuite.app'
-    : 'https://qa.api.jobsuite.app';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function POST(request: Request) {
   try {
@@ -88,7 +86,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Reset password error:', error);
     return NextResponse.json(
       { message: 'An error occurred while resetting the password' },
       { status: 500 }

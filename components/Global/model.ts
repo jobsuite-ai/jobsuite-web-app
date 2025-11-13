@@ -14,11 +14,17 @@ export type Client = {
 
 export type DynamoClient = {
     email: TypedDynamoStringReturn;
-    client_name: TypedDynamoStringReturn;
+    name: TypedDynamoStringReturn;
     phone_number: TypedDynamoStringReturn;
-    user_id: TypedDynamoStringReturn;
     id: TypedDynamoStringReturn;
     jobs: TypedDynamoListReturn<TypedDynamoStringReturn[]>;
+    address_street: TypedDynamoStringReturn;
+    address_city: TypedDynamoStringReturn;
+    address_state: TypedDynamoStringReturn;
+    address_zipcode: TypedDynamoStringReturn;
+    address_country: TypedDynamoStringReturn;
+    created_at: TypedDynamoStringReturn;
+    updated_at: TypedDynamoStringReturn;
 };
 
 export type SingleJob = {

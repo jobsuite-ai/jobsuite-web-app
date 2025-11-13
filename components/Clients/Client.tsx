@@ -30,7 +30,7 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
         mode: 'uncontrolled',
         initialValues: {
             email: client?.email.S,
-            client_name: client?.client_name.S,
+            client_name: client?.name.S,
             phone_number: client?.phone_number.S,
         },
         validate: (values) => ({
@@ -135,7 +135,7 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                                   style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
                                 />
                             </div>
-                            <Text fz={24} fw={700}>{client.client_name.S}</Text>
+                            <Text fz={24} fw={700}>{client.name.S}</Text>
 
                             <Flex direction="row" justify="space-between" gap="lg" mt="md" mr="lg" mb="xs">
                                 <Flex direction="column" justify="space-between" gap="md">
@@ -215,7 +215,7 @@ export default function SingleClient({ initialClient }: { initialClient: DynamoC
                     <TextInput
                       withAsterisk
                       label="Client Name"
-                      placeholder={client?.client_name.S}
+                      placeholder={client?.name.S}
                       key={form.key('client_name')}
                       {...form.getInputProps('client_name')}
                     />
