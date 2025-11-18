@@ -7,10 +7,11 @@ import { useParams, useRouter } from 'next/navigation';
 
 import SingleClient from '@/components/Clients/Client';
 import LoadingState from '@/components/Global/LoadingState';
-import { DynamoClient } from '@/components/Global/model';
+import { ContractorClient } from '@/components/Global/model';
+import { getApiHeaders } from '@/app/utils/apiClient';
 
 export default function Clients() {
-    const [client, setClient] = useState<DynamoClient>();
+    const [client, setClient] = useState<ContractorClient>();
     const params = useParams();
     const { user, isLoading } = useUser();
     const router = useRouter();
@@ -33,9 +34,7 @@ export default function Clients() {
             `/api/clients/${params.client_id as string}`,
             {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getApiHeaders(),
             }
         );
 

@@ -38,11 +38,23 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
     const showQuickReplies = !commentContents || commentContents.trim().length === 0;
 
     async function getJobComments() {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            notifications.show({
+                title: 'Authentication Error',
+                position: 'top-center',
+                color: 'red',
+                message: 'Please log in to view comments.',
+            });
+            return;
+        }
+
         const response = await fetch(
             `/api/job-comments/${estimateID}`,
             {
                 method: 'GET',
                 headers: {
+                    Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
             }
@@ -73,6 +85,17 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
             return;
         }
 
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            notifications.show({
+                title: 'Authentication Error',
+                position: 'top-center',
+                color: 'red',
+                message: 'Please log in to post comments.',
+            });
+            return;
+        }
+
         setCommentInputLoading(true);
         const commenter = user?.name ?? 'unknown';
         const response = await fetch(
@@ -80,6 +103,7 @@ export default function JobComments({ estimateID }: { estimateID: string }) {
             {
                 method: 'POST',
                 headers: {
+                    Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
