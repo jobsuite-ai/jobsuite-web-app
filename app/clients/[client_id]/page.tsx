@@ -5,10 +5,10 @@ import { useEffect, useState } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useParams, useRouter } from 'next/navigation';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import SingleClient from '@/components/Clients/Client';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient } from '@/components/Global/model';
-import { getApiHeaders } from '@/app/utils/apiClient';
 
 export default function Clients() {
     const [client, setClient] = useState<ContractorClient>();
