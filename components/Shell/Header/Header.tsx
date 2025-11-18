@@ -162,33 +162,31 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     </Group>
   );
 
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <>
       <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
         <Stack gap="xs" p="md">
-          {isAuthenticated && (
-            <>
-              {navItems}
-              {proposalsMenuItem}
-            </>
-          )}
+          {navItems}
+          {proposalsMenuItem}
         </Stack>
       </aside>
       <header className={classes.header}>
         <div className={classes.inner}>
           <Group gap="md">
-            {isAuthenticated && (
-              <UnstyledButton
-                onClick={() => setSidebarOpened(!sidebarOpened)}
-                className={classes.burger}
-              >
-                {sidebarOpened ? (
-                  <IconLayoutSidebarLeftCollapse size={22} />
-                ) : (
-                  <IconLayoutSidebarLeftExpand size={22} />
-                )}
-              </UnstyledButton>
-            )}
+            <UnstyledButton
+              onClick={() => setSidebarOpened(!sidebarOpened)}
+              className={classes.burger}
+            >
+              {sidebarOpened ? (
+                <IconLayoutSidebarLeftCollapse size={22} />
+              ) : (
+                <IconLayoutSidebarLeftExpand size={22} />
+              )}
+            </UnstyledButton>
             <Link
               key="Home"
               href="/"
@@ -199,56 +197,52 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           </Group>
 
           <Group className={classes.centerSection}>
-            {isAuthenticated && (
-              <Autocomplete
-                className={classes.search}
-                placeholder="Search by client name"
-                value={autocompleteValue}
-                leftSection={
-                  <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
-                }
-                renderOption={renderAutocompleteOption}
-                data={[]}
-                visibleFrom="xs"
-                onChange={(item) => {
-                  setAutocompleteValue(item);
-                }}
-              />
-            )}
+            <Autocomplete
+              className={classes.search}
+              placeholder="Search by client name"
+              value={autocompleteValue}
+              leftSection={
+                <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
+              }
+              renderOption={renderAutocompleteOption}
+              data={[]}
+              visibleFrom="xs"
+              onChange={(item) => {
+                setAutocompleteValue(item);
+              }}
+            />
           </Group>
 
-          {isAuthenticated && (
-            <Group gap="sm">
-              <Link
-                style={{ marginTop: rem(5) }}
-                key="Settings"
-                href="/settings"
-                onClick={(event) => handleNavLinkClick(event, '/settings')}
-              >
-                <IconSettings color="black" size={22} radius="xl" />
-              </Link>
-              <Link
-                style={{ marginTop: rem(5) }}
-                key="Profile"
-                href="/profile"
-                onClick={(event) => handleNavLinkClick(event, '/profile')}
-              >
-                <IconUser color="black" size={22} radius="xl" />
-              </Link>
-              <Menu shadow="md" width={500} position="bottom-end">
-                <Menu.Target>
-                  <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
-                    <IconNotification color="black" size={22} radius="xl" />
-                  </div>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item>
-                    <Text size="sm" ta="center">No Notifications</Text>
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
-            </Group>
-          )}
+          <Group gap="sm">
+            <Link
+              style={{ marginTop: rem(5) }}
+              key="Settings"
+              href="/settings"
+              onClick={(event) => handleNavLinkClick(event, '/settings')}
+            >
+              <IconSettings color="black" size={22} radius="xl" />
+            </Link>
+            <Link
+              style={{ marginTop: rem(5) }}
+              key="Profile"
+              href="/profile"
+              onClick={(event) => handleNavLinkClick(event, '/profile')}
+            >
+              <IconUser color="black" size={22} radius="xl" />
+            </Link>
+            <Menu shadow="md" width={500} position="bottom-end">
+              <Menu.Target>
+                <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
+                  <IconNotification color="black" size={22} radius="xl" />
+                </div>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item>
+                  <Text size="sm" ta="center">No Notifications</Text>
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </Group>
         </div>
       </header>
     </>

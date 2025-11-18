@@ -146,6 +146,13 @@ export default function EstimatePreview({
         buildTemplate().finally(() => setLoading(false));
     }, [buildTemplate]);
 
+    // Check if all required todos are complete
+    const hasAllItems =
+        imageResources.length > 0 &&
+        videoResources.length > 0 &&
+        !!estimate.transcription_summary &&
+        lineItems.length > 0;
+
     return (
         <>{loading || isSending || !client ? <LoadingState /> :
             <div className={classes.estimatePreviewWrapper}>
@@ -157,25 +164,19 @@ export default function EstimatePreview({
                           hasTranscriptionSummary={!!estimate.transcription_summary}
                           hasLineItems={lineItems.length > 0}
                         />
-                        {template ? (
+                        {hasAllItems && template && (
                             <Paper shadow="sm" radius="md" withBorder>
                                 <div dangerouslySetInnerHTML={{ __html: template }} />
                             </Paper>
-                        ) : (
-                            <Paper shadow="sm" radius="md" withBorder p="md">
-                                <div>
-                                    Unable to generate estimate preview.
-                                     Please ensure all required information is available.
-                                </div>
-                            </Paper>
                         )}
-
-                        <UploadNewTemplate
-                          template={template}
-                          estimate={estimate}
-                          clientEmail={client.email.S}
-                          setLoading={setIsSending}
-                        />
+                        {hasAllItems && (
+                            <UploadNewTemplate
+                              template={template}
+                              estimate={estimate}
+                              clientEmail={client.email.S}
+                              setLoading={setIsSending}
+                            />
+                        )}
                     </Flex>
                     : <UniversalError message="Unable to access estimate details" />
                 }
