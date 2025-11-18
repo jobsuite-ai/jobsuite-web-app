@@ -1,0 +1,51 @@
+name: Generate PR Description
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  generate-description:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+
+    - name: Get Git Diff
+      id: git_diff
+      run: |
+        DIFF=$(git diff HEAD^ HEAD)
+        echo "diff=$(echo "$DIFF" | jq -sRr @uri)" >> $GITHUB_OUTPUT
+
+    - name: Generate PR Description
+      id: generate_desc
+      uses: alvarocperez/pull-request-description@v1.0.2
+      with:
+        api_key: ${{ secrets.OPENAI_API_KEY }}
+        prompt: |
+          Analyze the code changes and generate a PR description in markdown with:
+          - Summary of changes
+          - Technical implementation details
+          - Testing requirements
+        git_diff: ${{ steps.git_diff.outputs.diff }}
+
+    - name: Update PR Description
+      uses: actions/github-script@v6
+      env:
+        PR_DESCRIPTION: ${{ steps.generate_desc.outputs.description }}
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const { owner, repo } = context.repo;
+          await github.rest.pulls.update({
+            owner,
+            repo,
+            pull_number: context.payload.pull_request.number,
+            body: process.env.PR_DESCRIPTION
+          });

@@ -16,16 +16,7 @@ interface FileListProps {
   onUpdate?: () => void;
 }
 
-function formatFileSize(bytes: number): string {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / (k ** i)).toFixed(2))} ${sizes[i]}`;
-}
-
-function getFileIcon(fileName: string) {
-    const extension = fileName.split('.').pop()?.toLowerCase();
+function getFileIcon() {
     return <IconFile size={24} />;
 }
 
@@ -124,7 +115,7 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
                 <Card key={resource.id} shadow="xs" radius="md" withBorder p="md">
                   <Group justify="space-between" align="center">
                     <Group gap="sm">
-                      {getFileIcon(resource.resource_location)}
+                      {getFileIcon()}
                       <div>
                         <Text fw={500} size="sm">
                           {resource.resource_location}
@@ -193,4 +184,3 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
     </>
   );
 }
-
