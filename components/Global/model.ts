@@ -226,6 +226,7 @@ export type ContractorClient = {
     address_state?: string;
     address_zipcode?: string;
     address_country?: string;
+    notes?: string;
     created_at: string;
     updated_at: string;
 };
