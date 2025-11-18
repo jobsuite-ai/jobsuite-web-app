@@ -41,7 +41,7 @@ function HomePageContent() {
 
   return (
     <Container size={420} my={40}>
-      <Title ta="center" fw={700} mb="md">
+      <Title ta="center" fw={700} mb="md" c="gray.0">
         Welcome to JobSuite
       </Title>
       {showRegister ? (

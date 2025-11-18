@@ -244,9 +244,10 @@ export default function Dashboard() {
     <Container size="xl" pt="md">
       <Stack gap="lg">
         <Group justify="space-between">
-          <Title order={1}>Dashboard</Title>
+          <Title order={1} c="gray.0">Dashboard</Title>
           <Select
             label="Time Period"
+            c="gray.0"
             value={timeFrame}
             onChange={(value) => setTimeFrame(value || '30')}
             data={[

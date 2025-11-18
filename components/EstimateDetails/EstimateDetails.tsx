@@ -8,6 +8,7 @@ import {
     IconArchive,
     IconCopy,
     IconEdit,
+    IconFile,
     IconFileText,
     IconList,
     IconPencil,
@@ -29,6 +30,8 @@ import { EstimateLineItem } from './estimate/LineItem';
 import LineItems, { LineItemsRef } from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import TranscriptionSummary, { TranscriptionSummaryRef } from './estimate/TranscriptionSummary';
+import FileList from './FileList';
+import FileUpload from './FileUpload';
 import ImageGallery from './ImageGallery';
 import ImageUpload from './ImageUpload';
 import JobTitle from './JobTitle';
@@ -49,6 +52,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [client, setClient] = useState<DynamoClient>();
     const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+    const [showFileUploadModal, setShowFileUploadModal] = useState(false);
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
@@ -315,8 +319,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const imageResources = useMemo(() => (
         resources.filter(r => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED')
     ), [resources]);
+    const fileResources = useMemo(() => (
+        resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
+    ), [resources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
+    const hasFiles = fileResources.length > 0;
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
@@ -360,6 +368,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   onClick={() => setShowImageUploadModal(true)}
                                                 >
                                                     Add Images
+                                                </Menu.Item>
+                                                <Menu.Item
+                                                  leftSection={<IconFile size={16} />}
+                                                  onClick={() => setShowFileUploadModal(true)}
+                                                >
+                                                    Add Files
                                                 </Menu.Item>
                                                 <Menu.Item
                                                   leftSection={<IconList size={16} />}
@@ -418,6 +432,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <ImageGallery
                                               estimateID={estimateID}
                                               resources={imageResources}
+                                              onUpdate={getResources}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* File List - Show if files exist */}
+                                    {hasFiles && (
+                                        <CollapsibleSection title="Files" defaultOpen>
+                                            <FileList
+                                              estimateID={estimateID}
+                                              resources={fileResources}
                                               onUpdate={getResources}
                                             />
                                         </CollapsibleSection>
@@ -652,6 +677,24 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 />
             </Modal>
 
+            {/* File Upload Modal */}
+            <Modal
+              opened={showFileUploadModal}
+              onClose={() => setShowFileUploadModal(false)}
+              size="lg"
+              centered
+              title={<Text fz={24} fw={700}>Upload Files</Text>}
+            >
+                <FileUpload
+                  estimateID={estimateID}
+                  setFile={() => {
+                    getResources();
+                    setShowFileUploadModal(false);
+                  }}
+                  setShowModal={setShowFileUploadModal}
+                />
+            </Modal>
+
             {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
     ), [
@@ -660,12 +703,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         estimateID,
         hasVideo,
         hasImages,
+        hasFiles,
         hasDescription,
         hasSpanishTranscription,
         videoResources,
         imageResources,
+        fileResources,
         showVideoUploaderModal,
         showImageUploadModal,
+        showFileUploadModal,
         showDescriptionEditor,
         showSpanishTranscriptionEditor,
         lineItemsCount,
@@ -680,6 +726,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         setIsModalOpen,
         setShowVideoUploaderModal,
         setShowImageUploadModal,
+        setShowFileUploadModal,
         transcriptionSummaryRef,
         lineItemsRef,
     ]);
