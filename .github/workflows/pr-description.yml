@@ -20,8 +20,46 @@ jobs:
     - name: Get Git Diff
       id: git_diff
       run: |
-        DIFF=$(git diff HEAD^ HEAD)
-        echo "diff=$(echo "$DIFF" | jq -sRr @uri)" >> $GITHUB_OUTPUT
+        # Get diff and write to file
+        git diff HEAD^ HEAD > diff.txt
+        
+        # Truncate to 100KB to avoid command-line argument limits
+        # This is a conservative limit to ensure it works reliably
+        # Command-line arguments have limits, so we keep it small
+        MAX_SIZE=100000
+        FILE_SIZE=$(wc -c < diff.txt | tr -d ' ')
+        
+        if [ $FILE_SIZE -gt $MAX_SIZE ]; then
+          echo "Diff is too large ($FILE_SIZE bytes), truncating to first $MAX_SIZE bytes"
+          head -c $MAX_SIZE diff.txt > diff_truncated.txt
+          mv diff_truncated.txt diff.txt
+          echo "⚠️ Note: Diff was truncated due to size limits" >> diff.txt
+        fi
+        
+        # Write diff to a file that persists between steps
+        # The action will need to read from this file or we'll pass a smaller version
+        cp diff.txt diff_for_action.txt
+
+    - name: Prepare Diff for Action
+      id: prepare_diff
+      run: |
+        # Read the diff file and prepare it for output
+        # Limit to 100KB max to avoid argument list too long errors
+        DIFF_CONTENT=$(cat diff_for_action.txt)
+        DIFF_LENGTH=${#DIFF_CONTENT}
+        MAX_LENGTH=100000
+        
+        if [ $DIFF_LENGTH -gt $MAX_LENGTH ]; then
+          echo "Truncating diff content to $MAX_LENGTH characters"
+          DIFF_CONTENT=$(echo "$DIFF_CONTENT" | head -c $MAX_LENGTH)
+        fi
+        
+        # Use multiline output with delimiter to safely pass through GITHUB_OUTPUT
+        {
+          echo 'diff<<DIFF_EOF'
+          echo "$DIFF_CONTENT"
+          echo 'DIFF_EOF'
+        } >> $GITHUB_OUTPUT
 
     - name: Generate PR Description
       id: generate_desc
@@ -33,7 +71,7 @@ jobs:
           - Summary of changes
           - Technical implementation details
           - Testing requirements
-        git_diff: ${{ steps.git_diff.outputs.diff }}
+        git_diff: ${{ steps.prepare_diff.outputs.diff }}
 
     - name: Update PR Description
       uses: actions/github-script@v6
