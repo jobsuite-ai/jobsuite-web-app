@@ -2,13 +2,15 @@
 
 import { MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Collapse, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconChevronDown, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Badge, Collapse, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconBuilding, IconChevronDown, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
+
+import { useSearchData } from '@/contexts/SearchDataContext';
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
@@ -32,11 +34,11 @@ interface SearchResult {
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { clients, estimates } = useSearchData();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -166,149 +168,291 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     </div>
   );
 
-  // Debounced search function
+  // Fuzzy match function - checks if search term appears in the text
+  const fuzzyMatch = (text: string, searchTerm: string): boolean => {
+    if (!text || !searchTerm) {
+      return false;
+    }
+
+    const textLower = text.toLowerCase().trim();
+    const searchLower = searchTerm.toLowerCase().trim();
+
+    if (!textLower || !searchLower) {
+      return false;
+    }
+
+    // Exact substring match (fastest and most reliable) - this should catch most cases
+    if (textLower.includes(searchLower)) {
+      return true;
+    }
+
+    // Remove punctuation and normalize whitespace for matching
+    const cleanedText = textLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+    const cleanedSearch = searchLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+
+    // Check if cleaned search appears in cleaned text
+    if (cleanedText.includes(cleanedSearch)) {
+      return true;
+    }
+
+    // Word-by-word matching for multi-word searches
+    const searchWords = cleanedSearch.split(/\s+/).filter((w) => w.length > 0);
+    if (searchWords.length > 1) {
+      const allWordsMatch = searchWords.every((searchWord) => cleanedText.includes(searchWord));
+      if (allWordsMatch) {
+        return true;
+      }
+    }
+
+    // For single-word searches, check if it appears in any word
+    if (searchWords.length === 1) {
+      const searchWord = searchWords[0];
+      const textWords = cleanedText.split(/\s+/);
+      if (textWords.some((textWord) => textWord.includes(searchWord))) {
+        return true;
+      }
+    }
+
+    // Fuzzy match: check if all characters of search term appear in order
+    // This is the most lenient match (e.g., "ms" matches "Main Street")
+    let searchIndex = 0;
+    for (let i = 0; i < textLower.length && searchIndex < searchLower.length; i += 1) {
+      if (textLower[i] === searchLower[searchIndex]) {
+        searchIndex += 1;
+      }
+    }
+
+    return searchIndex === searchLower.length;
+  };
+
+  // Client-side search function - instant results from cached data
   useEffect(() => {
     if (!autocompleteValue || autocompleteValue.trim().length < 2) {
       setSearchResults([]);
-      setIsSearching(false);
-      return undefined;
+      return;
     }
 
-    setIsSearching(true);
-    const timeoutId = setTimeout(async () => {
-      try {
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-          setSearchResults([]);
-          setIsSearching(false);
-          return;
-        }
+    const searchTerm = autocompleteValue.trim();
+    const results: SearchResult[] = [];
 
-        const response = await fetch(
-          `/api/search?q=${encodeURIComponent(autocompleteValue)}&limit=10`,
-          {
-            method: 'GET',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+    // Search estimates by title and address with fuzzy matching
+    estimates.forEach((estimate) => {
+      const titleText = estimate.title || '';
+      const titleMatch = titleText ? fuzzyMatch(titleText, searchTerm) : false;
 
-        if (!response.ok) {
-          setSearchResults([]);
-          setIsSearching(false);
-          return;
-        }
+      // Collect all possible address strings to search
+      const addressStrings: string[] = [];
 
-        const data = await response.json();
-        const results: SearchResult[] = [];
-
-        // Add estimates
-        if (data.estimates && Array.isArray(data.estimates)) {
-          data.estimates.forEach((estimate: any) => {
-            const addressParts = [
-              estimate.address_street,
-              estimate.address_city,
-              estimate.address_state,
-              estimate.address_zipcode,
-            ].filter(Boolean);
-            const address = addressParts.length > 0 ? addressParts.join(', ') : 'No address';
-            results.push({
-              type: 'estimate',
-              id: estimate.id,
-              label: estimate.title || `Estimate #${estimate.id.slice(0, 8)}`,
-              subtitle: address,
-            });
-          });
-        }
-
-        // Add clients
-        if (data.clients && Array.isArray(data.clients)) {
-          data.clients.forEach((client: any) => {
-            results.push({
-              type: 'client',
-              id: client.id,
-              label: client.name,
-              subtitle: client.email,
-            });
-          });
-        }
-
-        setSearchResults(results);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Search error:', error);
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
+      // Add legacy full address field if it exists
+      const clientAddress = estimate.client_address;
+      if (clientAddress && String(clientAddress).trim()) {
+        addressStrings.push(String(clientAddress).trim());
       }
-    }, 300); // 300ms debounce
 
-    return function cleanup() {
-      clearTimeout(timeoutId);
-    };
-  }, [autocompleteValue]);
+      // Add individual address fields
+      const street = estimate.address_street;
+      if (street && String(street).trim()) {
+        addressStrings.push(String(street).trim());
+      }
+
+      const city = estimate.address_city || estimate.city;
+      if (city && String(city).trim()) {
+        addressStrings.push(String(city).trim());
+      }
+
+      const state = estimate.address_state || estimate.state;
+      if (state && String(state).trim()) {
+        addressStrings.push(String(state).trim());
+      }
+
+      const zipcode = estimate.address_zipcode || estimate.zip_code;
+      if (zipcode && String(zipcode).trim()) {
+        addressStrings.push(String(zipcode).trim());
+      }
+
+      const country = estimate.address_country;
+      if (country && String(country).trim()) {
+        addressStrings.push(String(country).trim());
+      }
+
+      // Also create a combined address string
+      const combinedParts = [
+        street,
+        city,
+        state,
+        zipcode,
+        country,
+      ]
+        .filter((part) => part != null && part !== undefined && String(part).trim())
+        .map((part) => String(part).trim());
+
+      if (combinedParts.length > 0) {
+        const combinedAddress = combinedParts.join(' ').trim();
+        if (combinedAddress && !addressStrings.includes(combinedAddress)) {
+          addressStrings.push(combinedAddress);
+        }
+      }
+
+      // Search all address strings
+      let addressMatch = false;
+      for (const addrStr of addressStrings) {
+        if (addrStr && addrStr.length > 0) {
+          const matchResult = fuzzyMatch(addrStr, searchTerm);
+          if (matchResult) {
+            addressMatch = true;
+            break;
+          }
+        }
+      }
+
+      if (titleMatch || addressMatch) {
+        // Use new field names first, fall back to legacy names
+        const displayAddressParts = [
+          estimate.address_street || estimate.client_address,
+          estimate.address_city || estimate.city,
+          estimate.address_state || estimate.state,
+          estimate.address_zipcode || estimate.zip_code,
+        ].filter((part) => part && part.trim().length > 0);
+        const address = displayAddressParts.length > 0 ? displayAddressParts.join(', ') : 'No address';
+
+        results.push({
+          type: 'estimate',
+          id: estimate.id,
+          label: estimate.title || `Estimate #${estimate.id.slice(0, 8)}`,
+          subtitle: address,
+        });
+      }
+    });
+
+    // Search clients by name or email (exact substring match is fine for these)
+    clients.forEach((client) => {
+      const nameMatch = client.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const emailMatch = client.email.toLowerCase().includes(searchTerm.toLowerCase());
+
+      if (nameMatch || emailMatch) {
+        results.push({
+          type: 'client',
+          id: client.id,
+          label: client.name,
+          subtitle: client.email,
+        });
+      }
+    });
+
+    // Limit results to 10 total (5 estimates + 5 clients, or balanced)
+    const estimateResults = results.filter((r) => r.type === 'estimate').slice(0, 5);
+    const clientResults = results.filter((r) => r.type === 'client').slice(0, 5);
+
+    setSearchResults([...estimateResults, ...clientResults]);
+  }, [autocompleteValue, clients, estimates]);
 
   // Format search results for Autocomplete
   const autocompleteData = useMemo(() => {
-    if (searchResults.length === 0 && !isSearching && autocompleteValue.trim().length >= 2) {
+    if (searchResults.length === 0 && autocompleteValue.trim().length >= 2) {
       return [{ value: 'no-results', label: 'No results found', disabled: true }];
+    }
+    if (searchResults.length === 0) {
+      return [];
     }
     return searchResults.map((result) => ({
       value: `${result.type}-${result.id}`,
-      label: result.label,
+      // Include subtitle in label for Mantine's default filtering to work on addresses
+      label: result.subtitle ? `${result.label} ${result.subtitle}` : result.label,
       subtitle: result.subtitle,
       type: result.type,
       id: result.id,
     }));
-  }, [searchResults, isSearching, autocompleteValue]);
+  }, [searchResults, autocompleteValue]);
 
   const handleSearchSelect = useCallback((value: string | null) => {
-    if (!value || value === 'no-results') return;
+    if (!value || value === 'no-results') {
+      return false; // Return false to prevent default behavior
+    }
 
     const selectedResult = searchResults.find(
       (r) => `${r.type}-${r.id}` === value
     );
 
     if (selectedResult) {
+      // Clear the search input immediately
+      setAutocompleteValue('');
+      setSearchResults([]);
+
+      // Navigate to the selected item
       if (selectedResult.type === 'estimate') {
         router.push(`/proposals/${selectedResult.id}`);
       } else if (selectedResult.type === 'client') {
         router.push(`/clients/${selectedResult.id}`);
       }
-      setAutocompleteValue('');
-      setSearchResults([]);
+
+      return false; // Prevent default behavior (setting value in input)
     }
+
+    return false;
   }, [searchResults, router]);
 
   const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => {
     if (option.value === 'no-results') {
       return (
-        <Text size="sm" c="dimmed" p="xs">
-          No results found
-        </Text>
+        <Group gap="sm" p="xs">
+          <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
+            No results found
+          </Text>
+        </Group>
       );
     }
 
     const result = searchResults.find((r) => `${r.type}-${r.id}` === option.value);
     if (!result) return null;
 
+    const isEstimate = result.type === 'estimate';
+    const Icon = isEstimate ? IconBuilding : IconUserCircle;
+    const iconColor = isEstimate ? 'blue' : 'green';
+
     return (
-      <Group gap="sm" wrap="nowrap">
-        <div style={{ flex: 1 }}>
-          <Text size="sm" fw={500}>
+      <Group
+        gap="md"
+        wrap="nowrap"
+        p={4}
+        style={{ width: '100%' }}
+        onClick={(e) => {
+          // Prevent default and handle navigation
+          e.preventDefault();
+          handleSearchSelect(option.value);
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: rem(36),
+            height: rem(36),
+            borderRadius: '50%',
+            backgroundColor: `var(--mantine-color-${iconColor}-0)`,
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={20} color={`var(--mantine-color-${iconColor}-6)`} stroke={1.5} />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text size="sm" fw={500} lineClamp={1}>
             {result.label}
           </Text>
           {result.subtitle && (
-            <Text size="xs" c="dimmed">
+            <Text size="xs" c="dimmed" lineClamp={1} mt={2}>
               {result.subtitle}
             </Text>
           )}
         </div>
-        <Text size="xs" c="dimmed" style={{ textTransform: 'capitalize' }}>
+        <Badge
+          size="sm"
+          variant="light"
+          color={iconColor}
+          style={{ textTransform: 'capitalize', flexShrink: 0 }}
+        >
           {result.type}
-        </Text>
+        </Badge>
       </Group>
     );
   };
@@ -361,8 +505,29 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
               onChange={(value) => {
                 setAutocompleteValue(value);
               }}
-              onOptionSubmit={handleSearchSelect}
+              onOptionSubmit={(value) => {
+                // Handle navigation and prevent setting value in input
+                const shouldPrevent = handleSearchSelect(value);
+                if (shouldPrevent === false) {
+                  // Clear the value to prevent it from being set
+                  setTimeout(() => setAutocompleteValue(''), 0);
+                }
+              }}
               limit={10}
+              styles={{
+                dropdown: {
+                  borderRadius: rem(8),
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                },
+                option: {
+                  padding: rem(8),
+                  borderRadius: rem(6),
+                  cursor: 'pointer',
+                  '&[data-hovered]': {
+                    backgroundColor: 'var(--mantine-color-gray-1)',
+                  },
+                },
+              }}
             />
           </Group>
 

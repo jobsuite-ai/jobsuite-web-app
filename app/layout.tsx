@@ -10,6 +10,7 @@ import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 
 import { Shell } from '@/components/Shell/Shell';
+import { SearchDataProvider } from '@/contexts/SearchDataContext';
 
 // Custom fetcher that includes authentication token
 const authenticatedUserFetcher = async (url: string): Promise<UserProfile | undefined> => {
@@ -73,8 +74,10 @@ export default function RootLayout({ children }: { children: any }) {
       <body>
         <MantineProvider>
           <UserProvider fetcher={authenticatedUserFetcher}>
-            <Notifications />
-            <Shell>{children}</Shell>
+            <SearchDataProvider>
+              <Notifications />
+              <Shell>{children}</Shell>
+            </SearchDataProvider>
           </UserProvider>
         </MantineProvider>
       </body>
