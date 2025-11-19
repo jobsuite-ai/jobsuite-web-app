@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 import { getContractorId } from '@/app/api/utils/getContractorId';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(request: NextRequest) {
     try {
@@ -71,4 +71,3 @@ export async function GET(request: NextRequest) {
         );
     }
 }
-
