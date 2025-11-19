@@ -1,6 +1,6 @@
 'use client';
 
-import { MouseEvent, useEffect, useState } from 'react';
+import { MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Autocomplete, AutocompleteProps, Collapse, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser } from '@tabler/icons-react';
@@ -22,8 +22,17 @@ interface HeaderProps {
   setSidebarOpened: (opened: boolean) => void;
 }
 
+interface SearchResult {
+  type: 'estimate' | 'client';
+  id: string;
+  label: string;
+  subtitle?: string;
+}
+
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
-  const [autocompleteValue, setAutocompleteValue] = useState<string>();
+  const [autocompleteValue, setAutocompleteValue] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
   const router = useRouter();
@@ -157,10 +166,152 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     </div>
   );
 
-  const renderAutocompleteOption: AutocompleteProps['renderOption'] = () => (
-    <Group gap="sm">
-    </Group>
-  );
+  // Debounced search function
+  useEffect(() => {
+    if (!autocompleteValue || autocompleteValue.trim().length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return undefined;
+    }
+
+    setIsSearching(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+          setSearchResults([]);
+          setIsSearching(false);
+          return;
+        }
+
+        const response = await fetch(
+          `/api/search?q=${encodeURIComponent(autocompleteValue)}&limit=10`,
+          {
+            method: 'GET',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          setSearchResults([]);
+          setIsSearching(false);
+          return;
+        }
+
+        const data = await response.json();
+        const results: SearchResult[] = [];
+
+        // Add estimates
+        if (data.estimates && Array.isArray(data.estimates)) {
+          data.estimates.forEach((estimate: any) => {
+            const addressParts = [
+              estimate.address_street,
+              estimate.address_city,
+              estimate.address_state,
+              estimate.address_zipcode,
+            ].filter(Boolean);
+            const address = addressParts.length > 0 ? addressParts.join(', ') : 'No address';
+            results.push({
+              type: 'estimate',
+              id: estimate.id,
+              label: estimate.title || `Estimate #${estimate.id.slice(0, 8)}`,
+              subtitle: address,
+            });
+          });
+        }
+
+        // Add clients
+        if (data.clients && Array.isArray(data.clients)) {
+          data.clients.forEach((client: any) => {
+            results.push({
+              type: 'client',
+              id: client.id,
+              label: client.name,
+              subtitle: client.email,
+            });
+          });
+        }
+
+        setSearchResults(results);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300); // 300ms debounce
+
+    return function cleanup() {
+      clearTimeout(timeoutId);
+    };
+  }, [autocompleteValue]);
+
+  // Format search results for Autocomplete
+  const autocompleteData = useMemo(() => {
+    if (searchResults.length === 0 && !isSearching && autocompleteValue.trim().length >= 2) {
+      return [{ value: 'no-results', label: 'No results found', disabled: true }];
+    }
+    return searchResults.map((result) => ({
+      value: `${result.type}-${result.id}`,
+      label: result.label,
+      subtitle: result.subtitle,
+      type: result.type,
+      id: result.id,
+    }));
+  }, [searchResults, isSearching, autocompleteValue]);
+
+  const handleSearchSelect = useCallback((value: string | null) => {
+    if (!value || value === 'no-results') return;
+
+    const selectedResult = searchResults.find(
+      (r) => `${r.type}-${r.id}` === value
+    );
+
+    if (selectedResult) {
+      if (selectedResult.type === 'estimate') {
+        router.push(`/proposals/${selectedResult.id}`);
+      } else if (selectedResult.type === 'client') {
+        router.push(`/clients/${selectedResult.id}`);
+      }
+      setAutocompleteValue('');
+      setSearchResults([]);
+    }
+  }, [searchResults, router]);
+
+  const renderAutocompleteOption: AutocompleteProps['renderOption'] = ({ option }) => {
+    if (option.value === 'no-results') {
+      return (
+        <Text size="sm" c="dimmed" p="xs">
+          No results found
+        </Text>
+      );
+    }
+
+    const result = searchResults.find((r) => `${r.type}-${r.id}` === option.value);
+    if (!result) return null;
+
+    return (
+      <Group gap="sm" wrap="nowrap">
+        <div style={{ flex: 1 }}>
+          <Text size="sm" fw={500}>
+            {result.label}
+          </Text>
+          {result.subtitle && (
+            <Text size="xs" c="dimmed">
+              {result.subtitle}
+            </Text>
+          )}
+        </div>
+        <Text size="xs" c="dimmed" style={{ textTransform: 'capitalize' }}>
+          {result.type}
+        </Text>
+      </Group>
+    );
+  };
 
   if (!isAuthenticated) {
     return null;
@@ -199,17 +350,19 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           <Group className={classes.centerSection}>
             <Autocomplete
               className={classes.search}
-              placeholder="Search by client name"
+              placeholder="Search by client name, email, or estimate address"
               value={autocompleteValue}
               leftSection={
                 <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
               }
               renderOption={renderAutocompleteOption}
-              data={[]}
+              data={autocompleteData}
               visibleFrom="xs"
-              onChange={(item) => {
-                setAutocompleteValue(item);
+              onChange={(value) => {
+                setAutocompleteValue(value);
               }}
+              onOptionSubmit={handleSearchSelect}
+              limit={10}
             />
           </Group>
 
