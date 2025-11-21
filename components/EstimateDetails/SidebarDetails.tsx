@@ -236,7 +236,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             <Text size="sm" fw={500} c="dimmed">
               Status:
             </Text>
-            <Flex justify="flex-end" style={{ width: '100%' }}>
+            <Flex justify="flex-end" align="center" gap="xs" style={{ width: '100%' }}>
               <Menu opened={menuOpened} onChange={setMenuOpened} width={200} position="bottom-end">
                 <Menu.Target>
                   <Badge
@@ -322,15 +322,51 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           placeholder="Enter zip code"
         />
 
-        {/* Hours - Read-only */}
-        <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
-          <Text size="sm" fw={500} c="dimmed">
-            Job Hours:
-          </Text>
-          <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {estimate.estimate_hours || '—'}
-          </Text>
-        </Flex>
+        {/* Hours - Show breakdown if change orders exist */}
+        {estimate.original_hours !== undefined || estimate.change_order_hours ? (
+          <>
+            <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-xs)' }}>
+              <Text size="sm" fw={500} c="dimmed">
+                Original Hours:
+              </Text>
+              <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+                {estimate.original_hours?.toFixed(2) || estimate.hours_bid?.toFixed(2) || '—'}
+              </Text>
+            </Flex>
+            {estimate.change_order_hours ? (
+              <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-xs)' }}>
+                <Text size="sm" fw={500} c="dimmed">
+                  Change Order Hours:
+                </Text>
+                <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+                  {estimate.change_order_hours.toFixed(2)}
+                </Text>
+              </Flex>
+            ) : null}
+            <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+              <Text size="sm" fw={600} c="dimmed">
+                Total Hours:
+              </Text>
+              <Text
+                size="sm"
+                fw={600}
+                style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              >
+                {((estimate.original_hours || estimate.hours_bid || 0) +
+                  (estimate.change_order_hours || 0)).toFixed(2)}
+              </Text>
+            </Flex>
+          </>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Job Hours:
+            </Text>
+            <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+              {estimate.estimate_hours || estimate.hours_bid || '—'}
+            </Text>
+          </Flex>
+        )}
 
         {/* Rate - Read-only */}
         <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
@@ -338,7 +374,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             Job Rate:
           </Text>
           <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {estimate.hourly_rate || '—'}
+            ${estimate.hourly_rate?.toFixed(2) || '—'}
           </Text>
         </Flex>
 
