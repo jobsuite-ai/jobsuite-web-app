@@ -171,14 +171,13 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             if (formValues.additional_hours !== 0) {
                 const commentContent = `Additional hours: ${formValues.additional_hours}. Description: ${formValues.add_on_description}`;
 
-                const commentResponse = await fetch('/api/job-comments', {
+                const commentResponse = await fetch(`/api/estimate-comments/${estimate.id}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
                         id: crypto.randomUUID(),
-                        job_id: estimate.id,
                         commenter: 'System',
                         comment_contents: commentContent,
                         timestamp: new Date().toISOString(),

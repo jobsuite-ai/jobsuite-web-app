@@ -11,6 +11,7 @@ import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
 import { useSearchData } from '@/contexts/SearchDataContext';
+import { useAuth } from '@/hooks/useAuth';
 
 const links = [
   { link: '/dashboard', label: 'Dashboard' },
@@ -34,44 +35,11 @@ interface SearchResult {
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { clients, estimates } = useSearchData();
-
-  useEffect(() => {
-    // Check if user is authenticated
-    const checkAuth = () => {
-      const accessToken = localStorage.getItem('access_token');
-      setIsAuthenticated(!!accessToken);
-    };
-
-    // Initial check
-    checkAuth();
-
-    // Listen for storage changes (e.g., when login saves token)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'access_token') {
-        checkAuth();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-
-    // Also listen for custom event for same-origin storage changes
-    // (storage event only fires for changes from other windows/tabs)
-    const handleCustomStorageChange = () => {
-      checkAuth();
-    };
-
-    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
-    };
-  }, []);
+  const { isAuthenticated, isLoading } = useAuth();
 
   const handleNavLinkClick = (
     event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
@@ -457,7 +425,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     );
   };
 
-  if (!isAuthenticated) {
+  // Don't render header if not authenticated or still loading
+  if (isLoading || !isAuthenticated) {
     return null;
   }
 

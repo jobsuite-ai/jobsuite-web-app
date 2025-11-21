@@ -188,6 +188,14 @@ export type Estimate = {
     docuseal_link?: string;
     jira_link?: string;
     job_crew_lead?: string;
+    // Change order fields
+    change_orders?: string[];
+    original_estimate_id?: string;
+    original_hours?: number;
+    change_order_hours?: number;
+    original_rate?: number;
+    change_order_rate?: number;
+    change_orders_list?: Estimate[]; // Full change order objects when included
     // Legacy field names for compatibility
     estimate_date?: string; // Alias for scheduled_date
     estimate_hours?: number; // Alias for hours_bid

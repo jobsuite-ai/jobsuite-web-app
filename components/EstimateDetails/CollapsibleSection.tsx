@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { Collapse, Flex, Text, UnstyledButton } from '@mantine/core';
+import { Collapse, Flex, Loader, Text, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
 
 import classes from './styles/EstimateDetails.module.css';
@@ -12,6 +12,7 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
   defaultOpen?: boolean;
   headerActions?: React.ReactNode;
+  loading?: boolean;
 }
 
 export default function CollapsibleSection({
@@ -19,15 +20,28 @@ export default function CollapsibleSection({
   children,
   defaultOpen = true,
   headerActions,
+  loading = false,
 }: CollapsibleSectionProps) {
-  const [opened, setOpened] = useState(defaultOpen);
+  const [opened, setOpened] = useState(false);
+
+  // Only expand when not loading and defaultOpen is true
+  useEffect(() => {
+    if (!loading && defaultOpen) {
+      setOpened(true);
+    }
+  }, [loading, defaultOpen]);
 
   return (
     <div className={classes.collapsibleSection}>
       <div className={classes.collapsibleSectionHeader}>
         <UnstyledButton
-          onClick={() => setOpened((o) => !o)}
-          style={{ flex: 1 }}
+          onClick={() => {
+            if (!loading) {
+              setOpened((o) => !o);
+            }
+          }}
+          style={{ flex: 1, cursor: loading ? 'default' : 'pointer' }}
+          disabled={loading}
         >
           <Flex align="center" gap="xs">
             {opened ? (
@@ -38,6 +52,9 @@ export default function CollapsibleSection({
             <Text size="lg" fw={700}>
               {title}
             </Text>
+            {loading && (
+              <Loader size="sm" style={{ marginLeft: 'var(--mantine-spacing-xs)' }} />
+            )}
           </Flex>
         </UnstyledButton>
         {headerActions && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Card, Flex, Switch, TextInput } from '@mantine/core';
+import { Button, Card, Flex, Switch, Text, TextInput } from '@mantine/core';
 import '@mantine/core/styles.css';
 import { DatePickerInput, DateValue } from '@mantine/dates';
 import '@mantine/dates/styles.css';
@@ -107,6 +107,31 @@ export default function HoursAndRate({ estimate }: { estimate: Estimate }) {
                   style={{ cursor: 'pointer', position: 'absolute', top: '-5px', right: '-5px' }}
                 />
             </div>
+            {/* Show breakdown if change orders exist */}
+            {(estimate.original_hours !== undefined || estimate.change_order_hours) && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#f8f9fa', borderRadius: '0.5rem' }}>
+                    <Text size="sm" fw={600} mb="xs">Hours Breakdown:</Text>
+                    <Flex direction="column" gap="xs">
+                        <Flex justify="space-between">
+                            <Text size="sm" c="dimmed">Original Hours:</Text>
+                            <Text size="sm">{estimate.original_hours?.toFixed(2) || estimate.hours_bid?.toFixed(2) || '0.00'}</Text>
+                        </Flex>
+                        {estimate.change_order_hours ? (
+                            <Flex justify="space-between">
+                                <Text size="sm" c="dimmed">Change Order Hours:</Text>
+                                <Text size="sm">{estimate.change_order_hours.toFixed(2)}</Text>
+                            </Flex>
+                        ) : null}
+                        <Flex justify="space-between" style={{ borderTop: '1px solid #dee2e6', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                            <Text size="sm" fw={600}>Total Hours:</Text>
+                            <Text size="sm" fw={600}>
+                                {((estimate.original_hours || estimate.hours_bid || 0) +
+                                (estimate.change_order_hours || 0)).toFixed(2)}
+                            </Text>
+                        </Flex>
+                    </Flex>
+                </div>
+            )}
             <div className={classes.editFlexContainer}>
                 <TextInput
                   label="Job Hours"

@@ -2,12 +2,13 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
     IconCopy,
     IconEdit,
+    IconExternalLink,
     IconFile,
     IconFileText,
     IconList,
@@ -19,6 +20,7 @@ import {
 } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
 import LoadingState from '../Global/LoadingState';
 import { DynamoClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
@@ -56,6 +58,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
+    const [activityLoading, setActivityLoading] = useState(true);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const router = useRouter();
@@ -72,7 +75,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
         try {
             const response = await fetch(
-                `/api/estimates/${estimateID}`,
+                `/api/estimates/${estimateID}?include_change_orders=true`,
                 {
                     method: 'GET',
                     headers: {
@@ -340,7 +343,25 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
                                     <Flex justify="space-between" align="center" gap="md" w="100%">
-                                        <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                        <Flex align="center" gap="md">
+                                            <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                            {estimate.original_estimate_id && (
+                                                <Flex align="center" gap="lg">
+                                                    <Badge color="orange" size="lg">
+                                                        Change Order
+                                                    </Badge>
+                                                    <Anchor
+                                                      component="button"
+                                                      onClick={() => router.push(`/proposals/${estimate.original_estimate_id}`)}
+                                                      size="sm"
+                                                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <IconExternalLink size={16} />
+                                                        View Original Estimate
+                                                    </Anchor>
+                                                </Flex>
+                                            )}
+                                        </Flex>
                                         <Menu shadow="md" width={200} position="bottom-start" offset={5}>
                                             <Menu.Target>
                                                 <ActionIcon
@@ -422,8 +443,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     )}
 
                                     {/* Activity Section - Always show */}
-                                    <CollapsibleSection title="Activity" defaultOpen>
-                                        <JobComments estimateID={estimateID} />
+                                    <CollapsibleSection
+                                      title="Activity"
+                                      defaultOpen
+                                      loading={activityLoading}
+                                    >
+                                        <JobComments
+                                          estimateID={estimateID}
+                                          onLoadingChange={setActivityLoading}
+                                        />
                                     </CollapsibleSection>
 
                                     {/* Image Gallery - Show if images exist */}
@@ -547,6 +575,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               }}
                                             />
                                         </div>
+                                    )}
+
+                                    {/* Change Orders Section */}
+                                    {estimate && !estimate.original_estimate_id && (
+                                        <CollapsibleSection title="Change Orders" defaultOpen>
+                                            <ChangeOrders
+                                              estimate={estimate}
+                                              onUpdate={getEstimate}
+                                            />
+                                        </CollapsibleSection>
                                     )}
 
                                     {/* Estimate Preview Section */}
