@@ -453,7 +453,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 >
                                                     Add Line Item
                                                 </Menu.Item>
-
                                                 {!estimate?.original_estimate_id && (
                                                     <Menu.Item
                                                       leftSection={<IconReceipt size={16} />}
@@ -622,7 +621,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     )}
 
                                     {/* Change Orders Section - Only show if change orders exist */}
-                                    {estimate && !estimate.original_estimate_id && changeOrders.length > 0 && (
+                                    {estimate &&
+                                    !estimate.original_estimate_id &&
+                                    changeOrders.length > 0 &&
+                                    estimate.status !== EstimateStatus.ARCHIVED && (
                                         <CollapsibleSection title="Change Orders" defaultOpen>
                                             <ChangeOrders
                                               estimate={estimate}
