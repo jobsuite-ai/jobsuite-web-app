@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
-import { ActionIcon, Button, Flex, Image, Modal, Text } from '@mantine/core';
-import { IconChevronLeft, IconChevronRight, IconPlus, IconX } from '@tabler/icons-react';
+import { ActionIcon, Badge, Button, Flex, Image, Modal, Text } from '@mantine/core';
+import { IconChevronLeft, IconChevronRight, IconPhoto, IconPlus, IconX } from '@tabler/icons-react';
 
 import ImageUpload from './ImageUpload';
 import classes from './styles/EstimateDetails.module.css';
@@ -13,12 +13,19 @@ import { EstimateResource } from '@/components/Global/model';
 interface ImageGalleryProps {
   estimateID: string;
   resources: EstimateResource[];
+  coverPhotoResourceId?: string;
   onUpdate?: () => void;
 }
 
-export default function ImageGallery({ estimateID, resources, onUpdate }: ImageGalleryProps) {
+export default function ImageGallery({
+  estimateID,
+  resources,
+  coverPhotoResourceId,
+  onUpdate,
+}: ImageGalleryProps) {
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
   const [viewerModalOpened, setViewerModalOpened] = useState(false);
+  const [isSelectingCoverPhoto, setIsSelectingCoverPhoto] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imagePaths, setImagePaths] = useState<Array<{
     url: string;
@@ -106,9 +113,43 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
     }
   };
 
-  const openImageViewer = (index: number) => {
+  const openImageViewer = (index: number, selectingCoverPhoto = false) => {
     setSelectedImageIndex(index);
+    setIsSelectingCoverPhoto(selectingCoverPhoto);
     setViewerModalOpened(true);
+  };
+
+  const setCoverPhoto = async (resourceId: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cover_photo_resource_id: resourceId }),
+      });
+
+      if (response.ok) {
+        setViewerModalOpened(false);
+        setIsSelectingCoverPhoto(false);
+        if (onUpdate) {
+          onUpdate();
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to set cover photo:', error);
+    }
+  };
+
+  const handleSelectCoverPhoto = () => {
+    if (imagePaths.length > 0) {
+      openImageViewer(0, true);
+    }
   };
 
   const navigateImage = useCallback((direction: 'prev' | 'next') => {
@@ -180,6 +221,20 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
                       padding: '2px',
                     }}
                   />
+                  {coverPhotoResourceId === item.resource.id && (
+                    <Badge
+                      color="blue"
+                      variant="filled"
+                      style={{
+                        position: 'absolute',
+                        left: '8px',
+                        top: '8px',
+                        zIndex: 10,
+                      }}
+                    >
+                      Cover
+                    </Badge>
+                  )}
                   <Image
                     src={item.url}
                     alt={`Image ${index + 1}`}
@@ -202,13 +257,22 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
             </div>
           )}
         </Flex>
-        <Flex justify="center" align="center" direction="column" gap="md" mt="md">
+        <Flex justify="center" align="center" direction="row" gap="md" mt="md">
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => setShowImageUploadModal(true)}
             >
               Add Image
             </Button>
+            {imagePaths.length > 0 && (
+              <Button
+                variant="light"
+                leftSection={<IconPhoto size={16} />}
+                onClick={handleSelectCoverPhoto}
+              >
+                Change Cover Photo
+              </Button>
+            )}
         </Flex>
       </div>
 
@@ -230,7 +294,10 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
 
       <Modal
         opened={viewerModalOpened}
-        onClose={() => setViewerModalOpened(false)}
+        onClose={() => {
+          setViewerModalOpened(false);
+          setIsSelectingCoverPhoto(false);
+        }}
         size="xl"
         padding={0}
         withCloseButton={false}
@@ -259,7 +326,10 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
                 right: 16,
                 zIndex: 10,
               }}
-              onClick={() => setViewerModalOpened(false)}
+              onClick={() => {
+                setViewerModalOpened(false);
+                setIsSelectingCoverPhoto(false);
+              }}
             >
               <IconX size={20} />
             </ActionIcon>
@@ -269,7 +339,58 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
               fit="contain"
               style={{ maxWidth: '100%', maxHeight: '100%' }}
             />
-            {imagePaths.length > 1 && (
+            {imagePaths.length > 1 && !isSelectingCoverPhoto && (
+              <>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('prev')}
+                >
+                  <IconChevronLeft size={24} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('next')}
+                >
+                  <IconChevronRight size={24} />
+                </ActionIcon>
+              </>
+            )}
+            {isSelectingCoverPhoto && (
+              <Button
+                variant="filled"
+                color="blue"
+                size="lg"
+                style={{
+                  position: 'absolute',
+                  top: 20,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10,
+                }}
+                onClick={() => setCoverPhoto(imagePaths[selectedImageIndex].resource.id)}
+              >
+                Set as Cover Photo
+              </Button>
+            )}
+            {imagePaths.length > 1 && isSelectingCoverPhoto && (
               <>
                 <ActionIcon
                   variant="filled"
@@ -308,7 +429,7 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
               c="dimmed"
               style={{
                 position: 'absolute',
-                bottom: 16,
+                bottom: isSelectingCoverPhoto ? 16 : 16,
                 left: '50%',
                 transform: 'translateX(-50%)',
                 backgroundColor: 'rgba(0, 0, 0, 0.6)',

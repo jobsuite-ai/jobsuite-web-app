@@ -15,8 +15,8 @@ import {
     IconPencil,
     IconPhoto,
     IconPlus,
+    IconReceipt,
     IconVideo,
-    IconWriting,
 } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -27,6 +27,7 @@ import { DynamoClient, Estimate, EstimateResource, EstimateStatus } from '../Glo
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
+import CreateChangeOrder from './CreateChangeOrder';
 import EstimatePreview from './estimate/EstimatePreview';
 import { EstimateLineItem } from './estimate/LineItem';
 import LineItems, { LineItemsRef } from './estimate/LineItems';
@@ -59,6 +60,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
     const [activityLoading, setActivityLoading] = useState(true);
+    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
+    const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const router = useRouter();
@@ -213,6 +216,46 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimate?.client_id]);
 
+    const getChangeOrders = useCallback(async () => {
+        // Only fetch change orders if this is not a change order itself
+        if (!estimate?.id || estimate.original_estimate_id) {
+            setChangeOrders([]);
+            return;
+        }
+
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimate.id}/change-orders`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching change orders:', errorData);
+                return;
+            }
+
+            const data = await response.json();
+            setChangeOrders(Array.isArray(data) ? data : []);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching change orders:', error);
+        }
+    }, [estimate?.id, estimate?.original_estimate_id]);
+
     useEffect(() => {
         setLoading(true);
         Promise.all([getEstimate(), getResources(), getLineItems()])
@@ -224,6 +267,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             getClient();
         }
     }, [estimate?.client_id, client, getClient]);
+
+    useEffect(() => {
+        if (estimate?.id) {
+            getChangeOrders();
+        }
+    }, [estimate?.id, getChangeOrders]);
 
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const hasUploadingVideoRef = useRef(false);
@@ -404,26 +453,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 >
                                                     Add Line Item
                                                 </Menu.Item>
-                                                {!hasDescription && (
+
+                                                {!estimate?.original_estimate_id && (
                                                     <Menu.Item
-                                                      leftSection={<IconWriting size={16} />}
-                                                      onClick={() => {
-                                                        setShowDescriptionEditor(true);
-                                                        transcriptionSummaryRef.current
-                                                            ?.handleEdit();
-                                                    }}
-                                                    >
-                                                        Add Description
-                                                    </Menu.Item>
-                                                )}
-                                                {!hasSpanishTranscription && (
-                                                    <Menu.Item
-                                                      leftSection={<IconWriting size={16} />}
+                                                      leftSection={<IconReceipt size={16} />}
                                                       onClick={() =>
-                                                        setShowSpanishTranscriptionEditor(true)
-                                                    }
+                                                        setShowCreateChangeOrderModal(true)
+                                                      }
                                                     >
-                                                        Add Spanish Transcription
+                                                        Create Change Order
                                                     </Menu.Item>
                                                 )}
                                             </Menu.Dropdown>
@@ -460,7 +498,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <ImageGallery
                                               estimateID={estimateID}
                                               resources={imageResources}
-                                              onUpdate={getResources}
+                                              coverPhotoResourceId={
+                                                estimate.cover_photo_resource_id
+                                              }
+                                              onUpdate={() => {
+                                                getResources();
+                                                getEstimate();
+                                              }}
                                             />
                                         </CollapsibleSection>
                                     )}
@@ -577,12 +621,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </div>
                                     )}
 
-                                    {/* Change Orders Section */}
-                                    {estimate && !estimate.original_estimate_id && (
+                                    {/* Change Orders Section - Only show if change orders exist */}
+                                    {estimate && !estimate.original_estimate_id && changeOrders.length > 0 && (
                                         <CollapsibleSection title="Change Orders" defaultOpen>
                                             <ChangeOrders
                                               estimate={estimate}
-                                              onUpdate={getEstimate}
+                                              onUpdate={() => {
+                                                getEstimate();
+                                                getChangeOrders();
+                                              }}
                                             />
                                         </CollapsibleSection>
                                     )}
@@ -733,6 +780,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 />
             </Modal>
 
+            {/* Create Change Order Modal */}
+            {estimate && (
+                <CreateChangeOrder
+                  opened={showCreateChangeOrderModal}
+                  onClose={() => setShowCreateChangeOrderModal(false)}
+                  onSuccess={() => {
+                    getEstimate();
+                    getChangeOrders();
+                    setShowCreateChangeOrderModal(false);
+                  }}
+                  estimate={estimate}
+                />
+            )}
+
             {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
     ), [
@@ -754,8 +815,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         showSpanishTranscriptionEditor,
         lineItemsCount,
         isModalOpen,
+        changeOrders,
+        showCreateChangeOrderModal,
         getEstimate,
         getResources,
+        getChangeOrders,
         handleOpenExternalLink,
         handleCopySpanishTranscription,
         handleEditTranscriptionSummary,
@@ -765,6 +829,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         setShowVideoUploaderModal,
         setShowImageUploadModal,
         setShowFileUploadModal,
+        setShowCreateChangeOrderModal,
         transcriptionSummaryRef,
         lineItemsRef,
     ]);

@@ -1,22 +1,20 @@
 'use client';
 
-import { useEffect } from 'react';
-
-import { useUser } from '@auth0/nextjs-auth0/client';
-import { useRouter } from 'next/navigation';
+import { Center, Loader } from '@mantine/core';
 
 import { NewJobWorkflow } from '@/components/Workflows/NewJobWorkflow';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function AddJob() {
-    const { user, isLoading } = useUser();
-    const router = useRouter();
+    const { isLoading } = useAuth({ requireAuth: true });
 
-    useEffect(() => {
-        if (!isLoading && !user) {
-            // Redirect to login page if the user is not logged in
-            router.push('/profile');
-        }
-    }, [isLoading, user, router]);
+    if (isLoading) {
+        return (
+            <Center style={{ minHeight: '100vh' }}>
+                <Loader size="xl" />
+            </Center>
+        );
+    }
 
-    return (<NewJobWorkflow />);
+    return <NewJobWorkflow />;
 }

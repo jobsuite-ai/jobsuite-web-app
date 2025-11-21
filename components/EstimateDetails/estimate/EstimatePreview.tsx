@@ -37,35 +37,45 @@ export default function EstimatePreview({
     const [isSending, setIsSending] = useState(false);
     const [template, setTemplate] = useState<string>('');
 
-    // Get image path from resources
+    // Get image path from resources - prioritize cover photo
     const getImagePath = useCallback(() => {
         if (!imageResources || imageResources.length === 0) {
             return '';
         }
 
-        const firstImage = imageResources[0];
+        // Find cover photo if specified, otherwise use first image
+        let selectedImage = imageResources[0];
+        if (estimate.cover_photo_resource_id) {
+            const coverPhoto = imageResources.find(
+                (img) => img.id === estimate.cover_photo_resource_id
+            );
+            if (coverPhoto) {
+                selectedImage = coverPhoto;
+            }
+        }
+
         // If we have s3_bucket and s3_key, construct the correct S3 URL
-        if (firstImage.s3_bucket && firstImage.s3_key) {
-            const bucket = firstImage.s3_bucket;
+        if (selectedImage.s3_bucket && selectedImage.s3_key) {
+            const bucket = selectedImage.s3_bucket;
             const region = 'us-west-2'; // Default region
-            return `https://${bucket}.s3.${region}.amazonaws.com/${firstImage.s3_key}`;
+            return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.s3_key}`;
         }
 
         // Legacy fallback: use resource_location
-        if (firstImage.resource_location) {
+        if (selectedImage.resource_location) {
             // Try to extract bucket and key from resource_location if it's a full path
             // Otherwise, use the old format
             const getImageBucket = () => {
                 const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
                 return `jobsuite-resource-images-${env}`;
             };
-            const bucket = firstImage.s3_bucket || getImageBucket();
+            const bucket = selectedImage.s3_bucket || getImageBucket();
             const region = 'us-west-2';
-            return `https://${bucket}.s3.${region}.amazonaws.com/${firstImage.resource_location}`;
+            return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.resource_location}`;
         }
 
         return '';
-    }, [imageResources]);
+    }, [imageResources, estimate.cover_photo_resource_id]);
 
     const buildTemplate = useCallback(async () => {
         const result = await remark().use(html).process(estimate.transcription_summary || '');
@@ -139,7 +149,14 @@ export default function EstimatePreview({
             // If no client, clear template
             setTemplate('');
         }
-    }, [client, estimate, imageResources, lineItems, getImagePath]);
+    }, [
+        client,
+        estimate,
+        imageResources,
+        lineItems,
+        getImagePath,
+        estimate.cover_photo_resource_id,
+    ]);
 
     useEffect(() => {
         setLoading(true);
