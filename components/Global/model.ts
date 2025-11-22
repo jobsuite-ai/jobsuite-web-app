@@ -204,6 +204,8 @@ export type Estimate = {
     city?: string; // Alias for address_city
     state?: string; // Alias for address_state
     zip_code?: string; // Alias for address_zipcode
+    // Cover photo
+    cover_photo_resource_id?: string;
 };
 
 export type EstimateResource = {

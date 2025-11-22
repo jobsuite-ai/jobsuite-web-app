@@ -29,26 +29,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get query parameters from the request
-    const { searchParams } = new URL(request.url);
-    const timeFrame = searchParams.get('time_frame') || 'ytd';
-    const selectedMonth = searchParams.get('selected_month');
-    const selectedYear = searchParams.get('selected_year');
+    // Build the API URL
+    const homepageUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/homepage/data`;
 
-    // Build query parameters for the job engine API
-    const queryParams = new URLSearchParams({
-      time_frame: timeFrame,
-    });
-
-    if (selectedMonth !== null) {
-      queryParams.append('selected_month', selectedMonth);
-    }
-
-    if (selectedYear !== null) {
-      queryParams.append('selected_year', selectedYear);
-    }
-
-    const response = await fetch(`${apiBaseUrl}/api/v1/contractors/${contractorId}/dashboard/v2/metrics?${queryParams.toString()}`, {
+    // Fetch homepage data from backend
+    const homepageResponse = await fetch(homepageUrl, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -56,21 +41,21 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+    if (!homepageResponse.ok) {
+      const errorData = await homepageResponse.json().catch(() => ({}));
       return NextResponse.json(
-        { message: errorData.detail || 'Failed to fetch dashboard metrics' },
-        { status: response.status }
+        { message: errorData.detail || 'Failed to fetch homepage data' },
+        { status: homepageResponse.status }
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    const homepageData = await homepageResponse.json();
+    return NextResponse.json(homepageData);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error('Error fetching dashboard metrics:', error);
+    console.error('Error fetching homepage data:', error);
     return NextResponse.json(
-      { message: 'An error occurred while fetching dashboard metrics' },
+      { message: 'An error occurred while fetching homepage data' },
       { status: 500 }
     );
   }

@@ -6,6 +6,7 @@ import { Anchor, Button, Center, Container, Grid, Group, Loader, LoadingOverlay,
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { BarChart, LineChart, PieChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
 import { useAuth } from '@/hooks/useAuth';
@@ -147,7 +148,7 @@ export default function Dashboard() {
 
         const response = await fetch(`/api/dashboard-metrics?${queryParams.toString()}`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getApiHeaders(),
         });
 
         if (!response.ok) {

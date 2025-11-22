@@ -73,7 +73,7 @@ export function SearchDataProvider({ children }: { children: ReactNode }) {
     // Refresh data every 5 minutes to keep it relatively fresh
     const refreshInterval = setInterval(() => {
       loadData();
-    }, 5 * 60 * 1000); // 5 minutes
+    }, 10 * 60 * 1000); // 10 minutes
 
     // Also refresh when storage changes (e.g., after login)
     const handleStorageChange = (e: StorageEvent) => {
