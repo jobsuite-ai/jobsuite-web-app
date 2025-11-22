@@ -73,7 +73,8 @@ export function ClientSearch({ form, setExistingClientSelected }: {
         // Word-by-word matching for multi-word searches
         const searchWords = cleanedSearch.split(/\s+/).filter((w) => w.length > 0);
         if (searchWords.length > 1) {
-            const allWordsMatch = searchWords.every((searchWord) => cleanedText.includes(searchWord));
+            const allWordsMatch = searchWords.every((searchWord) =>
+                cleanedText.includes(searchWord));
             if (allWordsMatch) {
                 return true;
             }
@@ -193,18 +194,18 @@ export function ClientSearch({ form, setExistingClientSelected }: {
 
         return (
             <Group
-                gap="md"
-                wrap="nowrap"
-                p={4}
-                style={{ width: '100%' }}
-                onClick={(e) => {
+              gap="md"
+              wrap="nowrap"
+              p={4}
+              style={{ width: '100%' }}
+              onClick={(e) => {
                     // Prevent default and handle selection
                     e.preventDefault();
                     handleSearchSelect(option.value);
                 }}
             >
                 <div
-                    style={{
+                  style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -228,10 +229,10 @@ export function ClientSearch({ form, setExistingClientSelected }: {
                     )}
                 </div>
                 <Badge
-                    size="sm"
-                    variant="light"
-                    color="green"
-                    style={{ textTransform: 'capitalize', flexShrink: 0 }}
+                  size="sm"
+                  variant="light"
+                  color="green"
+                  style={{ textTransform: 'capitalize', flexShrink: 0 }}
                 >
                     client
                 </Badge>
@@ -245,17 +246,17 @@ export function ClientSearch({ form, setExistingClientSelected }: {
 
     return (
         <Autocomplete
-            placeholder="Search by client name or email"
-            value={autocompleteValue}
-            leftSection={
+          placeholder="Search by client name or email"
+          value={autocompleteValue}
+          leftSection={
                 <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
             }
-            renderOption={renderAutocompleteOption}
-            data={autocompleteData}
-            onChange={(value) => {
+          renderOption={renderAutocompleteOption}
+          data={autocompleteData}
+          onChange={(value) => {
                 setAutocompleteValue(value);
             }}
-            onOptionSubmit={(value) => {
+          onOptionSubmit={(value) => {
                 // Handle selection and prevent setting value in input
                 const shouldPrevent = handleSearchSelect(value);
                 if (shouldPrevent === false) {
@@ -263,8 +264,8 @@ export function ClientSearch({ form, setExistingClientSelected }: {
                     setTimeout(() => setAutocompleteValue(''), 0);
                 }
             }}
-            limit={10}
-            styles={{
+          limit={10}
+          styles={{
                 dropdown: {
                     borderRadius: rem(8),
                     boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
