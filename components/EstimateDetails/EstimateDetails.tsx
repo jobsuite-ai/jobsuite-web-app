@@ -23,7 +23,7 @@ import { useRouter } from 'next/navigation';
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
 import LoadingState from '../Global/LoadingState';
-import { DynamoClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
+import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
@@ -52,7 +52,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [estimate, setEstimate] = useState<Estimate>();
     const [resources, setResources] = useState<EstimateResource[]>([]);
     const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
-    const [client, setClient] = useState<DynamoClient>();
+    const [client, setClient] = useState<ContractorClient>();
     const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
     const [showFileUploadModal, setShowFileUploadModal] = useState(false);
@@ -209,7 +209,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
 
             const data = await response.json();
-            setClient(data.Item || data);
+            const clientData = data.Item || data;
+            setClient(clientData as ContractorClient);
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching client:', error);

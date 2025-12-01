@@ -164,12 +164,46 @@ export function NewJobWorkflow() {
                 });
 
                 if (!clientResponse.ok) {
-                    const errorData = await clientResponse.json();
-                    throw new Error(errorData.message || 'Failed to create client');
-                }
+                    // If client already exists (409 Conflict), search for it by email
+                    if (clientResponse.status === 409) {
+                        const searchResponse = await fetch(
+                            `/api/clients?search=${encodeURIComponent(formValues.client_email)}`,
+                            {
+                                method: 'GET',
+                                headers: getApiHeaders(),
+                            }
+                        );
 
-                const newClient = await clientResponse.json();
-                clientId = newClient.id;
+                        if (searchResponse.ok) {
+                            const searchData = await searchResponse.json();
+                            const clients = searchData.Items || [];
+                            // Find the client with matching email (case-insensitive)
+                            const existingClient = clients.find(
+                                (client: any) =>
+                                    client.email?.toLowerCase() ===
+                                    formValues.client_email.toLowerCase()
+                            );
+
+                            if (existingClient) {
+                                clientId = existingClient.id;
+                            } else {
+                                throw new Error(
+                                    'Client with this email already exists, but could not be found'
+                                );
+                            }
+                        } else {
+                            throw new Error(
+                                'Client with this email already exists, but could not be retrieved'
+                            );
+                        }
+                    } else {
+                        const errorData = await clientResponse.json();
+                        throw new Error(errorData.message || 'Failed to create client');
+                    }
+                } else {
+                    const newClient = await clientResponse.json();
+                    clientId = newClient.id;
+                }
             }
 
             // Step 2: Create estimate
