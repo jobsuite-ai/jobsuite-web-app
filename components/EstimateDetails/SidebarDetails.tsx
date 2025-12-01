@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { Badge, Flex, Menu, Paper, Text } from '@mantine/core';
-import { IconChevronDown } from '@tabler/icons-react';
+import { ActionIcon, Badge, Flex, Menu, Paper, Select, Text } from '@mantine/core';
+import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
@@ -20,9 +20,22 @@ interface SidebarDetailsProps {
   onUpdate: () => void;
 }
 
+interface User {
+  id: string;
+  email: string;
+  full_name?: string;
+}
+
 export default function SidebarDetails({ estimate, estimateID, onUpdate }: SidebarDetailsProps) {
   const [client, setClient] = useState<DynamoClient>();
   const [menuOpened, setMenuOpened] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [editingOwner, setEditingOwner] = useState(false);
+  const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(
+    estimate.owned_by || estimate.created_by || null
+  );
+  const [savingOwner, setSavingOwner] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
 
@@ -69,14 +82,65 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     loadClientDetails();
   }, [estimate?.client_id]);
 
+  useEffect(() => {
+    const loadUsers = async () => {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        return;
+      }
+
+      setLoadingUsers(true);
+      try {
+        const response = await fetch('/api/users', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to load users:', response.status);
+          return;
+        }
+
+        const data = await response.json();
+        setUsers(Array.isArray(data) ? data : []);
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error loading users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    loadUsers();
+  }, []);
+
+  // Sync selectedOwnerId when estimate changes (but not when editing)
+  useEffect(() => {
+    if (!editingOwner) {
+      setSelectedOwnerId(estimate.owned_by || estimate.created_by || null);
+    }
+  }, [estimate.owned_by, estimate.created_by, editingOwner]);
+
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
     try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        return;
+      }
+
       const response = await fetch(`/api/estimates/${estimateID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ status }),
       });
@@ -88,6 +152,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({ job: estimate, client }),
         });
@@ -105,6 +170,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const updateClientAddress = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
     const updateJobContent: UpdateClientDetailsInput = {
       city: estimate.address_city || estimate.city || '',
       zip_code: estimate.address_zipcode || estimate.zip_code || '',
@@ -119,6 +191,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(content),
     });
@@ -127,6 +200,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const updateCity = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
     const updateJobContent: UpdateClientDetailsInput = {
       city: value,
       zip_code: estimate.address_zipcode || estimate.zip_code || '',
@@ -141,6 +221,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(content),
     });
@@ -149,6 +230,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const updateZipCode = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
     const updateJobContent: UpdateClientDetailsInput = {
       city: estimate.address_city || estimate.city || '',
       zip_code: value,
@@ -163,6 +251,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(content),
     });
@@ -213,6 +302,54 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     onUpdate();
   };
 
+  const updateOwnedBy = async (userId: string | null) => {
+    if (savingOwner) return;
+    setSavingOwner(true);
+    try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        setSavingOwner(false);
+        return;
+      }
+
+      await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ owned_by: userId || null }),
+      });
+
+      setEditingOwner(false);
+      onUpdate();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update owner:', error);
+    } finally {
+      setSavingOwner(false);
+    }
+  };
+
+  const handleOwnerClick = () => {
+    setEditingOwner(true);
+    setSelectedOwnerId(estimate.owned_by || estimate.created_by || null);
+  };
+
+  const handleOwnerCancel = () => {
+    setSelectedOwnerId(estimate.owned_by || estimate.created_by || null);
+    setEditingOwner(false);
+  };
+
+  const getOwnerDisplayName = (): string => {
+    const ownerId = estimate.owned_by || estimate.created_by || null;
+    if (!ownerId) return '—';
+    const owner = users.find((u) => u.id === ownerId);
+    return owner ? owner.full_name || owner.email : '—';
+  };
+
   const statusOptions = Object.values(EstimateStatus).filter(
     (status) => status !== estimate.status
   );
@@ -261,6 +398,66 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             </Flex>
           </Flex>
         </div>
+
+        {/* Owned By */}
+        {editingOwner ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Owned by:
+              </Text>
+              <Select
+                data={users.map((user) => ({
+                  value: user.id,
+                  label: user.full_name || user.email,
+                }))}
+                value={selectedOwnerId}
+                onChange={setSelectedOwnerId}
+                placeholder="Select owner"
+                searchable
+                clearable
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={loadingUsers}
+                autoFocus
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="green"
+                variant="light"
+                onClick={() => updateOwnedBy(selectedOwnerId)}
+                loading={savingOwner}
+                size="lg"
+              >
+                <IconCheck size={18} />
+              </ActionIcon>
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={handleOwnerCancel}
+                disabled={savingOwner}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Owned by:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={handleOwnerClick}
+              c={estimate.owned_by || estimate.created_by ? 'dark' : 'dimmed'}
+            >
+              {getOwnerDisplayName()}
+            </Text>
+          </Flex>
+        )}
 
         {/* Client Name - Clickable, not editable */}
         <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>

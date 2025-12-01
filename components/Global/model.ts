@@ -169,6 +169,7 @@ export type Estimate = {
     spanish_transcription?: string;
     notes?: string;
     created_by: string;
+    owned_by?: string;
     scheduled_date: string;
     created_at: string;
     updated_at: string;

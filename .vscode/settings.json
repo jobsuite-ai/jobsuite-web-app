@@ -56,7 +56,8 @@
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode",
     "editor.codeActionsOnSave": {
-      "source.fixAll.eslint": "always"
+      "source.fixAll.eslint": "always",
+      "source.fixAll": "always"
     }
   },
   "[json]": {

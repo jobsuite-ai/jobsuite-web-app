@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Anchor, Button, Center, Container, Grid, Group, Loader, LoadingOverlay, Modal, NumberInput, Paper, Select, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -94,7 +94,7 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -264,7 +264,6 @@ export default function Dashboard() {
         </Group>
 
         <div style={{ position: 'relative' }}>
-          <LoadingOverlay visible={loading} />
 
           <Grid gutter="md">
             {/* Top row metrics */}
@@ -610,7 +609,18 @@ export default function Dashboard() {
 
             {/* Charts Tabs */}
             <Grid.Col span={12}>
-              <Tabs defaultValue="weekly">
+              <Tabs
+                defaultValue="weekly"
+                styles={(theme) => ({
+                  tab: {
+                    color: theme.colors.gray[0],
+                    '&:hover': {
+                      color: theme.white,
+                      backgroundColor: theme.colors.dark[5],
+                    },
+                  },
+                })}
+              >
                 <Tabs.List>
                   <Tabs.Tab value="weekly">Weekly Proposals</Tabs.Tab>
                   <Tabs.Tab value="referrals">Referral Sources</Tabs.Tab>
