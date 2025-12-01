@@ -2,7 +2,21 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Avatar, Button, Card, Divider, Group, Paper, Popover, Skeleton, Stack, Text, Textarea, rem } from '@mantine/core';
+import {
+    ActionIcon,
+    Avatar,
+    Button,
+    Card,
+    Divider,
+    Group,
+    Paper,
+    Popover,
+    Skeleton,
+    Stack,
+    Text,
+    Textarea,
+    rem,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconChevronDown, IconClock, IconMessage, IconMoodSmile, IconSend } from '@tabler/icons-react';
 
@@ -30,6 +44,12 @@ interface JobCommentsProps {
     onLoadingChange?: (loading: boolean) => void;
 }
 
+interface User {
+    id: string;
+    email: string;
+    full_name: string;
+}
+
 export default function JobComments({ estimateID, onLoadingChange }: JobCommentsProps) {
     const [loading, setLoading] = useState(true);
     const [commentInputLoading, setCommentInputLoading] = useState(false);
@@ -37,6 +57,13 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
     const [commentContents, setCommentContents] = useState<string>();
     const [emojiPickerOpened, setEmojiPickerOpened] = useState(false);
     const [showAllComments, setShowAllComments] = useState(false);
+    const [users, setUsers] = useState<User[]>([]);
+    const [mentionQuery, setMentionQuery] = useState<string>('');
+    const [mentionPosition, setMentionPosition] = useState<{
+        start: number;
+        end: number;
+    } | null>(null);
+    const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const showQuickReplies = !commentContents || commentContents.trim().length === 0;
@@ -104,6 +131,31 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         }
     }
 
+    async function getUsers() {
+        try {
+            const accessToken = localStorage.getItem('access_token');
+            if (!accessToken) {
+                return;
+            }
+
+            const response = await fetch('/api/users', {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.ok) {
+                const usersData = await response.json();
+                setUsers(usersData);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching users:', error);
+        }
+    }
+
     useEffect(() => {
         setLoading(true);
         onLoadingChange?.(true);
@@ -111,7 +163,41 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
             setLoading(false);
             onLoadingChange?.(false);
         });
+        getUsers();
     }, [estimateID, onLoadingChange]);
+
+    // Replace @username with @user_id in comment contents
+    function replaceMentionsWithUserIds(text: string): string {
+        if (!text || !users.length) return text;
+
+        let result = text;
+        // Find all @mentions that match user names or emails
+        const mentionPattern = /@([a-zA-Z0-9._-]+)/g;
+        const matches = Array.from(text.matchAll(mentionPattern));
+
+        // Process matches in reverse order to maintain positions
+        for (let i = matches.length - 1; i >= 0; i -= 1) {
+            const match = matches[i];
+            const mentionText = match[1].toLowerCase();
+
+            // Find matching user by name or email
+            const user = users.find(
+                (u) =>
+                    u.full_name?.toLowerCase() === mentionText ||
+                    u.email?.toLowerCase() === mentionText ||
+                    u.full_name?.toLowerCase().replace(/\s+/g, '') === mentionText
+            );
+
+            if (user) {
+                // Replace @username with @user_id
+                const start = match.index!;
+                const end = start + match[0].length;
+                result = `${result.substring(0, start)}@${user.id}${result.substring(end)}`;
+            }
+        }
+
+        return result;
+    }
 
     async function postJobComment() {
         if (!commentContents?.trim()) {
@@ -135,6 +221,9 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
             return;
         }
 
+        // Replace @username with @user_id before submitting
+        const processedComment = replaceMentionsWithUserIds(commentContents);
+
         setCommentInputLoading(true);
         const response = await fetch(
             `/api/estimate-comments/${estimateID}`,
@@ -145,7 +234,7 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    comment_contents: commentContents,
+                    comment_contents: processedComment,
                 }),
             }
         );
@@ -187,8 +276,93 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault();
             postJobComment();
+        } else if (mentionPosition && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            const filteredUsers = getFilteredUsers();
+            if (event.key === 'ArrowDown') {
+                setSelectedMentionIndex((prev) => (prev + 1) % filteredUsers.length);
+            } else {
+                setSelectedMentionIndex((prev) => (
+                    (prev - 1 + filteredUsers.length) % filteredUsers.length
+                ));
+            }
+        } else if (mentionPosition && event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault();
+            const filteredUsers = getFilteredUsers();
+            if (filteredUsers.length > 0) {
+                insertMention(filteredUsers[selectedMentionIndex]);
+            }
+        } else if (mentionPosition && event.key === 'Escape') {
+            event.preventDefault();
+            setMentionPosition(null);
+            setMentionQuery('');
         }
     };
+
+    function getFilteredUsers(): User[] {
+        if (!mentionQuery) return users.slice(0, 5);
+        const query = mentionQuery.toLowerCase();
+        return users
+            .filter(
+                (user) =>
+                    user.full_name?.toLowerCase().includes(query) ||
+                    user.email?.toLowerCase().includes(query)
+            )
+            .slice(0, 5);
+    }
+
+    function insertMention(user: User) {
+        if (!mentionPosition || !textareaRef.current) return;
+
+        const textarea = textareaRef.current;
+        const text = commentContents || '';
+        const beforeMention = text.substring(0, mentionPosition.start);
+        const afterMention = text.substring(mentionPosition.end);
+        const newText = `${beforeMention}@${user.full_name || user.email} ${afterMention}`;
+
+        setCommentContents(newText);
+        setMentionPosition(null);
+        setMentionQuery('');
+        setSelectedMentionIndex(0);
+
+        // Set cursor position after the mention
+        setTimeout(() => {
+            const newCursorPos = beforeMention.length + (
+                (user.full_name || user.email).length + 2);
+            textarea.focus();
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+    }
+
+    function handleTextareaChange(event: React.ChangeEvent<HTMLTextAreaElement>) {
+        const { value } = event.currentTarget;
+        const cursorPos = event.currentTarget.selectionStart;
+        setCommentContents(value);
+
+        // Check if we're typing a mention
+        const textBeforeCursor = value.substring(0, cursorPos);
+        const lastAtIndex = textBeforeCursor.lastIndexOf('@');
+
+        if (lastAtIndex !== -1) {
+            // Check if there's a space or newline after @ (if so, not a mention)
+            const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+            if (!textAfterAt.match(/[\s\n]/)) {
+                // We're in a mention
+                const mentionText = textAfterAt;
+                setMentionQuery(mentionText);
+                setMentionPosition({
+                    start: lastAtIndex,
+                    end: cursorPos,
+                });
+                setSelectedMentionIndex(0);
+                return;
+            }
+        }
+
+        // Not in a mention
+        setMentionPosition(null);
+        setMentionQuery('');
+    }
 
     const handleQuickReplyClick = (reply: string) => {
         setCommentContents(reply);
@@ -231,19 +405,81 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         <Stack gap="md" className={classes.commentsContainer}>
             <Divider label="Add a comment" labelPosition="left" />
 
-            <Card shadow="xs" padding="md" radius="md" withBorder>
-                <Stack gap="md">
-                    <Textarea
-                      ref={textareaRef}
-                      placeholder="Write your comment here... (Press Cmd/Ctrl + Enter to submit)"
-                      autosize
-                      minRows={3}
-                      maxRows={8}
-                      onChange={(event) => setCommentContents(event.currentTarget.value)}
-                      onKeyDown={handleKeyDown}
-                      value={commentContents}
-                      disabled={commentInputLoading}
-                    />
+            <Card shadow="xs" padding="md" radius="md" withBorder style={{ overflow: 'visible' }}>
+                <Stack gap="md" style={{ overflow: 'visible' }}>
+                    <div style={{ position: 'relative', zIndex: 1, overflow: 'visible' }}>
+                        <Textarea
+                          ref={textareaRef}
+                          placeholder="Write your comment here... (Press Cmd/Ctrl + Enter to submit). Type @ to mention users."
+                          autosize
+                          minRows={3}
+                          maxRows={8}
+                          onChange={handleTextareaChange}
+                          onKeyDown={handleKeyDown}
+                          value={commentContents}
+                          disabled={commentInputLoading}
+                        />
+                        {mentionPosition && (
+                            <Paper
+                              shadow="md"
+                              p="xs"
+                              withBorder
+                              style={{
+                                  position: 'absolute',
+                                  top: '100%',
+                                  left: 0,
+                                  right: 0,
+                                  marginTop: 4,
+                                  zIndex: 9999,
+                                  maxHeight: 200,
+                                  overflowY: 'auto',
+                                  backgroundColor: 'var(--mantine-color-body)',
+                              }}
+                            >
+                                <Stack gap={2}>
+                                    {getFilteredUsers().length > 0 ? (
+                                        getFilteredUsers().map((user, index) => (
+                                            <Button
+                                              key={user.id}
+                                              variant={index === selectedMentionIndex ? 'light' : 'subtle'}
+                                              size="xl"
+                                              fullWidth
+                                              justify="flex-start"
+                                              onClick={() => insertMention(user)}
+                                              style={{ textAlign: 'left' }}
+                                              onMouseEnter={() => setSelectedMentionIndex(index)}
+                                            >
+                                                <Group gap="xs" wrap="nowrap" p="md">
+                                                    <Avatar size="xs" radius="xl">
+                                                        {(user.full_name || user.email)
+                                                            .split(' ')
+                                                            .map((n) => n[0])
+                                                            .join('')
+                                                            .toUpperCase()
+                                                            .slice(0, 2)}
+                                                    </Avatar>
+                                                    <div>
+                                                        <Text size="sm" fw={500}>
+                                                            {user.full_name || user.email}
+                                                        </Text>
+                                                        {user.full_name && (
+                                                            <Text size="xs" c="dimmed">
+                                                                {user.email}
+                                                            </Text>
+                                                        )}
+                                                    </div>
+                                                </Group>
+                                            </Button>
+                                        ))
+                                    ) : (
+                                        <Text size="sm" c="dimmed" p="xs">
+                                            No users found
+                                        </Text>
+                                    )}
+                                </Stack>
+                            </Paper>
+                        )}
+                    </div>
                     <Group justify="space-between" align="center" wrap="wrap">
                         <Popover
                           opened={emojiPickerOpened}
