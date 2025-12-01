@@ -4,6 +4,7 @@ export type TemplateInput = {
     notes: string;
     image: string;
     discountReason?: string;
+    discountPercentage?: number;
     estimateNumber: string;
     rate: number;
 };

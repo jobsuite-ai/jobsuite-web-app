@@ -10,17 +10,17 @@ import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
-import { DynamoClient, Estimate, EstimateStatus } from '../Global/model';
+import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
-import { UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialEstimate }: { initialEstimate: Estimate }) {
     const [estimate, setEstimate] = useState(initialEstimate);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
-    const [client, setClient] = useState<DynamoClient>();
+    const [client, setClient] = useState<ContractorClient>();
     const [menuOpened, setMenuOpened] = useState(false);
     const router = useRouter();
 
@@ -54,7 +54,8 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 }
 
                 const data = await response.json();
-                setClient(data.Item || data);
+                const clientData = data.Item || data;
+                setClient(clientData as ContractorClient);
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Error loading client details:', error);
@@ -98,16 +99,6 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const updateJob = async () => {
         const formValues = form.getValues();
 
-        const updateJobContent: UpdateClientDetailsInput = {
-            city: formValues.city,
-            zip_code: formValues.zip_code,
-            client_address: formValues.client_address,
-        };
-
-        const content: UpdateJobContent = {
-            update_client_details: updateJobContent,
-        };
-
         const response = await fetch(
             `/api/estimates/${estimate.id}`,
             {
@@ -115,7 +106,11 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(content),
+                body: JSON.stringify({
+                    address_street: formValues.client_address,
+                    address_city: formValues.city,
+                    address_zipcode: formValues.zip_code,
+                }),
             }
         );
 
@@ -326,8 +321,8 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                     </Flex>
                     <Flex direction="column" gap="lg" mt="md" mb="xs">
                         <Flex direction="column">
-                            <Text size="sm" c="dimmed">{client.email?.S}</Text>
-                            <Text size="sm" c="dimmed">Client Phone: {client.phone_number?.S}</Text>
+                            <Text size="sm" c="dimmed">{client?.email}</Text>
+                            <Text size="sm" c="dimmed">Client Phone: {client?.phone_number}</Text>
                         </Flex>
                         <Flex direction="column">
                             <Text size="sm" c="dimmed">{estimate.address_street || estimate.client_address}</Text>

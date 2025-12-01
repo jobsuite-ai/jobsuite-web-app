@@ -8,10 +8,10 @@ import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
 import LoadingState from '../Global/LoadingState';
-import { DynamoClient, Estimate, EstimateStatus } from '../Global/model';
+import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
-import { UpdateClientDetailsInput, UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { logToCloudWatch } from '@/public/logger';
 
 interface SidebarDetailsProps {
@@ -27,7 +27,7 @@ interface User {
 }
 
 export default function SidebarDetails({ estimate, estimateID, onUpdate }: SidebarDetailsProps) {
-  const [client, setClient] = useState<DynamoClient>();
+  const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -71,7 +71,8 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         }
 
         const data = await response.json();
-        setClient(data.Item || data);
+        const clientData = data.Item || data;
+        setClient(clientData as ContractorClient);
         fetchedClientIdRef.current = estimate.client_id;
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -177,23 +178,17 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       return;
     }
 
-    const updateJobContent: UpdateClientDetailsInput = {
-      city: estimate.address_city || estimate.city || '',
-      zip_code: estimate.address_zipcode || estimate.zip_code || '',
-      client_address: value,
-    };
-
-    const content: UpdateJobContent = {
-      update_client_details: updateJobContent,
-    };
-
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(content),
+      body: JSON.stringify({
+        address_street: value,
+        address_city: estimate.address_city || estimate.city || '',
+        address_zipcode: estimate.address_zipcode || estimate.zip_code || '',
+      }),
     });
 
     onUpdate();
@@ -207,23 +202,17 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       return;
     }
 
-    const updateJobContent: UpdateClientDetailsInput = {
-      city: value,
-      zip_code: estimate.address_zipcode || estimate.zip_code || '',
-      client_address: estimate.address_street || estimate.client_address || '',
-    };
-
-    const content: UpdateJobContent = {
-      update_client_details: updateJobContent,
-    };
-
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(content),
+      body: JSON.stringify({
+        address_city: value,
+        address_zipcode: estimate.address_zipcode || estimate.zip_code || '',
+        address_street: estimate.address_street || estimate.client_address || '',
+      }),
     });
 
     onUpdate();
@@ -237,15 +226,29 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       return;
     }
 
-    const updateJobContent: UpdateClientDetailsInput = {
-      city: estimate.address_city || estimate.city || '',
-      zip_code: value,
-      client_address: estimate.address_street || estimate.client_address || '',
-    };
+    await fetch(`/api/estimates/${estimateID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        address_city: estimate.address_city || estimate.city || '',
+        address_zipcode: value,
+        address_street: estimate.address_street || estimate.client_address || '',
+      }),
+    });
 
-    const content: UpdateJobContent = {
-      update_client_details: updateJobContent,
-    };
+    onUpdate();
+  };
+
+  const updateDiscountReason = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
 
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
@@ -253,30 +256,28 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(content),
+      body: JSON.stringify({ discount_reason: value || null }),
     });
 
     onUpdate();
   };
 
-  const updateDiscountReason = async (value: string) => {
-    const updateJobContent: UpdateHoursAndRateInput = {
-      hours: (estimate.hours_bid || estimate.estimate_hours || 0).toString(),
-      rate: estimate.hourly_rate?.toString() || '106',
-      date: estimate.scheduled_date || estimate.estimate_date || new Date().toISOString(),
-      discount_reason: value,
-    };
+  const updateDiscountPercentage = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
 
-    const content: UpdateJobContent = {
-      update_hours_and_rate: updateJobContent,
-    };
-
+    const discountPercentage = value ? parseFloat(value) : null;
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(content),
+      body: JSON.stringify({ discount_percentage: discountPercentage }),
     });
 
     onUpdate();
@@ -471,7 +472,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             c="blue"
             td="underline"
           >
-            {estimate.client_name || 'Client'}
+            {client?.name || 'Client'}
           </Text>
         </Flex>
 
@@ -481,7 +482,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             Email:
           </Text>
           <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {client.email?.S || '—'}
+            {client?.email || '—'}
           </Text>
         </Flex>
 
@@ -491,7 +492,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             Phone:
           </Text>
           <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {client.phone_number?.S || '—'}
+            {client?.phone_number || '—'}
           </Text>
         </Flex>
 
@@ -575,15 +576,22 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           </Text>
         </Flex>
 
+        {/* Discount Percentage */}
+        <EditableField
+          label="Discount Percentage"
+          value={`${estimate.discount_percentage?.toString() || '0'}%`}
+          onSave={updateDiscountPercentage}
+          placeholder="Enter discount percentage (e.g., 10 for 10%)"
+          type="number"
+        />
+
         {/* Discount Reason */}
-        {estimate.discount_reason && (
-          <EditableField
-            label="Discount Reason"
-            value={estimate.discount_reason}
-            onSave={updateDiscountReason}
-            placeholder="Enter discount reason"
-          />
-        )}
+        <EditableField
+          label="Discount Reason"
+          value={estimate.discount_reason}
+          onSave={updateDiscountReason}
+          placeholder="Enter discount reason"
+        />
 
         {/* Paint Details */}
         <EditableField

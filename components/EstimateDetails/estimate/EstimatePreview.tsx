@@ -15,7 +15,7 @@ import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
 import { UploadNewTemplate } from '@/components/EstimateDetails/estimate/UploadNewTemplate';
 import LoadingState from '@/components/Global/LoadingState';
-import { DynamoClient, Estimate, EstimateResource } from '@/components/Global/model';
+import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 
 interface EstimatePreviewProps {
@@ -23,7 +23,7 @@ interface EstimatePreviewProps {
     imageResources?: EstimateResource[];
     videoResources?: EstimateResource[];
     lineItems?: EstimateLineItem[];
-    client?: DynamoClient;
+    client?: ContractorClient;
 }
 
 export default function EstimatePreview({
@@ -95,17 +95,18 @@ export default function EstimatePreview({
             const estimateNumber = uuidv4().split('-')[0];
             const templateInput: TemplateInput = {
                 client: {
-                    name: client.name.S || 'Undefined Name',
+                    name: client.name || 'Undefined Name',
                     city: estimate.address_city || estimate.city || '',
                     state: estimate.address_state || estimate.state || '',
-                    email: client.email.S || 'Undefined Email',
+                    email: client.email || 'Undefined Email',
                     address: estimate.address_street || estimate.client_address || '',
-                    phone: client.phone_number.S || 'Undefined Phone Number',
+                    phone: client.phone_number || 'Undefined Phone Number',
                 },
                 items: templateLineItems,
                 image: imagePath,
                 notes: htmlString,
                 discountReason: estimate.discount_reason,
+                discountPercentage: estimate.discount_percentage,
                 estimateNumber,
                 rate: estimate.hourly_rate,
             };
@@ -190,7 +191,7 @@ export default function EstimatePreview({
                             <UploadNewTemplate
                               template={template}
                               estimate={estimate}
-                              clientEmail={client.email.S}
+                              clientEmail={client.email}
                               setLoading={setIsSending}
                             />
                         )}

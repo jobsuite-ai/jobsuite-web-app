@@ -139,7 +139,7 @@ export default function Dashboard() {
         });
 
         if (selectedMonth !== null && selectedMonth !== undefined) {
-          queryParams.append('selected_month', (selectedMonth + 1).toString());
+          queryParams.append('selected_month', (selectedMonth).toString());
         }
 
         if (selectedYear !== null && selectedYear !== undefined) {

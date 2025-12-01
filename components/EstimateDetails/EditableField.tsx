@@ -61,7 +61,9 @@ export default function EditableField({
     }
   };
 
-  const displayValue = value !== undefined && value !== null ? String(value) : '—';
+  const displayValue = value !== undefined && value !== null && String(value).trim() !== ''
+    ? String(value)
+    : '—';
 
   return (
     <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
