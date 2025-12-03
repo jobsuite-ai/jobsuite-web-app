@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { getContractorId } from '../utils/getContractorId';
+
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
+
 export async function GET(request: NextRequest) {
   try {
-    const contractorId = process.env.RLPP_USER_ID;
+    // Get the access token from the Authorization header
+    const authHeader = request.headers.get('Authorization');
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json(
+        { message: 'Authorization header missing or invalid' },
+        { status: 401 }
+      );
+    }
+
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+    const apiBaseUrl = getApiBaseUrl();
+
+    // Get contractor_id from cache (header) or fetch from API
+    const contractorId = await getContractorId(request);
 
     if (!contractorId) {
       return NextResponse.json(
-        { error: 'RLPP_USER_ID environment variable is not set' },
-        { status: 500 }
+        { message: 'User does not have a contractor ID' },
+        { status: 400 }
       );
     }
 
@@ -20,7 +38,6 @@ export async function GET(request: NextRequest) {
     // Build query parameters for the job engine API
     const queryParams = new URLSearchParams({
       time_frame: timeFrame,
-      api_key: '3cc3cde9-23c0-4820-8588-a23554a74fbe',
     });
 
     if (selectedMonth !== null) {
@@ -31,22 +48,29 @@ export async function GET(request: NextRequest) {
       queryParams.append('selected_year', selectedYear);
     }
 
-    const response = await fetch(`https://qa.api.jobsuite.app/api/v1/contractors/${contractorId}/dashboard/metrics?${queryParams.toString()}`, {
+    const response = await fetch(`${apiBaseUrl}/api/v1/contractors/${contractorId}/dashboard/v2/metrics?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
+        Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      return NextResponse.json(
+        { message: errorData.detail || 'Failed to fetch dashboard metrics' },
+        { status: response.status }
+      );
     }
 
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Error fetching dashboard metrics:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard metrics' },
+      { message: 'An error occurred while fetching dashboard metrics' },
       { status: 500 }
     );
   }

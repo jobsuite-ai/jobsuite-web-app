@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getContractorId } from '../../../../../../utils/getContractorId';
 
-const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
-    ? 'https://api.jobsuite.app'
-    : 'https://qa.api.jobsuite.app';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(
     request: NextRequest,

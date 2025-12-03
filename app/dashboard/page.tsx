@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 
-import { Anchor, Button, Center, Container, Grid, Group, Loader, LoadingOverlay, Modal, NumberInput, Paper, Select, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { BarChart, LineChart, PieChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
 import { useAuth } from '@/hooks/useAuth';
@@ -93,7 +94,7 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -138,7 +139,7 @@ export default function Dashboard() {
         });
 
         if (selectedMonth !== null && selectedMonth !== undefined) {
-          queryParams.append('selected_month', (selectedMonth + 1).toString());
+          queryParams.append('selected_month', (selectedMonth).toString());
         }
 
         if (selectedYear !== null && selectedYear !== undefined) {
@@ -147,7 +148,7 @@ export default function Dashboard() {
 
         const response = await fetch(`/api/dashboard-metrics?${queryParams.toString()}`, {
           method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getApiHeaders(),
         });
 
         if (!response.ok) {
@@ -244,9 +245,10 @@ export default function Dashboard() {
     <Container size="xl" pt="md">
       <Stack gap="lg">
         <Group justify="space-between">
-          <Title order={1}>Dashboard</Title>
+          <Title order={1} c="gray.0">Dashboard</Title>
           <Select
             label="Time Period"
+            c="gray.0"
             value={timeFrame}
             onChange={(value) => setTimeFrame(value || '30')}
             data={[
@@ -262,7 +264,6 @@ export default function Dashboard() {
         </Group>
 
         <div style={{ position: 'relative' }}>
-          <LoadingOverlay visible={loading} />
 
           <Grid gutter="md">
             {/* Top row metrics */}
@@ -608,7 +609,18 @@ export default function Dashboard() {
 
             {/* Charts Tabs */}
             <Grid.Col span={12}>
-              <Tabs defaultValue="weekly">
+              <Tabs
+                defaultValue="weekly"
+                styles={(theme) => ({
+                  tab: {
+                    color: theme.colors.gray[0],
+                    '&:hover': {
+                      color: theme.white,
+                      backgroundColor: theme.colors.dark[5],
+                    },
+                  },
+                })}
+              >
                 <Tabs.List>
                   <Tabs.Tab value="weekly">Weekly Proposals</Tabs.Tab>
                   <Tabs.Tab value="referrals">Referral Sources</Tabs.Tab>

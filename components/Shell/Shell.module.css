@@ -16,6 +16,10 @@
     width: calc(100% - 250px);
 }
 
+.wrapperNoHeader {
+    margin-top: 0;
+}
+
 .verticalWrapper {
     display: flex;
     flex-direction: column;
@@ -24,6 +28,10 @@
     min-height: 100vh;
     width: 100%;
     overflow-x: hidden;
+}
+
+.verticalWrapperNoHeader {
+    background-color: #2a3a54;
 }
 
 .spacer {

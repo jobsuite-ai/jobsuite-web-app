@@ -14,11 +14,17 @@ export type Client = {
 
 export type DynamoClient = {
     email: TypedDynamoStringReturn;
-    client_name: TypedDynamoStringReturn;
+    name: TypedDynamoStringReturn;
     phone_number: TypedDynamoStringReturn;
-    user_id: TypedDynamoStringReturn;
     id: TypedDynamoStringReturn;
     jobs: TypedDynamoListReturn<TypedDynamoStringReturn[]>;
+    address_street: TypedDynamoStringReturn;
+    address_city: TypedDynamoStringReturn;
+    address_state: TypedDynamoStringReturn;
+    address_zipcode: TypedDynamoStringReturn;
+    address_country: TypedDynamoStringReturn;
+    created_at: TypedDynamoStringReturn;
+    updated_at: TypedDynamoStringReturn;
 };
 
 export type SingleJob = {
@@ -163,6 +169,7 @@ export type Estimate = {
     spanish_transcription?: string;
     notes?: string;
     created_by: string;
+    owned_by?: string;
     scheduled_date: string;
     created_at: string;
     updated_at: string;
@@ -182,6 +189,14 @@ export type Estimate = {
     docuseal_link?: string;
     jira_link?: string;
     job_crew_lead?: string;
+    // Change order fields
+    change_orders?: string[];
+    original_estimate_id?: string;
+    original_hours?: number;
+    change_order_hours?: number;
+    original_rate?: number;
+    change_order_rate?: number;
+    change_orders_list?: Estimate[]; // Full change order objects when included
     // Legacy field names for compatibility
     estimate_date?: string; // Alias for scheduled_date
     estimate_hours?: number; // Alias for hours_bid
@@ -190,6 +205,10 @@ export type Estimate = {
     city?: string; // Alias for address_city
     state?: string; // Alias for address_state
     zip_code?: string; // Alias for address_zipcode
+    // Cover photo
+    cover_photo_resource_id?: string;
+    referral_source?: string;
+    referral_name?: string;
 };
 
 export type EstimateResource = {
@@ -220,6 +239,7 @@ export type ContractorClient = {
     address_state?: string;
     address_zipcode?: string;
     address_country?: string;
+    notes?: string;
     created_at: string;
     updated_at: string;
 };

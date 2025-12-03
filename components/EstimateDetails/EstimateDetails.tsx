@@ -2,31 +2,39 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
     IconCopy,
     IconEdit,
+    IconExternalLink,
+    IconFile,
     IconFileText,
     IconList,
     IconPencil,
     IconPhoto,
     IconPlus,
+    IconReceipt,
     IconVideo,
-    IconWriting,
 } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
 import LoadingState from '../Global/LoadingState';
-import { Estimate, EstimateResource, EstimateStatus } from '../Global/model';
+import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
+import CreateChangeOrder from './CreateChangeOrder';
+import EstimatePreview from './estimate/EstimatePreview';
+import { EstimateLineItem } from './estimate/LineItem';
 import LineItems, { LineItemsRef } from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import TranscriptionSummary, { TranscriptionSummaryRef } from './estimate/TranscriptionSummary';
+import FileList from './FileList';
+import FileUpload from './FileUpload';
 import ImageGallery from './ImageGallery';
 import ImageUpload from './ImageUpload';
 import JobTitle from './JobTitle';
@@ -43,11 +51,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
     const [resources, setResources] = useState<EstimateResource[]>([]);
+    const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
+    const [client, setClient] = useState<ContractorClient>();
     const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+    const [showFileUploadModal, setShowFileUploadModal] = useState(false);
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
+    const [activityLoading, setActivityLoading] = useState(true);
+    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
+    const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const router = useRouter();
@@ -64,7 +78,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
         try {
             const response = await fetch(
-                `/api/estimates/${estimateID}`,
+                `/api/estimates/${estimateID}?include_change_orders=true`,
                 {
                     method: 'GET',
                     headers: {
@@ -129,10 +143,137 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimateID]);
 
+    const getLineItems = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching line items:', errorData);
+                return;
+            }
+
+            const items = await response.json();
+            setLineItems(Array.isArray(items) ? items : []);
+            setLineItemsCount(Array.isArray(items) ? items.length : 0);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching line items:', error);
+        }
+    }, [estimateID]);
+
+    const getClient = useCallback(async () => {
+        if (!estimate?.client_id) {
+            return;
+        }
+
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/clients/${estimate.client_id}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching client:', errorData);
+                return;
+            }
+
+            const data = await response.json();
+            const clientData = data.Item || data;
+            setClient(clientData as ContractorClient);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching client:', error);
+        }
+    }, [estimate?.client_id]);
+
+    const getChangeOrders = useCallback(async () => {
+        // Only fetch change orders if this is not a change order itself
+        if (!estimate?.id || estimate.original_estimate_id) {
+            setChangeOrders([]);
+            return;
+        }
+
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimate.id}/change-orders`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching change orders:', errorData);
+                return;
+            }
+
+            const data = await response.json();
+            setChangeOrders(Array.isArray(data) ? data : []);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching change orders:', error);
+        }
+    }, [estimate?.id, estimate?.original_estimate_id]);
+
     useEffect(() => {
         setLoading(true);
-        Promise.all([getEstimate(), getResources()]).finally(() => setLoading(false));
-    }, [estimateID, getEstimate, getResources]);
+        Promise.all([getEstimate(), getResources(), getLineItems()])
+            .finally(() => setLoading(false));
+    }, [estimateID, getEstimate, getResources, getLineItems]);
+
+    useEffect(() => {
+        if (estimate?.client_id && !client) {
+            getClient();
+        }
+    }, [estimate?.client_id, client, getClient]);
+
+    useEffect(() => {
+        if (estimate?.id) {
+            getChangeOrders();
+        }
+    }, [estimate?.id, getChangeOrders]);
 
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const hasUploadingVideoRef = useRef(false);
@@ -231,8 +372,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const imageResources = useMemo(() => (
         resources.filter(r => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED')
     ), [resources]);
+    const fileResources = useMemo(() => (
+        resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
+    ), [resources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
+    const hasFiles = fileResources.length > 0;
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
@@ -248,7 +393,25 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
                                     <Flex justify="space-between" align="center" gap="md" w="100%">
-                                        <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                        <Flex align="center" gap="md">
+                                            <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
+                                            {estimate.original_estimate_id && (
+                                                <Flex align="center" gap="lg">
+                                                    <Badge color="orange" size="lg">
+                                                        Change Order
+                                                    </Badge>
+                                                    <Anchor
+                                                      component="button"
+                                                      onClick={() => router.push(`/proposals/${estimate.original_estimate_id}`)}
+                                                      size="sm"
+                                                      style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                                    >
+                                                        <IconExternalLink size={16} />
+                                                        View Original Estimate
+                                                    </Anchor>
+                                                </Flex>
+                                            )}
+                                        </Flex>
                                         <Menu shadow="md" width={200} position="bottom-start" offset={5}>
                                             <Menu.Target>
                                                 <ActionIcon
@@ -278,6 +441,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     Add Images
                                                 </Menu.Item>
                                                 <Menu.Item
+                                                  leftSection={<IconFile size={16} />}
+                                                  onClick={() => setShowFileUploadModal(true)}
+                                                >
+                                                    Add Files
+                                                </Menu.Item>
+                                                <Menu.Item
                                                   leftSection={<IconList size={16} />}
                                                   onClick={() =>
                                                       lineItemsRef.current?.openAddModal()
@@ -285,26 +454,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 >
                                                     Add Line Item
                                                 </Menu.Item>
-                                                {!hasDescription && (
+                                                {!estimate?.original_estimate_id && (
                                                     <Menu.Item
-                                                      leftSection={<IconWriting size={16} />}
-                                                      onClick={() => {
-                                                        setShowDescriptionEditor(true);
-                                                        transcriptionSummaryRef.current
-                                                            ?.handleEdit();
-                                                    }}
-                                                    >
-                                                        Add Description
-                                                    </Menu.Item>
-                                                )}
-                                                {!hasSpanishTranscription && (
-                                                    <Menu.Item
-                                                      leftSection={<IconWriting size={16} />}
+                                                      leftSection={<IconReceipt size={16} />}
                                                       onClick={() =>
-                                                        setShowSpanishTranscriptionEditor(true)
-                                                    }
+                                                        setShowCreateChangeOrderModal(true)
+                                                      }
                                                     >
-                                                        Add Spanish Transcription
+                                                        Create Change Order
                                                     </Menu.Item>
                                                 )}
                                             </Menu.Dropdown>
@@ -323,12 +480,41 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
+                                    {/* Activity Section - Always show */}
+                                    <CollapsibleSection
+                                      title="Activity"
+                                      defaultOpen
+                                      loading={activityLoading}
+                                    >
+                                        <JobComments
+                                          estimateID={estimateID}
+                                          onLoadingChange={setActivityLoading}
+                                        />
+                                    </CollapsibleSection>
+
                                     {/* Image Gallery - Show if images exist */}
                                     {hasImages && (
                                         <CollapsibleSection title="Image Gallery" defaultOpen>
                                             <ImageGallery
                                               estimateID={estimateID}
                                               resources={imageResources}
+                                              coverPhotoResourceId={
+                                                estimate.cover_photo_resource_id
+                                              }
+                                              onUpdate={() => {
+                                                getResources();
+                                                getEstimate();
+                                              }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* File List - Show if files exist */}
+                                    {hasFiles && (
+                                        <CollapsibleSection title="Files" defaultOpen>
+                                            <FileList
+                                              estimateID={estimateID}
+                                              resources={fileResources}
                                               onUpdate={getResources}
                                             />
                                         </CollapsibleSection>
@@ -414,7 +600,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <LineItems
                                               ref={lineItemsRef}
                                               estimateID={estimateID}
-                                              onLineItemsChange={setLineItemsCount}
+                                              onLineItemsChange={(count) => {
+                                                setLineItemsCount(count);
+                                                // Refresh line items when count changes
+                                                getLineItems();
+                                              }}
                                             />
                                         </CollapsibleSection>
                                     ) : (
@@ -422,15 +612,43 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <LineItems
                                               ref={lineItemsRef}
                                               estimateID={estimateID}
-                                              onLineItemsChange={setLineItemsCount}
+                                              onLineItemsChange={(count) => {
+                                                setLineItemsCount(count);
+                                                // Refresh line items when count changes
+                                                getLineItems();
+                                              }}
                                             />
                                         </div>
                                     )}
 
-                                    {/* Activity Section - Always show */}
-                                    <CollapsibleSection title="Activity" defaultOpen>
-                                        <JobComments estimateID={estimateID} />
-                                    </CollapsibleSection>
+                                    {/* Change Orders Section - Only show if change orders exist */}
+                                    {estimate &&
+                                    !estimate.original_estimate_id &&
+                                    changeOrders.length > 0 &&
+                                    estimate.status !== EstimateStatus.ARCHIVED && (
+                                        <CollapsibleSection title="Change Orders" defaultOpen>
+                                            <ChangeOrders
+                                              estimate={estimate}
+                                              onUpdate={() => {
+                                                getEstimate();
+                                                getChangeOrders();
+                                              }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* Estimate Preview Section */}
+                                    {estimate && (
+                                        <CollapsibleSection title="Estimate Preview" defaultOpen>
+                                            <EstimatePreview
+                                              estimate={estimate}
+                                              imageResources={imageResources}
+                                              videoResources={videoResources}
+                                              lineItems={lineItems}
+                                              client={client}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
                                 </div>
                             </div>
 
@@ -547,6 +765,38 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 />
             </Modal>
 
+            {/* File Upload Modal */}
+            <Modal
+              opened={showFileUploadModal}
+              onClose={() => setShowFileUploadModal(false)}
+              size="lg"
+              centered
+              title={<Text fz={24} fw={700}>Upload Files</Text>}
+            >
+                <FileUpload
+                  estimateID={estimateID}
+                  setFile={() => {
+                    getResources();
+                    setShowFileUploadModal(false);
+                  }}
+                  setShowModal={setShowFileUploadModal}
+                />
+            </Modal>
+
+            {/* Create Change Order Modal */}
+            {estimate && (
+                <CreateChangeOrder
+                  opened={showCreateChangeOrderModal}
+                  onClose={() => setShowCreateChangeOrderModal(false)}
+                  onSuccess={() => {
+                    getEstimate();
+                    getChangeOrders();
+                    setShowCreateChangeOrderModal(false);
+                  }}
+                  estimate={estimate}
+                />
+            )}
+
             {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
     ), [
@@ -555,18 +805,24 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         estimateID,
         hasVideo,
         hasImages,
+        hasFiles,
         hasDescription,
         hasSpanishTranscription,
         videoResources,
         imageResources,
+        fileResources,
         showVideoUploaderModal,
         showImageUploadModal,
+        showFileUploadModal,
         showDescriptionEditor,
         showSpanishTranscriptionEditor,
         lineItemsCount,
         isModalOpen,
+        changeOrders,
+        showCreateChangeOrderModal,
         getEstimate,
         getResources,
+        getChangeOrders,
         handleOpenExternalLink,
         handleCopySpanishTranscription,
         handleEditTranscriptionSummary,
@@ -575,41 +831,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         setIsModalOpen,
         setShowVideoUploaderModal,
         setShowImageUploadModal,
+        setShowFileUploadModal,
+        setShowCreateChangeOrderModal,
         transcriptionSummaryRef,
         lineItemsRef,
     ]);
-
-    // const PdfDetails = () => (
-    //     <>
-    //         {loading ? <LoadingState /> : <>
-    //             <div className={classes.jobDetailsWrapper}>
-    //                 {estimate ?
-    //                     <>
-    //                         <JobTitle initialTitle={estimate.job_title || ''}
-    // estimateID={estimateID} onSave={getEstimate} />
-    //                         <div className={classes.flexContainer}>
-    //                             <div className={classes.videoWrapper}>
-    //                                 {estimate.pdf ?
-    //                                     <PdfViewer
-    //                                       name={typeof estimate.pdf === 'object' &&
-    // estimate.pdf?.name ? estimate.pdf.name : estimate.pdf}
-    //                                       estimateID={estimateID}
-    //                                       refresh={getEstimate}
-    //                                     />
-    //                                     :
-    //                                     <PdfUploader
-    //                                       estimateID={estimateID}
-    //                                       refresh={getEstimate}
-    //                                     />
-    //                                 }
-    //                             </div>
-    //                         </div>
-    //                     </> : <UniversalError message="Unable to access estimate details" />
-    //                 }
-    //             </div>
-    //                                       </>}
-    //     </>
-    // );
 
     return OverviewDetails;
 }

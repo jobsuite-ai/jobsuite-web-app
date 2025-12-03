@@ -1,41 +1,61 @@
-import { List, Text, ThemeIcon, rem } from '@mantine/core';
-import { IconCircleDashed } from '@tabler/icons-react';
+import { Alert, Flex, List, ThemeIcon, rem } from '@mantine/core';
+import { IconCircleDashedCheck } from '@tabler/icons-react';
 
-import { Estimate } from '@/components/Global/model';
+interface EstimateTodoProps {
+    hasImages: boolean;
+    hasVideo: boolean;
+    hasTranscriptionSummary: boolean;
+    hasLineItems: boolean;
+}
 
-export default function EstimateTodo({ estimate }: { estimate: Estimate }) {
+export default function EstimateTodo({
+    hasImages,
+    hasVideo,
+    hasTranscriptionSummary,
+    hasLineItems,
+}: EstimateTodoProps) {
     const inProgressIcon = (
         <ThemeIcon color="blue" size={24} radius="xl">
-            <IconCircleDashed style={{ width: rem(16), height: rem(16) }} />
+            <IconCircleDashedCheck style={{ width: 22, height: 22 }} />
         </ThemeIcon>
     );
 
+    const hasAllItems = hasImages && hasVideo && hasTranscriptionSummary && hasLineItems;
+
     return (
-        <>
-            {(!estimate.images || !estimate.video ||
-            !estimate.transcription_summary ||
-            !estimate.line_items ||
-            !estimate.transcription_summary) &&
-                <Text>Please complete the following steps before sending the estimate</Text>
-            }
-            <List spacing="xs" size="sm" mt="lg">
-                {!estimate.images &&
-                    <List.Item icon={inProgressIcon}>Upload an image of the house</List.Item>
-                }
-                {!estimate.video &&
-                    <List.Item icon={inProgressIcon}>Upload a video of the house</List.Item>
-                }
-                {!estimate.line_items &&
-                    <List.Item icon={inProgressIcon}>
-                        Add line items for the cost of the job
-                    </List.Item>
-                }
-                {!estimate.transcription_summary &&
-                    <List.Item icon={inProgressIcon}>
-                        Wait for transcription summary to be uploaded
-                    </List.Item>
-                }
-            </List>
-        </>
+        <Flex direction="row" gap="xl" justify="center" align="center">
+            {!hasAllItems && (
+                <Alert
+                  color="yellow"
+                  style={{ flex: 1, width: '50%', borderRadius: rem(8) }}
+                  styles={{
+                      message: { fontSize: rem(16) },
+                  }}
+                >
+                    Please complete the following steps before sending the estimate.
+                    A preview will be generated once all items are complete.
+                </Alert>
+            )}
+            {!hasAllItems && (
+                <List spacing="xs" size="sm" style={{ flex: 1, width: '50%' }}>
+                    {!hasImages && (
+                        <List.Item icon={inProgressIcon}>Upload an image of the house</List.Item>
+                    )}
+                    {!hasVideo && (
+                        <List.Item icon={inProgressIcon}>Upload a video of the house</List.Item>
+                    )}
+                    {!hasLineItems && (
+                        <List.Item icon={inProgressIcon}>
+                            Add line items for the cost of the job
+                        </List.Item>
+                    )}
+                    {!hasTranscriptionSummary && (
+                        <List.Item icon={inProgressIcon}>
+                            Wait for transcription summary to be uploaded
+                        </List.Item>
+                    )}
+                </List>
+            )}
+        </Flex>
     );
 }

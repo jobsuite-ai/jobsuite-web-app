@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getContractorId } from '../../utils/getContractorId';
 
-const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
-    ? 'https://api.jobsuite.app'
-    : 'https://qa.api.jobsuite.app';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(
     request: NextRequest,
@@ -36,9 +34,19 @@ export async function GET(
             );
         }
 
+        // Check if change orders should be included
+        const url = new URL(request.url);
+        const includeChangeOrders = url.searchParams.get('include_change_orders') === 'true';
+
+        // Build API URL with query params
+        let estimateUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}`;
+        if (includeChangeOrders) {
+            estimateUrl += '?include_change_orders=true';
+        }
+
         // Get specific estimate from backend
         const estimateResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}`,
+            estimateUrl,
             {
                 method: 'GET',
                 headers: {

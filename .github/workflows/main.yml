@@ -1,0 +1,45 @@
+name: Merge main into production
+
+on:
+  workflow_dispatch:
+
+jobs:
+  merge-main-into-production:
+    runs-on: ubuntu-latest
+
+    # Needs write access to push to the repo
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history, needed for proper merges
+
+      - name: Set up Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch branches
+        run: |
+          git fetch origin main
+          git fetch origin production
+
+      - name: Merge main into production
+        run: |
+          # Switch to production branch
+          git checkout production
+
+          # Merge main into production
+          git merge origin/main --no-ff --no-edit
+
+      - name: Push production
+        run: |
+          # Only push if there are changes
+          if [ -n "$(git status --porcelain)" ]; then
+            git push origin production
+          else
+            echo "No changes to push. production is already up to date with main."
+          fi

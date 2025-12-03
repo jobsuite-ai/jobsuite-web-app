@@ -5,12 +5,13 @@ import { useEffect, useState } from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 import { useParams, useRouter } from 'next/navigation';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import SingleClient from '@/components/Clients/Client';
 import LoadingState from '@/components/Global/LoadingState';
-import { DynamoClient } from '@/components/Global/model';
+import { ContractorClient } from '@/components/Global/model';
 
 export default function Clients() {
-    const [client, setClient] = useState<DynamoClient>();
+    const [client, setClient] = useState<ContractorClient>();
     const params = useParams();
     const { user, isLoading } = useUser();
     const router = useRouter();
@@ -33,9 +34,7 @@ export default function Clients() {
             `/api/clients/${params.client_id as string}`,
             {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: getApiHeaders(),
             }
         );
 

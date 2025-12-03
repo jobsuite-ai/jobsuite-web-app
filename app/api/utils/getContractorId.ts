@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const getApiBaseUrl = () => process.env.NODE_ENV === 'production'
-    ? 'https://api.jobsuite.app'
-    : 'https://qa.api.jobsuite.app';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 /**
  * Gets the contractor_id from the request headers if available,

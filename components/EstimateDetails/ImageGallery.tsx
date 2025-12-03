@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Flex, Grid, Image, Modal, Text } from '@mantine/core';
-import { IconPlus, IconX } from '@tabler/icons-react';
+import { ActionIcon, Badge, Button, Flex, Image, Modal, Text } from '@mantine/core';
+import { IconChevronLeft, IconChevronRight, IconPhoto, IconPlus, IconX } from '@tabler/icons-react';
 
 import ImageUpload from './ImageUpload';
 import classes from './styles/EstimateDetails.module.css';
@@ -13,11 +13,20 @@ import { EstimateResource } from '@/components/Global/model';
 interface ImageGalleryProps {
   estimateID: string;
   resources: EstimateResource[];
+  coverPhotoResourceId?: string;
   onUpdate?: () => void;
 }
 
-export default function ImageGallery({ estimateID, resources, onUpdate }: ImageGalleryProps) {
+export default function ImageGallery({
+  estimateID,
+  resources,
+  coverPhotoResourceId,
+  onUpdate,
+}: ImageGalleryProps) {
   const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [viewerModalOpened, setViewerModalOpened] = useState(false);
+  const [isSelectingCoverPhoto, setIsSelectingCoverPhoto] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [imagePaths, setImagePaths] = useState<Array<{
     url: string;
     resource: EstimateResource;
@@ -104,40 +113,137 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
     }
   };
 
+  const openImageViewer = (index: number, selectingCoverPhoto = false) => {
+    setSelectedImageIndex(index);
+    setIsSelectingCoverPhoto(selectingCoverPhoto);
+    setViewerModalOpened(true);
+  };
+
+  const setCoverPhoto = async (resourceId: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
+
+    try {
+      const response = await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cover_photo_resource_id: resourceId }),
+      });
+
+      if (response.ok) {
+        setViewerModalOpened(false);
+        setIsSelectingCoverPhoto(false);
+        if (onUpdate) {
+          onUpdate();
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to set cover photo:', error);
+    }
+  };
+
+  const handleSelectCoverPhoto = () => {
+    if (imagePaths.length > 0) {
+      openImageViewer(0, true);
+    }
+  };
+
+  const navigateImage = useCallback((direction: 'prev' | 'next') => {
+    setSelectedImageIndex((prev) => {
+      if (direction === 'prev') {
+        return prev > 0 ? prev - 1 : imagePaths.length - 1;
+      }
+      return prev < imagePaths.length - 1 ? prev + 1 : 0;
+    });
+  }, [imagePaths.length]);
+
+  useEffect(() => {
+    if (!viewerModalOpened) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        navigateImage('prev');
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        navigateImage('next');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    // eslint-disable-next-line consistent-return
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [viewerModalOpened, navigateImage]);
+
   return (
     <>
       <div className={classes.imageGalleryContainer}>
         <Flex direction="column" gap="md">
           {imagePaths.length > 0 ? (
-            <Grid className={classes.imageGrid}>
+            <div className={classes.imageGalleryScroll}>
               {imagePaths.map((item, index) => (
-                <Grid.Col key={item.resource.id} span={{ base: 12, sm: 6, md: 4 }}>
-                  <Card shadow="xs" radius="md" withBorder style={{ position: 'relative' }}>
-                    <IconX
-                      onClick={() => deleteImage(item.resource)}
+                <div
+                  key={item.resource.id}
+                  role="button"
+                  tabIndex={0}
+                  style={{ position: 'relative', flexShrink: 0, cursor: 'pointer' }}
+                  onClick={() => openImageViewer(index)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openImageViewer(index);
+                    }
+                  }}
+                >
+                  <IconX
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteImage(item.resource);
+                    }}
+                    style={{
+                      cursor: 'pointer',
+                      position: 'absolute',
+                      right: '8px',
+                      top: '8px',
+                      width: '18px',
+                      height: '18px',
+                      zIndex: 10,
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                      borderRadius: '50%',
+                      padding: '2px',
+                    }}
+                  />
+                  {coverPhotoResourceId === item.resource.id && (
+                    <Badge
+                      color="blue"
+                      variant="filled"
                       style={{
-                        cursor: 'pointer',
                         position: 'absolute',
-                        right: '10px',
-                        top: '10px',
-                        width: '20px',
-                        height: '20px',
+                        left: '8px',
+                        top: '8px',
                         zIndex: 10,
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '50%',
-                        padding: '2px',
                       }}
-                    />
-                    <Image
-                      src={item.url}
-                      alt={`Image ${index + 1}`}
-                      radius="md"
-                      style={{ width: '100%', height: 'auto' }}
-                    />
-                  </Card>
-                </Grid.Col>
+                    >
+                      Cover
+                    </Badge>
+                  )}
+                  <Image
+                    src={item.url}
+                    alt={`Image ${index + 1}`}
+                    radius="md"
+                    style={{ width: '150px', height: '150px', objectFit: 'cover' }}
+                  />
+                </div>
               ))}
-            </Grid>
+            </div>
           ) : (
             <div className={classes.emptyState}>
               <Image
@@ -151,13 +257,22 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
             </div>
           )}
         </Flex>
-        <Flex justify="center" align="center" direction="column" gap="md" mt="md">
+        <Flex justify="center" align="center" direction="row" gap="md" mt="md">
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => setShowImageUploadModal(true)}
             >
               Add Image
             </Button>
+            {imagePaths.length > 0 && (
+              <Button
+                variant="light"
+                leftSection={<IconPhoto size={16} />}
+                onClick={handleSelectCoverPhoto}
+              >
+                Change Cover Photo
+              </Button>
+            )}
         </Flex>
       </div>
 
@@ -175,6 +290,158 @@ export default function ImageGallery({ estimateID, resources, onUpdate }: ImageG
           setImage={handleImageUpload}
           setShowModal={setShowImageUploadModal}
         />
+      </Modal>
+
+      <Modal
+        opened={viewerModalOpened}
+        onClose={() => {
+          setViewerModalOpened(false);
+          setIsSelectingCoverPhoto(false);
+        }}
+        size="xl"
+        padding={0}
+        withCloseButton={false}
+        centered
+        overlayProps={{
+          backgroundOpacity: 0.75,
+          blur: 3,
+        }}
+        zIndex={400}
+        radius="md"
+        styles={{
+          body: { position: 'relative', padding: 0 },
+          content: { borderRadius: 'var(--mantine-radius-md)' },
+          overlay: { zIndex: 400 },
+        }}
+      >
+        {imagePaths.length > 0 && (
+          <div style={{ position: 'relative', width: '100%', height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ActionIcon
+              variant="filled"
+              size="lg"
+              radius="xl"
+              style={{
+                position: 'absolute',
+                top: 16,
+                right: 16,
+                zIndex: 10,
+              }}
+              onClick={() => {
+                setViewerModalOpened(false);
+                setIsSelectingCoverPhoto(false);
+              }}
+            >
+              <IconX size={20} />
+            </ActionIcon>
+            <Image
+              src={imagePaths[selectedImageIndex].url}
+              alt={`Image ${selectedImageIndex + 1}`}
+              fit="contain"
+              style={{ maxWidth: '100%', maxHeight: '100%' }}
+            />
+            {imagePaths.length > 1 && !isSelectingCoverPhoto && (
+              <>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('prev')}
+                >
+                  <IconChevronLeft size={24} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('next')}
+                >
+                  <IconChevronRight size={24} />
+                </ActionIcon>
+              </>
+            )}
+            {isSelectingCoverPhoto && (
+              <Button
+                variant="filled"
+                color="blue"
+                size="lg"
+                style={{
+                  position: 'absolute',
+                  top: 20,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  zIndex: 10,
+                }}
+                onClick={() => setCoverPhoto(imagePaths[selectedImageIndex].resource.id)}
+              >
+                Set as Cover Photo
+              </Button>
+            )}
+            {imagePaths.length > 1 && isSelectingCoverPhoto && (
+              <>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    left: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('prev')}
+                >
+                  <IconChevronLeft size={24} />
+                </ActionIcon>
+                <ActionIcon
+                  variant="filled"
+                  size="xl"
+                  radius="xl"
+                  style={{
+                    position: 'absolute',
+                    right: 16,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    zIndex: 10,
+                  }}
+                  onClick={() => navigateImage('next')}
+                >
+                  <IconChevronRight size={24} />
+                </ActionIcon>
+              </>
+            )}
+            <Text
+              size="sm"
+              c="dimmed"
+              style={{
+                position: 'absolute',
+                bottom: isSelectingCoverPhoto ? 16 : 16,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0, 0, 0, 0.6)',
+                padding: '4px 12px',
+                borderRadius: 4,
+                color: 'white',
+              }}
+            >
+              {selectedImageIndex + 1} / {imagePaths.length}
+            </Text>
+          </div>
+        )}
       </Modal>
     </>
   );

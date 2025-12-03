@@ -1,0 +1,42 @@
+name: Enforce Production Branch Protection
+
+on:
+  pull_request:
+    branches:
+      - production
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      contents: read
+    steps:
+      - name: Check if PR is from main branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+            
+            const sourceBranch = pr.head.ref;
+            const targetBranch = pr.base.ref;
+            
+            console.log(`Source branch: ${sourceBranch}`);
+            console.log(`Target branch: ${targetBranch}`);
+            
+            if (targetBranch === 'production' && sourceBranch !== 'main') {
+              core.setFailed(
+                `❌ ERROR: Pull requests to 'production' branch must come from 'main' branch.\n` +
+                `Current source branch: ${sourceBranch}\n` +
+                `Please create a pull request from 'main' to 'production' instead.`
+              );
+            } else {
+              console.log('✅ Source branch check passed - PR is from \'main\' branch');
+            }
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+

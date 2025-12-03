@@ -54,7 +54,11 @@
   },
   "[typescriptreact]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "dbaeumer.vscode-eslint"
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "always",
+      "source.fixAll": "always"
+    }
   },
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"

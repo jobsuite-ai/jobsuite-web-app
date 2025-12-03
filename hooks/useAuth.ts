@@ -62,6 +62,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         return;
       }
 
+      // Set loading state when checking auth
+      setIsLoading(true);
+
       // Validate token and optionally fetch user
       try {
         const response = await fetch('/api/auth/me', {
@@ -100,6 +103,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         }
 
         setIsLoading(false);
+        setError(null);
       } catch (err) {
         // Error checking token
         localStorage.removeItem('access_token');
@@ -116,7 +120,30 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       }
     };
 
+    // Initial check
     checkAuth();
+
+    // Listen for storage changes (e.g., when login saves token in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'access_token') {
+        checkAuth();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    // Also listen for custom event for same-origin storage changes
+    // (storage event only fires for changes from other windows/tabs)
+    const handleCustomStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
+    };
   }, [router, requireAuth, redirectTo, fetchUser]);
 
   return {

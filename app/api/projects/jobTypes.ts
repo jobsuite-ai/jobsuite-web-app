@@ -45,9 +45,9 @@ export type UpdatePaintDetailsInput = {
 };
 
 export type UpdateClientDetailsInput = {
-    client_address: string,
-    city: string,
-    zip_code: string,
+    address_street: string,
+    address_city: string,
+    address_zipcode: string,
 };
 
 export type JobVideo = {

@@ -1,42 +1,27 @@
-import { TemplateInput, TemplateDescription } from './template_model';
+import { TemplateDescription, TemplateInput } from './template_model';
 
-const RATE = process.env.FULL_RATE as string ?? 106;
-const FULL_RATE = +RATE;
-
-const getPrice = (description: TemplateDescription, fullRate: number) => {
-    if (description.hours) {
-        return getPriceFromNumber(Number(description.hours) * fullRate);
-    }
-
-    return getPriceFromNumber(description.price);
-};
-
-const getDiscountedPrice = (hours: number, rate: number) => getPriceFromNumber(hours * rate);
-
-const getDiscountedSubtotal = (price: number, rate: number, fullRate: number) => {
-    const multiplier = rate / fullRate;
-    return getPriceFromNumber(price * multiplier);
-};
-
-const getDiscountedTotal = (total: number, rate: number, fullRate: number) => {
-    const hours = total / fullRate;
-    return getPriceFromNumber(hours * (fullRate - rate));
-};
+const getPrice = (description: TemplateDescription) =>
+    // Always use the price from the line item (already calculated as hours * rate)
+    getPriceFromNumber(description.price);
 
 const generateDescriptions = (
     descriptions: TemplateDescription[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     rate: number,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     discountReason?: string
 ) => {
     let output = '';
-    const fullRate = discountReason ? FULL_RATE : rate;
 
     descriptions.forEach((description) => {
+        // Always use the actual price from the line item (already calculated correctly)
+        const displayPrice = getPrice(description);
+
         const html = `
             <div class="description">
                 <div class="price-section">
                     <p>${description.header}</p>
-                    <p>${getPrice(description, fullRate)}</p>
+                    <p>${displayPrice}</p>
                 </div>
                 <div>
                     ${description.content}
@@ -53,25 +38,25 @@ const generateTotals = (
     descriptions: TemplateDescription[],
     rate: number,
     discountReason?: string,
+    discountPercentage?: number,
 ) => {
     let output = '';
-    let total = 0;
-    const percentDiscount = 100 - (Math.round((rate / FULL_RATE) * 100));
-    const fullRate = discountReason ? FULL_RATE : rate;
+    // Sum up the actual prices from line items
+    const subtotal = descriptions.reduce((sum, desc) => sum + desc.price, 0);
+
+    // Calculate discount amount if discount percentage is provided
+    const discountAmount = discountPercentage
+        ? subtotal * (discountPercentage / 100)
+        : 0;
+
+    const total = subtotal - discountAmount;
+    const percentDiscount = discountPercentage || 0;
 
     descriptions.forEach((description) => {
-        total += (description.hours ? Number(description.hours) * fullRate : description.price);
         const html = `
             <div class="subtotal">
                 <div>${description.header}</div>
-                ${!discountReason ? `<div style="font-weight: normal;">${getPrice(description, fullRate)}</div>`
-                    : `
-                        <div style="display: flex; flex-direction: column">
-                            <div style="font-weight: normal; text-decoration: line-through;">${getPrice(description, fullRate)}</div>
-                            <div style="font-weight: normal;">${getDiscountedPrice(Number(description.hours), rate)}</div>
-                        </div>
-                    `
-                }
+                <div style="font-weight: normal;">${getPrice(description)}</div>
             </div>
         `;
         output += html;
@@ -80,24 +65,22 @@ const generateTotals = (
     const subAndTotal = `
         <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
             <div>Subtotal</div>
-            ${!discountReason ? `<div style="font-weight: normal;">${getPriceFromNumber(total)}</div>`
-                : `
-                    <div style="display: flex; flex-direction: column">
-                        <div style="font-weight: normal; text-decoration: line-through;">${getPriceFromNumber(total)}</div>
-                        <div style="font-weight: normal;">${getDiscountedSubtotal(total, rate, fullRate)}</div>
-                    </div>
-                `
-            }
+            ${discountPercentage ? `
+                <div style="display: flex; flex-direction: column">
+                    <div style="font-weight: normal; text-decoration: line-through;">${getPriceFromNumber(subtotal)}</div>
+                    <div style="font-weight: normal;">${getPriceFromNumber(total)}</div>
+                </div>
+            ` : `<div style="font-weight: normal;">${getPriceFromNumber(subtotal)}</div>`}
         </div>
-        ${!discountReason ? '' : `
+        ${discountPercentage ? `
             <div class="subtotal" style="border-top: 1px solid !important; padding-top: 10px;">
-                <div style="color: green;">${discountReason} (${percentDiscount}%)</div>
-                <div style="font-weight: normal; color: green">${getDiscountedTotal(total, rate, fullRate)}</div>
+                <div style="color: green;">${discountReason || 'Discount'} (${percentDiscount.toFixed(1)}%)</div>
+                <div style="font-weight: normal; color: green">-${getPriceFromNumber(discountAmount)}</div>
             </div>
-        `}
+        ` : ''}
         <div class="total">
             <p>Total</p>
-            <p>${!discountReason ? getPriceFromNumber(total) : getDiscountedSubtotal(total, rate, fullRate)}</p>
+            <p>${getPriceFromNumber(total)}</p>
         </div>
     `;
 
@@ -294,7 +277,7 @@ export const generateTemplate = (template: TemplateInput) => `
     <body class="body-wrapper">
         <div class="full-page-wrapper">
             <div class="container">
-                <h1>ESTIMATE</h1>
+                <h1>Project Proposal</h1>
 
                 <div class="top-wrapper">
                     <div class="left-top-wrapper">
@@ -310,7 +293,7 @@ export const generateTemplate = (template: TemplateInput) => `
 
                     <div class="client-contact">
                         <p><strong>Date:</strong> ${getTodaysDate()}</p>
-                        <p><strong>Estimate ID:</strong> 8a57d91694e3</p>
+                        <p><strong>Estimate ID:</strong> ${template.estimateNumber}</p>
                         <h3 style="margin-top: 60px;">Prepared For</h3>
                         <p>${template.client.name}</p>
                         <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
@@ -346,7 +329,7 @@ export const generateTemplate = (template: TemplateInput) => `
                     <div class="totals-wrapper">
                         <div class="totals-container"></div>
                         <div class="totals-container">
-                            ${generateTotals(template.items, template.rate, template.discountReason)}
+                            ${generateTotals(template.items, template.rate, template.discountReason, template.discountPercentage)}
                         </div>
                     </div>
                 </div>
@@ -392,7 +375,7 @@ export const generateTemplate = (template: TemplateInput) => `
                 </div>
 
                 <div class="footer">
-                    <p>© 2024 R L Peek Painting. All rights reserved.</p>
+                    <p>© 2025 R.L. Peek Painting. All rights reserved.</p>
                 </div>
             </div>
         </div>
