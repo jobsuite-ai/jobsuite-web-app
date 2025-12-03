@@ -17,9 +17,9 @@ frontend:
             echo "Building for DEVELOPMENT ($AWS_BRANCH branch)"
           fi
         # Debug: Show which environment variables are available
-        - echo "Branch: $AWS_BRANCH"
-        - echo "NODE_ENV: $NODE_ENV"
-        - echo "WEBHOOK_EMAIL configured: $([ -n "$WEBHOOK_EMAIL" ] && echo 'yes' || echo 'no')"
+        - "echo \"Branch: $AWS_BRANCH\""
+        - "echo \"NODE_ENV: $NODE_ENV\""
+        - "echo \"WEBHOOK_EMAIL configured: $([ -n \"$WEBHOOK_EMAIL\" ] && echo 'yes' || echo 'no')\""
     build:
       commands:
         - npm run build
