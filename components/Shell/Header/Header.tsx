@@ -1,23 +1,26 @@
 'use client';
 
-import { MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Badge, Collapse, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconChevronDown, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Badge, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
 import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
 
 const links = [
+  { link: '/', label: 'Home' },
   { link: '/dashboard', label: 'Dashboard' },
   { link: '/clients', label: 'Clients' },
   { link: '/add-proposal', label: 'Add Proposal' },
   { link: '/projects', label: 'Projects' },
+  { link: '/proposals', label: 'Proposals' },
 ];
 
 interface HeaderProps {
@@ -32,10 +35,29 @@ interface SearchResult {
   subtitle?: string;
 }
 
+interface Notification {
+  id: string;
+  user_id: string;
+  contractor_id: string;
+  title: string;
+  message: string;
+  type: string;
+  link: string | null;
+  is_acknowledged: boolean;
+  acknowledged_at: string | null;
+  delivery_status: string;
+  delivery_method: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-  const [proposalsMenuOpened, setProposalsMenuOpened] = useState(false);
+  const [unacknowledgedCount, setUnacknowledgedCount] = useState<number>(0);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const unacknowledgedCountRef = useRef<number>(0);
   const router = useRouter();
   const pathname = usePathname();
   const { clients, estimates } = useSearchData();
@@ -48,10 +70,6 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     event.preventDefault();
     router.push(link);
   };
-
-  // Check if Proposals menu should be active
-  const isProposalsActive =
-    pathname === '/proposals' || pathname?.startsWith('/proposals/');
 
   const navItems = links.map((link) => {
     // Check if the current pathname matches the link exactly or is a subroute
@@ -71,70 +89,6 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       />
     );
   });
-
-  // Add Proposals menu item with nested dropdown
-  const proposalsMenuItem = (
-    <div key="Proposals">
-      <NavLink
-        component="div"
-        label="Proposals"
-        active={isProposalsActive}
-        rightSection={
-          <button
-            type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setProposalsMenuOpened(!proposalsMenuOpened);
-            }}
-            style={{
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              margin: 0,
-            }}
-            aria-label="Toggle proposals menu"
-          >
-            <IconChevronDown
-              size={16}
-              style={{
-                transform: proposalsMenuOpened ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s',
-              }}
-            />
-          </button>
-        }
-        style={{ cursor: 'pointer' }}
-        onClick={(e) => {
-          // Only navigate if not clicking the chevron button
-          const target = e.target as HTMLElement;
-          if (target.closest('button[aria-label="Toggle proposals menu"]')) {
-            return;
-          }
-          // Clicking the main text navigates to /proposals
-          e.preventDefault();
-          router.push('/proposals');
-        }}
-      />
-      <Collapse in={proposalsMenuOpened}>
-        <div style={{ paddingLeft: rem(32) }}>
-          <NavLink
-            component={Link}
-            href="/proposals/completed"
-            label="Completed Estimates"
-            active={pathname === '/proposals/completed'}
-            onClick={(e) => {
-              handleNavLinkClick(e as any, '/proposals/completed');
-              setProposalsMenuOpened(false);
-            }}
-          />
-        </div>
-      </Collapse>
-    </div>
-  );
 
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {
@@ -425,6 +379,113 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     );
   };
 
+  // Fetch unacknowledged notification count with adaptive polling
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) {
+      return undefined;
+    }
+
+    const fetchUnacknowledgedCount = async () => {
+      // Don't poll if page is not visible
+      if (document.hidden) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/notifications/unacknowledged', {
+          method: 'GET',
+          headers: getApiHeaders(),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const count = data.count || 0;
+          setUnacknowledgedCount(count);
+          unacknowledgedCountRef.current = count; // Update ref for polling logic
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching unacknowledged count:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchUnacknowledgedCount();
+
+    // Adaptive polling:
+    // - 120 seconds (2 minutes) when no notifications
+    // - 60 seconds (1 minute) when there are notifications
+    // This reduces server load while still keeping the count reasonably up-to-date
+    const getPollInterval = () => unacknowledgedCountRef.current > 0 ? 60000 : 120000;
+
+    let timeoutId: NodeJS.Timeout;
+
+    const scheduleNextPoll = () => {
+      timeoutId = setTimeout(() => {
+        fetchUnacknowledgedCount().then(() => {
+          scheduleNextPoll();
+        });
+      }, getPollInterval());
+    };
+
+    scheduleNextPoll();
+
+    // Also poll when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUnacknowledgedCount();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isAuthenticated, isLoading]);
+
+  // Fetch notifications when menu opens
+  const fetchNotifications = useCallback(async () => {
+    if (notificationsLoading) return;
+
+    setNotificationsLoading(true);
+    try {
+      const response = await fetch('/api/notifications/unacknowledged/list?limit=10', {
+        method: 'GET',
+        headers: getApiHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data || []);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching notifications:', error);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [notificationsLoading]);
+
+  // Acknowledge notification
+  const acknowledgeNotification = useCallback(async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/acknowledge`, {
+        method: 'POST',
+        headers: getApiHeaders(),
+      });
+
+      if (response.ok) {
+        // Remove from list and update count
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        setUnacknowledgedCount((prev) => Math.max(0, prev - 1));
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error acknowledging notification:', error);
+    }
+  }, []);
+
   // Don't render header if not authenticated or still loading
   if (isLoading || !isAuthenticated) {
     return null;
@@ -435,7 +496,6 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
         <Stack gap="xs" p="md">
           {navItems}
-          {proposalsMenuItem}
         </Stack>
       </aside>
       <header className={classes.header}>
@@ -517,16 +577,90 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
             >
               <IconUser color="black" size={22} radius="xl" />
             </Link>
-            <Menu shadow="md" width={500} position="bottom-end">
+            <Menu
+              shadow="md"
+              width={400}
+              position="bottom-end"
+              onOpen={fetchNotifications}
+            >
               <Menu.Target>
-                <div style={{ marginTop: rem(5), cursor: 'pointer' }}>
+                <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
                   <IconNotification color="black" size={22} radius="xl" />
+                  {unacknowledgedCount > 0 && (
+                    <Badge
+                      size="xs"
+                      color="red"
+                      variant="filled"
+                      style={{
+                        position: 'absolute',
+                        top: rem(-4),
+                        right: rem(-4),
+                        minWidth: rem(18),
+                        height: rem(18),
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: rem(10),
+                      }}
+                    >
+                      {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
+                    </Badge>
+                  )}
                 </div>
               </Menu.Target>
               <Menu.Dropdown>
-                <Menu.Item>
-                  <Text size="sm" ta="center">No Notifications</Text>
-                </Menu.Item>
+                <Menu.Label>
+                  <Group justify="space-between">
+                    <Text size="sm" fw={600}>
+                      Notifications
+                    </Text>
+                    {unacknowledgedCount > 0 && (
+                      <Badge size="sm" color="red" variant="light">
+                        {unacknowledgedCount} new
+                      </Badge>
+                    )}
+                  </Group>
+                </Menu.Label>
+                {notificationsLoading ? (
+                  <Menu.Item disabled>
+                    <Text size="sm" c="dimmed">
+                      Loading...
+                    </Text>
+                  </Menu.Item>
+                ) : notifications.length === 0 ? (
+                  <Menu.Item disabled>
+                    <Text size="sm" c="dimmed" ta="center">
+                      No notifications
+                    </Text>
+                  </Menu.Item>
+                ) : (
+                  notifications.map((notification) => (
+                    <Menu.Item
+                      key={notification.id}
+                      onClick={() => {
+                        acknowledgeNotification(notification.id);
+                        if (notification.link) {
+                          router.push(notification.link);
+                        }
+                      }}
+                    >
+                      <Stack gap={4}>
+                        <Text size="sm" fw={500} lineClamp={1}>
+                          {notification.title}
+                        </Text>
+                        <Text size="xs" c="dimmed" lineClamp={2}>
+                          {notification.message}
+                        </Text>
+                        {notification.link && (
+                          <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                            View details →
+                          </Text>
+                        )}
+                      </Stack>
+                    </Menu.Item>
+                  ))
+                )}
               </Menu.Dropdown>
             </Menu>
           </Group>

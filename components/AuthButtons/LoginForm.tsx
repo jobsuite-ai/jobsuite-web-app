@@ -66,8 +66,8 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
         color: 'green',
       });
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Redirect to homepage
+      router.push('/');
     } catch (err) {
       notifications.show({
         title: 'Error',

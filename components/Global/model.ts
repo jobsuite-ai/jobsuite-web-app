@@ -207,6 +207,8 @@ export type Estimate = {
     zip_code?: string; // Alias for address_zipcode
     // Cover photo
     cover_photo_resource_id?: string;
+    referral_source?: string;
+    referral_name?: string;
 };
 
 export type EstimateResource = {

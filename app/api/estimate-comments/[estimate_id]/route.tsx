@@ -96,7 +96,7 @@ export async function POST(
 
         // Get request body
         const body = await request.json();
-        const { comment_contents } = body;
+        const { comment_contents, mentioned_user_ids } = body;
 
         if (!estimate_id || !comment_contents) {
             return NextResponse.json(
@@ -106,6 +106,20 @@ export async function POST(
         }
 
         // Create comment via backend API
+        const requestBody: { comment_contents: string; mentioned_user_ids?: string[] } = {
+            comment_contents,
+        };
+
+        // Include mentioned_user_ids if provided
+        if (
+            mentioned_user_ids &&
+            Array.isArray(mentioned_user_ids) &&
+            mentioned_user_ids.length > 0 &&
+            mentioned_user_ids.length <= 100
+        ) {
+            requestBody.mentioned_user_ids = mentioned_user_ids;
+        }
+
         const createResponse = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/comments`,
             {
@@ -114,9 +128,7 @@ export async function POST(
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    comment_contents,
-                }),
+                body: JSON.stringify(requestBody),
             }
         );
 

@@ -3,6 +3,7 @@
 import { JobStatus } from './model';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { logToCloudWatch } from '@/public/logger';
 
 export default async function updateJobStatus(status: JobStatus, jobID: string) {
@@ -11,17 +12,15 @@ export default async function updateJobStatus(status: JobStatus, jobID: string) 
     };
 
     const response = await fetch(
-        '/api/jobs',
+        `/api/projects/${jobID}`,
         {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ content, jobID }),
+            headers: getApiHeaders(),
+            body: JSON.stringify(content),
         }
     );
 
     await logToCloudWatch(`Job status for jog with id: ${jobID} updated to: ${status}`);
-    const { Attributes } = await response.json();
-    return Attributes;
+    const result = await response.json();
+    return result;
 }

@@ -51,6 +51,8 @@ interface FormValues {
     estimate_type: EstimateType | string;
     notes: string;
     title: string;
+    referral_source: string;
+    referral_name: string;
 }
 
 export function NewJobWorkflow() {
@@ -58,6 +60,7 @@ export function NewJobWorkflow() {
     const [clientType, setClientType] = useState<string>('new');
     const [existingClientSelected, setExistingClientSelected] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [referralSource, setReferralSource] = useState<string>('');
     const router = useRouter();
 
     const form = useForm<FormValues>({
@@ -81,6 +84,8 @@ export function NewJobWorkflow() {
             estimate_type: EstimateType.INTERIOR,
             notes: '',
             title: '',
+            referral_source: '',
+            referral_name: '',
         },
 
         validate: (values) => {
@@ -127,6 +132,12 @@ export function NewJobWorkflow() {
                 }
                 if (!values.estimate_type) {
                     errors.estimate_type = 'Estimate type is required';
+                }
+                if (!values.referral_source) {
+                    errors.referral_source = 'Referral source is required';
+                }
+                if (values.referral_source === 'Referral' && !values.referral_name.trim()) {
+                    errors.referral_name = 'Referrer name is required when Referral is selected';
                 }
 
                 return errors;
@@ -219,6 +230,8 @@ export function NewJobWorkflow() {
                     address_zipcode: formValues.address_zipcode || null,
                     address_country: formValues.address_country || null,
                     title: formValues.title || null,
+                    referral_source: formValues.referral_source || null,
+                    referral_name: formValues.referral_name || null,
                 }),
             });
 
@@ -419,6 +432,39 @@ export function NewJobWorkflow() {
                                   key={form.key('notes')}
                                   {...form.getInputProps('notes')}
                                 />
+                                <Select
+                                  withAsterisk
+                                  label="Referral Source"
+                                  placeholder="How did they find you?"
+                                  data={[
+                                    { value: 'Website', label: 'Website' },
+                                    { value: 'Google', label: 'Google' },
+                                    { value: 'Referral', label: 'Referral' },
+                                    { value: 'Facebook', label: 'Facebook' },
+                                    { value: 'Instagram', label: 'Instagram' },
+                                    { value: 'Trucks', label: 'Saw our trucks' },
+                                    { value: 'Yard Sign', label: 'Yard Sign' },
+                                    { value: 'Postcard', label: 'Postcard' },
+                                    { value: 'Past Customer', label: 'Past Customer' },
+                                    { value: 'Other', label: 'Other' },
+                                  ]}
+                                  searchable
+                                  key={form.key('referral_source')}
+                                  {...form.getInputProps('referral_source')}
+                                  onChange={(value) => {
+                                    setReferralSource(value || '');
+                                    form.setFieldValue('referral_source', value || '');
+                                  }}
+                                />
+                                {referralSource === 'Referral' && (
+                                    <TextInput
+                                      withAsterisk
+                                      label="Who referred them?"
+                                      placeholder="Enter the name of the person who referred them"
+                                      key={form.key('referral_name')}
+                                      {...form.getInputProps('referral_name')}
+                                    />
+                                )}
                             </Stack>
                         </Stepper.Step>
 
@@ -491,6 +537,18 @@ export function NewJobWorkflow() {
                                                 <Text size="sm">{form.getValues().notes}</Text>
                                             </Stack>
                                         </>
+                                    )}
+                                    {(form.getValues().referral_source || referralSource) && (
+                                        <Group justify="space-between">
+                                            <Text size="sm" c="dimmed">Referral Source:</Text>
+                                            <Text size="sm" fw={500}>{form.getValues().referral_source || referralSource}</Text>
+                                        </Group>
+                                    )}
+                                    {(form.getValues().referral_source === 'Referral' || referralSource === 'Referral') && (form.getValues().referral_name || '') && (
+                                        <Group justify="space-between">
+                                            <Text size="sm" c="dimmed">Referred by:</Text>
+                                            <Text size="sm" fw={500}>{form.getValues().referral_name}</Text>
+                                        </Group>
                                     )}
                                 </Stack>
                             </Stack>
