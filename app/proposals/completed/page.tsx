@@ -1,20 +1,16 @@
 'use client';
 
-import { Center, Loader } from '@mantine/core';
+import { useEffect } from 'react';
 
-import CompletedEstimatesList from '@/components/EstimatesList/CompletedEstimatesList';
-import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 export default function CompletedEstimates() {
-    const { isLoading } = useAuth({ requireAuth: true });
+    const router = useRouter();
 
-    if (isLoading) {
-        return (
-            <Center style={{ minHeight: '100vh' }}>
-                <Loader size="xl" />
-            </Center>
-        );
-    }
+    useEffect(() => {
+        // Redirect to main proposals page
+        router.replace('/proposals');
+    }, [router]);
 
-    return <CompletedEstimatesList />;
+    return null;
 }

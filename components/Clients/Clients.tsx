@@ -29,7 +29,7 @@ export default function ClientsList() {
   }
 
   async function getJobs() {
-    const response = await fetch('/api/jobs', {
+    const response = await fetch('/api/projects', {
       method: 'GET',
       headers: getApiHeaders(),
     });

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Carousel } from '@mantine/carousel';
 import {
+    Badge,
     Button,
     Container,
     Grid,
@@ -28,7 +29,24 @@ import { MetricCard } from '../Dashboard/MetricCard';
 import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useAuth } from '@/hooks/useAuth';
+
+interface Notification {
+  id: string;
+  user_id: string;
+  contractor_id: string;
+  title: string;
+  message: string;
+  type: string;
+  link: string | null;
+  is_acknowledged: boolean;
+  acknowledged_at: string | null;
+  delivery_status: string;
+  delivery_method: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface HomepageEstimate {
   id: string;
@@ -118,6 +136,8 @@ export default function Homepage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HomepageData | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   // Extract first name from full_name
   const getFirstName = () => {
@@ -168,6 +188,56 @@ export default function Homepage() {
 
     fetchHomepageData();
   }, []);
+
+  // Fetch notifications
+  useEffect(() => {
+    async function fetchNotifications() {
+      try {
+        setNotificationsLoading(true);
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+          return;
+        }
+
+        const response = await fetch('/api/notifications/unacknowledged/list?limit=5', {
+          method: 'GET',
+          headers: getApiHeaders(),
+        });
+
+        if (response.ok) {
+          const notificationsData = await response.json();
+          setNotifications(notificationsData || []);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error fetching notifications:', err);
+      } finally {
+        setNotificationsLoading(false);
+      }
+    }
+
+    if (!loading && !error) {
+      fetchNotifications();
+    }
+  }, [loading, error]);
+
+  // Acknowledge notification
+  const acknowledgeNotification = async (notificationId: string) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/acknowledge`, {
+        method: 'POST',
+        headers: getApiHeaders(),
+      });
+
+      if (response.ok) {
+        // Remove from list
+        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error acknowledging notification:', err);
+    }
+  };
 
   if (loading) {
     return <LoadingState />;
@@ -247,16 +317,71 @@ export default function Homepage() {
           </Group>
         </AnimatedSection>
 
-        {/* Action Center (Notifications Placeholder) */}
+        {/* Action Center (Notifications) */}
         <AnimatedSection delay={0.2}>
           <Paper p="lg" radius="md" withBorder>
             <Group gap="sm" mb="md">
               <IconBell size={20} />
               <Title order={3}>Action Center</Title>
+              {notifications.length > 0 && (
+                <Badge size="sm" color="red" variant="light">
+                  {notifications.length} {notifications.length === 1 ? 'notification' : 'notifications'}
+                </Badge>
+              )}
             </Group>
-            <Text c="dimmed" size="sm">
-              Notifications will appear here once the notification platform is built.
-            </Text>
+            {notificationsLoading ? (
+              <Text c="dimmed" size="sm">
+                Loading notifications...
+              </Text>
+            ) : notifications.length === 0 ? (
+              <Text c="dimmed" size="sm">
+                No new notifications
+              </Text>
+            ) : (
+              <Stack gap="sm">
+                {notifications.map((notification) => (
+                  <Paper
+                    key={notification.id}
+                    p="md"
+                    radius="sm"
+                    withBorder
+                    style={{ cursor: notification.link ? 'pointer' : 'default' }}
+                    onClick={() => {
+                      acknowledgeNotification(notification.id);
+                      if (notification.link) {
+                        router.push(notification.link);
+                      }
+                    }}
+                  >
+                    <Stack gap={4}>
+                      <Group justify="space-between" align="flex-start">
+                        <Text size="sm" fw={500} lineClamp={1} style={{ flex: 1 }}>
+                          {notification.title}
+                        </Text>
+                        <Button
+                          variant="subtle"
+                          size="xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            acknowledgeNotification(notification.id);
+                          }}
+                        >
+                          Dismiss
+                        </Button>
+                      </Group>
+                      <Text size="xs" c="dimmed" lineClamp={2}>
+                        {notification.message}
+                      </Text>
+                      {notification.link && (
+                        <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                          View details →
+                        </Text>
+                      )}
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            )}
           </Paper>
         </AnimatedSection>
 

@@ -193,6 +193,9 @@ export default function EstimatePreview({
                               estimate={estimate}
                               clientEmail={client.email}
                               setLoading={setIsSending}
+                              imageResources={imageResources}
+                              videoResources={videoResources}
+                              lineItems={lineItems}
                             />
                         )}
                     </Flex>

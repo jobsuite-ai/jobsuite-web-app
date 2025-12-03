@@ -59,7 +59,7 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
 
     async function getJobs() {
         const response = await fetch(
-            '/api/jobs',
+            '/api/projects',
             {
                 method: 'GET',
                 headers: getApiHeaders(),

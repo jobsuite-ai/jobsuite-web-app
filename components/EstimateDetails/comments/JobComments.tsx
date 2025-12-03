@@ -166,37 +166,70 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         getUsers();
     }, [estimateID, onLoadingChange]);
 
-    // Replace @username with @user_id in comment contents
-    function replaceMentionsWithUserIds(text: string): string {
-        if (!text || !users.length) return text;
+    // Extract mentioned user IDs from comment contents (keep original text with usernames)
+    function processMentions(text: string): { processedText: string; mentionedUserIds: string[] } {
+        if (!text || !users.length) {
+            return { processedText: text, mentionedUserIds: [] };
+        }
 
-        let result = text;
-        // Find all @mentions that match user names or emails
-        const mentionPattern = /@([a-zA-Z0-9._-]+)/g;
+        // Keep the original text unchanged - don't replace @username with @user_id
+        const mentionedUserIds: string[] = [];
+
+        // Find all @mentions - match @ followed by word characters,
+        // spaces, dots, hyphens, underscores
+        // This will match @Jonas, @Jonas Peek, @user.email, etc.
+        // Stop at punctuation, multiple spaces, or end of string
+        const mentionPattern = /@([a-zA-Z0-9._\s-]+?)(?=\s{2,}|[.,;:!?\n]|$)/g;
         const matches = Array.from(text.matchAll(mentionPattern));
 
-        // Process matches in reverse order to maintain positions
-        for (let i = matches.length - 1; i >= 0; i -= 1) {
-            const match = matches[i];
-            const mentionText = match[1].toLowerCase();
+        // Process matches to extract user IDs
+        for (const match of matches) {
+            const mentionText = match[1].trim();
 
-            // Find matching user by name or email
-            const user = users.find(
-                (u) =>
-                    u.full_name?.toLowerCase() === mentionText ||
-                    u.email?.toLowerCase() === mentionText ||
-                    u.full_name?.toLowerCase().replace(/\s+/g, '') === mentionText
-            );
+            if (mentionText) {
+                // Try to find matching user
+                // First try exact match (full name, email, or name without spaces)
+                let user = users.find(
+                    (u) => {
+                        const nameLower = u.full_name?.toLowerCase() || '';
+                        const emailLower = u.email?.toLowerCase() || '';
+                        const mentionLower = mentionText.toLowerCase();
+                        return (
+                            nameLower === mentionLower ||
+                            emailLower === mentionLower ||
+                            nameLower.replace(/\s+/g, '') === mentionLower.replace(/\s+/g, '')
+                        );
+                    }
+                );
 
-            if (user) {
-                // Replace @username with @user_id
-                const start = match.index!;
-                const end = start + match[0].length;
-                result = `${result.substring(0, start)}@${user.id}${result.substring(end)}`;
+                // If no exact match, try partial match (for cases where user typed partial name)
+                if (!user) {
+                    const mentionLower = mentionText.toLowerCase();
+                    // Try matching by first name or partial name
+                    user = users.find(
+                        (u) => {
+                            const nameLower = u.full_name?.toLowerCase() || '';
+                            const emailLower = u.email?.toLowerCase() || '';
+                            return (
+                                nameLower.startsWith(mentionLower) ||
+                                emailLower.startsWith(mentionLower) ||
+                                nameLower.split(/\s+/)[0] === mentionLower.split(/\s+/)[0]
+                            );
+                        }
+                    );
+                }
+
+                if (user) {
+                    // Add to mentioned user IDs (avoid duplicates)
+                    if (!mentionedUserIds.includes(user.id)) {
+                        mentionedUserIds.push(user.id);
+                    }
+                }
             }
         }
 
-        return result;
+        // Return original text unchanged - only extract mentioned user IDs
+        return { processedText: text, mentionedUserIds };
     }
 
     async function postJobComment() {
@@ -221,8 +254,8 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
             return;
         }
 
-        // Replace @username with @user_id before submitting
-        const processedComment = replaceMentionsWithUserIds(commentContents);
+        // Process mentions: replace @username with @user_id and extract mentioned user IDs
+        const { processedText, mentionedUserIds } = processMentions(commentContents);
 
         setCommentInputLoading(true);
         const response = await fetch(
@@ -234,7 +267,8 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    comment_contents: processedComment,
+                    comment_contents: processedText,
+                    mentioned_user_ids: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
                 }),
             }
         );
