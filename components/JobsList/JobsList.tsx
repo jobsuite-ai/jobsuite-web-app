@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
     DndContext,
     DragEndEvent,
+    DragOverEvent,
     DragOverlay,
     DragStartEvent,
     PointerSensor,
@@ -37,12 +38,12 @@ import classes from './JobsList.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
-import { getEstimateBadgeColor } from '../Global/utils';
+import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 // Sortable job card component
 interface SortableJobCardProps {
     project: Estimate;
-    onClick: () => void;
+    onClick: (event: React.MouseEvent) => void;
 }
 
 function SortableJobCard({ project, onClick }: SortableJobCardProps) {
@@ -73,10 +74,10 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
           {...listeners}
           className={classes.sortableJobCard}
           style={style}
-          onClick={() => {
+          onClick={(event) => {
                 // Only trigger click if not dragging
                 if (!isDragging) {
-                    onClick();
+                    onClick(event);
                 }
             }}
         >
@@ -122,6 +123,7 @@ interface KanbanColumnProps {
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
     columnRef?: React.RefObject<HTMLDivElement>;
+    isOver?: boolean;
 }
 
 function KanbanColumn({
@@ -131,11 +133,14 @@ function KanbanColumn({
     isCollapsed,
     onToggleCollapse,
     columnRef,
+    isOver: isOverProp,
 }: KanbanColumnProps) {
     const jobIds = jobs.map((job) => job.id);
-    const { setNodeRef, isOver } = useDroppable({
+    const { setNodeRef, isOver: isOverDroppable } = useDroppable({
         id: column.id,
     });
+    // Use prop if provided (from parent state), otherwise use droppable's isOver
+    const isOver = isOverProp !== undefined ? isOverProp : isOverDroppable;
 
     const isHistorical = column.id === 'historical';
 
@@ -221,7 +226,7 @@ function KanbanColumn({
                                 <SortableJobCard
                                   key={job.id}
                                   project={job}
-                                  onClick={() => onJobClick(job)}
+                                  onClick={(event) => onJobClick(job, event)}
                                 />
                             ))
                         ) : (
@@ -248,6 +253,7 @@ export default function JobsList() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
+    const [overId, setOverId] = useState<string | null>(null);
     const [columns, setColumns] = useState<ColumnConfig[]>(loadColumnSettings());
     const [isHistoricalCollapsed, setIsHistoricalCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
@@ -409,15 +415,57 @@ export default function JobsList() {
         setActiveId(event.active.id as string);
     }
 
+    // Handle drag over - allows dropping on sortable items by treating them as column drops
+    function handleDragOver(event: DragOverEvent) {
+        const { over } = event;
+
+        if (!over) {
+            setOverId(null);
+            return;
+        }
+
+        const overItemId = over.id as string;
+
+        // If dragging over a sortable item (job), find which column it belongs to
+        const job = jobs.find((j) => j.id === overItemId);
+        if (job) {
+            // Find the column that contains this job
+            const column = columns.find((col) => {
+                const estimate = job as Estimate;
+                const jobStatus = typeof estimate.status === 'string'
+                    ? estimate.status
+                    : estimate.status;
+                return col.statuses.includes(jobStatus as JobStatus);
+            });
+            if (column) {
+                setOverId(column.id);
+                return;
+            }
+        }
+
+        // If dragging over a column directly, use that
+        const column = columns.find((col) => col.id === overItemId);
+        if (column) {
+            setOverId(column.id);
+            return;
+        }
+
+        setOverId(null);
+    }
+
     // Handle drag end
     async function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
         setActiveId(null);
 
-        if (!over) return;
+        // Use overId state if available (from drag over), otherwise use over from event
+        const targetColumnId = overId || (over?.id as string);
+
+        setOverId(null);
+
+        if (!targetColumnId) return;
 
         const estimateId = active.id as string;
-        const targetColumnId = over.id as string;
 
         // Find the estimate
         const estimate = jobs.find((j) => j.id === estimateId) as Estimate | undefined;
@@ -511,6 +559,7 @@ export default function JobsList() {
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
             <div ref={scrollContainerRef} className={classes.flexWrapper}>
@@ -531,6 +580,7 @@ export default function JobsList() {
                           isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
                           onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
                           columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
+                          isOver={overId === column.id}
                         />
                     ))}
                 </Flex>
@@ -559,7 +609,7 @@ export default function JobsList() {
                         )}
                         size="sm"
                       >
-                        {String(activeJob.status || 'UNKNOWN')}
+                        {String(getFormattedEstimateStatus(activeJob.status) || 'UNKNOWN')}
                       </Badge>
                     </Group>
 
