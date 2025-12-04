@@ -209,6 +209,10 @@ export type Estimate = {
     cover_photo_resource_id?: string;
     referral_source?: string;
     referral_name?: string;
+    // Date fields
+    sold_date?: string;
+    started_date?: string;
+    finished_date?: string;
 };
 
 export type EstimateResource = {
