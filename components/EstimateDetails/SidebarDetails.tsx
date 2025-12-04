@@ -310,6 +310,47 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     onUpdate();
   };
 
+  const updateCrewLead = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    await fetch(`/api/estimates/${estimateID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ job_crew_lead: value || null }),
+    });
+
+    onUpdate();
+  };
+
+  const updateActualHours = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    const actualHours = value ? parseFloat(value) : null;
+    await fetch(`/api/estimates/${estimateID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ actual_hours: actualHours }),
+    });
+
+    onUpdate();
+  };
+
   const updateOwnedBy = async (userId: string | null) => {
     if (savingOwner) return;
     setSavingOwner(true);
@@ -583,6 +624,23 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           </Text>
         </Flex>
 
+        {/* Job Total - Read-only (hours * rate) */}
+        <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+          <Text size="sm" fw={500} c="dimmed">
+            Job Total:
+          </Text>
+          <Text size="sm" fw={600} style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+            {(() => {
+              // Use actual_hours if available and > 0, otherwise use estimated hours
+              const hours = ((estimate.original_hours || estimate.hours_bid || 0) +
+               (estimate.change_order_hours || 0)) as number;
+              const rate = estimate.hourly_rate || 0;
+              const total = hours * rate;
+              return total > 0 ? `$${total.toFixed(2)}` : '—';
+            })()}
+          </Text>
+        </Flex>
+
         {/* Discount Percentage */}
         <EditableField
           label="Discount Percentage"
@@ -608,6 +666,23 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           type="textarea"
           multiline
           placeholder="Enter paint details"
+        />
+
+        {/* Crew Lead */}
+        <EditableField
+          label="Crew Lead"
+          value={estimate.job_crew_lead}
+          onSave={updateCrewLead}
+          placeholder="Enter crew lead name"
+        />
+
+        {/* Actual Hours */}
+        <EditableField
+          label="Actual Hours"
+          value={estimate.actual_hours}
+          onSave={updateActualHours}
+          type="number"
+          placeholder="Enter actual hours"
         />
       </Flex>
     </Paper>

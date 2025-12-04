@@ -16,7 +16,7 @@
 }
 
 .flexWrapper::-webkit-scrollbar {
-    height: 8px;
+    height: 16px;
 }
 
 .flexWrapper::-webkit-scrollbar-track {
