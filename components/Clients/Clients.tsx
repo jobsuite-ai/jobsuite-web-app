@@ -10,43 +10,32 @@ import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Job } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 export default function ClientsList() {
+  const {
+    clients: cachedClients,
+    projects: cachedProjects,
+    loading: cacheLoading,
+  } = useDataCache();
   const [clients, setClients] = useState(new Array<ContractorClient>());
   const [jobs, setJobs] = useState(new Array<Job>());
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  // Update clients and jobs when cache data changes
   useEffect(() => {
-    setLoading(true);
-    getPageData().finally(() => setLoading(false));
-  }, []);
+    const clientsLoaded = cachedClients.length > 0 || !cacheLoading.clients;
+    const projectsLoaded = cachedProjects.length > 0 || !cacheLoading.projects;
 
-  async function getPageData() {
-    await getClients();
-    await getJobs();
-  }
-
-  async function getJobs() {
-    const response = await fetch('/api/projects', {
-      method: 'GET',
-      headers: getApiHeaders(),
-    });
-
-    const { Items }: { Items: Job[] } = await response.json();
-    setJobs(Items);
-  }
-
-  async function getClients() {
-    const response = await fetch('/api/clients', {
-      method: 'GET',
-      headers: getApiHeaders(),
-    });
-
-    const { Items }: { Items: ContractorClient[] } = await response.json();
-    setClients(Items);
-  }
+    if (clientsLoaded && projectsLoaded) {
+      setClients(cachedClients);
+      setJobs(cachedProjects);
+      setLoading(false);
+    } else if (cacheLoading.clients || cacheLoading.projects) {
+      setLoading(true);
+    }
+  }, [cachedClients, cachedProjects, cacheLoading.clients, cacheLoading.projects]);
 
   const getJobsForClient = (clientID: string): Job[] =>
     jobs.filter((job) => job.client_id === clientID);

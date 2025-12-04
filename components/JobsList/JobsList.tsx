@@ -32,7 +32,7 @@ import {
     Text,
     Title,
 } from '@mantine/core';
-import { IconArrowsMoveHorizontal } from '@tabler/icons-react';
+import { IconArrowsMoveHorizontal, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
@@ -40,6 +40,8 @@ import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 // Utility functions for dates and hours
 function formatDate(dateString?: string): string {
@@ -322,6 +324,7 @@ function saveJobOrder(orderMap: JobOrderMap): void {
 }
 
 export default function JobsList() {
+    const { projects, loading: cacheLoading, refreshData } = useDataCache();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -333,6 +336,7 @@ export default function JobsList() {
         const saved = localStorage.getItem('historical_column_collapsed');
         return saved === 'true';
     });
+    const [refreshing, setRefreshing] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const router = useRouter();
 
@@ -345,10 +349,15 @@ export default function JobsList() {
         })
     );
 
+    // Update jobs when cache data changes
     useEffect(() => {
-        setLoading(true);
-        getJobs().finally(() => setLoading(false));
-    }, []);
+        if (projects.length > 0 || !cacheLoading.projects) {
+            setJobs(projects);
+            setLoading(false);
+        } else if (cacheLoading.projects) {
+            setLoading(true);
+        }
+    }, [projects, cacheLoading.projects]);
 
     // Listen for storage changes to reload column settings
     useEffect(() => {
@@ -433,37 +442,14 @@ export default function JobsList() {
         setIsHistoricalCollapsed((prev) => !prev);
     };
 
-    async function getJobs() {
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
+    const handleRefresh = async () => {
+        setRefreshing(true);
         try {
-            const response = await fetch('/api/projects', {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching jobs:', errorData);
-                return;
-            }
-
-            const data = await response.json();
-            const jobsList = data.Items || data || [];
-            setJobs(Array.isArray(jobsList) ? jobsList : []);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching jobs:', error);
+            await refreshData('projects');
+        } finally {
+            setRefreshing(false);
         }
-    }
+    };
 
     // Get jobs for each column
     function getJobsForColumn(columnId: string): Job[] {
@@ -711,6 +697,9 @@ export default function JobsList() {
                 const errorData = await response.json().catch(() => ({}));
                 // eslint-disable-next-line no-console
                 console.error('Error updating estimate status:', errorData);
+            } else {
+                // Refresh cache after successful update
+                refreshData('projects');
             }
         } catch (error) {
             // Revert on error
@@ -746,7 +735,19 @@ export default function JobsList() {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-            <div ref={scrollContainerRef} className={classes.flexWrapper}>
+            <div style={{ position: 'relative', height: '100%' }}>
+                <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
+                    <ActionIcon
+                      variant="light"
+                      onClick={handleRefresh}
+                      loading={refreshing || cacheLoading.projects}
+                      title="Refresh projects"
+                      size={40}
+                    >
+                        <IconRefresh size={24} />
+                    </ActionIcon>
+                </div>
+                <div ref={scrollContainerRef} className={classes.flexWrapper}>
                 <Flex
                   direction="row"
                   justify="flex-start"
@@ -768,6 +769,7 @@ export default function JobsList() {
                         />
                     ))}
                 </Flex>
+                </div>
             </div>
 
             <DragOverlay>

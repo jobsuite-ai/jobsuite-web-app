@@ -26,6 +26,7 @@ import { USStatesMap } from '../Global/usStates';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { EstimateType } from '@/components/Global/model';
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 const NUMBER_OF_STEPS = 3;
 
@@ -62,6 +63,7 @@ export function NewJobWorkflow() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [referralSource, setReferralSource] = useState<string>('');
     const router = useRouter();
+    const { refreshData } = useDataCache();
 
     const form = useForm<FormValues>({
         mode: 'uncontrolled',
@@ -260,6 +262,14 @@ export function NewJobWorkflow() {
                     // eslint-disable-next-line no-console
                     console.warn('Failed to create initial comment:', await commentResponse.json());
                 }
+            }
+
+            // Refresh cache for estimates and projects after creating new estimate
+            await refreshData('estimates');
+            await refreshData('projects');
+            // Also refresh clients if a new client was created
+            if (clientType === 'new' || !formValues.client_id) {
+                await refreshData('clients');
             }
 
             notifications.show({

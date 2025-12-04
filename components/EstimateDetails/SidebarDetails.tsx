@@ -12,6 +12,7 @@ import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import { logToCloudWatch } from '@/public/logger';
 
 interface SidebarDetailsProps {
@@ -38,6 +39,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const [savingOwner, setSavingOwner] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
+  const { refreshData } = useDataCache();
 
   useEffect(() => {
     const loadClientDetails = async () => {
@@ -164,6 +166,11 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       }
 
       setMenuOpened(false);
+
+      // Refresh cache after status update
+      await refreshData('estimates');
+      await refreshData('projects');
+
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to update estimate status: ${error}`);
