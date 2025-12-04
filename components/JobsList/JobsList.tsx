@@ -17,6 +17,7 @@ import {
     SortableContext,
     useSortable,
     verticalListSortingStrategy,
+    arrayMove,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -39,6 +40,42 @@ import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+
+// Utility functions for dates and hours
+function formatDate(dateString?: string): string {
+    if (!dateString) return '';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch {
+        return '';
+    }
+}
+
+function getDisplayDate(estimate: Estimate): string {
+    const { status } = estimate;
+
+    // If in progress, show started_date
+    if (status === EstimateStatus.PROJECT_IN_PROGRESS) {
+        return estimate.started_date ? formatDate(estimate.started_date) : '';
+    }
+
+    // If completed, show finished_date
+    if (status === EstimateStatus.PROJECT_COMPLETED) {
+        return estimate.finished_date ? formatDate(estimate.finished_date) : '';
+    }
+
+    // Otherwise, show sold_date (for signed contracts)
+    return estimate.sold_date ? formatDate(estimate.sold_date) : '';
+}
+
+function getTotalHours(estimate: Estimate): number {
+    // Prefer actual_hours if available, otherwise use hours_bid
+    if (estimate.actual_hours && estimate.actual_hours > 0) {
+        return estimate.actual_hours;
+    }
+    return estimate.hours_bid || 0;
+}
 
 // Sortable job card component
 interface SortableJobCardProps {
@@ -111,6 +148,17 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
                     {project.address_zipcode || project.zip_code}
                 </Text>
             </Stack>
+
+            <Group justify="space-between" mt="xs" gap="xs">
+                <Text size="xs" c="dimmed">
+                    {getTotalHours(project) > 0 ? `${getTotalHours(project).toFixed(1)} hrs` : 'No hours'}
+                </Text>
+                {getDisplayDate(project) && (
+                    <Text size="xs" c="dimmed">
+                        {getDisplayDate(project)}
+                    </Text>
+                )}
+            </Group>
         </Card>
     );
 }
@@ -249,12 +297,37 @@ function KanbanColumn({
     );
 }
 
+// localStorage key for job order persistence
+const JOB_ORDER_STORAGE_KEY = 'jobsuite_job_order';
+
+// Type for storing job order per column
+type JobOrderMap = Record<string, string[]>; // columnId -> array of job IDs
+
+function loadJobOrder(): JobOrderMap {
+    if (typeof window === 'undefined') return {};
+    const saved = localStorage.getItem(JOB_ORDER_STORAGE_KEY);
+    if (saved) {
+        try {
+            return JSON.parse(saved) as JobOrderMap;
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
+function saveJobOrder(orderMap: JobOrderMap): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(JOB_ORDER_STORAGE_KEY, JSON.stringify(orderMap));
+}
+
 export default function JobsList() {
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [overId, setOverId] = useState<string | null>(null);
     const [columns, setColumns] = useState<ColumnConfig[]>(loadColumnSettings());
+    const [jobOrder, setJobOrder] = useState<JobOrderMap>(loadJobOrder());
     const [isHistoricalCollapsed, setIsHistoricalCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
         const saved = localStorage.getItem('historical_column_collapsed');
@@ -297,6 +370,11 @@ export default function JobsList() {
     useEffect(() => {
         localStorage.setItem('historical_column_collapsed', String(isHistoricalCollapsed));
     }, [isHistoricalCollapsed]);
+
+    // Save job order to localStorage whenever it changes
+    useEffect(() => {
+        saveJobOrder(jobOrder);
+    }, [jobOrder]);
 
     // Scroll to end when historical column is expanded (transitioning from collapsed)
     const prevCollapsedRef = useRef(isHistoricalCollapsed);
@@ -392,22 +470,51 @@ export default function JobsList() {
         const column = columns.find((col) => col.id === columnId);
         if (!column) return [];
 
-        return jobs
-            .filter((job) => {
-                // Handle both string and EstimateStatus enum values
-                const estimate = job as Estimate;
-                const jobStatus = typeof estimate.status === 'string'
-                    ? estimate.status
-                    : estimate.status;
-                return column.statuses.includes(jobStatus as JobStatus);
-            })
-            .sort((a, b) =>
-                // Sort by updated_at (newest first)
-                 (
+        const filteredJobs = jobs.filter((job) => {
+            // Handle both string and EstimateStatus enum values
+            const estimate = job as Estimate;
+            const jobStatus = typeof estimate.status === 'string'
+                ? estimate.status
+                : estimate.status;
+            return column.statuses.includes(jobStatus as JobStatus);
+        });
+
+        // Check if we have a saved order for this column
+        const savedOrder = jobOrder[columnId];
+        if (savedOrder && savedOrder.length > 0) {
+            // Create a map for quick lookup
+            const jobMap = new Map(filteredJobs.map(job => [job.id, job]));
+
+            // Sort by saved order, then add any new jobs that aren't in the saved order
+            const orderedJobs: Job[] = [];
+            const usedIds = new Set<string>();
+
+            // Add jobs in saved order
+            for (const jobId of savedOrder) {
+                const job = jobMap.get(jobId);
+                if (job) {
+                    orderedJobs.push(job);
+                    usedIds.add(jobId);
+                }
+            }
+
+            // Add any new jobs that weren't in the saved order
+            // (sorted by updated_at, newest first)
+            const newJobs = filteredJobs
+                .filter(job => !usedIds.has(job.id))
+                .sort((a, b) =>
                     new Date((b as Estimate).updated_at).getTime() -
                     new Date((a as Estimate).updated_at).getTime()
-                )
-            );
+                );
+
+            return [...orderedJobs, ...newJobs];
+        }
+
+        // No saved order, sort by updated_at (newest first)
+        return filteredJobs.sort((a, b) =>
+            new Date((b as Estimate).updated_at).getTime() -
+            new Date((a as Estimate).updated_at).getTime()
+        );
     }
 
     // Handle drag start
@@ -477,11 +584,38 @@ export default function JobsList() {
 
         // Check if estimate is already in this column
         const currentStatus = String(estimate.status);
-        if (targetColumn.statuses.some((status) => String(status) === currentStatus)) {
+        const isSameColumn = targetColumn.statuses.some(
+            (status) => String(status) === currentStatus
+        );
+
+        if (isSameColumn) {
+            // Reordering within the same column
+            // Get the current order for this column, or create one from current jobs
+            const currentOrder = jobOrder[targetColumnId] ||
+                getJobsForColumn(targetColumnId).map(j => j.id);
+            const oldIndex = currentOrder.indexOf(estimateId);
+
+            // Check if we're dragging over another job in the same column
+            const overJobId = over?.id && typeof over.id === 'string' ? over.id : null;
+
+            if (overJobId && oldIndex !== -1) {
+                const newIndex = currentOrder.indexOf(overJobId);
+
+                if (oldIndex !== newIndex && newIndex !== -1) {
+                    // Reorder the array
+                    const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+
+                    // Update the job order state
+                    setJobOrder((prev) => ({
+                        ...prev,
+                        [targetColumnId]: newOrder,
+                    }));
+                }
+            }
             return;
         }
 
-        // Update estimate status
+        // Moving to a different column - update estimate status
         const newStatus = targetColumn.defaultStatus as EstimateStatus;
 
         // Optimistically update the UI
@@ -490,6 +624,56 @@ export default function JobsList() {
                 j.id === estimateId ? { ...j, status: newStatus } : j
             )
         );
+
+        // Remove from old column's order and add to new column's order
+        const oldColumn = columns.find((col) =>
+            col.statuses.some((status) => String(status) === currentStatus)
+        );
+
+        setJobOrder((prev) => {
+            const newOrder = { ...prev };
+
+            // Remove from old column's order
+            if (oldColumn && newOrder[oldColumn.id]) {
+                newOrder[oldColumn.id] = newOrder[oldColumn.id].filter(
+                    id => id !== estimateId
+                );
+            }
+
+            // Add to new column's order at the end
+            // (or at a specific position if dragging over a job)
+            const targetJobs = getJobsForColumn(targetColumnId);
+            const overJob = over?.id && typeof over.id === 'string'
+                ? targetJobs.find((j) => j.id === over.id)
+                : null;
+
+            if (overJob) {
+                const insertIndex = targetJobs.findIndex((j) => j.id === overJob.id);
+                if (!newOrder[targetColumnId]) {
+                    newOrder[targetColumnId] = targetJobs.map((j) => j.id);
+                }
+                const currentOrder = newOrder[targetColumnId];
+                const currentIndex = currentOrder.indexOf(estimateId);
+                if (currentIndex === -1) {
+                    // Insert at the position
+                    currentOrder.splice(insertIndex, 0, estimateId);
+                } else {
+                    // Move within the array
+                    const reordered = arrayMove(currentOrder, currentIndex, insertIndex);
+                    newOrder[targetColumnId] = reordered;
+                }
+            } else {
+                // Add to end
+                if (!newOrder[targetColumnId]) {
+                    newOrder[targetColumnId] = [];
+                }
+                if (!newOrder[targetColumnId].includes(estimateId)) {
+                    newOrder[targetColumnId] = [...newOrder[targetColumnId], estimateId];
+                }
+            }
+
+            return newOrder;
+        });
 
         // Update via API
         const accessToken = localStorage.getItem('access_token');
@@ -635,6 +819,19 @@ export default function JobsList() {
                             (activeJob as Estimate).zip_code}
                       </Text>
                     </Stack>
+
+                    <Group justify="space-between" mt="xs" gap="xs">
+                      <Text size="xs" c="dimmed">
+                        {getTotalHours(activeJob as Estimate) > 0
+                          ? `${getTotalHours(activeJob as Estimate).toFixed(1)} hrs`
+                          : 'No hours'}
+                      </Text>
+                      {getDisplayDate(activeJob as Estimate) && (
+                        <Text size="xs" c="dimmed">
+                          {getDisplayDate(activeJob as Estimate)}
+                        </Text>
+                      )}
+                    </Group>
                   </Card>
                 ) : null}
             </DragOverlay>
