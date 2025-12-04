@@ -20,8 +20,8 @@ export function getDefaultColumns(): ColumnConfig[] {
         {
             id: 'scheduling',
             title: 'Scheduling',
-            statuses: ['ESTIMATE_SCHEDULED' as JobStatus],
-            defaultStatus: 'ESTIMATE_SCHEDULED' as JobStatus,
+            statuses: ['PROJECT_NOT_SCHEDULED' as JobStatus],
+            defaultStatus: 'PROJECT_NOT_SCHEDULED' as JobStatus,
         },
         {
             id: 'project-scheduled',
@@ -32,26 +32,26 @@ export function getDefaultColumns(): ColumnConfig[] {
         {
             id: 'in-progress',
             title: 'In Progress',
-            statuses: ['ESTIMATE_COMPLETED' as JobStatus, 'IN_PROGRESS' as JobStatus],
-            defaultStatus: 'ESTIMATE_COMPLETED' as JobStatus,
+            statuses: ['PROJECT_IN_PROGRESS' as JobStatus],
+            defaultStatus: 'PROJECT_IN_PROGRESS' as JobStatus,
         },
         {
             id: 'billing-needed',
             title: 'Billing Needed',
-            statuses: ['BILLING_NEEDED' as JobStatus],
-            defaultStatus: 'BILLING_NEEDED' as JobStatus,
+            statuses: ['PROJECT_BILLING_NEEDED' as JobStatus],
+            defaultStatus: 'PROJECT_BILLING_NEEDED' as JobStatus,
         },
         {
             id: 'accounts-receivable',
             title: 'Accounts Receivable',
-            statuses: ['INVOICED' as JobStatus],
-            defaultStatus: 'INVOICED' as JobStatus,
+            statuses: ['PROJECT_ACCOUNTS_RECEIVABLE' as JobStatus],
+            defaultStatus: 'PROJECT_ACCOUNTS_RECEIVABLE' as JobStatus,
         },
         {
             id: 'payments-received',
             title: 'Payments Received',
-            statuses: ['PAID' as JobStatus],
-            defaultStatus: 'PAID' as JobStatus,
+            statuses: ['PROJECT_PAYMENTS_RECEIVED' as JobStatus],
+            defaultStatus: 'PROJECT_PAYMENTS_RECEIVED' as JobStatus,
         },
         {
             id: 'historical',
