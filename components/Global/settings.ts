@@ -56,8 +56,8 @@ export function getDefaultColumns(): ColumnConfig[] {
         {
             id: 'historical',
             title: 'Historical',
-            statuses: ['ARCHIVED' as JobStatus],
-            defaultStatus: 'ARCHIVED' as JobStatus,
+            statuses: ['PROJECT_COMPLETED' as JobStatus],
+            defaultStatus: 'PROJECT_COMPLETED' as JobStatus,
         },
     ];
 }
