@@ -45,11 +45,11 @@ export default function ImageGallery({
         };
 
         const paths = imageResources.map((resource) => {
+          const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
           // If we have s3_bucket and s3_key, construct the correct S3 URL
           if (resource.s3_bucket && resource.s3_key) {
             // Use the bucket from the resource, or fallback to default
             const bucket = resource.s3_bucket || getImageBucket();
-            const region = 'us-west-2'; // Default region, could be made configurable
             const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
             return { url, resource };
           }
@@ -59,7 +59,7 @@ export default function ImageGallery({
           // before S3 metadata was stored
           const imageName = resource.resource_location;
           const url = imageName
-            ? `https://${getImageBucket()}.s3.us-west-2.amazonaws.com/${estimateID}/${imageName}`
+            ? `https://${getImageBucket()}.s3.${region}.amazonaws.com/${estimateID}/${imageName}`
             : null;
           return { url, resource };
         });

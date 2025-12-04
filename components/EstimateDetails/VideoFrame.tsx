@@ -26,8 +26,10 @@ export function VideoFrame({ resource, estimateID, refresh }: {
         return `jobsuite-resource-videos-${env}`;
     };
 
+    const getVideoBucketRegion = () => process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
+
     const videoUrl = resource.s3_key
-        ? `https://${getVideoBucket()}.s3.us-west-2.amazonaws.com/${resource.s3_key}`
+        ? `https://${getVideoBucket()}.s3.${getVideoBucketRegion()}.amazonaws.com/${resource.s3_key}`
         : null;
     const objectExists = resource.upload_status === 'COMPLETED' && videoUrl !== null;
 
