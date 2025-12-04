@@ -10,6 +10,7 @@ import { Notifications } from '@mantine/notifications';
 import '@mantine/notifications/styles.css';
 
 import { Shell } from '@/components/Shell/Shell';
+import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { SearchDataProvider } from '@/contexts/SearchDataContext';
 
 // Custom fetcher that includes authentication token
@@ -74,10 +75,12 @@ export default function RootLayout({ children }: { children: any }) {
       <body>
         <MantineProvider>
           <UserProvider fetcher={authenticatedUserFetcher}>
-            <SearchDataProvider>
-              <Notifications />
-              <Shell>{children}</Shell>
-            </SearchDataProvider>
+            <DataCacheProvider>
+              <SearchDataProvider>
+                <Notifications />
+                <Shell>{children}</Shell>
+              </SearchDataProvider>
+            </DataCacheProvider>
           </UserProvider>
         </MantineProvider>
       </body>
