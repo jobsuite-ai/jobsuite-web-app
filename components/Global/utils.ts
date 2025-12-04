@@ -41,6 +41,24 @@ export const getEstimateBadgeColor = (estimateStatus: EstimateStatus) => {
             return BADGE_COLORS.ALERT;
         case EstimateStatus.ARCHIVED:
             return '#d3d3d3';
+        case EstimateStatus.ACCOUNTING_NEEDED:
+            return BADGE_COLORS.WARNING;
+        case EstimateStatus.PROJECT_NOT_SCHEDULED:
+            return BADGE_COLORS.WARNING;
+        case EstimateStatus.PROJECT_SCHEDULED:
+            return BADGE_COLORS.INFO;
+        case EstimateStatus.PROJECT_IN_PROGRESS:
+            return BADGE_COLORS.SUCCESS;
+        case EstimateStatus.PROJECT_BILLING_NEEDED:
+            return BADGE_COLORS.WARNING;
+        case EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE:
+            return BADGE_COLORS.INFO;
+        case EstimateStatus.PROJECT_PAYMENTS_RECEIVED:
+            return BADGE_COLORS.SUCCESS;
+        case EstimateStatus.PROJECT_COMPLETED:
+            return BADGE_COLORS.SUCCESS;
+        case EstimateStatus.PROJECT_CANCELLED:
+            return BADGE_COLORS.ERROR;
         default:
             return '#d3d3d3';
     }
@@ -76,6 +94,24 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
             return 'Stale Estimate';
         case EstimateStatus.ARCHIVED:
             return 'Archived';
+        case EstimateStatus.ACCOUNTING_NEEDED:
+            return 'Accounting Needed';
+        case EstimateStatus.PROJECT_NOT_SCHEDULED:
+            return 'Project Not Scheduled';
+        case EstimateStatus.PROJECT_SCHEDULED:
+            return 'Project Scheduled';
+        case EstimateStatus.PROJECT_IN_PROGRESS:
+            return 'Project In Progress';
+        case EstimateStatus.PROJECT_BILLING_NEEDED:
+            return 'Project Billing Needed';
+        case EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE:
+            return 'Project Accounts Receivable';
+        case EstimateStatus.PROJECT_PAYMENTS_RECEIVED:
+            return 'Project Payments Received';
+        case EstimateStatus.PROJECT_COMPLETED:
+            return 'Project Completed';
+        case EstimateStatus.PROJECT_CANCELLED:
+            return 'Project Cancelled';
         default:
             return 'Estimate Not Finished';
     }
