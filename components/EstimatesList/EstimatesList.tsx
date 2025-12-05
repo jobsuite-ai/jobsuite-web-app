@@ -3,6 +3,7 @@
 import { useMemo, useEffect, useState } from 'react';
 
 import {
+    ActionIcon,
     Badge,
     Card,
     Center,
@@ -24,13 +25,15 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconX, IconChevronDown, IconSearch } from '@tabler/icons-react';
+import { IconX, IconChevronDown, IconSearch, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 // Define column status groups and their order
 const PROPOSAL_PIPELINE_STATUSES = [
@@ -54,12 +57,14 @@ const ACCEPTED_STATUSES = [
 const ALL_STATUSES = Object.values(EstimateStatus);
 
 export default function EstimatesList() {
+    const { estimates: cachedEstimates, loading: cacheLoading, refreshData } = useDataCache();
     const [estimates, setEstimates] = useState(new Array<Estimate>());
     const [columnOneEstimates, setColumnOneEstimates] = useState(new Array<Estimate>());
     const [columnTwoEstimates, setColumnTwoEstimates] = useState(new Array<Estimate>());
     const [columnThreeEstimates, setColumnThreeEstimates] = useState(new Array<Estimate>());
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'main' | 'list'>('main');
+    const [refreshing, setRefreshing] = useState(false);
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -69,10 +74,15 @@ export default function EstimatesList() {
 
     const router = useRouter();
 
+    // Update estimates when cache data changes
     useEffect(() => {
-        setLoading(true);
-        getEstimates().finally(() => setLoading(false));
-    }, []);
+        if (cachedEstimates.length > 0 || !cacheLoading.estimates) {
+            setEstimates(cachedEstimates);
+            setLoading(false);
+        } else if (cacheLoading.estimates) {
+            setLoading(true);
+        }
+    }, [cachedEstimates, cacheLoading.estimates]);
 
     useEffect(() => {
         // Sort jobs into columns based on status
@@ -207,41 +217,14 @@ export default function EstimatesList() {
     const hasActiveFilters = searchQuery.trim() || selectedStatuses.length > 0 ||
         dateRange[0] || dateRange[1] || clientNameFilter.trim();
 
-    async function getEstimates() {
-        // Get access token from localStorage
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
+    const handleRefresh = async () => {
+        setRefreshing(true);
         try {
-            // Fetch all estimates (backend will filter if needed, but we filter client-side)
-            const response = await fetch('/api/estimates', {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching estimates:', errorData);
-                return;
-            }
-
-            const data = await response.json();
-            // Handle both { Items: [...] } and direct array responses
-            const estimatesList = data.Items || data || [];
-            setEstimates(Array.isArray(estimatesList) ? estimatesList : []);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching estimates:', error);
-            setEstimates([]);
+            await refreshData('estimates');
+        } finally {
+            setRefreshing(false);
         }
-    }
+    };
 
     // Helper function to render a job card
     const renderEstimateCard = (estimate: Estimate) => (
@@ -564,14 +547,26 @@ export default function EstimatesList() {
                     {/* View Toggle */}
                     <Group justify="space-between" px="md">
                         <Title order={3} c="gray.0">Proposals</Title>
-                        <SegmentedControl
-                          value={viewMode}
-                          onChange={(value) => setViewMode(value as 'main' | 'list')}
-                          data={[
-                              { label: 'Main', value: 'main' },
-                              { label: 'List', value: 'list' },
-                          ]}
-                        />
+                        <Group gap="xs">
+                            <SegmentedControl
+                              value={viewMode}
+                              onChange={(value) => setViewMode(value as 'main' | 'list')}
+                              data={[
+                                  { label: 'Main', value: 'main' },
+                                  { label: 'List', value: 'list' },
+                              ]}
+                            />
+                            <ActionIcon
+                              variant="light"
+                              onClick={handleRefresh}
+                              loading={refreshing || cacheLoading.estimates}
+                              title="Refresh proposals"
+                              ml="sm"
+                              size={40}
+                            >
+                                <IconRefresh size={24} />
+                            </ActionIcon>
+                        </Group>
                     </Group>
 
                     {viewMode === 'main' ? (
