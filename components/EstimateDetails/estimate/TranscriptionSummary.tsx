@@ -74,24 +74,67 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
     };
 
     const handleEditSave = async () => {
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            notifications.show({
+                title: 'Error',
+                position: 'top-center',
+                color: 'red',
+                message: 'Authentication required. Please log in again.',
+            });
+            return;
+        }
+
         const content: UpdateJobContent = {
             transcription_summary: markdown,
         };
 
-        const response = await fetch(
-            `/api/estimates/${estimateID}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(content),
-            }
-        );
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(content),
+                }
+            );
 
-        await response.json();
-        setEditMarkdown(false);
-        refresh();
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error updating description:', errorData);
+                notifications.show({
+                    title: 'Error',
+                    position: 'top-center',
+                    color: 'red',
+                    message: 'Failed to update description',
+                });
+                return;
+            }
+
+            await response.json();
+            setEditMarkdown(false);
+            refresh();
+            notifications.show({
+                title: 'Success!',
+                position: 'top-center',
+                color: 'green',
+                message: 'Description updated successfully',
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error updating description:', error);
+            notifications.show({
+                title: 'Error',
+                position: 'top-center',
+                color: 'red',
+                message: 'Failed to update description',
+            });
+        }
     };
 
     const reload = async () => {

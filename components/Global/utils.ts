@@ -116,3 +116,42 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
             return 'Estimate Not Finished';
     }
 };
+
+export const formatPhoneNumber = (phoneNumber: string | null | undefined): string => {
+    if (!phoneNumber) {
+        return '—';
+    }
+
+    // Remove all non-numeric characters
+    const digits = phoneNumber.replace(/\D/g, '');
+
+    // If 11 digits and starts with 1, format as +1 (XXX) XXX-XXXX
+    if (digits.length === 11 && digits.startsWith('1')) {
+        const areaCode = digits.slice(1, 4);
+        const middle = digits.slice(4, 7);
+        const last = digits.slice(7, 11);
+        return `+1 (${areaCode}) ${middle}-${last}`;
+    }
+
+    // If 10 digits, format as (XXX) XXX-XXXX
+    if (digits.length === 10) {
+        const areaCode = digits.slice(0, 3);
+        const middle = digits.slice(3, 6);
+        const last = digits.slice(6, 10);
+        return `(${areaCode}) ${middle}-${last}`;
+    }
+
+    // If already formatted with +1, try to parse it
+    if (phoneNumber.includes('+1') || phoneNumber.includes('+ 1')) {
+        const cleaned = digits;
+        if (cleaned.length === 11 && cleaned.startsWith('1')) {
+            const areaCode = cleaned.slice(1, 4);
+            const middle = cleaned.slice(4, 7);
+            const last = cleaned.slice(7, 11);
+            return `+1 (${areaCode}) ${middle}-${last}`;
+        }
+    }
+
+    // If not a standard format, return as is
+    return phoneNumber;
+};
