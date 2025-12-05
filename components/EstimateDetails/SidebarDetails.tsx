@@ -9,7 +9,7 @@ import { useRouter } from 'next/navigation';
 import EditableField from './EditableField';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
-import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
@@ -540,7 +540,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             Phone:
           </Text>
           <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {client?.phone_number || '—'}
+            {formatPhoneNumber(client?.phone_number)}
           </Text>
         </Flex>
 
@@ -633,7 +633,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             {(() => {
               // Use actual_hours if available and > 0, otherwise use estimated hours
               const hours = ((estimate.original_hours || estimate.hours_bid || 0) +
-               (estimate.change_order_hours || 0)) as number;
+                (estimate.change_order_hours || 0)) as number;
               const rate = estimate.hourly_rate || 0;
               const total = hours * rate;
               return total > 0 ? `$${total.toFixed(2)}` : '—';
