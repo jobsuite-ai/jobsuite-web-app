@@ -62,6 +62,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [activityLoading, setActivityLoading] = useState(true);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
+    const [firstPdfUrl, setFirstPdfUrl] = useState<string | null>(null);
+    const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const router = useRouter();
@@ -375,9 +377,58 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const fileResources = useMemo(() => (
         resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
     ), [resources]);
+    const firstPdfResource = useMemo(() => (
+        fileResources.find(r => r.resource_location?.toLowerCase().endsWith('.pdf'))
+    ), [fileResources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
+    const hasPdfPreview = firstPdfResource !== undefined;
+
+    const getPdfPresignedUrl = useCallback(async (resource: EstimateResource) => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        setLoadingPdfUrl(true);
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                // eslint-disable-next-line no-console
+                console.error('Error fetching PDF presigned URL:', errorData);
+                setFirstPdfUrl(null);
+                return;
+            }
+
+            const data = await response.json();
+            const presignedUrl = data.presigned_url || data.url;
+            setFirstPdfUrl(presignedUrl || null);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching PDF presigned URL:', error);
+            setFirstPdfUrl(null);
+        } finally {
+            setLoadingPdfUrl(false);
+        }
+    }, [estimateID]);
+
+    useEffect(() => {
+        if (firstPdfResource) {
+            getPdfPresignedUrl(firstPdfResource);
+        } else {
+            setFirstPdfUrl(null);
+        }
+    }, [firstPdfResource, getPdfPresignedUrl]);
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
@@ -506,6 +557,38 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 getEstimate();
                                               }}
                                             />
+                                        </CollapsibleSection>
+                                    )}
+
+                                    {/* PDF Preview - Show if first file is a PDF */}
+                                    {hasPdfPreview && firstPdfResource && (
+                                        <CollapsibleSection title="PDF Preview" defaultOpen>
+                                            {loadingPdfUrl ? (
+                                                <LoadingState />
+                                            ) : firstPdfUrl ? (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'center',
+                                                    alignItems: 'center',
+                                                    minHeight: '500px',
+                                                    width: '100%',
+                                                }}>
+                                                    <iframe
+                                                      title={`PDF preview for ${firstPdfResource.resource_location}`}
+                                                      src={firstPdfUrl}
+                                                      style={{
+                                                          width: '100%',
+                                                          height: '800px',
+                                                          border: 'none',
+                                                          borderRadius: '8px',
+                                                      }}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <Text c="dimmed" ta="center" p="md">
+                                                    Unable to load PDF preview
+                                                </Text>
+                                            )}
                                         </CollapsibleSection>
                                     )}
 
@@ -806,11 +889,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         hasVideo,
         hasImages,
         hasFiles,
+        hasPdfPreview,
         hasDescription,
         hasSpanishTranscription,
         videoResources,
         imageResources,
         fileResources,
+        firstPdfResource,
+        firstPdfUrl,
+        loadingPdfUrl,
         showVideoUploaderModal,
         showImageUploadModal,
         showFileUploadModal,

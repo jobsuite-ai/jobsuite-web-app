@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getContractorId } from '../utils/getContractorId';
 
-import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
-
 export async function GET(request: NextRequest) {
   try {
     // Get the access token from the Authorization header
@@ -17,7 +15,8 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-    const apiBaseUrl = getApiBaseUrl();
+    // Force production endpoint for dashboard
+    const apiBaseUrl = 'https://api.jobsuite.app';
 
     // Get contractor_id from cache (header) or fetch from API
     const contractorId = await getContractorId(request);
