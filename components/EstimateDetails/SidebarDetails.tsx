@@ -2,17 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Badge, Flex, Menu, Paper, Select, Text } from '@mantine/core';
+import { ActionIcon, Badge, Flex, Menu, Paper, Select, Skeleton, Text } from '@mantine/core';
 import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
-import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
 
 interface SidebarDetailsProps {
@@ -21,17 +21,10 @@ interface SidebarDetailsProps {
   onUpdate: () => void;
 }
 
-interface User {
-  id: string;
-  email: string;
-  full_name?: string;
-}
-
 export default function SidebarDetails({ estimate, estimateID, onUpdate }: SidebarDetailsProps) {
   const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const { users, loading: loadingUsers } = useUsers();
   const [editingOwner, setEditingOwner] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(
     estimate.owned_by || estimate.created_by || null
@@ -84,42 +77,6 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
     loadClientDetails();
   }, [estimate?.client_id]);
-
-  useEffect(() => {
-    const loadUsers = async () => {
-      const accessToken = localStorage.getItem('access_token');
-      if (!accessToken) {
-        return;
-      }
-
-      setLoadingUsers(true);
-      try {
-        const response = await fetch('/api/users', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-
-        if (!response.ok) {
-          // eslint-disable-next-line no-console
-          console.error('Failed to load users:', response.status);
-          return;
-        }
-
-        const data = await response.json();
-        setUsers(Array.isArray(data) ? data : []);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error loading users:', error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    loadUsers();
-  }, []);
 
   // Sync selectedOwnerId when estimate changes (but not when editing)
   useEffect(() => {
@@ -409,10 +366,6 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     </Menu.Item>
   ));
 
-  if (!client) {
-    return <LoadingState />;
-  }
-
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
       <Flex direction="column" gap="md">
@@ -423,27 +376,31 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
               Status:
             </Text>
             <Flex justify="flex-end" align="center" gap="xs" style={{ width: '100%' }}>
-              <Menu opened={menuOpened} onChange={setMenuOpened} width={200} position="bottom-end">
-                <Menu.Target>
-                  <Badge
-                    style={{
-                      color: '#ffffff',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                    }}
-                    color={getEstimateBadgeColor(estimate.status)}
-                    rightSection={<IconChevronDown size={12} />}
-                  >
-                    {getFormattedEstimateStatus(estimate.status)}
-                  </Badge>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Label>Change Status</Menu.Label>
-                  {statusDropdownOptions}
-                </Menu.Dropdown>
-              </Menu>
+              {!client ? (
+                <Skeleton height={24} width={120} />
+              ) : (
+                <Menu opened={menuOpened} onChange={setMenuOpened} width={200} position="bottom-end">
+                  <Menu.Target>
+                    <Badge
+                      style={{
+                        color: '#ffffff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                      }}
+                      color={getEstimateBadgeColor(estimate.status)}
+                      rightSection={<IconChevronDown size={12} />}
+                    >
+                      {getFormattedEstimateStatus(estimate.status)}
+                    </Badge>
+                  </Menu.Target>
+                  <Menu.Dropdown>
+                    <Menu.Label>Change Status</Menu.Label>
+                    {statusDropdownOptions}
+                  </Menu.Dropdown>
+                </Menu>
+              )}
             </Flex>
           </Flex>
         </div>
@@ -513,15 +470,19 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           <Text size="sm" fw={500} c="dimmed">
             Client:
           </Text>
-          <Text
-            size="sm"
-            style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
-            onClick={() => router.push(`/clients/${estimate.client_id}`)}
-            c="blue"
-            td="underline"
-          >
-            {client?.name || 'Client'}
-          </Text>
+          {!client ? (
+            <Skeleton height={20} width={150} />
+          ) : (
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => router.push(`/clients/${estimate.client_id}`)}
+              c="blue"
+              td="underline"
+            >
+              {client?.name || 'Client'}
+            </Text>
+          )}
         </Flex>
 
         {/* Client Email - Read-only */}
@@ -529,9 +490,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           <Text size="sm" fw={500} c="dimmed">
             Email:
           </Text>
-          <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {client?.email || '—'}
-          </Text>
+          {!client ? (
+            <Skeleton height={20} width={200} />
+          ) : (
+            <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+              {client?.email || '—'}
+            </Text>
+          )}
         </Flex>
 
         {/* Client Phone - Read-only */}
@@ -539,9 +504,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           <Text size="sm" fw={500} c="dimmed">
             Phone:
           </Text>
-          <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
-            {formatPhoneNumber(client?.phone_number)}
-          </Text>
+          {!client ? (
+            <Skeleton height={20} width={150} />
+          ) : (
+            <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+              {formatPhoneNumber(client?.phone_number)}
+            </Text>
+          )}
         </Flex>
 
         {/* Address */}

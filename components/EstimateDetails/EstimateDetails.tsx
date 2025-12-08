@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Skeleton, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -22,6 +22,7 @@ import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
+import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
@@ -46,7 +47,6 @@ import VideoUploader from './VideoUploader';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
-    const [loading, setLoading] = useState(true);
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -59,24 +59,186 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
-    const [activityLoading, setActivityLoading] = useState(true);
-    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const [firstPdfUrl, setFirstPdfUrl] = useState<string | null>(null);
     const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
+    const isMountedRef = useRef(true);
     const router = useRouter();
+
+    // Single initial loading state - true until all initial data is loaded
+    const [initialLoading, setInitialLoading] = useState(true);
+    const [comments, setComments] = useState<any[]>([]);
+    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
 
     // const searchParams = useSearchParams();
     // const page = searchParams?.get('page');
 
-    const getEstimate = useCallback(async () => {
+    // Fetch all initial data in a single effect
+    useEffect(() => {
+        isMountedRef.current = true;
         const accessToken = localStorage.getItem('access_token');
 
         if (!accessToken) {
+            setInitialLoading(false);
             return;
         }
+
+        const fetchAllData = async () => {
+            try {
+                setInitialLoading(true);
+
+                // Fetch all data in parallel
+                const [estimateRes, resourcesRes, lineItemsRes] = await Promise.all([
+                    fetch(`/api/estimates/${estimateID}?include_change_orders=true`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                    fetch(`/api/estimates/${estimateID}/resources`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                    fetch(`/api/estimates/${estimateID}/line-items`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                ]);
+
+                if (!isMountedRef.current) return;
+
+                // Process estimate
+                if (estimateRes.ok) {
+                    const estimateData = await estimateRes.json();
+                    setEstimate(estimateData);
+
+                    // Fetch client if estimate has client_id
+                    if (estimateData.client_id) {
+                        try {
+                            const clientRes = await fetch(`/api/clients/${estimateData.client_id}`, {
+                                method: 'GET',
+                                headers: {
+                                    Authorization: `Bearer ${accessToken}`,
+                                    'Content-Type': 'application/json',
+                                },
+                            });
+                            if (clientRes.ok && isMountedRef.current) {
+                                const clientData = await clientRes.json();
+                                setClient(clientData.Item || clientData);
+                            }
+                        } catch (error) {
+                            // eslint-disable-next-line no-console
+                            console.error('Error fetching client:', error);
+                        }
+                    }
+
+                    // Fetch change orders if not a change order itself
+                    if (
+                        !estimateData.original_estimate_id &&
+                        estimateData.status !== EstimateStatus.ARCHIVED
+                    ) {
+                        try {
+                            const changeOrdersRes = await fetch(`/api/estimates/${estimateData.id}/change-orders`, {
+                                method: 'GET',
+                                headers: {
+                                    Authorization: `Bearer ${accessToken}`,
+                                    'Content-Type': 'application/json',
+                                },
+                            });
+                            if (changeOrdersRes.ok && isMountedRef.current) {
+                                const changeOrdersData = await changeOrdersRes.json();
+                                setChangeOrders(changeOrdersData || []);
+                            }
+                        } catch (error) {
+                            // eslint-disable-next-line no-console
+                            console.error('Error fetching change orders:', error);
+                        }
+                    }
+                } else {
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching estimate:', await estimateRes.json().catch(() => ({})));
+                }
+
+                // Process resources
+                if (resourcesRes.ok) {
+                    const resourcesData = await resourcesRes.json();
+                    const resourcesArray = Array.isArray(resourcesData) ? resourcesData : [];
+                    setResources(resourcesArray);
+
+                    // Check if any video resource exists
+                    const videoResource = resourcesArray.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
+                    if (videoResource && isMountedRef.current) {
+                        setObjectExists(true);
+                    }
+                } else {
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching resources:', await resourcesRes.json().catch(() => ({})));
+                }
+
+                // Process line items
+                if (lineItemsRes.ok) {
+                    const items = await lineItemsRes.json();
+                    const itemsArray = Array.isArray(items) ? items : [];
+                    if (isMountedRef.current) {
+                        setLineItems(itemsArray);
+                        setLineItemsCount(itemsArray.length);
+                    }
+                } else {
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching line items:', await lineItemsRes.json().catch(() => ({})));
+                }
+
+                // Fetch comments
+                try {
+                    const commentsRes = await fetch(`/api/estimate-comments/${estimateID}`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+                    if (commentsRes.ok && isMountedRef.current) {
+                        const commentsData = await commentsRes.json();
+                        // Comments API returns { Items: [...] }
+                        const commentsArray = commentsData.Items ||
+                            Array.isArray(commentsData) ? commentsData : [];
+                        setComments(commentsArray);
+                    }
+                } catch (error) {
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching comments:', error);
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error fetching data:', error);
+            } finally {
+                if (isMountedRef.current) {
+                    setInitialLoading(false);
+                }
+            }
+        };
+
+        fetchAllData();
+
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
+            isMountedRef.current = false;
+        };
+    }, [estimateID]);
+
+    // Separate functions for refreshing data after initial load
+    const getEstimate = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
 
         try {
             const response = await fetch(
@@ -90,15 +252,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 }
             );
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching estimate:', errorData);
-                return;
+            if (response.ok) {
+                const estimateData = await response.json();
+                setEstimate(estimateData);
             }
-
-            const estimateData = await response.json();
-            setEstimate(estimateData);
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching estimate:', error);
@@ -107,10 +264,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const getResources = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
+        if (!accessToken) return;
 
         try {
             const response = await fetch(
@@ -124,20 +278,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 }
             );
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching resources:', errorData);
-                return;
-            }
+            if (response.ok) {
+                const resourcesData = await response.json();
+                const resourcesArray = Array.isArray(resourcesData) ? resourcesData : [];
+                setResources(resourcesArray);
 
-            const resourcesData = await response.json();
-            setResources(Array.isArray(resourcesData) ? resourcesData : []);
-
-            // Check if any video resource exists
-            const videoResource = resourcesData.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
-            if (videoResource) {
-                setObjectExists(true);
+                // Check if any video resource exists
+                const videoResource = resourcesArray.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
+                if (videoResource) {
+                    setObjectExists(true);
+                }
             }
         } catch (error) {
             // eslint-disable-next-line no-console
@@ -145,137 +295,23 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimateID]);
 
-    const getLineItems = useCallback(async () => {
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimateID}/line-items`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching line items:', errorData);
-                return;
-            }
-
-            const items = await response.json();
-            setLineItems(Array.isArray(items) ? items : []);
-            setLineItemsCount(Array.isArray(items) ? items.length : 0);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching line items:', error);
-        }
-    }, [estimateID]);
-
-    const getClient = useCallback(async () => {
-        if (!estimate?.client_id) {
-            return;
-        }
-
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                `/api/clients/${estimate.client_id}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching client:', errorData);
-                return;
-            }
-
-            const data = await response.json();
-            const clientData = data.Item || data;
-            setClient(clientData as ContractorClient);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching client:', error);
-        }
-    }, [estimate?.client_id]);
-
-    const getChangeOrders = useCallback(async () => {
-        // Only fetch change orders if this is not a change order itself
-        if (!estimate?.id || estimate.original_estimate_id) {
-            setChangeOrders([]);
-            return;
-        }
-
-        const accessToken = localStorage.getItem('access_token');
-
-        if (!accessToken) {
-            return;
-        }
-
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimate.id}/change-orders`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching change orders:', errorData);
-                return;
-            }
-
-            const data = await response.json();
-            setChangeOrders(Array.isArray(data) ? data : []);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching change orders:', error);
-        }
-    }, [estimate?.id, estimate?.original_estimate_id]);
-
+    // Fallback: If loading takes too long, force completion after 10 seconds
     useEffect(() => {
-        setLoading(true);
-        Promise.all([getEstimate(), getResources(), getLineItems()])
-            .finally(() => setLoading(false));
-    }, [estimateID, getEstimate, getResources, getLineItems]);
-
-    useEffect(() => {
-        if (estimate?.client_id && !client) {
-            getClient();
+        if (!initialLoading) {
+            return;
         }
-    }, [estimate?.client_id, client, getClient]);
 
-    useEffect(() => {
-        if (estimate?.id) {
-            getChangeOrders();
-        }
-    }, [estimate?.id, getChangeOrders]);
+        const timeout = setTimeout(() => {
+            // eslint-disable-next-line no-console
+            console.warn('Initial loading timeout - forcing completion');
+            setInitialLoading(false);
+        }, 10000);
+
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
+            clearTimeout(timeout);
+        };
+    }, [initialLoading]);
 
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const hasUploadingVideoRef = useRef(false);
@@ -285,7 +321,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         resources.some(r => r.resource_type === 'VIDEO' && r.upload_status !== 'COMPLETED') && !objectExists
     ), [resources, objectExists]);
 
+    // Polling for video upload - only after initial load is complete
     useEffect(() => {
+        // Don't start polling until initial load is complete
+        if (initialLoading) {
+            return;
+        }
+
         // Only update polling if the state actually changed
         if (hasUploadingVideo !== hasUploadingVideoRef.current) {
             hasUploadingVideoRef.current = hasUploadingVideo;
@@ -304,13 +346,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         }
 
-        return () => {
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
             if (pollingIntervalRef.current) {
                 clearInterval(pollingIntervalRef.current);
                 pollingIntervalRef.current = null;
             }
         };
-    }, [hasUploadingVideo, getResources]);
+    }, [hasUploadingVideo, initialLoading]);
 
     const handleOpenExternalLink = (link: string) => {
         window.open(link, '_blank');
@@ -422,13 +465,18 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimateID]);
 
+    // Fetch PDF URL only after initial load is complete
     useEffect(() => {
+        if (initialLoading) {
+            return;
+        }
+
         if (firstPdfResource) {
             getPdfPresignedUrl(firstPdfResource);
         } else {
             setFirstPdfUrl(null);
         }
-    }, [firstPdfResource, getPdfPresignedUrl]);
+    }, [firstPdfResource, getPdfPresignedUrl, initialLoading]);
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
@@ -436,7 +484,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const OverviewDetails = useMemo(() => (
         <>
-            {loading ? <LoadingState /> : <>
+            {initialLoading ? <EstimateDetailsSkeleton /> : <>
                 {estimate ?
                     <>
                         <div className={classes.twoColumnLayout}>
@@ -535,11 +583,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     <CollapsibleSection
                                       title="Activity"
                                       defaultOpen
-                                      loading={activityLoading}
                                     >
                                         <JobComments
                                           estimateID={estimateID}
-                                          onLoadingChange={setActivityLoading}
+                                          initialComments={comments}
+                                          skipInitialFetch
                                         />
                                     </CollapsibleSection>
 
@@ -564,7 +612,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {hasPdfPreview && firstPdfResource && (
                                         <CollapsibleSection title="PDF Preview" defaultOpen>
                                             {loadingPdfUrl ? (
-                                                <LoadingState />
+                                                <Skeleton height={800} radius="md" />
                                             ) : firstPdfUrl ? (
                                                 <div style={{
                                                     display: 'flex',
@@ -685,8 +733,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               estimateID={estimateID}
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
-                                                // Refresh line items when count changes
-                                                getLineItems();
                                               }}
                                             />
                                         </CollapsibleSection>
@@ -697,24 +743,22 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               estimateID={estimateID}
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
-                                                // Refresh line items when count changes
-                                                getLineItems();
                                               }}
                                             />
                                         </div>
                                     )}
 
-                                    {/* Change Orders Section - Only show if change orders exist */}
+                                    {/* Change Orders Section - Only show if not archived */}
                                     {estimate &&
                                     !estimate.original_estimate_id &&
-                                    changeOrders.length > 0 &&
                                     estimate.status !== EstimateStatus.ARCHIVED && (
                                         <CollapsibleSection title="Change Orders" defaultOpen>
                                             <ChangeOrders
                                               estimate={estimate}
+                                              initialChangeOrders={changeOrders}
+                                              skipInitialFetch
                                               onUpdate={() => {
                                                 getEstimate();
-                                                getChangeOrders();
                                               }}
                                             />
                                         </CollapsibleSection>
@@ -791,7 +835,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         </div>
                     </> : <UniversalError message="Unable to access estimate details" />
                 }
-                                          </>}
+                                                            </>}
             {/* Archive Confirmation Modal */}
             <Modal
               opened={isModalOpen}
@@ -873,7 +917,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                   onClose={() => setShowCreateChangeOrderModal(false)}
                   onSuccess={() => {
                     getEstimate();
-                    getChangeOrders();
                     setShowCreateChangeOrderModal(false);
                   }}
                   estimate={estimate}
@@ -883,7 +926,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             {/* Line Item Modal - Removed since LineItems component has its own modal */}
         </>
     ), [
-        loading,
+        initialLoading,
         estimate,
         estimateID,
         hasVideo,
@@ -905,11 +948,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         showSpanishTranscriptionEditor,
         lineItemsCount,
         isModalOpen,
-        changeOrders,
         showCreateChangeOrderModal,
+        comments,
+        changeOrders,
         getEstimate,
         getResources,
-        getChangeOrders,
         handleOpenExternalLink,
         handleCopySpanishTranscription,
         handleEditTranscriptionSummary,
@@ -922,6 +965,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         setShowCreateChangeOrderModal,
         transcriptionSummaryRef,
         lineItemsRef,
+        router,
     ]);
 
     return OverviewDetails;

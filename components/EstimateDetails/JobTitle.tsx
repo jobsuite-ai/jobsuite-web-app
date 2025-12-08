@@ -37,6 +37,13 @@ export default function JobTitle({ initialTitle, estimateID, onSave }: {
     }
 
     setSaving(true);
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      logToCloudWatch('No access token available for updating job title');
+      setSaving(false);
+      return;
+    }
+
     const content: UpdateJobContent = {
       title,
     };
@@ -44,7 +51,10 @@ export default function JobTitle({ initialTitle, estimateID, onSave }: {
     try {
       await fetch(`/api/estimates/${estimateID}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(content),
       });
 

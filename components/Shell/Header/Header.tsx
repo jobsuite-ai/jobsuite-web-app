@@ -641,7 +641,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                       onClick={() => {
                         acknowledgeNotification(notification.id);
                         if (notification.link) {
-                          router.push(notification.link);
+                          // Transform /estimates/ to /proposals/ for backward compatibility
+                          const link = notification.link.replace('/estimates/', '/proposals/');
+                          router.push(link);
                         }
                       }}
                     >

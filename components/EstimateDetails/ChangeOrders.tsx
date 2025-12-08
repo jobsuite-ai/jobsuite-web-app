@@ -14,20 +14,36 @@ import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/uti
 interface ChangeOrdersProps {
     estimate: Estimate;
     onUpdate: () => void;
+    onLoadingChange?: (loading: boolean) => void;
+    initialChangeOrders?: Estimate[];
+    skipInitialFetch?: boolean;
 }
 
-export default function ChangeOrders({ estimate, onUpdate }: ChangeOrdersProps) {
-    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
-    const [loading, setLoading] = useState(true);
+export default function ChangeOrders({
+    estimate,
+    onUpdate,
+    onLoadingChange,
+    initialChangeOrders,
+    skipInitialFetch = false,
+}: ChangeOrdersProps) {
+    const [changeOrders, setChangeOrders] = useState<Estimate[]>(initialChangeOrders || []);
+    const [loading, setLoading] = useState(!skipInitialFetch);
     const [createModalOpened, setCreateModalOpened] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
+        // Skip initial fetch if initialChangeOrders are provided
+        if (skipInitialFetch && initialChangeOrders) {
+            setLoading(false);
+            return;
+        }
+
         if (estimate && !estimate.original_estimate_id) {
             // Only fetch change orders if this is not a change order itself
             fetchChangeOrders();
         } else {
             setLoading(false);
+            onLoadingChange?.(false);
         }
     }, [estimate]);
 
@@ -35,10 +51,12 @@ export default function ChangeOrders({ estimate, onUpdate }: ChangeOrdersProps) 
         if (!estimate?.id) return;
 
         setLoading(true);
+        onLoadingChange?.(true);
         try {
             const accessToken = localStorage.getItem('access_token');
             if (!accessToken) {
                 setLoading(false);
+                onLoadingChange?.(false);
                 return;
             }
 
@@ -59,6 +77,7 @@ export default function ChangeOrders({ estimate, onUpdate }: ChangeOrdersProps) 
             console.error('Error fetching change orders:', error);
         } finally {
             setLoading(false);
+            onLoadingChange?.(false);
         }
     };
 
