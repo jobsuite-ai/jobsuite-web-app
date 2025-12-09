@@ -21,10 +21,10 @@ import { notifications } from '@mantine/notifications';
 import { IconChevronDown, IconClock, IconMessage, IconMoodSmile, IconSend } from '@tabler/icons-react';
 
 import { JobComment } from './JobComment';
-import { SingleComment } from '../../Global/model';
+import { SingleComment, User } from '../../Global/model';
 import classes from '../styles/EstimateDetails.module.css';
 
-import LoadingState from '@/components/Global/LoadingState';
+import { useUsers } from '@/hooks/useUsers';
 
 const QUICK_REPLIES = [
     'Looks good! 👍',
@@ -42,22 +42,34 @@ const COMMON_EMOJIS = [
 interface JobCommentsProps {
     estimateID: string;
     onLoadingChange?: (loading: boolean) => void;
+    initialComments?: any[];
+    skipInitialFetch?: boolean;
 }
 
-interface User {
-    id: string;
-    email: string;
-    full_name: string;
-}
-
-export default function JobComments({ estimateID, onLoadingChange }: JobCommentsProps) {
-    const [loading, setLoading] = useState(true);
+export default function JobComments({
+    estimateID,
+    onLoadingChange,
+    initialComments,
+    skipInitialFetch = false,
+}: JobCommentsProps) {
+    const [loading, setLoading] = useState(!skipInitialFetch);
     const [commentInputLoading, setCommentInputLoading] = useState(false);
-    const [jobComments, setJobComments] = useState<SingleComment[]>();
+    const [jobComments, setJobComments] = useState<SingleComment[] | undefined>(
+        initialComments && Array.isArray(initialComments)
+            ? initialComments.map((comment: any) => ({
+                  ...comment,
+                  timestamp: comment.created_at || comment.timestamp,
+              })).sort((a: SingleComment, b: SingleComment) => {
+                  const dateA = new Date(a.timestamp).getTime();
+                  const dateB = new Date(b.timestamp).getTime();
+                  return dateB - dateA;
+              })
+            : undefined
+    );
     const [commentContents, setCommentContents] = useState<string>();
     const [emojiPickerOpened, setEmojiPickerOpened] = useState(false);
     const [showAllComments, setShowAllComments] = useState(false);
-    const [users, setUsers] = useState<User[]>([]);
+    const { users } = useUsers();
     const [mentionQuery, setMentionQuery] = useState<string>('');
     const [mentionPosition, setMentionPosition] = useState<{
         start: number;
@@ -131,40 +143,26 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         }
     }
 
-    async function getUsers() {
-        try {
-            const accessToken = localStorage.getItem('access_token');
-            if (!accessToken) {
-                return;
-            }
+    const onLoadingChangeRef = useRef(onLoadingChange);
 
-            const response = await fetch('/api/users', {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (response.ok) {
-                const usersData = await response.json();
-                setUsers(usersData);
-            }
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching users:', error);
-        }
-    }
+    // Keep the ref updated with the latest callback
+    useEffect(() => {
+        onLoadingChangeRef.current = onLoadingChange;
+    }, [onLoadingChange]);
 
     useEffect(() => {
+        // Skip initial fetch if initialComments are provided
+        if (skipInitialFetch && initialComments) {
+            return;
+        }
+
         setLoading(true);
-        onLoadingChange?.(true);
+        onLoadingChangeRef.current?.(true);
         getJobComments().finally(() => {
             setLoading(false);
-            onLoadingChange?.(false);
+            onLoadingChangeRef.current?.(false);
         });
-        getUsers();
-    }, [estimateID, onLoadingChange]);
+    }, [estimateID]);
 
     // Extract mentioned user IDs from comment contents (keep original text with usernames)
     function processMentions(text: string): { processedText: string; mentionedUserIds: string[] } {
@@ -421,10 +419,6 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
         setEmojiPickerOpened(false);
     };
 
-    if (loading) {
-        return <LoadingState />;
-    }
-
     // Use generic placeholder for skeleton comment initials
     // The actual user info will come from the backend when the comment is created
     const userInitials = 'U';
@@ -615,32 +609,65 @@ export default function JobComments({ estimateID, onLoadingChange }: JobComments
                   </Card>
                 )}
 
-                {/* Show existing comments (newest first) */}
-                {jobComments && jobComments.length > 0 ? (
-                    <>
-                        {displayedComments?.map((comment) => (
-                            <JobComment key={comment.id} commentDetails={comment} />
+                {/* Show loading skeleton for comments while loading */}
+                {loading ? (
+                    <Stack gap="xs">
+                        {[1, 2, 3].map((i) => (
+                            <Card key={i} shadow="xs" padding="md" radius="md" withBorder>
+                                <Stack gap="xs">
+                                    <Group justify="space-between" align="flex-start" wrap="nowrap">
+                                        <Group gap="sm" align="center" wrap="nowrap">
+                                            <Avatar size="md" radius="xl" color="blue" variant="light">
+                                                <Skeleton height={32} width={32} circle />
+                                            </Avatar>
+                                            <div>
+                                                <Skeleton height={16} width={120} radius="sm" mb={4} />
+                                                <Group gap={4} mt={2}>
+                                                    <IconClock size={12} style={{ opacity: 0.6 }} />
+                                                    <Skeleton height={12} width={100} radius="sm" />
+                                                </Group>
+                                            </div>
+                                        </Group>
+                                    </Group>
+                                    <div style={{ paddingLeft: rem(48) }}>
+                                        <Skeleton height={14} width="100%" radius="sm" mb={6} />
+                                        <Skeleton height={14} width="90%" radius="sm" mb={6} />
+                                        <Skeleton height={14} width="75%" radius="sm" />
+                                    </div>
+                                </Stack>
+                            </Card>
                         ))}
-                        {hasMoreComments && !showAllComments && (
-                          <Button
-                            variant="light"
-                            leftSection={<IconChevronDown size={16} />}
-                            onClick={() => setShowAllComments(true)}
-                            fullWidth
-                            mt="xs"
-                          >
-                            More
-                          </Button>
-                        )}
+                    </Stack>
+                ) : (
+                    <>
+                        {/* Show existing comments (newest first) */}
+                        {jobComments && jobComments.length > 0 ? (
+                            <>
+                                {displayedComments?.map((comment) => (
+                                    <JobComment key={comment.id} commentDetails={comment} />
+                                ))}
+                                {hasMoreComments && !showAllComments && (
+                                  <Button
+                                    variant="light"
+                                    leftSection={<IconChevronDown size={16} />}
+                                    onClick={() => setShowAllComments(true)}
+                                    fullWidth
+                                    mt="xs"
+                                  >
+                                    More
+                                  </Button>
+                                )}
+                            </>
+                        ) : !commentInputLoading ? (
+                            <Paper p="xl" radius="md" withBorder style={{ textAlign: 'center' }}>
+                                <IconMessage size={48} style={{ opacity: 0.3, margin: '0 auto' }} />
+                                <Text c="dimmed" mt="md" size="sm">
+                                    No comments yet. Be the first to add a comment!
+                                </Text>
+                            </Paper>
+                        ) : null}
                     </>
-                ) : !commentInputLoading ? (
-                    <Paper p="xl" radius="md" withBorder style={{ textAlign: 'center' }}>
-                        <IconMessage size={48} style={{ opacity: 0.3, margin: '0 auto' }} />
-                        <Text c="dimmed" mt="md" size="sm">
-                            No comments yet. Be the first to add a comment!
-                        </Text>
-                    </Paper>
-                ) : null}
+                )}
             </Stack>
         </Stack>
     );

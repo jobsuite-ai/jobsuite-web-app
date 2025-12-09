@@ -194,6 +194,17 @@ function KanbanColumn({
 
     const isHistorical = column.id === 'historical';
 
+    // Calculate total price for accounts-receivable and billing-needed columns
+    const shouldShowPrice = column.id === 'accounts-receivable' || column.id === 'billing-needed';
+    const totalPrice = shouldShowPrice
+        ? jobs.reduce((sum, job) => {
+              const estimate = job as Estimate;
+              const hours = estimate.hours_bid || 0;
+              const rate = estimate.hourly_rate || 0;
+              return sum + hours * rate;
+          }, 0)
+        : 0;
+
     if (isHistorical && isCollapsed) {
         const collapsedClassName = `${classes.kanbanColumn} ${classes.historicalCollapsed} ${
             isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver
@@ -212,13 +223,20 @@ function KanbanColumn({
               className={collapsedClassName}
             >
                 <Stack align="center" gap="md" h="100%" justify="center">
-                    <Title
-                      order={5}
-                      className={classes.rotatedTitle}
-                      ta="center"
-                    >
-                        {column.title}
-                    </Title>
+                    <Stack gap={2} align="center">
+                        <Title
+                          order={5}
+                          className={classes.rotatedTitle}
+                          ta="center"
+                        >
+                            {column.title}
+                        </Title>
+                        {shouldShowPrice && totalPrice > 0 && (
+                            <Text size="sm" fw={600} ta="center" c="dimmed">
+                                ${totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </Text>
+                        )}
+                    </Stack>
                     <Badge size="lg" variant="light">{jobs.length}</Badge>
                     <Center>
                       <ActionIcon
@@ -247,9 +265,16 @@ function KanbanColumn({
           className={`${classes.kanbanColumn} ${isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver}`}
         >
             <Flex justify="space-between" align="center" mb="md">
-                <Title order={5} ta="center">
-                    {column.title}
-                </Title>
+                <Stack gap={2} style={{ flex: 1 }}>
+                    <Title order={5} ta="center">
+                        {column.title}
+                    </Title>
+                    {shouldShowPrice && totalPrice > 0 && (
+                        <Text size="sm" fw={600} ta="center" c="dimmed">
+                            ${totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                    )}
+                </Stack>
                 {isHistorical && onToggleCollapse ? (
                     <Group gap="xs">
                         <Badge size="lg" variant="light">{jobs.length}</Badge>
@@ -735,8 +760,8 @@ export default function JobsList() {
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-            <div style={{ position: 'relative', height: '100%' }}>
-                <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
+            <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ position: 'sticky', top: '10px', right: '10px', zIndex: 10, alignSelf: 'flex-end' }}>
                     <ActionIcon
                       variant="light"
                       onClick={handleRefresh}

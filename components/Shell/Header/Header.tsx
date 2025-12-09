@@ -2,8 +2,8 @@
 
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Badge, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -641,7 +641,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                       onClick={() => {
                         acknowledgeNotification(notification.id);
                         if (notification.link) {
-                          router.push(notification.link);
+                          // Transform /estimates/ to /proposals/ for backward compatibility
+                          const link = notification.link.replace('/estimates/', '/proposals/');
+                          router.push(link);
                         }
                       }}
                     >
@@ -661,6 +663,15 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                     </Menu.Item>
                   ))
                 )}
+                <Divider />
+                <Menu.Item
+                  leftSection={<IconList size={16} />}
+                  onClick={() => {
+                    router.push('/notifications');
+                  }}
+                >
+                  <Text size="sm">View All Notifications</Text>
+                </Menu.Item>
               </Menu.Dropdown>
             </Menu>
           </Group>

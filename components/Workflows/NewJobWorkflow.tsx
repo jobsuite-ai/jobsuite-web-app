@@ -30,6 +30,44 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 
 const NUMBER_OF_STEPS = 3;
 
+// Validation helper functions
+const validateEmail = (email: string): string | null => {
+    if (!email.trim()) {
+        return 'Email is required';
+    }
+    // Simple format: something@something.something
+    const emailRegex = /^.+@.+\..+$/;
+    if (!emailRegex.test(email.trim())) {
+        return 'Invalid email format. Must be in format: name@domain.tld';
+    }
+    return null;
+};
+
+const validatePhoneNumber = (phone: string): string | null => {
+    if (!phone.trim()) {
+        return 'Phone number is required';
+    }
+    // Match backend pattern:
+    // ^(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$|^00[0-9]{10,11}$
+    const phoneRegex = /^(\+?1[-.\s]?)?\(?([0-9]{3})\)?[-.\s]?([0-9]{3})[-.\s]?([0-9]{4})$|^00[0-9]{10,11}$/;
+    if (!phoneRegex.test(phone.trim())) {
+        return 'Invalid phone number format. Use formats like: (555) 123-4567, 555-123-4567, or 5551234567';
+    }
+    return null;
+};
+
+const validateZipCode = (zipcode: string): string | null => {
+    if (!zipcode.trim()) {
+        return 'Zip code is required';
+    }
+    // Match backend pattern: ^\d{5}(-\d{4})?$
+    const zipRegex = /^\d{5}(-\d{4})?$/;
+    if (!zipRegex.test(zipcode.trim())) {
+        return 'Invalid zip code format. Use 5 digits or 5+4 format (e.g., 12345 or 12345-6789)';
+    }
+    return null;
+};
+
 interface FormValues {
     // Client fields
     client_id: string | null;
@@ -104,13 +142,25 @@ export function NewJobWorkflow() {
                     if (!values.client_name.trim()) {
                         errors.client_name = 'Client name is required';
                     }
-                    if (!values.client_email.trim()) {
-                        errors.client_email = 'Client email is required';
-                    } else if (!/^\S+@\S+$/.test(values.client_email)) {
-                        errors.client_email = 'Invalid email format';
+
+                    // Validate email format
+                    const emailError = validateEmail(values.client_email);
+                    if (emailError) {
+                        errors.client_email = emailError;
                     }
-                    if (!values.client_phone_number.trim()) {
-                        errors.client_phone_number = 'Client phone number is required';
+
+                    // Validate phone number format
+                    const phoneError = validatePhoneNumber(values.client_phone_number);
+                    if (phoneError) {
+                        errors.client_phone_number = phoneError;
+                    }
+
+                    // Validate zip code if provided
+                    if (values.client_address_zipcode.trim()) {
+                        const zipError = validateZipCode(values.client_address_zipcode);
+                        if (zipError) {
+                            errors.client_address_zipcode = zipError;
+                        }
                     }
                 }
 
@@ -129,9 +179,13 @@ export function NewJobWorkflow() {
                 if (!values.address_state) {
                     errors.address_state = 'State is required';
                 }
-                if (!values.address_zipcode.trim()) {
-                    errors.address_zipcode = 'Zip code is required';
+
+                // Validate zip code format
+                const zipError = validateZipCode(values.address_zipcode);
+                if (zipError) {
+                    errors.address_zipcode = zipError;
                 }
+
                 if (!values.estimate_type) {
                     errors.estimate_type = 'Estimate type is required';
                 }
