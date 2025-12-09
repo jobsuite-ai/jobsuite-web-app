@@ -209,8 +209,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     if (commentsRes.ok && isMountedRef.current) {
                         const commentsData = await commentsRes.json();
                         // Comments API returns { Items: [...] }
-                        const commentsArray = commentsData.Items ||
-                            Array.isArray(commentsData) ? commentsData : [];
+                        let commentsArray: any[] = [];
+                        if (commentsData.Items && Array.isArray(commentsData.Items)) {
+                            commentsArray = commentsData.Items;
+                        } else if (Array.isArray(commentsData)) {
+                            commentsArray = commentsData;
+                        }
                         setComments(commentsArray);
                     }
                 } catch (error) {

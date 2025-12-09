@@ -320,14 +320,23 @@ export default function Homepage() {
         {/* Action Center (Notifications) */}
         <AnimatedSection delay={0.2}>
           <Paper p="lg" radius="md" withBorder>
-            <Group gap="sm" mb="md">
-              <IconBell size={20} />
-              <Title order={3}>Action Center</Title>
-              {notifications.length > 0 && (
-                <Badge size="sm" color="red" variant="light">
-                  {notifications.length} {notifications.length === 1 ? 'notification' : 'notifications'}
-                </Badge>
-              )}
+            <Group justify="space-between" mb="md">
+              <Group gap="sm">
+                <IconBell size={20} />
+                <Title order={3}>Action Center</Title>
+                {notifications.length > 0 && (
+                  <Badge size="sm" color="red" variant="light">
+                    {notifications.length} {notifications.length === 1 ? 'notification' : 'notifications'}
+                  </Badge>
+                )}
+              </Group>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => router.push('/notifications')}
+              >
+                View All
+              </Button>
             </Group>
             {notificationsLoading ? (
               <Text c="dimmed" size="sm">

@@ -55,14 +55,16 @@ export default function JobComments({
     const [loading, setLoading] = useState(!skipInitialFetch);
     const [commentInputLoading, setCommentInputLoading] = useState(false);
     const [jobComments, setJobComments] = useState<SingleComment[] | undefined>(
-        initialComments ? initialComments.map((comment: any) => ({
-            ...comment,
-            timestamp: comment.created_at || comment.timestamp,
-        })).sort((a: SingleComment, b: SingleComment) => {
-            const dateA = new Date(a.timestamp).getTime();
-            const dateB = new Date(b.timestamp).getTime();
-            return dateB - dateA;
-        }) : undefined
+        initialComments && Array.isArray(initialComments)
+            ? initialComments.map((comment: any) => ({
+                  ...comment,
+                  timestamp: comment.created_at || comment.timestamp,
+              })).sort((a: SingleComment, b: SingleComment) => {
+                  const dateA = new Date(a.timestamp).getTime();
+                  const dateB = new Date(b.timestamp).getTime();
+                  return dateB - dateA;
+              })
+            : undefined
     );
     const [commentContents, setCommentContents] = useState<string>();
     const [emojiPickerOpened, setEmojiPickerOpened] = useState(false);
