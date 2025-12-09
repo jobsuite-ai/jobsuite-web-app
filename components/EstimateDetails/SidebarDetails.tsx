@@ -7,7 +7,7 @@ import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
-import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
+import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
@@ -30,6 +30,11 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     estimate.owned_by || estimate.created_by || null
   );
   const [savingOwner, setSavingOwner] = useState(false);
+  const [editingJobType, setEditingJobType] = useState(false);
+  const [selectedJobType, setSelectedJobType] = useState<string | null>(
+    estimate.estimate_type || null
+  );
+  const [savingJobType, setSavingJobType] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData } = useDataCache();
@@ -84,6 +89,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       setSelectedOwnerId(estimate.owned_by || estimate.created_by || null);
     }
   }, [estimate.owned_by, estimate.created_by, editingOwner]);
+
+  // Sync selectedJobType when estimate changes (but not when editing)
+  useEffect(() => {
+    if (!editingJobType) {
+      setSelectedJobType(estimate.estimate_type || null);
+    }
+  }, [estimate.estimate_type, editingJobType]);
 
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
@@ -356,6 +368,76 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     return owner ? owner.full_name || owner.email : '—';
   };
 
+  const updateJobType = async (value: string | null) => {
+    if (savingJobType) return;
+    setSavingJobType(true);
+    try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        setSavingJobType(false);
+        return;
+      }
+
+      // Map "Full House" to "BOTH" for backend
+      const backendValue = value === 'Full House' ? EstimateType.BOTH : value;
+
+      await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ estimate_type: backendValue || null }),
+      });
+
+      setEditingJobType(false);
+      onUpdate();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update job type:', error);
+    } finally {
+      setSavingJobType(false);
+    }
+  };
+
+  const handleJobTypeClick = () => {
+    setEditingJobType(true);
+    // Normalize BOTH to 'Full House' for the Select component
+    const normalizedType =
+      estimate.estimate_type === EstimateType.BOTH || estimate.estimate_type === 'BOTH'
+        ? 'Full House'
+        : estimate.estimate_type || null;
+    setSelectedJobType(normalizedType);
+  };
+
+  const handleJobTypeCancel = () => {
+    // Reset to original estimate type (normalized for display)
+    const normalizedType =
+      estimate.estimate_type === EstimateType.BOTH || estimate.estimate_type === 'BOTH'
+        ? 'Full House'
+        : estimate.estimate_type || null;
+    setSelectedJobType(normalizedType);
+    setEditingJobType(false);
+  };
+
+  const getJobTypeDisplayName = (): string => {
+    const jobType = estimate.estimate_type;
+    if (!jobType) return '—';
+    // Map "BOTH" to "Full House" for display
+    if (jobType === EstimateType.BOTH || jobType === 'BOTH') {
+      return 'Full House';
+    }
+    if (jobType === EstimateType.INTERIOR || jobType === 'INTERIOR') {
+      return 'Interior';
+    }
+    if (jobType === EstimateType.EXTERIOR || jobType === 'EXTERIOR') {
+      return 'Exterior';
+    }
+    return jobType;
+  };
+
   const statusOptions = Object.values(EstimateStatus).filter(
     (status) => status !== estimate.status
   );
@@ -404,6 +486,64 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             </Flex>
           </Flex>
         </div>
+
+        {/* Job Type */}
+        {editingJobType ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Job Type:
+              </Text>
+              <Select
+                data={[
+                  { value: EstimateType.INTERIOR, label: 'Interior' },
+                  { value: EstimateType.EXTERIOR, label: 'Exterior' },
+                  { value: 'Full House', label: 'Full House' },
+                ]}
+                value={selectedJobType}
+                onChange={(value) => setSelectedJobType(value)}
+                placeholder="Select job type"
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                autoFocus
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="green"
+                variant="light"
+                onClick={() => updateJobType(selectedJobType)}
+                loading={savingJobType}
+                size="lg"
+              >
+                <IconCheck size={18} />
+              </ActionIcon>
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={handleJobTypeCancel}
+                disabled={savingJobType}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Job Type:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={handleJobTypeClick}
+              c={estimate.estimate_type ? 'dark' : 'dimmed'}
+            >
+              {getJobTypeDisplayName()}
+            </Text>
+          </Flex>
+        )}
 
         {/* Owned By */}
         {editingOwner ? (
@@ -593,7 +733,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           </Text>
         </Flex>
 
-        {/* Job Total - Read-only (hours * rate) */}
+        {/* Job Total - Read-only (hours * rate - discount) */}
         <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
           <Text size="sm" fw={500} c="dimmed">
             Job Total:
@@ -604,7 +744,14 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
               const hours = ((estimate.original_hours || estimate.hours_bid || 0) +
                 (estimate.change_order_hours || 0)) as number;
               const rate = estimate.hourly_rate || 0;
-              const total = hours * rate;
+              const subtotal = hours * rate;
+
+              // Apply discount if discount_percentage is set
+              const discountPercentage = estimate.discount_percentage || 0;
+              const discountAmount =
+                discountPercentage > 0 ? subtotal * (discountPercentage / 100) : 0;
+              const total = subtotal - discountAmount;
+
               return total > 0 ? `$${total.toFixed(2)}` : '—';
             })()}
           </Text>
