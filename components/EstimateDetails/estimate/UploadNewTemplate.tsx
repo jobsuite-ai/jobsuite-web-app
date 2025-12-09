@@ -6,8 +6,6 @@ import { notifications } from '@mantine/notifications';
 import { EstimateLineItem } from './LineItem';
 import { Estimate, EstimateResource, EstimateStatus } from '../../Global/model';
 
-import updateJobStatus from '@/components/Global/updateJobStatus';
-
 export function UploadNewTemplate({
     template,
     estimate,
@@ -69,8 +67,25 @@ export function UploadNewTemplate({
                 throw new Error(errorData.error || 'Failed to send estimate');
             }
 
-            // Step 3: Update job status
-            await updateJobStatus(EstimateStatus.ESTIMATE_SENT, estimate.id);
+            // Step 3: Update estimate status
+            const accessToken = localStorage.getItem('access_token');
+            if (!accessToken) {
+                throw new Error('No access token found');
+            }
+
+            const statusResponse = await fetch(`/api/estimates/${estimate.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({ status: EstimateStatus.ESTIMATE_SENT }),
+            });
+
+            if (!statusResponse.ok) {
+                const errorData = await statusResponse.json();
+                throw new Error(errorData.message || 'Failed to update estimate status');
+            }
 
             setLoading(false);
             notifications.show({

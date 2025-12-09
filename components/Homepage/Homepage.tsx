@@ -515,7 +515,7 @@ export default function Homepage() {
         {data.recently_finished.length > 0 && (
           <AnimatedSection delay={0.6}>
             <Group justify="space-between" mb="md">
-              <Title order={2}>Recently Finished</Title>
+              <Title order={2} c="gray.1">Recently Finished</Title>
               <Button
                 variant="subtle"
                 size="sm"

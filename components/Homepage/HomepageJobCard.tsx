@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Card, Group, Image, Stack, Text } from '@mantine/core';
+import { Badge, Card, Group, Stack, Text } from '@mantine/core';
 import { useRouter } from 'next/navigation';
 
 import { EstimateStatus } from '../Global/model';
@@ -95,12 +95,22 @@ export default function HomepageJobCard({
       <Stack gap="sm">
         {/* Cover Image */}
         <div style={{ position: 'relative', width: '100%', height: '200px', overflow: 'hidden', borderRadius: 'var(--mantine-radius-md)' }}>
-          <Image
+          <img
             src={cover_photo_url || placeholderImage}
             alt={title || client_name}
-            height={200}
-            fit="cover"
-            fallbackSrc={placeholderImage}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+            onError={(e) => {
+              // Fallback to placeholder if image fails to load
+              const target = e.target as HTMLImageElement;
+              if (target.src !== placeholderImage) {
+                target.src = placeholderImage;
+              }
+            }}
           />
         </div>
 
