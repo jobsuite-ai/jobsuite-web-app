@@ -210,9 +210,12 @@ export type Estimate = {
     referral_source?: string;
     referral_name?: string;
     // Date fields
+    sent_date?: string;
+    is_project?: number;
     sold_date?: string;
     started_date?: string;
     finished_date?: string;
+    tentative_scheduling_date?: string;
 };
 
 export type EstimateResource = {

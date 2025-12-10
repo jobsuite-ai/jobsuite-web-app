@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { ActionIcon, Badge, Flex, Menu, Paper, Select, Skeleton, Text } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import '@mantine/dates/styles.css';
 import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -35,6 +37,11 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     estimate.estimate_type || null
   );
   const [savingJobType, setSavingJobType] = useState(false);
+  const [editingTentativeDate, setEditingTentativeDate] = useState(false);
+  const [selectedTentativeDate, setSelectedTentativeDate] = useState<Date | null>(
+    estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+  );
+  const [savingTentativeDate, setSavingTentativeDate] = useState(false);
   // Local state for optimistic status updates
   const [currentStatus, setCurrentStatus] = useState<EstimateStatus>(estimate.status);
   const router = useRouter();
@@ -103,6 +110,15 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   useEffect(() => {
     setCurrentStatus(estimate.status);
   }, [estimate.status]);
+
+  // Sync selectedTentativeDate when estimate changes (but not when editing)
+  useEffect(() => {
+    if (!editingTentativeDate) {
+      setSelectedTentativeDate(
+        estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+      );
+    }
+  }, [estimate.tentative_scheduling_date, editingTentativeDate]);
 
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
@@ -273,6 +289,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const updatePaintDetails = async (value: string) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
     const content: UpdateJobContent = {
       update_paint_details: {
         keep_same_colors: (estimate as any).keep_same_colors || false,
@@ -285,6 +308,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify(content),
     });
@@ -320,17 +344,69 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       return;
     }
 
-    const actualHours = value ? parseFloat(value) : null;
+    // Handle empty string or invalid input
+    const trimmedValue = value?.trim();
+    const actualHours = trimmedValue ? parseFloat(trimmedValue) : 0;
+
+    // If parseFloat returns NaN, default to 0
+    const finalHours = Number.isNaN(actualHours) ? 0 : actualHours;
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ actual_hours: actualHours }),
+      body: JSON.stringify({ actual_hours: finalHours }),
     });
 
     onUpdate();
+  };
+
+  const updateTentativeSchedulingDate = async (date: Date | null) => {
+    if (savingTentativeDate) return;
+    setSavingTentativeDate(true);
+    try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        setSavingTentativeDate(false);
+        return;
+      }
+
+      await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          tentative_scheduling_date: date ? date.toISOString() : null,
+        }),
+      });
+
+      setEditingTentativeDate(false);
+      onUpdate();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update tentative scheduling date:', error);
+    } finally {
+      setSavingTentativeDate(false);
+    }
+  };
+
+  const handleTentativeDateClick = () => {
+    setEditingTentativeDate(true);
+    setSelectedTentativeDate(
+      estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+    );
+  };
+
+  const handleTentativeDateCancel = () => {
+    setSelectedTentativeDate(
+      estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+    );
+    setEditingTentativeDate(false);
   };
 
   const updateOwnedBy = async (userId: string | null) => {
@@ -813,6 +889,64 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           type="number"
           placeholder="Enter actual hours"
         />
+
+        {/* Tentative Scheduling Date - Only show for projects */}
+        {estimate.is_project && (
+          editingTentativeDate ? (
+            <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+              <Flex justify="space-between" align="center" gap="sm" mb="xs">
+                <Text size="sm" fw={500} c="dimmed">
+                  Tentative Scheduling Date:
+                </Text>
+                <DatePickerInput
+                  value={selectedTentativeDate}
+                  onChange={setSelectedTentativeDate}
+                  placeholder="Select date"
+                  style={{ flex: 1, maxWidth: '200px' }}
+                  size="sm"
+                  clearable
+                  autoFocus
+                />
+              </Flex>
+              <Flex gap="xs" justify="flex-end">
+                <ActionIcon
+                  color="green"
+                  variant="light"
+                  onClick={() => updateTentativeSchedulingDate(selectedTentativeDate)}
+                  loading={savingTentativeDate}
+                  size="lg"
+                >
+                  <IconCheck size={18} />
+                </ActionIcon>
+                <ActionIcon
+                  color="red"
+                  variant="light"
+                  onClick={handleTentativeDateCancel}
+                  disabled={savingTentativeDate}
+                  size="lg"
+                >
+                  <IconX size={18} />
+                </ActionIcon>
+              </Flex>
+            </div>
+          ) : (
+            <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+              <Text size="sm" fw={500} c="dimmed">
+                Tentative Scheduling Date:
+              </Text>
+              <Text
+                size="sm"
+                style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+                onClick={handleTentativeDateClick}
+                c={estimate.tentative_scheduling_date ? 'dark' : 'dimmed'}
+              >
+                {estimate.tentative_scheduling_date
+                  ? new Date(estimate.tentative_scheduling_date).toLocaleDateString()
+                  : '—'}
+              </Text>
+            </Flex>
+          )
+        )}
       </Flex>
     </Paper>
   );
