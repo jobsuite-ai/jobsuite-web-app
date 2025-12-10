@@ -66,8 +66,8 @@ export default function RootLayout({ children }: { children: any }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <ColorSchemeScript />
-        <link rel="icon" type="image/png" href="/jobsuite-logo-horizontal.png" />
-        <link rel="shortcut icon" href="/jobsuite-logo-horizontal.png" />
+        <link rel="icon" type="image/png" href="/jobsuite-no-text.png" />
+        <link rel="shortcut icon" href="/jobsuite-no-text.png" />
         <meta
           name="viewport"
           content="minimum-scale=1, initial-scale=1, width=device-width, user-scalable=no"
