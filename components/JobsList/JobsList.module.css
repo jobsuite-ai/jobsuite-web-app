@@ -10,10 +10,11 @@
     overflow-x: auto;
     overflow-y: hidden;
     margin: 0 auto;
-    padding: 20px;
+    padding: 20px 0;
     scrollbar-width: thin;
     scrollbar-color: transparent transparent;
     flex: 1;
+    -webkit-overflow-scrolling: touch;
 }
 
 .flexWrapper::-webkit-scrollbar {
@@ -67,6 +68,7 @@
 
 .sortableJobCard {
     cursor: grab;
+    min-height: 44px; /* Ensure touch-friendly minimum height */
 }
 
 .badge {
@@ -83,6 +85,56 @@
     flex-shrink: 0;
     border: 0px!important;
     border-radius: var(--mantine-radius-md)!important;
+}
+
+
+@media (max-width: 768px) {
+    .kanbanColumn {
+        min-width: 100%;
+        max-width: 100%;
+        width: 100%;
+        height: auto;
+        margin-bottom: var(--mantine-spacing-md);
+    }
+    
+    .flexWrapper {
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: auto;
+        min-height: 100%;
+        padding: var(--mantine-spacing-sm) 0;
+    }
+
+    .accountingNeededColumn {
+        margin-top: 60px;
+    }
+
+    .historicalCollapsed {
+        min-width: 100%;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .flexContainer {
+        width: 100%;
+        min-width: 100%;
+        padding-left: var(--mantine-spacing-sm);
+        padding-right: var(--mantine-spacing-sm);
+    }
+
+    .scrollArea {
+        max-height: none;
+    }
+
+    .badge {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+
+    .sortableJobCard {
+        padding: var(--mantine-spacing-sm) !important;
+        font-size: 0.875rem;
+    }
 }
 
 .historicalCollapsed {
@@ -121,47 +173,42 @@
 .flexContainer {
     width: max-content;
     min-width: 100%;
+    padding-left: 20px;
+    padding-right: 20px;
 }
 
 .dragOverlayCard {
     opacity: 0.9;
 }
 
-/* Media Query for mobile screens */
-@media (max-width: 768px) {
-    .flexWrapper {
-        display: flex;
-        gap: var(--mantine-spacing-md);
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        margin-bottom: var(--mantine-spacing-lg);
-    }
+.refreshButton {
+    position: sticky;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    align-self: flex-end;
+}
 
-    .archiveIcon {
-        cursor: pointer;
-        position: absolute;
-        z-index: 1;
-        top: 30px;
-        right: -140px;
+@media (max-width: 768px) {
+    .refreshButton {
+        position: fixed;
+        top: 80px;
+        right: 16px;
+        z-index: 100;
     }
 }
 
 @media (max-width: 480px) {
     .flexWrapper {
-        display: flex;
-        gap: var(--mantine-spacing-md);
-        align-items: center;
-        justify-content: center;
-        flex-direction: column;
-        margin-bottom: var(--mantine-spacing-lg);
+        padding: var(--mantine-spacing-xs);
     }
-    
-    .archiveIcon {
-        cursor: pointer;
-        position: absolute;
-        z-index: 1;
-        top: 30px;
-        right: -140px;
+
+    .kanbanColumn {
+        padding: var(--mantine-spacing-sm) !important;
+    }
+
+    .sortableJobCard {
+        padding: var(--mantine-spacing-xs) !important;
+        min-height: 44px; /* Ensure touch-friendly minimum height */
     }
 }

@@ -495,11 +495,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             {/* Column 1: Main Content - Video, Images, Description, Activity */}
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
-                                    <Flex justify="space-between" align="center" gap="md" w="100%">
-                                        <Flex align="center" gap="md">
+                                    <Flex justify="space-between" align="center" gap="md" w="100%" direction={{ base: 'column', sm: 'row' }}>
+                                        <Flex align="center" gap="md" wrap="wrap">
                                             <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
                                             {estimate.original_estimate_id && (
-                                                <Flex align="center" gap="lg">
+                                                <Flex align="center" gap="lg" wrap="wrap">
                                                     <Badge color="orange" size="lg">
                                                         Change Order
                                                     </Badge>
@@ -628,11 +628,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     <iframe
                                                       title={`PDF preview for ${firstPdfResource.resource_location}`}
                                                       src={firstPdfUrl}
+                                                      className={classes.pdfIframe}
                                                       style={{
                                                           width: '100%',
                                                           height: '800px',
                                                           border: 'none',
                                                           borderRadius: '8px',
+                                                          maxHeight: '70vh',
                                                       }}
                                                     />
                                                 </div>
@@ -797,7 +799,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {(estimate.docuseal_link || estimate.jira_link) &&
                                         <div>
                                             <Text size="lg" fw={700} mb="md">Resource Links</Text>
-                                            <Flex direction="row" justify="center" gap="xl">
+                                            <Flex direction={{ base: 'column', sm: 'row' }} justify="center" gap="xl">
                                                 {estimate.docuseal_link &&
                                                     <ResourceLink
                                                       handler={() =>
@@ -845,6 +847,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               opened={isModalOpen}
               onClose={() => setIsModalOpen(false)}
               size="lg"
+              className={classes.archiveModal}
               title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
@@ -853,9 +856,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             This will archive the estimate, a process that can be reversed but will
                             require manual intervention.
                         </Text>
-                        <Flex direction="row" gap="lg" justify="center" align="center">
-                            <Button type="submit" onClick={archiveEstimate}>Confirm</Button>
-                            <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        <Flex direction="column" gap="lg" justify="center" align="center" className={classes.archiveModalButtons}>
+                            <Button type="submit" onClick={archiveEstimate} fullWidth>Confirm</Button>
+                            <Button type="submit" onClick={() => setIsModalOpen(false)} fullWidth>Cancel</Button>
                         </Flex>
                     </Flex>
                 </Center>
@@ -866,6 +869,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               opened={showVideoUploaderModal}
               onClose={() => setShowVideoUploaderModal(false)}
               size="lg"
+              className={classes.uploadModal}
               centered
               title={<Text fz={24} fw={700}>Upload Video</Text>}
             >
@@ -883,6 +887,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               opened={showImageUploadModal}
               onClose={() => setShowImageUploadModal(false)}
               size="lg"
+              className={classes.uploadModal}
               centered
               title={<Text fz={24} fw={700}>Upload Images</Text>}
             >
@@ -901,6 +906,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               opened={showFileUploadModal}
               onClose={() => setShowFileUploadModal(false)}
               size="lg"
+              className={classes.uploadModal}
               centered
               title={<Text fz={24} fw={700}>Upload Files</Text>}
             >

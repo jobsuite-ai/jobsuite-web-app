@@ -16,6 +16,17 @@
     width: calc(100% - 250px);
 }
 
+@media (max-width: 768px) {
+    .wrapper {
+        margin-top: rem(64px);
+    }
+
+    .wrapperWithSidebar {
+        margin-left: 0;
+        width: 100%;
+    }
+}
+
 .wrapperNoHeader {
     margin-top: 0;
 }
@@ -46,4 +57,11 @@
     max-width: 100%;
     box-sizing: border-box;
     overflow-x: hidden;
+}
+
+@media (max-width: 768px) {
+    .main {
+        overflow-x: hidden;
+        width: 100%;
+    }
 }
