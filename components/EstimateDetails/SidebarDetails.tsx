@@ -35,6 +35,8 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     estimate.estimate_type || null
   );
   const [savingJobType, setSavingJobType] = useState(false);
+  // Local state for optimistic status updates
+  const [currentStatus, setCurrentStatus] = useState<EstimateStatus>(estimate.status);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData } = useDataCache();
@@ -97,6 +99,11 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     }
   }, [estimate.estimate_type, editingJobType]);
 
+  // Sync currentStatus when estimate prop changes
+  useEffect(() => {
+    setCurrentStatus(estimate.status);
+  }, [estimate.status]);
+
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
@@ -117,7 +124,15 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         body: JSON.stringify({ status }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to update estimate status');
+      }
+
       await response.json();
+
+      // Optimistically update the status immediately
+      setCurrentStatus(status);
+      setMenuOpened(false);
 
       if (status === EstimateStatus.CONTRACTOR_SIGNED && client) {
         const jiraResponse = await fetch('/api/jira', {
@@ -133,8 +148,6 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           throw new Error('Failed to create JIRA ticket');
         }
       }
-
-      setMenuOpened(false);
 
       // Refresh cache after status update
       await refreshData('estimates');
@@ -439,7 +452,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const statusOptions = Object.values(EstimateStatus).filter(
-    (status) => status !== estimate.status
+    (status) => status !== currentStatus
   );
 
   const statusDropdownOptions = statusOptions.map((status) => (
@@ -471,10 +484,10 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
                         alignItems: 'center',
                         gap: '5px',
                       }}
-                      color={getEstimateBadgeColor(estimate.status)}
+                      color={getEstimateBadgeColor(currentStatus)}
                       rightSection={<IconChevronDown size={12} />}
                     >
-                      {getFormattedEstimateStatus(estimate.status)}
+                      {getFormattedEstimateStatus(currentStatus)}
                     </Badge>
                   </Menu.Target>
                   <Menu.Dropdown>
