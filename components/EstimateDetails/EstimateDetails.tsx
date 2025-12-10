@@ -515,7 +515,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 </Flex>
                                             )}
                                         </Flex>
-                                        <Menu shadow="md" width={200} position={{ base: 'bottom', sm: 'bottom-start' }} offset={5}>
+                                        <Menu shadow="md" width={200} position="bottom-start" offset={5}>
                                             <Menu.Target>
                                                 <ActionIcon
                                                   variant="filled"
@@ -846,8 +846,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             <Modal
               opened={isModalOpen}
               onClose={() => setIsModalOpen(false)}
-              size={{ base: '90%', sm: 'md', lg: 'lg' }}
-              title={<Text fz={{ base: 24, sm: 30 }} fw={700}>Are you sure?</Text>}
+              size="lg"
+              className={classes.archiveModal}
+              title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
                     <Flex direction="column">
@@ -855,9 +856,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             This will archive the estimate, a process that can be reversed but will
                             require manual intervention.
                         </Text>
-                        <Flex direction={{ base: 'column', sm: 'row' }} gap="lg" justify="center" align="center">
-                            <Button type="submit" onClick={archiveEstimate} fullWidth={{ base: true, sm: false }}>Confirm</Button>
-                            <Button type="submit" onClick={() => setIsModalOpen(false)} fullWidth={{ base: true, sm: false }}>Cancel</Button>
+                        <Flex direction="column" gap="lg" justify="center" align="center" className={classes.archiveModalButtons}>
+                            <Button type="submit" onClick={archiveEstimate} fullWidth>Confirm</Button>
+                            <Button type="submit" onClick={() => setIsModalOpen(false)} fullWidth>Cancel</Button>
                         </Flex>
                     </Flex>
                 </Center>
@@ -866,10 +867,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             {/* Video Upload Modal */}
             <Modal
               opened={showVideoUploaderModal}
-              onClose={() => setShowImageUploadModal(false)}
-              size={{ base: '95%', sm: 'md', lg: 'lg' }}
+              onClose={() => setShowVideoUploaderModal(false)}
+              size="lg"
+              className={classes.uploadModal}
               centered
-              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Video</Text>}
+              title={<Text fz={24} fw={700}>Upload Video</Text>}
             >
                 <VideoUploader
                   estimateID={estimateID}
@@ -883,10 +885,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             {/* Image Upload Modal */}
             <Modal
               opened={showImageUploadModal}
-              onClose={() => setShowImageUploaderModal(false)}
-              size={{ base: '95%', sm: 'md', lg: 'lg' }}
+              onClose={() => setShowImageUploadModal(false)}
+              size="lg"
+              className={classes.uploadModal}
               centered
-              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Images</Text>}
+              title={<Text fz={24} fw={700}>Upload Images</Text>}
             >
                 <ImageUpload
                   estimateID={estimateID}
@@ -902,9 +905,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             <Modal
               opened={showFileUploadModal}
               onClose={() => setShowFileUploadModal(false)}
-              size={{ base: '95%', sm: 'md', lg: 'lg' }}
+              size="lg"
+              className={classes.uploadModal}
               centered
-              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Files</Text>}
+              title={<Text fz={24} fw={700}>Upload Files</Text>}
             >
                 <FileUpload
                   estimateID={estimateID}

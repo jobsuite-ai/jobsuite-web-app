@@ -283,10 +283,38 @@
     }
 }
 
+/* Modal responsive styles */
+.archiveModal,
+.uploadModal {
+    width: 90%;
+    max-width: 600px;
+}
+
+.archiveModalButtons {
+    flex-direction: column;
+}
+
+@media (max-width: 768px) {
+    .archiveModal,
+    .uploadModal {
+        width: 90%;
+        max-width: 600px;
+    }
+
+    .archiveModalButtons {
+        flex-direction: column;
+    }
+}
+
 @media (max-width: 480px) {
     .pdfIframe {
         height: 50vh !important;
         max-height: 400px;
+    }
+
+    .archiveModal,
+    .uploadModal {
+        width: 95%;
     }
 }
 

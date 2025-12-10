@@ -325,8 +325,8 @@ export default function EstimatesList() {
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.currentTarget.value)}
                               leftSection={<IconSearch size={16} />}
-                              style={{ flex: 1, minWidth: { base: '100%', sm: 200 } }}
-                              w={{ base: '100%', sm: 'auto' }}
+                              className={classes.searchInput}
+                              style={{ flex: 1 }}
                             />
                             <Menu shadow="md" width={250} position="bottom-end">
                                 <Menu.Target>
