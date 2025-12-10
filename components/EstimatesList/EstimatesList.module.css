@@ -1,0 +1,87 @@
+/* Mobile responsive styles for EstimatesList */
+
+@media (max-width: 768px) {
+    /* Make columns stack vertically on mobile */
+    .estimatesColumn {
+        width: 100% !important;
+        height: auto !important;
+        margin-bottom: var(--mantine-spacing-md);
+        max-height: none !important;
+    }
+
+    /* Adjust filter bar for mobile */
+    .filterBar {
+        padding: var(--mantine-spacing-sm) !important;
+    }
+
+    .filterButtonsGroup {
+        flex-wrap: wrap !important;
+    }
+
+    .filterButton {
+        flex: 1 1 auto;
+        min-width: 120px;
+        min-height: 44px; /* Touch-friendly */
+    }
+
+    /* Make table responsive - use horizontal scroll on mobile */
+    .tableContainer {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        width: 100%;
+    }
+
+    /* Ensure table has minimum width for readability */
+    .responsiveTable {
+        min-width: 600px;
+    }
+
+    /* Adjust view toggle for mobile */
+    .viewToggleGroup {
+        flex-wrap: wrap;
+        gap: var(--mantine-spacing-xs);
+    }
+
+    /* Adjust title and controls for mobile */
+    .headerGroup {
+        flex-direction: column;
+        align-items: flex-start !important;
+        gap: var(--mantine-spacing-sm);
+    }
+
+    /* Make estimate cards touch-friendly */
+    .estimateCard {
+        min-height: 44px;
+        padding: var(--mantine-spacing-sm) !important;
+    }
+
+    /* Search input responsive */
+    .searchInput {
+        width: 100%;
+        min-width: 200px;
+    }
+}
+
+@media (max-width: 480px) {
+    .estimatesColumn {
+        padding: var(--mantine-spacing-sm) !important;
+    }
+
+    .filterButton {
+        width: 100%;
+        margin-bottom: var(--mantine-spacing-xs);
+    }
+
+    .responsiveTable {
+        min-width: 500px;
+        font-size: 0.875rem;
+    }
+
+    /* Ensure table cells are readable */
+    .responsiveTable th,
+    .responsiveTable td {
+        padding: var(--mantine-spacing-xs) !important;
+        font-size: 0.875rem;
+    }
+}
+

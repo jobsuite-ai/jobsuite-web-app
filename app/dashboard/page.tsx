@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -94,7 +94,7 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -272,6 +272,7 @@ export default function Dashboard() {
                 title="Total Proposals"
                 value={metrics.totalJobs.toString()}
                 description="Number of proposals populating the dashboard"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -282,6 +283,7 @@ export default function Dashboard() {
                   maximumFractionDigits: 0,
                 })}`}
                 description="Total value of all finished proposals"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -292,6 +294,7 @@ export default function Dashboard() {
                   maximumFractionDigits: 0,
                 })}`}
                 description="Total value of sold projects"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -299,6 +302,7 @@ export default function Dashboard() {
                 title="Conversion Rate"
                 value={`${metrics.conversionRate.toFixed(1)}%`}
                 description="Percentage of bids that converted to sales"
+                loading={loading}
               />
             </Grid.Col>
 
@@ -308,6 +312,7 @@ export default function Dashboard() {
                 title="Sent Or Declined Proposals"
                 value={metrics.activeBids.toString()}
                 description="Number of declined or no response proposals"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -318,6 +323,7 @@ export default function Dashboard() {
                   maximumFractionDigits: 0,
                 })}`}
                 description="Average value per sold job"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
@@ -328,13 +334,15 @@ export default function Dashboard() {
                   maximumFractionDigits: 0,
                 })}`}
                 description="Value of projects in pipeline"
+                loading={loading}
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 3 }}>
               <MetricCard
                 title="Dollars Bid to Dollars Sold"
-                value={`${((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1)}%`}
+                value={`${metrics.totalBidValue > 0 ? ((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1) : '0.0'}%`}
                 description="Percentage of dollars bid to dollars sold"
+                loading={loading}
               />
             </Grid.Col>
               <Grid.Col span={{ base: 12, md: 6 }}>
@@ -342,21 +350,33 @@ export default function Dashboard() {
                   <Group justify="space-between" my="sm">
                     <div>
                       <Text size="sm" c="dimmed">Total Estimated Hours</Text>
-                      <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
+                      )}
                     </div>
                     <div>
                       <Text size="sm" c="dimmed">Total Actual Hours</Text>
-                      <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
+                      )}
                     </div>
                     <div>
                       <Text size="sm" c="dimmed">Variance</Text>
-                      <Text
-                        size="xl"
-                        fw={700}
-                        c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
-                      >
-                        {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
-                      </Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text
+                          size="xl"
+                          fw={700}
+                          c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
+                        >
+                          {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
+                        </Text>
+                      )}
                     </div>
                   </Group>
                 </Paper>
@@ -397,11 +417,19 @@ export default function Dashboard() {
                   <Group justify="space-between" mt="sm">
                     <div>
                       <Text size="sm" c="dimmed">Projects in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
-                      <Text size="xl" fw={700}>{metrics.currentMonthJobs}</Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text size="xl" fw={700}>{metrics.currentMonthJobs}</Text>
+                      )}
                     </div>
                     <div>
                       <Text size="sm" c="dimmed">Hours in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
-                      <Text size="xl" fw={700}>{metrics.currentMonthHours.toFixed(1)}</Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text size="xl" fw={700}>{metrics.currentMonthHours.toFixed(1)}</Text>
+                      )}
                     </div>
                   </Group>
                 </Paper>
@@ -419,16 +447,24 @@ export default function Dashboard() {
                   <Group justify="space-between" mt="sm">
                     <div>
                       <Text size="sm" c="dimmed">Current Hours</Text>
-                      <Text size="xl" fw={700}>{metrics.hoursLeftToSell.toFixed(1)}</Text>
+                      {loading ? (
+                        <Skeleton height={28} mt={4} />
+                      ) : (
+                        <Text size="xl" fw={700}>{metrics.hoursLeftToSell.toFixed(1)}</Text>
+                      )}
                     </div>
                     <div>
                       <Text size="sm" c="dimmed">Last Updated</Text>
-                      <Text size="sm" c="dimmed">
-                        {metrics.hoursLeftLastUpdated
-                          ? new Date(metrics.hoursLeftLastUpdated).toLocaleString()
-                          : 'Never'
-                        }
-                      </Text>
+                      {loading ? (
+                        <Skeleton height={16} mt={4} width={150} />
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          {metrics.hoursLeftLastUpdated
+                            ? new Date(metrics.hoursLeftLastUpdated).toLocaleString()
+                            : 'Never'
+                          }
+                        </Text>
+                      )}
                     </div>
                   </Group>
                 </Paper>
@@ -437,7 +473,13 @@ export default function Dashboard() {
                   <Title order={3}>
                     Follow-Ups
                   </Title>
-                  {metrics.upcomingFollowUps.length > 0 ? (
+                  {loading ? (
+                    <Stack mt="md" gap="xs">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} height={40} />
+                      ))}
+                    </Stack>
+                  ) : metrics.upcomingFollowUps.length > 0 ? (
                     <Table>
                       <Table.Thead>
                         <Table.Tr>
@@ -488,77 +530,93 @@ export default function Dashboard() {
               <Grid.Col span={{ base: 12, md: 6 }}>
                 <Paper withBorder p="md" radius="md">
                   <Title order={3}>Hours by Crew Lead</Title>
-                  <Table mt="md">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Crew Lead</Table.Th>
-                        <Table.Th>Estimated</Table.Th>
-                        <Table.Th>Actual</Table.Th>
-                        <Table.Th>Variance</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {metrics.crewLeadHours.map((lead) => (
-                        <Table.Tr key={lead.crewLead}>
-                          <Table.Td>{lead.crewLead}</Table.Td>
-                          <Table.Td>{lead.estimatedHours.toFixed(1)}</Table.Td>
-                          <Table.Td>{lead.actualHours.toFixed(1)}</Table.Td>
-                          <Table.Td>
-                            <Text
-                              c={lead.actualHours > lead.estimatedHours ? 'red' : 'green'}
-                            >
-                              {(lead.actualHours - lead.estimatedHours).toFixed(1)}
-                            </Text>
-                          </Table.Td>
-                        </Table.Tr>
+                  {loading ? (
+                    <Stack mt="md" gap="xs">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} height={40} />
                       ))}
-                    </Table.Tbody>
-                  </Table>
+                    </Stack>
+                  ) : (
+                    <Table mt="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Crew Lead</Table.Th>
+                          <Table.Th>Estimated</Table.Th>
+                          <Table.Th>Actual</Table.Th>
+                          <Table.Th>Variance</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {metrics.crewLeadHours.map((lead) => (
+                          <Table.Tr key={lead.crewLead}>
+                            <Table.Td>{lead.crewLead}</Table.Td>
+                            <Table.Td>{lead.estimatedHours.toFixed(1)}</Table.Td>
+                            <Table.Td>{lead.actualHours.toFixed(1)}</Table.Td>
+                            <Table.Td>
+                              <Text
+                                c={lead.actualHours > lead.estimatedHours ? 'red' : 'green'}
+                              >
+                                {(lead.actualHours - lead.estimatedHours).toFixed(1)}
+                              </Text>
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  )}
                 </Paper>
                 <Paper withBorder p="md" radius="md" mt="md">
                   <Title order={3}>
                     Recently Sold Projects
                   </Title>
-                  <Table mt="md">
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Project Name</Table.Th>
-                        <Table.Th>Estimated Hours</Table.Th>
-                        <Table.Th>Sold Date</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {metrics.recentlySoldJobs.map((job) => (
-                        <Table.Tr key={job.id}>
-                          <Table.Td>
-                            <Anchor
-                              style={{ color: '#228be6', textDecoration: 'underline', cursor: 'pointer' }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                if (e.metaKey || e.ctrlKey) {
-                                  // Open in new tab
-                                  window.open(`/jobs/${job.id}`, '_blank');
-                                } else {
-                                  // Normal navigation
-                                  router.push(`/jobs/${job.id}`);
-                                }
-                              }}
-                            >
-                              {job.name}
-                            </Anchor>
-                          </Table.Td>
-                          <Table.Td>{job.estimatedHours.toFixed(1)}</Table.Td>
-                          <Table.Td>
-                            {new Date(job.soldDate).toLocaleDateString()}
-                          </Table.Td>
-                        </Table.Tr>
+                  {loading ? (
+                    <Stack mt="md" gap="xs">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} height={40} />
                       ))}
-                    </Table.Tbody>
-                  </Table>
+                    </Stack>
+                  ) : (
+                    <Table mt="md">
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>Project Name</Table.Th>
+                          <Table.Th>Estimated Hours</Table.Th>
+                          <Table.Th>Sold Date</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {metrics.recentlySoldJobs.map((job) => (
+                          <Table.Tr key={job.id}>
+                            <Table.Td>
+                              <Anchor
+                                style={{ color: '#228be6', textDecoration: 'underline', cursor: 'pointer' }}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  if (e.metaKey || e.ctrlKey) {
+                                    // Open in new tab
+                                    window.open(`/jobs/${job.id}`, '_blank');
+                                  } else {
+                                    // Normal navigation
+                                    router.push(`/jobs/${job.id}`);
+                                  }
+                                }}
+                              >
+                                {job.name}
+                              </Anchor>
+                            </Table.Td>
+                            <Table.Td>{job.estimatedHours.toFixed(1)}</Table.Td>
+                            <Table.Td>
+                              {new Date(job.soldDate).toLocaleDateString()}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  )}
                 </Paper>
               </Grid.Col>
 
-              {metrics.jobsWithHourDifferences.length > 0 && (
+              {!loading && metrics.jobsWithHourDifferences.length > 0 && (
                 <Grid.Col span={12}>
                   <Paper withBorder p="md" radius="md">
                     <Title order={3}>
@@ -632,24 +690,32 @@ export default function Dashboard() {
                 <Tabs.Panel value="revenue" pt="md">
                   <Paper withBorder p="md" radius="md">
                     <Title order={3}>Revenue Trend Over Time</Title>
-                    <LineChart
-                      data={metrics.revenueByWeek.map(item => ({
-                        date: item.date || '',
-                        value: item.value || 0,
-                      }))}
-                    />
+                    {loading ? (
+                      <Skeleton height={300} mt="md" />
+                    ) : (
+                      <LineChart
+                        data={metrics.revenueByWeek.map(item => ({
+                          date: item.date || '',
+                          value: item.value || 0,
+                        }))}
+                      />
+                    )}
                   </Paper>
                 </Tabs.Panel>
 
                 <Tabs.Panel value="weekly" pt="md">
                   <Paper withBorder p="md" radius="md">
                     <Title order={3}>Proposals Created by Week</Title>
-                    <LineChart
-                      data={metrics.jobsByWeek.map(item => ({
-                        date: item.date || '',
-                        value: item.value || 0,
-                      }))}
-                    />
+                    {loading ? (
+                      <Skeleton height={300} mt="md" />
+                    ) : (
+                      <LineChart
+                        data={metrics.jobsByWeek.map(item => ({
+                          date: item.date || '',
+                          value: item.value || 0,
+                        }))}
+                      />
+                    )}
                   </Paper>
                 </Tabs.Panel>
 
@@ -658,22 +724,30 @@ export default function Dashboard() {
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Projects by Status</Title>
-                        <PieChart data={Object.entries(metrics.statusCounts).map(
-                          ([status, count]) => ({
-                            status: status || 'Unknown',
-                            count: count || 0,
-                          })
-                        )} />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <PieChart data={Object.entries(metrics.statusCounts).map(
+                            ([status, count]) => ({
+                              status: status || 'Unknown',
+                              count: count || 0,
+                            })
+                          )} />
+                        )}
                       </Paper>
                     </Grid.Col>
 
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Status Trends Over Time</Title>
-                        <LineChart
-                          data={metrics.statusTrend}
-                          multiLine
-                        />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <LineChart
+                            data={metrics.statusTrend}
+                            multiLine
+                          />
+                        )}
                       </Paper>
                     </Grid.Col>
                   </Grid>
@@ -684,22 +758,30 @@ export default function Dashboard() {
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Bid to Sale Comparison</Title>
-                        <BarChart data={metrics.bidToSoldData.map(item => ({
-                          category: item.category || 'Unknown',
-                          value: item.value || 0,
-                        }))} />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <BarChart data={metrics.bidToSoldData.map(item => ({
+                            category: item.category || 'Unknown',
+                            value: item.value || 0,
+                          }))} />
+                        )}
                       </Paper>
                     </Grid.Col>
 
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Value Comparison</Title>
-                        <BarChart
-                          data={[
-                            { category: 'Bid Value', value: metrics.totalBidValue || 0 },
-                            { category: 'Sold Value', value: metrics.totalSoldValue || 0 },
-                          ]}
-                        />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <BarChart
+                            data={[
+                              { category: 'Bid Value', value: metrics.totalBidValue || 0 },
+                              { category: 'Sold Value', value: metrics.totalSoldValue || 0 },
+                            ]}
+                          />
+                        )}
                       </Paper>
                     </Grid.Col>
                   </Grid>
@@ -710,23 +792,31 @@ export default function Dashboard() {
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>All Projects by Referral Source</Title>
-                        <BarChart
-                          data={metrics.referralSources.map(item => ({
-                            category: formatLabel(item.category || 'Unknown'),
-                            value: item.value || 0,
-                          }))}
-                        />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <BarChart
+                            data={metrics.referralSources.map(item => ({
+                              category: formatLabel(item.category || 'Unknown'),
+                              value: item.value || 0,
+                            }))}
+                          />
+                        )}
                       </Paper>
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
                         <Title order={3}>Accepted Projects by Referral Source</Title>
-                        <BarChart
-                          data={metrics.acceptedReferralSources.map(item => ({
-                            category: formatLabel(item.category || 'Unknown'),
-                            value: item.value || 0,
-                          }))}
-                        />
+                        {loading ? (
+                          <Skeleton height={300} mt="md" />
+                        ) : (
+                          <BarChart
+                            data={metrics.acceptedReferralSources.map(item => ({
+                              category: formatLabel(item.category || 'Unknown'),
+                              value: item.value || 0,
+                            }))}
+                          />
+                        )}
                       </Paper>
                     </Grid.Col>
                   </Grid>

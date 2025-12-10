@@ -11,11 +11,37 @@ interface CachedData<T> {
 
 const CACHE_PREFIX = 'jobsuite_cache_';
 
+// Cache expiration times in milliseconds
+const CACHE_EXPIRATION: Record<CacheKey, number> = {
+  clients: 10 * 60 * 1000, // 10 minutes
+  estimates: 5 * 60 * 1000, // 5 minutes
+  projects: Infinity, // No expiration for projects
+};
+
 /**
  * Get the full cache key for a given cache type
  */
 function getCacheKey(key: CacheKey): string {
   return `${CACHE_PREFIX}${key}`;
+}
+
+/**
+ * Get the expiration time in milliseconds for a given cache key
+ */
+function getCacheExpiration(key: CacheKey): number {
+  return CACHE_EXPIRATION[key] ?? Infinity;
+}
+
+/**
+ * Check if cached data has expired
+ */
+function isCacheExpired(key: CacheKey, timestamp: number): boolean {
+  const expirationTime = getCacheExpiration(key);
+  if (expirationTime === Infinity) {
+    return false; // Never expires
+  }
+  const now = Date.now();
+  return now - timestamp > expirationTime;
 }
 
 /**
@@ -35,6 +61,14 @@ export function getCachedData<T>(key: CacheKey): T[] | null {
     }
 
     const parsed: CachedData<T> = JSON.parse(cached);
+
+    // Check if cache has expired
+    if (isCacheExpired(key, parsed.timestamp)) {
+      // Clear expired cache
+      clearCachedData(key);
+      return null;
+    }
+
     return parsed.data;
   } catch (error) {
     // eslint-disable-next-line no-console

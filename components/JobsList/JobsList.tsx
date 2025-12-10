@@ -252,6 +252,9 @@ function KanbanColumn({
         );
     }
 
+    const isAccountingNeeded = column.id === 'accounting-needed';
+    const columnClassName = `${classes.kanbanColumn} ${isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver} ${isAccountingNeeded ? classes.accountingNeededColumn : ''}`;
+
     return (
         <Card
           ref={(node) => {
@@ -262,7 +265,7 @@ function KanbanColumn({
           }}
           withBorder
           shadow="sm"
-          className={`${classes.kanbanColumn} ${isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver}`}
+          className={columnClassName}
         >
             <Flex justify="space-between" align="center" mb="md">
                 <Stack gap={2} style={{ flex: 1 }}>
@@ -761,7 +764,7 @@ export default function JobsList() {
           onDragEnd={handleDragEnd}
         >
             <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ position: 'sticky', top: '10px', right: '10px', zIndex: 10, alignSelf: 'flex-end' }}>
+                <div className={classes.refreshButton}>
                     <ActionIcon
                       variant="light"
                       onClick={handleRefresh}
@@ -774,7 +777,7 @@ export default function JobsList() {
                 </div>
                 <div ref={scrollContainerRef} className={classes.flexWrapper}>
                 <Flex
-                  direction="row"
+                  direction={{ base: 'column', md: 'row' }}
                   justify="flex-start"
                   align="flex-start"
                   gap="md"
