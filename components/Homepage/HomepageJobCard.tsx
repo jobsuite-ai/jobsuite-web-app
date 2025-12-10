@@ -83,6 +83,37 @@ export default function HomepageJobCard({
   const placeholderImage =
     'https://i.ibb.co/R0xWFjF/Screenshot-2025-01-26-at-6-23-24-PM.png';
 
+  // Transform image URL to ensure we're loading the full-size image, not a preview
+  const getImageUrl = (url: string | undefined): string => {
+    if (!url) return placeholderImage;
+
+    // If the URL contains preview or thumbnail indicators, try to get the full image
+    // Remove common preview/thumbnail patterns from the URL
+    let imageUrl = url;
+
+    // Check if URL contains preview/thumbnail folder paths and remove them
+    // Common patterns: /preview/, /thumbnail/
+    if (imageUrl.includes('/preview/')) {
+      imageUrl = imageUrl.replace(/\/preview\//g, '/');
+    }
+    if (imageUrl.includes('/thumbnail/')) {
+      imageUrl = imageUrl.replace(/\/thumbnail\//g, '/');
+    }
+
+    // Remove common preview suffixes from filename
+    // Match patterns like: filename_preview.jpg, filename-thumb.jpg, filename.preview.jpg, etc.
+    imageUrl = imageUrl
+      .replace(/_preview\./g, '.')
+      .replace(/_thumb\./g, '.')
+      .replace(/-preview\./g, '.')
+      .replace(/-thumb\./g, '.')
+      .replace(/\.preview\./g, '.');
+
+    return imageUrl;
+  };
+
+  const imageUrl = getImageUrl(cover_photo_url);
+
   return (
     <Card
       shadow="sm"
@@ -96,7 +127,7 @@ export default function HomepageJobCard({
         {/* Cover Image */}
         <div style={{ position: 'relative', width: '100%', height: '200px', overflow: 'hidden', borderRadius: 'var(--mantine-radius-md)' }}>
           <img
-            src={cover_photo_url || placeholderImage}
+            src={imageUrl}
             alt={title || client_name}
             style={{
               width: '100%',
@@ -104,6 +135,8 @@ export default function HomepageJobCard({
               objectFit: 'cover',
               display: 'block',
             }}
+            loading="eager"
+            decoding="async"
             onError={(e) => {
               // Fallback to placeholder if image fails to load
               const target = e.target as HTMLImageElement;

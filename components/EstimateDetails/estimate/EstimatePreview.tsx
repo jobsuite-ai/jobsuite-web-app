@@ -191,7 +191,7 @@ export default function EstimatePreview({
                             <UploadNewTemplate
                               template={template}
                               estimate={estimate}
-                              clientEmail={client.email}
+                              client={client}
                               setLoading={setIsSending}
                               imageResources={imageResources}
                               videoResources={videoResources}

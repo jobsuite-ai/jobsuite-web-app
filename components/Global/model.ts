@@ -235,6 +235,15 @@ export type EstimateResource = {
     completed_at?: string;
 };
 
+export type SubClient = {
+    id: string;
+    name: string;
+    email: string;
+    phone_number: string;
+    role?: string;
+    notes?: string;
+};
+
 export type ContractorClient = {
     id: string;
     contractor_id: string;
@@ -247,6 +256,7 @@ export type ContractorClient = {
     address_zipcode?: string;
     address_country?: string;
     notes?: string;
+    sub_clients?: SubClient[];
     created_at: string;
     updated_at: string;
 };
