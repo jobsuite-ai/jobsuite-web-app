@@ -200,20 +200,33 @@
     .twoColumnLayout {
         flex-direction: column;
         height: auto;
+        min-height: auto;
+        max-height: none;
+        padding: 0;
     }
 
     .mainColumn {
         height: auto;
         overflow-y: visible;
-        padding-right: 0;
+        margin-left: 0;
+        padding: var(--mantine-spacing-sm);
+        width: 100%;
     }
 
     .sidebarColumn {
         width: 100%;
-        min-width: 100%;
+        min-width: unset;
         height: auto;
         overflow-y: visible;
-        padding-left: 0;
+        padding: var(--mantine-spacing-sm);
+        margin-right: 0;
+        border-left: none;
+        border-top: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+        order: 2; /* Ensure sidebar appears after main content */
+    }
+
+    .mainColumn {
+        order: 1; /* Ensure main content appears first */
     }
 
     .jobDetailsWrapper {
@@ -226,7 +239,7 @@
 
     .rightSidebar {
         width: 100%;
-        min-width: 100%;
+        min-width: unset;
         position: relative;
         top: 0;
     }
@@ -246,7 +259,7 @@
     }
 
     .videoFrame {
-        margin-top: 70px;
+        margin-top: 0;
         justify-self: center;
     }
 
@@ -256,6 +269,45 @@
     
     .jobFieldWrapper {
         width: 100%;
+    }
+
+    .jobTitle {
+        font-size: 20px;
+    }
+
+    .columnContent {
+        padding-bottom: var(--mantine-spacing-sm);
+    }
+
+    /* Make PDF iframe responsive */
+    .pdfIframe {
+        height: 60vh !important;
+        max-height: 600px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pdfIframe {
+        height: 50vh !important;
+        max-height: 400px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mainColumn {
+        padding: var(--mantine-spacing-xs);
+    }
+
+    .sidebarColumn {
+        padding: var(--mantine-spacing-xs);
+    }
+
+    .jobTitle {
+        font-size: 18px;
+    }
+
+    .sectionContent {
+        padding: var(--mantine-spacing-sm);
     }
 }
 

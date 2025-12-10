@@ -495,11 +495,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             {/* Column 1: Main Content - Video, Images, Description, Activity */}
                             <div className={classes.mainColumn}>
                                 <div className={classes.jobTitleWrapper}>
-                                    <Flex justify="space-between" align="center" gap="md" w="100%">
-                                        <Flex align="center" gap="md">
+                                    <Flex justify="space-between" align="center" gap="md" w="100%" direction={{ base: 'column', sm: 'row' }}>
+                                        <Flex align="center" gap="md" wrap="wrap">
                                             <JobTitle initialTitle={estimate.title || ''} estimateID={estimateID} onSave={getEstimate} />
                                             {estimate.original_estimate_id && (
-                                                <Flex align="center" gap="lg">
+                                                <Flex align="center" gap="lg" wrap="wrap">
                                                     <Badge color="orange" size="lg">
                                                         Change Order
                                                     </Badge>
@@ -515,7 +515,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 </Flex>
                                             )}
                                         </Flex>
-                                        <Menu shadow="md" width={200} position="bottom-start" offset={5}>
+                                        <Menu shadow="md" width={200} position={{ base: 'bottom', sm: 'bottom-start' }} offset={5}>
                                             <Menu.Target>
                                                 <ActionIcon
                                                   variant="filled"
@@ -628,11 +628,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     <iframe
                                                       title={`PDF preview for ${firstPdfResource.resource_location}`}
                                                       src={firstPdfUrl}
+                                                      className={classes.pdfIframe}
                                                       style={{
                                                           width: '100%',
                                                           height: '800px',
                                                           border: 'none',
                                                           borderRadius: '8px',
+                                                          maxHeight: '70vh',
                                                       }}
                                                     />
                                                 </div>
@@ -797,7 +799,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {(estimate.docuseal_link || estimate.jira_link) &&
                                         <div>
                                             <Text size="lg" fw={700} mb="md">Resource Links</Text>
-                                            <Flex direction="row" justify="center" gap="xl">
+                                            <Flex direction={{ base: 'column', sm: 'row' }} justify="center" gap="xl">
                                                 {estimate.docuseal_link &&
                                                     <ResourceLink
                                                       handler={() =>
@@ -844,8 +846,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             <Modal
               opened={isModalOpen}
               onClose={() => setIsModalOpen(false)}
-              size="lg"
-              title={<Text fz={30} fw={700}>Are you sure?</Text>}
+              size={{ base: '90%', sm: 'md', lg: 'lg' }}
+              title={<Text fz={{ base: 24, sm: 30 }} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
                     <Flex direction="column">
@@ -853,9 +855,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             This will archive the estimate, a process that can be reversed but will
                             require manual intervention.
                         </Text>
-                        <Flex direction="row" gap="lg" justify="center" align="center">
-                            <Button type="submit" onClick={archiveEstimate}>Confirm</Button>
-                            <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
+                        <Flex direction={{ base: 'column', sm: 'row' }} gap="lg" justify="center" align="center">
+                            <Button type="submit" onClick={archiveEstimate} fullWidth={{ base: true, sm: false }}>Confirm</Button>
+                            <Button type="submit" onClick={() => setIsModalOpen(false)} fullWidth={{ base: true, sm: false }}>Cancel</Button>
                         </Flex>
                     </Flex>
                 </Center>
@@ -864,10 +866,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             {/* Video Upload Modal */}
             <Modal
               opened={showVideoUploaderModal}
-              onClose={() => setShowVideoUploaderModal(false)}
-              size="lg"
+              onClose={() => setShowImageUploadModal(false)}
+              size={{ base: '95%', sm: 'md', lg: 'lg' }}
               centered
-              title={<Text fz={24} fw={700}>Upload Video</Text>}
+              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Video</Text>}
             >
                 <VideoUploader
                   estimateID={estimateID}
@@ -881,10 +883,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             {/* Image Upload Modal */}
             <Modal
               opened={showImageUploadModal}
-              onClose={() => setShowImageUploadModal(false)}
-              size="lg"
+              onClose={() => setShowImageUploaderModal(false)}
+              size={{ base: '95%', sm: 'md', lg: 'lg' }}
               centered
-              title={<Text fz={24} fw={700}>Upload Images</Text>}
+              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Images</Text>}
             >
                 <ImageUpload
                   estimateID={estimateID}
@@ -900,9 +902,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             <Modal
               opened={showFileUploadModal}
               onClose={() => setShowFileUploadModal(false)}
-              size="lg"
+              size={{ base: '95%', sm: 'md', lg: 'lg' }}
               centered
-              title={<Text fz={24} fw={700}>Upload Files</Text>}
+              title={<Text fz={{ base: 20, sm: 24 }} fw={700}>Upload Files</Text>}
             >
                 <FileUpload
                   estimateID={estimateID}

@@ -28,6 +28,7 @@ import '@mantine/dates/styles.css';
 import { IconX, IconChevronDown, IconSearch, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import classes from './EstimatesList.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
@@ -235,7 +236,8 @@ export default function EstimatesList() {
           radius="md"
           w="100%"
           withBorder
-          style={{ cursor: 'pointer' }}
+          className={classes.estimateCard}
+          style={{ cursor: 'pointer', minHeight: 44 }}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey) {
               // Open in new tab
@@ -275,9 +277,10 @@ export default function EstimatesList() {
           bg="gray.0"
           p="md"
           radius="md"
-          w="32%"
-          h="calc(100vh - 110px)"
+          w={{ base: '100%', md: '32%' }}
+          h={{ base: 'auto', md: 'calc(100vh - 110px)' }}
           style={{ display: 'flex', flexDirection: 'column' }}
+          className={classes.estimatesColumn}
         >
             <Group gap="xs" w="100%" justify="center" mb="md">
                 <Title order={5}>{title}</Title>
@@ -313,22 +316,25 @@ export default function EstimatesList() {
         <Box p="md" style={{ width: '100%', maxWidth: '1400px', margin: '0 auto' }}>
             <Stack gap="md">
                 {/* Filter Bar */}
-                <Paper p="sm" withBorder>
+                <Paper p="sm" withBorder className={classes.filterBar}>
                     <Flex direction="column" gap="sm">
                         {/* Top row: Search and filter buttons */}
-                        <Group gap="xs" wrap="nowrap" align="flex-start">
+                        <Group gap="xs" wrap="wrap" align="flex-start" className={classes.filterButtonsGroup}>
                             <TextInput
                               placeholder="Search by title, client, or address..."
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.currentTarget.value)}
                               leftSection={<IconSearch size={16} />}
-                              style={{ flex: 1, minWidth: 200 }}
+                              style={{ flex: 1, minWidth: { base: '100%', sm: 200 } }}
+                              w={{ base: '100%', sm: 'auto' }}
                             />
                             <Menu shadow="md" width={250} position="bottom-end">
                                 <Menu.Target>
                                     <Button
                                       variant={selectedStatuses.length > 0 ? 'filled' : 'default'}
                                       rightSection={<IconChevronDown size={14} />}
+                                      className={classes.filterButton}
+                                      style={{ minWidth: 120 }}
                                     >
                                         Status
                                         {selectedStatuses.length > 0 && ` (${selectedStatuses.length})`}
@@ -355,6 +361,8 @@ export default function EstimatesList() {
                                     <Button
                                       variant={clientNameFilter.trim() ? 'filled' : 'default'}
                                       rightSection={<IconChevronDown size={14} />}
+                                      className={classes.filterButton}
+                                      style={{ minWidth: 120 }}
                                     >
                                         Client
                                     </Button>
@@ -376,6 +384,8 @@ export default function EstimatesList() {
                                     <Button
                                       variant={dateRange[0] || dateRange[1] ? 'filled' : 'default'}
                                       rightSection={<IconChevronDown size={14} />}
+                                      className={classes.filterButton}
+                                      style={{ minWidth: 120 }}
                                     >
                                         Date Range
                                     </Button>
@@ -452,8 +462,8 @@ export default function EstimatesList() {
 
                 {/* Table */}
                 <Paper withBorder>
-                    <ScrollArea>
-                        <Table striped highlightOnHover>
+                    <ScrollArea className={classes.tableContainer}>
+                        <Table striped highlightOnHover className={classes.responsiveTable}>
                             <Table.Thead>
                                 <Table.Tr>
                                     <Table.Th>Title</Table.Th>
@@ -545,9 +555,9 @@ export default function EstimatesList() {
             ) : (
                 <Stack gap="md" p="md">
                     {/* View Toggle */}
-                    <Group justify="space-between" px="md">
+                    <Group justify="space-between" px="md" className={classes.headerGroup} wrap="wrap">
                         <Title order={3} c="gray.0">Proposals</Title>
-                        <Group gap="xs">
+                        <Group gap="xs" className={classes.viewToggleGroup}>
                             <SegmentedControl
                               value={viewMode}
                               onChange={(value) => setViewMode(value as 'main' | 'list')}
@@ -579,10 +589,10 @@ export default function EstimatesList() {
                         }}>
                             {estimates ? (
                                 <Flex
-                                  direction="row"
+                                  direction={{ base: 'column', md: 'row' }}
                                   justify="center"
                                   align="flex-start"
-                                  w="95%"
+                                  w={{ base: '100%', md: '95%' }}
                                   gap="xl"
                                 >
                                     {renderColumn(columnOneEstimates, 'In Progress')}
