@@ -86,7 +86,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             actual_hours: estimate.hours_bid || estimate.estimate_hours || 0,
             additional_hours: 0,
             add_on_description: '',
-            job_crew_lead: estimate.job_crew_lead || '',
+            job_crew_lead: estimate.project_crew_lead || '',
         },
         validate: {
             actual_hours: (value: string | number) => (value === '' ? 'Must enter actual hours' : null),
@@ -144,7 +144,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
         const content: UpdateJobContent = {
             update_hours_and_rate: updateHoursAndRateInput,
             actual_hours: formValues.actual_hours.toString(),
-            job_crew_lead: formValues.job_crew_lead.toUpperCase(),
+            project_crew_lead: formValues.job_crew_lead.toUpperCase(),
         };
 
         try {
@@ -193,7 +193,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 hours_bid: newHoursBid,
                 estimate_hours: newHoursBid,
                 actual_hours: actualHoursValue,
-                job_crew_lead: formValues.job_crew_lead.toUpperCase(),
+                project_crew_lead: formValues.job_crew_lead.toUpperCase(),
             }));
 
             setIsCompletionModalOpen(false);

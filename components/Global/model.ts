@@ -64,7 +64,7 @@ export type SingleJob = {
     keep_same_colors?: TypedDynamoBooleanReturn;
     has_existing_paint?: TypedDynamoBooleanReturn;
     paint_details?: TypedDynamoStringReturn;
-    job_crew_lead?: TypedDynamoStringReturn;
+    project_crew_lead?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {
@@ -188,7 +188,7 @@ export type Estimate = {
     line_items?: any[];
     docuseal_link?: string;
     jira_link?: string;
-    job_crew_lead?: string;
+    project_crew_lead?: string;
     // Change order fields
     change_orders?: string[];
     original_estimate_id?: string;
@@ -210,9 +210,12 @@ export type Estimate = {
     referral_source?: string;
     referral_name?: string;
     // Date fields
+    sent_date?: string;
+    is_project?: number;
     sold_date?: string;
     started_date?: string;
     finished_date?: string;
+    tentative_scheduling_date?: string;
 };
 
 export type EstimateResource = {

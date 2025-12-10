@@ -263,10 +263,20 @@ export default function EstimatesList() {
                 </Badge>
             </Group>
 
-            <Flex direction="column" align="flex-start">
+            <Flex direction="column" align="flex-start" gap="xs">
                 <Text size="sm" c="dimmed">{estimate.address_street}</Text>
                 <Text size="sm" c="dimmed">{estimate.address_city}, {estimate.address_state}</Text>
                 <Text size="sm" c="dimmed">{estimate.address_zipcode}</Text>
+                {(estimate.estimate_hours || estimate.hours_bid) && (
+                    <Text size="sm" c="dimmed" mt="xs">
+                        Hours: {estimate.estimate_hours || estimate.hours_bid}
+                    </Text>
+                )}
+                {estimate.sent_date && (
+                    <Text size="sm" c="dimmed">
+                        Sent: {new Date(estimate.sent_date).toLocaleDateString()}
+                    </Text>
+                )}
             </Flex>
         </Card>
     );
