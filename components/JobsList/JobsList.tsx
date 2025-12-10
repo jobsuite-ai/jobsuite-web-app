@@ -57,6 +57,11 @@ function formatDate(dateString?: string): string {
 function getDisplayDate(estimate: Estimate): string {
     const { status } = estimate;
 
+    // For projects, prioritize tentative_scheduling_date
+    if (estimate.is_project && estimate.tentative_scheduling_date) {
+        return formatDate(estimate.tentative_scheduling_date);
+    }
+
     // If in progress, show started_date
     if (status === EstimateStatus.PROJECT_IN_PROGRESS) {
         return estimate.started_date ? formatDate(estimate.started_date) : '';
@@ -513,22 +518,58 @@ export default function JobsList() {
             }
 
             // Add any new jobs that weren't in the saved order
-            // (sorted by updated_at, newest first)
+            // (sorted by tentative_scheduling_date if available, otherwise updated_at)
             const newJobs = filteredJobs
                 .filter(job => !usedIds.has(job.id))
-                .sort((a, b) =>
-                    new Date((b as Estimate).updated_at).getTime() -
-                    new Date((a as Estimate).updated_at).getTime()
-                );
+                .sort((a, b) => {
+                    const estimateA = a as Estimate;
+                    const estimateB = b as Estimate;
+
+                    // Sort by tentative_scheduling_date if available (soonest first)
+                    const dateA = estimateA.tentative_scheduling_date
+                        ? new Date(estimateA.tentative_scheduling_date).getTime()
+                        : null;
+                    const dateB = estimateB.tentative_scheduling_date
+                        ? new Date(estimateB.tentative_scheduling_date).getTime()
+                        : null;
+
+                    if (dateA && dateB) {
+                        return dateA - dateB; // Soonest first
+                    }
+                    if (dateA && !dateB) return -1; // Jobs with dates come first
+                    if (!dateA && dateB) return 1;
+
+                    // Fallback to updated_at (newest first)
+                    return new Date(estimateB.updated_at).getTime() -
+                        new Date(estimateA.updated_at).getTime();
+                });
 
             return [...orderedJobs, ...newJobs];
         }
 
-        // No saved order, sort by updated_at (newest first)
-        return filteredJobs.sort((a, b) =>
-            new Date((b as Estimate).updated_at).getTime() -
-            new Date((a as Estimate).updated_at).getTime()
-        );
+        // No saved order, sort by tentative_scheduling_date if available, otherwise updated_at
+        return filteredJobs.sort((a, b) => {
+            const estimateA = a as Estimate;
+            const estimateB = b as Estimate;
+
+            // Sort by tentative_scheduling_date if available (soonest first)
+            const dateA = estimateA.tentative_scheduling_date
+                ? new Date(estimateA.tentative_scheduling_date).getTime()
+                : null;
+            const dateB = estimateB.tentative_scheduling_date
+                ? new Date(estimateB.tentative_scheduling_date).getTime()
+                : null;
+
+            if (dateA && dateB) {
+                return dateA - dateB; // Soonest first
+            }
+            if (dateA && !dateB) return -1; // Jobs with dates come first
+            if (!dateA && dateB) return 1;
+
+            // Fallback to updated_at (newest first)
+            return new Date(estimateB.updated_at).getTime() -
+                new Date(estimateA.updated_at).getTime();
+        });
     }
 
     // Handle drag start
