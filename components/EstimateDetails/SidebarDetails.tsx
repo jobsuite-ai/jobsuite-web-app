@@ -330,7 +330,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ job_crew_lead: value || null }),
+      body: JSON.stringify({ project_crew_lead: value || null }),
     });
 
     onUpdate();
@@ -876,7 +876,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         {/* Crew Lead */}
         <EditableField
           label="Crew Lead"
-          value={estimate.job_crew_lead}
+          value={estimate.project_crew_lead}
           onSave={updateCrewLead}
           placeholder="Enter crew lead name"
         />
