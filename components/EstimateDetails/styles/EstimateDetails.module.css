@@ -211,6 +211,7 @@
         margin-left: 0;
         padding: var(--mantine-spacing-sm);
         width: 100%;
+        order: 1; /* Ensure main content appears first */
     }
 
     .sidebarColumn {
@@ -223,10 +224,6 @@
         border-left: none;
         border-top: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
         order: 2; /* Ensure sidebar appears after main content */
-    }
-
-    .mainColumn {
-        order: 1; /* Ensure main content appears first */
     }
 
     .jobDetailsWrapper {

@@ -96,21 +96,25 @@
         height: auto;
         margin-bottom: var(--mantine-spacing-md);
     }
+    
     .flexWrapper {
         overflow-x: hidden;
         overflow-y: auto;
-        padding: var(--mantine-spacing-sm);
         height: auto;
         min-height: 100%;
+        padding: var(--mantine-spacing-sm) 0;
     }
+
     .accountingNeededColumn {
         margin-top: 60px;
     }
+
     .historicalCollapsed {
         min-width: 100%;
         max-width: 100%;
         width: 100%;
     }
+
     .flexContainer {
         width: 100%;
         min-width: 100%;
@@ -118,10 +122,6 @@
         padding-right: var(--mantine-spacing-sm);
     }
 
-    .flexWrapper {
-        padding-left: 0;
-        padding-right: 0;
-    }
     .scrollArea {
         max-height: none;
     }
@@ -130,6 +130,7 @@
         font-size: 0.75rem;
         padding: 4px 8px;
     }
+
     .sortableJobCard {
         padding: var(--mantine-spacing-sm) !important;
         font-size: 0.875rem;
