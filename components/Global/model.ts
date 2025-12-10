@@ -64,7 +64,7 @@ export type SingleJob = {
     keep_same_colors?: TypedDynamoBooleanReturn;
     has_existing_paint?: TypedDynamoBooleanReturn;
     paint_details?: TypedDynamoStringReturn;
-    job_crew_lead?: TypedDynamoStringReturn;
+    project_crew_lead?: TypedDynamoStringReturn;
 };
 
 export type SingleLineItem = {
@@ -188,7 +188,7 @@ export type Estimate = {
     line_items?: any[];
     docuseal_link?: string;
     jira_link?: string;
-    job_crew_lead?: string;
+    project_crew_lead?: string;
     // Change order fields
     change_orders?: string[];
     original_estimate_id?: string;

@@ -108,6 +108,8 @@ export async function PUT(
 
         // Get request body
         const body = await request.json();
+        // eslint-disable-next-line no-console
+        console.log('Update estimate request body:', JSON.stringify(body, null, 2));
 
         // Update estimate via backend API
         const updateResponse = await fetch(
@@ -122,6 +124,9 @@ export async function PUT(
             }
         );
 
+        // eslint-disable-next-line no-console
+        console.log('Backend response status:', updateResponse.status);
+
         if (!updateResponse.ok) {
             const errorData = await updateResponse.json();
             return NextResponse.json(
@@ -131,6 +136,8 @@ export async function PUT(
         }
 
         const estimate = await updateResponse.json();
+        // eslint-disable-next-line no-console
+        console.log('Backend response estimate:', JSON.stringify(estimate, null, 2));
         return NextResponse.json(estimate);
     } catch (error) {
         // eslint-disable-next-line no-console
