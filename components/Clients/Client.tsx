@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 
 import { Badge, Button, Card, Center, Divider, Flex, Group, Modal, Paper, Text, TextInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { IconCheck, IconClock, IconEdit, IconMail, IconMapPin, IconNotes, IconPhone, IconX } from '@tabler/icons-react';
+import { IconCheck, IconClock, IconEdit, IconMail, IconMapPin, IconNotes, IconPhone, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './Clients.module.css';
 import LoadingState from '../Global/LoadingState';
-import { ContractorClient, Job } from '../Global/model';
+import { ContractorClient, Job, SubClient } from '../Global/model';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 
@@ -22,6 +22,9 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
     const [isEditingNotes, setIsEditingNotes] = useState(false);
     const [notesValue, setNotesValue] = useState(client?.notes || '');
     const [isSavingNotes, setIsSavingNotes] = useState(false);
+    const [isSubClientModalOpen, setIsSubClientModalOpen] = useState(false);
+    const [editingSubClient, setEditingSubClient] = useState<SubClient | null>(null);
+    const [isDeletingSubClient, setIsDeletingSubClient] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -32,6 +35,23 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
     useEffect(() => {
         setNotesValue(client?.notes || '');
     }, [client]);
+
+    async function refreshClient() {
+        try {
+            const response = await fetch(
+                `/api/clients/${client.id}`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+            const updatedClient = await response.json();
+            setClient(updatedClient.Item || updatedClient);
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to refresh client:', error);
+        }
+    }
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -58,8 +78,11 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
     }
 
     async function getJobs() {
+        if (!client?.id) {
+            return;
+        }
         const response = await fetch(
-            '/api/projects',
+            `/api/projects?client_id=${client.id}`,
             {
                 method: 'GET',
                 headers: getApiHeaders(),
@@ -145,6 +168,113 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
         ].filter(Boolean);
         return parts.length > 0 ? parts.join(', ') : 'No address on file';
     };
+
+    const subClientForm = useForm({
+        mode: 'uncontrolled',
+        initialValues: {
+            name: '',
+            email: '',
+            phone_number: '',
+            role: '',
+            notes: '',
+        },
+        validate: (values) => ({
+            email: values.email === '' ? 'Must enter email' : null,
+            phone_number: values.phone_number === '' ? 'Must enter phone number' : null,
+            name: values.name === '' ? 'Must enter name' : null,
+        }),
+    });
+
+    function openSubClientModal(subClient?: SubClient) {
+        if (subClient) {
+            setEditingSubClient(subClient);
+            subClientForm.setValues({
+                name: subClient.name,
+                email: subClient.email,
+                phone_number: subClient.phone_number,
+                role: subClient.role || '',
+                notes: subClient.notes || '',
+            });
+        } else {
+            setEditingSubClient(null);
+            subClientForm.reset();
+        }
+        setIsSubClientModalOpen(true);
+    }
+
+    function closeSubClientModal() {
+        setIsSubClientModalOpen(false);
+        setEditingSubClient(null);
+        subClientForm.reset();
+    }
+
+    async function saveSubClient() {
+        const formValues = subClientForm.getValues();
+        const subClientData = {
+            name: formValues.name,
+            email: formValues.email,
+            phone_number: formValues.phone_number,
+            role: formValues.role || null,
+            notes: formValues.notes || null,
+        };
+
+        try {
+            if (editingSubClient) {
+                // Update existing sub-client
+                const response = await fetch(
+                    `/api/clients/${client.id}/sub-clients/${editingSubClient.id}`,
+                    {
+                        method: 'PUT',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify(subClientData),
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error('Failed to update sub-client');
+                }
+            } else {
+                // Create new sub-client
+                const response = await fetch(
+                    `/api/clients/${client.id}/sub-clients`,
+                    {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify(subClientData),
+                    }
+                );
+                if (!response.ok) {
+                    throw new Error('Failed to create sub-client');
+                }
+            }
+            await refreshClient();
+            closeSubClientModal();
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to save sub-client:', error);
+        }
+    }
+
+    async function deleteSubClient(subClientId: string) {
+        setIsDeletingSubClient(subClientId);
+        try {
+            const response = await fetch(
+                `/api/clients/${client.id}/sub-clients/${subClientId}`,
+                {
+                    method: 'DELETE',
+                    headers: getApiHeaders(),
+                }
+            );
+            if (!response.ok) {
+                throw new Error('Failed to delete sub-client');
+            }
+            await refreshClient();
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to delete sub-client:', error);
+        } finally {
+            setIsDeletingSubClient(null);
+        }
+    }
 
     return (
         <>
@@ -263,6 +393,104 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                                 ) : (
                                     <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-wrap', minHeight: '60px' }}>
                                         {client.notes || 'No notes. Click edit to add notes.'}
+                                    </Text>
+                                )}
+                            </Flex>
+
+                            <Divider my="md" />
+
+                            {/* Sub-Clients Section */}
+                            <Flex direction="column" gap="xs">
+                                <Group justify="space-between" mb={4}>
+                                    <Text size="sm" fw={600}>
+                                        Sub-Clients
+                                    </Text>
+                                    <Button
+                                      size="xs"
+                                      variant="light"
+                                      leftSection={<IconPlus size={14} />}
+                                      onClick={() => openSubClientModal()}
+                                    >
+                                        Add Sub-Client
+                                    </Button>
+                                </Group>
+                                {client.sub_clients && client.sub_clients.length > 0 ? (
+                                    <Flex direction="column" gap="sm">
+                                        {client.sub_clients.map((subClient) => (
+                                            <Paper
+                                              key={subClient.id}
+                                              shadow="xs"
+                                              radius="md"
+                                              withBorder
+                                              p="md"
+                                            >
+                                                <Flex direction="row" justify="space-between" align="flex-start">
+                                                    <Flex direction="column" gap="xs" style={{ flex: 1 }}>
+                                                        <Group gap="xs">
+                                                            <Text size="sm" fw={600}>
+                                                                {subClient.name}
+                                                            </Text>
+                                                            {subClient.role && (
+                                                                <Badge size="sm" variant="light" color="blue">
+                                                                    {subClient.role}
+                                                                </Badge>
+                                                            )}
+                                                        </Group>
+                                                        <Flex direction="row" gap="md" wrap="wrap">
+                                                            <Text size="xs" c="dimmed">
+                                                                <IconMail size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                                                                <a href={`mailto:${subClient.email}`} onClick={(e) => e.stopPropagation()}>
+                                                                    {subClient.email}
+                                                                </a>
+                                                            </Text>
+                                                            <Text size="xs" c="dimmed">
+                                                                <IconPhone size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                                                                <a href={`tel:+1${subClient.phone_number}`} onClick={(e) => e.stopPropagation()}>
+                                                                    {subClient.phone_number}
+                                                                </a>
+                                                            </Text>
+                                                        </Flex>
+                                                        {subClient.notes && (
+                                                            <Text size="xs" c="dimmed" style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>
+                                                                <IconNotes size={12} style={{ marginRight: 4, verticalAlign: 'middle' }} />
+                                                                {subClient.notes}
+                                                            </Text>
+                                                        )}
+                                                    </Flex>
+                                                    <Group gap="xs">
+                                                        <IconEdit
+                                                          size={16}
+                                                          style={{ cursor: 'pointer' }}
+                                                          onClick={() =>
+                                                            openSubClientModal(subClient)
+                                                          }
+                                                        />
+                                                        <IconTrash
+                                                          size={16}
+                                                          style={{
+                                                            cursor:
+                                                              isDeletingSubClient === subClient.id
+                                                                ? 'wait'
+                                                                : 'pointer',
+                                                            color: 'var(--mantine-color-red-6)',
+                                                            opacity:
+                                                              isDeletingSubClient === subClient.id
+                                                                ? 0.5
+                                                                : 1,
+                                                          }}
+                                                          onClick={() =>
+                                                            deleteSubClient(subClient.id)
+                                                          }
+                                                        />
+                                                    </Group>
+                                                </Flex>
+                                            </Paper>
+                                        ))}
+                                    </Flex>
+                                ) : (
+                                    <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
+                                        No sub-clients. Click &quot;Add Sub-Client&quot; to add
+                                        contacts associated with this client.
                                     </Text>
                                 )}
                             </Flex>
@@ -441,6 +669,59 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                         </Flex>
                     </Flex>
                 </Center>
+            </Modal>
+
+            {/* Sub-Client Modal */}
+            <Modal
+              opened={isSubClientModalOpen}
+              onClose={closeSubClientModal}
+              title={editingSubClient ? 'Edit Sub-Client' : 'Add Sub-Client'}
+              size="lg"
+            >
+                <Flex direction="column" gap="md">
+                    <TextInput
+                      withAsterisk
+                      label="Name"
+                      placeholder="Enter name"
+                      key={subClientForm.key('name')}
+                      {...subClientForm.getInputProps('name')}
+                    />
+                    <TextInput
+                      withAsterisk
+                      label="Email"
+                      placeholder="Enter email"
+                      key={subClientForm.key('email')}
+                      {...subClientForm.getInputProps('email')}
+                    />
+                    <TextInput
+                      withAsterisk
+                      label="Phone Number"
+                      placeholder="Enter phone number"
+                      key={subClientForm.key('phone_number')}
+                      {...subClientForm.getInputProps('phone_number')}
+                    />
+                    <TextInput
+                      label="Role/Title"
+                      placeholder="e.g., Owner, Sales Person, Project Manager"
+                      key={subClientForm.key('role')}
+                      {...subClientForm.getInputProps('role')}
+                    />
+                    <Textarea
+                      label="Notes"
+                      placeholder="Track interactions and important information about this contact..."
+                      key={subClientForm.key('notes')}
+                      {...subClientForm.getInputProps('notes')}
+                      minRows={4}
+                    />
+                    <Group justify="flex-end" mt="md">
+                        <Button variant="outline" onClick={closeSubClientModal}>
+                            Cancel
+                        </Button>
+                        <Button onClick={saveSubClient}>
+                            {editingSubClient ? 'Update' : 'Create'}
+                        </Button>
+                    </Group>
+                </Flex>
             </Modal>
         </>
     );

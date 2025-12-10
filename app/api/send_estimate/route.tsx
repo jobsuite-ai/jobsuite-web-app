@@ -6,7 +6,27 @@ const client = new DynamoDBClient({});
 
 export async function POST(request: Request) {
     try {
-        const { template_id, jobID, client_email } = await request.json();
+        const { template_id, jobID, client_email, client_emails } = await request.json();
+
+        // Support both single email (backward compatibility) and multiple emails
+        const emails = client_emails &&
+          Array.isArray(client_emails) ? client_emails : (client_email ? [client_email] : []);
+
+        if (emails.length === 0) {
+            return Response.json({ error: 'No email addresses provided' }, { status: 400 });
+        }
+
+        // Build submitters array - one for each email, plus the service provider
+        const submitters = emails.map((email: string) => ({
+            role: 'Property Owner',
+            email,
+        }));
+
+        // Add service provider email
+        submitters.push({
+            role: 'Service Provider',
+            email: process.env.COMPANY_EMAIL || '',
+        });
 
         const options = {
             method: 'POST',
@@ -15,10 +35,7 @@ export async function POST(request: Request) {
             data: {
                 template_id,
                 send_email: true,
-                submitters: [
-                    { role: 'Property Owner', email: client_email },
-                    { role: 'Service Provider', email: process.env.COMPANY_EMAIL },
-                ],
+                submitters,
                 reply_to: 'brandon@rlpeekpainting.com',
             },
         };
