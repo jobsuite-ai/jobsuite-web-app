@@ -28,24 +28,27 @@ export function UploadNewTemplate({
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
 
-    // Collect all available emails
+    // Collect all available emails (deduplicated by email value)
     const availableEmails = useMemo(() => {
         const emails: Array<{ value: string; label: string }> = [];
+        const seenEmails = new Set<string>();
 
-        if (client?.email) {
+        if (client?.email && !seenEmails.has(client.email)) {
             emails.push({
                 value: client.email,
                 label: `${client.name} (${client.email})`,
             });
+            seenEmails.add(client.email);
         }
 
         if (client?.sub_clients) {
             client.sub_clients.forEach((subClient) => {
-                if (subClient.email) {
+                if (subClient.email && !seenEmails.has(subClient.email)) {
                     emails.push({
                         value: subClient.email,
                         label: `${subClient.name}${subClient.role ? ` - ${subClient.role}` : ''} (${subClient.email})`,
                     });
+                    seenEmails.add(subClient.email);
                 }
             });
         }
@@ -189,9 +192,17 @@ export function UploadNewTemplate({
     const hasMultipleEmails = availableEmails.length > 1;
 
     return (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {hasMultipleEmails && (
-                <div style={{ marginBottom: 16, padding: 16, border: '1px solid var(--mantine-color-gray-3)', borderRadius: 8 }}>
+                <div style={{
+                    marginBottom: 16,
+                    padding: 16,
+                    border: '1px solid var(--mantine-color-gray-3)',
+                    borderRadius: 8,
+                    width: '100%',
+                    maxWidth: '700px',
+                    minWidth: '500px',
+                }}>
                     <Group mb="sm">
                         <Checkbox
                           label="Send to all emails"
