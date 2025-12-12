@@ -39,19 +39,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Read file as buffer and create a new File for proper FormData serialization
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Create form data for backend
+        // Create form data for backend - same pattern as ImageUpload
         const backendFormData = new FormData();
-        // Create a Blob from buffer and append with filename
-        const blob = new Blob([buffer], { type: file.type });
-        backendFormData.append('file', blob, file.name);
+        backendFormData.append('file', file);
 
-        // Upload logo via backend API
-        // Important: Do NOT set Content-Type header manually
-        // fetch will automatically set it to multipart/form-data with boundary
+        // Upload logo via backend API - same pattern as estimate resources
         const uploadResponse = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo`,
             {
