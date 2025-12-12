@@ -159,7 +159,6 @@ export default function MessageCreator({
                 setTemplates(templateMap);
             }
         } catch (err) {
-            console.error('Error loading data:', err);
             notifications.show({
                 title: 'Error',
                 message: 'Failed to load data',
@@ -203,7 +202,12 @@ export default function MessageCreator({
                 }
             }
         } catch (err) {
-            console.error('Error loading sub-clients:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Error loading sub-clients',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
         }
     };
 
