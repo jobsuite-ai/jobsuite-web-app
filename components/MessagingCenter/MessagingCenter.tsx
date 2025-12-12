@@ -14,6 +14,7 @@ import {
     Alert,
     Paper,
     Tabs,
+    Modal,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
@@ -23,6 +24,7 @@ import {
     IconTrash,
     IconSend,
     IconPlus,
+    IconSettings,
 } from '@tabler/icons-react';
 
 import MessageCreator from './MessageCreator';
@@ -69,6 +71,12 @@ interface Client {
     address_city?: string;
     address_state?: string;
     address_zipcode?: string;
+    sub_clients?: Array<{
+        id: string;
+        name?: string;
+        email?: string;
+        role?: string;
+    }>;
 }
 
 interface Estimate {
@@ -155,6 +163,11 @@ export default function MessagingCenter() {
     const [sending, setSending] = useState<string | null>(null);
     const [renderedMessages, setRenderedMessages] =
         useState<Record<string, { subject: string; body: string }>>({});
+    const [clientOutreachEmail, setClientOutreachEmail] = useState<string | null>(null);
+    const [messageRecipients, setMessageRecipients] = useState<
+        Record<string, string[]>
+    >({});
+    const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
 
     useEffect(() => {
@@ -169,6 +182,7 @@ export default function MessagingCenter() {
             return undefined;
         }
 
+        loadClientOutreachEmail();
         loadMessages();
         loadCount();
         // Refresh count every minute
@@ -182,6 +196,29 @@ export default function MessagingCenter() {
             clearInterval(interval);
         };
     }, [isAuthenticated, isLoading]);
+
+    const loadClientOutreachEmail = async () => {
+        try {
+            const response = await fetch(
+                '/api/configurations?config_type=contractor_config',
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+            if (response.ok) {
+                const configs = await response.json();
+                const config = configs.find(
+                    (c: any) => c.configuration_type === 'contractor_config'
+                );
+                if (config?.configuration?.client_outreach_email) {
+                    setClientOutreachEmail(config.configuration.client_outreach_email);
+                }
+            }
+        } catch (err) {
+            // Ignore errors, will fallback to default
+        }
+    };
 
     const loadMessages = async () => {
         // Don't make request if not authenticated
@@ -306,8 +343,9 @@ export default function MessagingCenter() {
                 if (estimateData) estimateMap.set(id, estimateData);
             });
 
-            // Render templates for each message
+            // Render templates for each message and calculate recipients
             const renderedRecord: Record<string, { subject: string; body: string }> = {};
+            const recipientsRecord: Record<string, string[]> = {};
 
             data.forEach((message) => {
                 const client = clientMap.get(message.client_id);
@@ -320,9 +358,39 @@ export default function MessagingCenter() {
                     subject: renderedSubject,
                     body: renderedBody,
                 };
+
+                // Calculate recipient emails
+                const recipients: string[] = [];
+                if (client) {
+                    if (message.recipient_type === 'ALL_SUB_CLIENTS') {
+                        if (client.email) {
+                            recipients.push(client.email);
+                        }
+                        if (client.sub_clients) {
+                            client.sub_clients.forEach((subClient) => {
+                                if (subClient.email && !recipients.includes(subClient.email)) {
+                                    recipients.push(subClient.email);
+                                }
+                            });
+                        }
+                    } else if (message.recipient_type === 'SINGLE_SUB_CLIENT') {
+                        if (message.recipient_sub_client_id && client.sub_clients) {
+                            const subClient = client.sub_clients.find(
+                                (sc) => sc.id === message.recipient_sub_client_id
+                            );
+                            if (subClient?.email) {
+                                recipients.push(subClient.email);
+                            }
+                        } else if (client.email) {
+                            recipients.push(client.email);
+                        }
+                    }
+                }
+                recipientsRecord[message.id] = recipients;
             });
 
             setRenderedMessages(renderedRecord);
+            setMessageRecipients(recipientsRecord);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load messages');
         } finally {
@@ -360,23 +428,19 @@ export default function MessagingCenter() {
     }, [activeTab, isAuthenticated, isLoading]);
 
     const handleSend = async (message: OutreachMessage) => {
+        // Check if client_outreach_email is configured
+        if (!clientOutreachEmail) {
+            setShowEmailConfigModal(true);
+            return;
+        }
+
         try {
             setSending(message.id);
             setError(null);
 
-            // Get SES email from templates
-            const templatesResponse = await fetch('/api/outreach-templates', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-            const templates = await templatesResponse.json();
-            const fromEmail =
-                templates._ses_identity?.email || 'noreply@jobsuite.app';
-
             const response = await fetch(`/api/outreach-messages/${message.id}/send`, {
                 method: 'POST',
                 headers: getApiHeaders(),
-                body: JSON.stringify({ from_email: fromEmail }),
             });
 
             if (!response.ok) {
@@ -540,6 +604,38 @@ export default function MessagingCenter() {
                                                 <Text c="dimmed" size="sm">
                                                     Due: {formatDate(message.to_be_sent_date)}
                                                 </Text>
+                                                <Group gap="xs" mt="xs">
+                                                    <Text c="dimmed" size="xs">
+                                                        From:{' '}
+                                                        <Text
+                                                          component="span"
+                                                          c="white"
+                                                          fw={500}
+                                                          size="xs"
+                                                        >
+                                                            {clientOutreachEmail ||
+                                                                'noreply@jobsuite.app'}
+                                                        </Text>
+                                                    </Text>
+                                                    {messageRecipients[message.id] &&
+                                                        messageRecipients[
+                                                            message.id
+                                                        ].length > 0 && (
+                                                            <Text c="dimmed" size="xs">
+                                                                To:{' '}
+                                                                <Text
+                                                                  component="span"
+                                                                  c="white"
+                                                                  fw={500}
+                                                                  size="xs"
+                                                                >
+                                                                    {messageRecipients[
+                                                                        message.id
+                                                                    ].join(', ')}
+                                                                </Text>
+                                                            </Text>
+                                                        )}
+                                                </Group>
                                             </div>
                                         </Group>
 
@@ -612,6 +708,38 @@ export default function MessagingCenter() {
                     loadCount();
                 }}
             />
+
+            <Modal
+              opened={showEmailConfigModal}
+              onClose={() => setShowEmailConfigModal(false)}
+              title="Email Configuration Required"
+              centered
+            >
+                <Stack gap="md">
+                    <Text>
+                        You need to configure a client outreach email address before
+                        sending messages. This email will be used as the &quot;From&quot;
+                        address for all outreach emails.
+                    </Text>
+                    <Group justify="flex-end">
+                        <Button
+                          variant="subtle"
+                          onClick={() => setShowEmailConfigModal(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                          leftSection={<IconSettings size={16} />}
+                          onClick={() => {
+                                setShowEmailConfigModal(false);
+                                window.location.href = '/settings';
+                            }}
+                        >
+                            Go to Settings
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
         </div>
     );
 }

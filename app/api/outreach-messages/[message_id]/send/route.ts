@@ -29,19 +29,10 @@ export async function POST(
         }
 
         const apiBaseUrl = getApiBaseUrl();
-        const body = await request.json();
-        const fromEmail = body.from_email;
 
-        if (!fromEmail) {
-            return NextResponse.json(
-                { message: 'from_email is required' },
-                { status: 400 }
-            );
-        }
-
-        // Send message via backend API
+        // Send message via backend API (backend will get from_email from config)
         const sendResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/outreach-messages/${message_id}/send?from_email=${encodeURIComponent(fromEmail)}`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/outreach-messages/${message_id}/send`,
             {
                 method: 'POST',
                 headers: {

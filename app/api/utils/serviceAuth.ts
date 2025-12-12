@@ -26,9 +26,8 @@ let credentialsCache: ServiceAccountCredentials | null = null;
 export const getApiBaseUrl = () => {
   // Local development - check if we're running locally
   const nodeEnv = process.env.NODE_ENV;
-  const isLocal = nodeEnv === 'development' || process.env.LOCAL_DEV === 'true';
 
-  if (isLocal && !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH) {
+  if (process.env.IS_LOCAL_ENV === 'true' && !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH) {
     const url = process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
     // eslint-disable-next-line no-console
     console.log('Local mode detected');
