@@ -6,21 +6,19 @@ frontend:
         - npm ci
         # Write AWS_BRANCH to .env file for runtime access in Next.js API routes
         - echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
-        # Set NODE_ENV based on branch (optional - for Next.js .env file loading)
+        # Log branch info (don't override NODE_ENV - Next.js needs it as 'production' for builds)
+        # Note: main branch uses QA/development endpoints, not production
         - |
           if [ "$AWS_BRANCH" = "prod" ] || [ "$AWS_BRANCH" = "production" ]; then
-            export NODE_ENV=production
-            echo "Building for PRODUCTION ($AWS_BRANCH branch)"
-          elif [ "$AWS_BRANCH" = "qa" ] || [ "$AWS_BRANCH" = "staging" ]; then
-            export NODE_ENV=development
-            echo "Building for QA/STAGING ($AWS_BRANCH branch)"
+            echo "Building for PRODUCTION ($AWS_BRANCH branch) - will use api.jobsuite.app"
+          elif [ "$AWS_BRANCH" = "main" ] || [ "$AWS_BRANCH" = "qa" ] || [ "$AWS_BRANCH" = "staging" ]; then
+            echo "Building for QA/DEVELOPMENT ($AWS_BRANCH branch) - will use qa.api.jobsuite.app"
           else
-            export NODE_ENV=development
-            echo "Building for DEVELOPMENT ($AWS_BRANCH branch)"
+            echo "Building for DEVELOPMENT ($AWS_BRANCH branch) - will use qa.api.jobsuite.app"
           fi
         # Debug: Show which environment variables are available
         - "echo \"Branch: $AWS_BRANCH\""
-        - "echo \"NODE_ENV: $NODE_ENV\""
+        - "echo \"NODE_ENV: $NODE_ENV (Next.js sets this automatically)\""
         - "echo \"AMPLIFY_BRANCH written to .env.production: $AWS_BRANCH\""
         - "echo \"WEBHOOK_EMAIL configured: $([ -n \"$WEBHOOK_EMAIL\" ] && echo 'yes' || echo 'no')\""
     build:

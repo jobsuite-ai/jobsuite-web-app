@@ -25,8 +25,6 @@ let credentialsCache: ServiceAccountCredentials | null = null;
 
 export const getApiBaseUrl = () => {
   // Local development - check if we're running locally
-  const nodeEnv = process.env.NODE_ENV;
-
   if (process.env.IS_LOCAL_ENV === 'true' && !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH) {
     const url = process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
     // eslint-disable-next-line no-console
@@ -34,20 +32,21 @@ export const getApiBaseUrl = () => {
     return url;
   }
 
-  // Use AWS_BRANCH to determine environment (more reliable than NODE_ENV in Amplify)
+  // Use AWS_BRANCH or AMPLIFY_BRANCH to determine environment
+  // Note: main branch uses QA endpoints, not production
   const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
 
-  // Production (main branch)
-  if (branch === 'production' || (nodeEnv === 'production' && !branch)) {
+  // Production - only if branch is explicitly 'production' or 'prod'
+  if (branch === 'production' || branch === 'prod') {
     return 'https://api.jobsuite.app';
   }
 
-  // QA/Staging
-  if (branch === 'qa' || branch === 'main') {
+  // QA/Development - main, qa, staging branches all use QA endpoints
+  if (branch === 'qa' || branch === 'main' || branch === 'staging') {
     return 'https://qa.api.jobsuite.app';
   }
 
-  // Default to QA for unknown branches
+  // Default to QA for unknown branches (safer than defaulting to production)
   return 'https://qa.api.jobsuite.app';
 };
 
