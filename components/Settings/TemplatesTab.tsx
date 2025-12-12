@@ -50,6 +50,7 @@ interface TemplatesData {
     _ses_identity?: {
         email?: string;
         status?: string;
+        display_name?: string;
     };
     _review_link?: string;
 }
@@ -71,7 +72,9 @@ export default function TemplatesTab() {
     const [saving, setSaving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [sesEmail, setSesEmail] = useState('');
+    const [sesDisplayName, setSesDisplayName] = useState('');
     const [sesVerifying, setSesVerifying] = useState(false);
+    const [sesUpdatingDisplayName, setSesUpdatingDisplayName] = useState(false);
     const { users, loading: usersLoading } = useUsers();
 
     useEffect(() => {
@@ -95,6 +98,7 @@ export default function TemplatesTab() {
             const data: TemplatesData = await response.json();
             setTemplates(data);
             setSesEmail(data._ses_identity?.email || '');
+            setSesDisplayName(data._ses_identity?.display_name || '');
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error loading templates:', err);
@@ -229,7 +233,7 @@ export default function TemplatesTab() {
 
             notifications.show({
                 title: 'Success',
-                message: `Verification email sent to ${sesEmail}. Please check your inbox.`,
+                message: `Verification email sent to ${sesEmail}. Please check your inbox for an email from Amazon Web Services - there will be a link to verify the email address.`,
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
@@ -242,6 +246,47 @@ export default function TemplatesTab() {
             });
         } finally {
             setSesVerifying(false);
+        }
+    };
+
+    const updateSesDisplayName = async () => {
+        try {
+            setSesUpdatingDisplayName(true);
+            const response = await fetch('/api/outreach-templates/ses-identity/display-name', {
+                method: 'PUT',
+                headers: getApiHeaders(),
+                body: JSON.stringify({ display_name: sesDisplayName || null }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update display name');
+            }
+
+            const data = await response.json();
+            setTemplates((prev) => ({
+                ...prev,
+                _ses_identity: {
+                    ...prev._ses_identity,
+                    display_name: data.display_name,
+                },
+            }));
+
+            notifications.show({
+                title: 'Success',
+                message: 'Display name updated successfully',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to update display name',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSesUpdatingDisplayName(false);
         }
     };
 
@@ -299,6 +344,32 @@ export default function TemplatesTab() {
                         >
                             Status: {templates._ses_identity.status}
                         </Badge>
+                    )}
+                    {templates._ses_identity?.status === 'Success' && (
+                        <Stack gap="xs">
+                            <Text fw={500} size="sm">
+                                Display Name
+                            </Text>
+                            <Text c="dimmed" size="xs">
+                                The name that will appear as the sender in client emails (e.g.,
+                                &quot;Your Company Name&quot;). If left empty, defaults to
+                                &quot;Jobsuite&quot;.
+                            </Text>
+                            <Group>
+                                <TextInput
+                                  placeholder="Your Company Name"
+                                  value={sesDisplayName}
+                                  onChange={(e) => setSesDisplayName(e.target.value)}
+                                  style={{ flex: 1 }}
+                                />
+                                <Button
+                                  onClick={updateSesDisplayName}
+                                  loading={sesUpdatingDisplayName}
+                                >
+                                    Save
+                                </Button>
+                            </Group>
+                        </Stack>
                     )}
                 </Stack>
             </Card>
