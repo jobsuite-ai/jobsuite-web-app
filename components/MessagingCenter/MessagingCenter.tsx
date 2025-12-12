@@ -199,20 +199,15 @@ export default function MessagingCenter() {
 
     const loadClientOutreachEmail = async () => {
         try {
-            const response = await fetch(
-                '/api/configurations?config_type=contractor_config',
-                {
-                    method: 'GET',
-                    headers: getApiHeaders(),
-                }
-            );
+            const response = await fetch('/api/outreach-templates', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
             if (response.ok) {
-                const configs = await response.json();
-                const config = configs.find(
-                    (c: any) => c.configuration_type === 'contractor_config'
-                );
-                if (config?.configuration?.client_outreach_email) {
-                    setClientOutreachEmail(config.configuration.client_outreach_email);
+                const data = await response.json();
+                const sesEmail = data._ses_identity?.email;
+                if (sesEmail) {
+                    setClientOutreachEmail(sesEmail);
                 }
             }
         } catch (err) {
@@ -428,7 +423,7 @@ export default function MessagingCenter() {
     }, [activeTab, isAuthenticated, isLoading]);
 
     const handleSend = async (message: OutreachMessage) => {
-        // Check if client_outreach_email is configured
+        // Check if SES email identity is configured
         if (!clientOutreachEmail) {
             setShowEmailConfigModal(true);
             return;
