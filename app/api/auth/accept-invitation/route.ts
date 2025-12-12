@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { getApiBaseUrl } from '../utils/serviceAuth';
+import { getApiBaseUrl } from '../../utils/serviceAuth';
 
 export async function POST(request: Request) {
   try {
