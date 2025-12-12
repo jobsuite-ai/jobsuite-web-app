@@ -24,9 +24,19 @@ let tokenCache: TokenCache | null = null;
 let credentialsCache: ServiceAccountCredentials | null = null;
 
 export const getApiBaseUrl = () => {
+  // Local development - check if we're running locally
+  const nodeEnv = process.env.NODE_ENV;
+  const isLocal = nodeEnv === 'development' || process.env.LOCAL_DEV === 'true';
+
+  if (isLocal && !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH) {
+    const url = process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
+    // eslint-disable-next-line no-console
+    console.log('Local mode detected');
+    return url;
+  }
+
   // Use AWS_BRANCH to determine environment (more reliable than NODE_ENV in Amplify)
   const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
-  const nodeEnv = process.env.NODE_ENV;
 
   // Production (main branch)
   if (branch === 'production' || (nodeEnv === 'production' && !branch)) {

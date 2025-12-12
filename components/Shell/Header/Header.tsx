@@ -3,7 +3,7 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList } from '@tabler/icons-react';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -21,6 +21,7 @@ const links = [
   { link: '/add-proposal', label: 'Add Proposal' },
   { link: '/projects', label: 'Projects' },
   { link: '/proposals', label: 'Proposals' },
+  { link: '/messaging-center', label: 'Messaging Center' },
 ];
 
 interface HeaderProps {
@@ -55,6 +56,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [unacknowledgedCount, setUnacknowledgedCount] = useState<number>(0);
+  const [messageCount, setMessageCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const unacknowledgedCountRef = useRef<number>(0);
@@ -76,6 +78,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     const isActive =
       pathname === link.link ||
       (link.link !== '/' && pathname?.startsWith(`${link.link}/`));
+
+    // Add badge for Messaging Center if there are messages due today
+    const showBadge = link.link === '/messaging-center' && messageCount > 0;
+
     return (
       <NavLink
         key={link.label}
@@ -83,6 +89,12 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         href={link.link}
         label={link.label}
         active={isActive}
+        leftSection={link.link === '/messaging-center' ? <IconMail size={18} /> : undefined}
+        rightSection={showBadge ? (
+          <Badge size="xs" color="red" variant="filled">
+            {messageCount > 99 ? '99+' : messageCount}
+          </Badge>
+        ) : undefined}
         onClick={(event) => {
           handleNavLinkClick(event as any, link.link);
         }}
@@ -385,6 +397,24 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       return undefined;
     }
 
+    const fetchMessageCount = async () => {
+      try {
+        const response = await fetch('/api/outreach-messages/count', {
+          method: 'GET',
+          headers: getApiHeaders(),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setMessageCount(data.count || 0);
+        }
+      } catch (err) {
+        console.error('Error fetching message count:', err);
+      }
+    };
+
+    fetchMessageCount();
+    const messageInterval = setInterval(fetchMessageCount, 60000); // Refresh every minute
+
     const fetchUnacknowledgedCount = async () => {
       // Don't poll if page is not visible
       if (document.hidden) {
@@ -441,6 +471,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(messageInterval);
     };
   }, [isAuthenticated, isLoading]);
 

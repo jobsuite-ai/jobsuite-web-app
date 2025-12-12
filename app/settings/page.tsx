@@ -13,11 +13,15 @@ import {
     Title,
     Loader,
     Alert,
+    FileButton,
+    Image,
+    Box,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX } from '@tabler/icons-react';
+import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import TemplatesTab from '@/components/Settings/TemplatesTab';
 
 interface ContractorConfiguration {
     id: string;
@@ -38,6 +42,9 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [clientOutreachEmail, setClientOutreachEmail] = useState('');
+    const [reviewLink, setReviewLink] = useState('');
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
     const [configId, setConfigId] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
 
@@ -82,9 +89,28 @@ export default function SettingsPage() {
                 setClientOutreachEmail(
                     config.configuration?.client_outreach_email || ''
                 );
+                setReviewLink(
+                    config.configuration?.review_link || ''
+                );
             } else {
                 setConfigId(null);
                 setClientOutreachEmail('');
+                setReviewLink('');
+            }
+
+            // Load logo URL separately
+            try {
+                const logoResponse = await fetch('/api/configurations/logo', {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                });
+                if (logoResponse.ok) {
+                    const logoData = await logoResponse.json();
+                    setLogoUrl(logoData.logo_url || null);
+                }
+            } catch (err) {
+                // Logo loading failed, that's okay
+                setLogoUrl(null);
             }
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -102,10 +128,41 @@ export default function SettingsPage() {
             setSaving(true);
             setError(null);
 
+            // Get existing config to preserve logo fields
+            const existingConfigs: ContractorConfiguration[] = configId ? await (async () => {
+                try {
+                    const response = await fetch(
+                        '/api/configurations?config_type=contractor_config',
+                        {
+                            method: 'GET',
+                            headers: getApiHeaders(),
+                        }
+                    );
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch {
+                    // Ignore errors
+                }
+                return [];
+            })() : [];
+
+            const existingConfig = existingConfigs.find(
+                (c) => c.configuration_type === 'contractor_config'
+            );
+
             const configData = {
                 configuration_type: 'contractor_config',
                 configuration: {
                     client_outreach_email: clientOutreachEmail,
+                    review_link: reviewLink,
+                    // Preserve logo fields if they exist
+                    ...(existingConfig?.configuration?.logo_s3_key && {
+                        logo_s3_key: existingConfig.configuration.logo_s3_key,
+                    }),
+                    ...(existingConfig?.configuration?.logo_s3_bucket && {
+                        logo_s3_bucket: existingConfig.configuration.logo_s3_bucket,
+                    }),
                 },
             };
 
@@ -166,6 +223,78 @@ export default function SettingsPage() {
         setHasChanges(true);
     };
 
+    const handleReviewLinkChange = (value: string) => {
+        setReviewLink(value);
+        setHasChanges(true);
+    };
+
+    const handleLogoUpload = async (file: File | null) => {
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            notifications.show({
+                title: 'Error',
+                message: 'Please upload an image file',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            return;
+        }
+
+        // Validate file size (5MB max)
+        if (file.size > 5 * 1024 * 1024) {
+            notifications.show({
+                title: 'Error',
+                message: 'File size must be less than 5MB',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            return;
+        }
+
+        try {
+            setUploadingLogo(true);
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/configurations/logo', {
+                method: 'POST',
+                headers: getApiHeaders(),
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to upload logo');
+            }
+
+            const data = await response.json();
+            setLogoUrl(data.logo_url);
+
+            notifications.show({
+                title: 'Success',
+                message: 'Logo uploaded successfully',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Reload configuration to get updated logo
+            await loadConfiguration();
+        } catch (err) {
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to upload logo';
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setUploadingLogo(false);
+        }
+    };
+
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
             <Title c="white" order={1} mb="xl">
@@ -190,6 +319,7 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
+                    <Tabs.Tab value="templates">Templates</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                 </Tabs.List>
 
@@ -217,6 +347,53 @@ export default function SettingsPage() {
                                   type="email"
                                 />
 
+                                <TextInput
+                                  label="Review Link"
+                                  placeholder="https://..."
+                                  description="Review link to include in post-completion thank you messages"
+                                  value={reviewLink}
+                                  onChange={(e) => handleReviewLinkChange(e.target.value)}
+                                />
+
+                                {/* Logo Upload */}
+                                <Box>
+                                    <Text size="sm" fw={500} mb="xs">
+                                        Company Logo
+                                    </Text>
+                                    <Text size="xs" c="dimmed" mb="md">
+                                        Upload a logo to be displayed in email templates.
+                                        Recommended size: 200x60px. Max file size: 5MB.
+                                    </Text>
+                                    <Group gap="md" align="flex-start">
+                                        {logoUrl && (
+                                            <Image
+                                              src={logoUrl}
+                                              alt="Company Logo"
+                                              w={200}
+                                              h={60}
+                                              fit="contain"
+                                              style={{ border: '1px solid #dee2e6', borderRadius: '4px', padding: '8px' }}
+                                            />
+                                        )}
+                                        <FileButton
+                                          onChange={handleLogoUpload}
+                                          accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                                          disabled={uploadingLogo}
+                                        >
+                                            {(props) => (
+                                                <Button
+                                                  {...props}
+                                                  leftSection={<IconUpload size={16} />}
+                                                  loading={uploadingLogo}
+                                                  variant="outline"
+                                                >
+                                                    {logoUrl ? 'Change Logo' : 'Upload Logo'}
+                                                </Button>
+                                            )}
+                                        </FileButton>
+                                    </Group>
+                                </Box>
+
                                 <Group justify="flex-end" mt="md">
                                     <Button
                                       onClick={handleSave}
@@ -229,6 +406,10 @@ export default function SettingsPage() {
                             </Stack>
                         )}
                     </Card>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="templates" pt="md">
+                    <TemplatesTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="notifications" pt="md">
