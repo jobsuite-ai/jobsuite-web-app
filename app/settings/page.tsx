@@ -41,7 +41,6 @@ export default function SettingsPage() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [clientOutreachEmail, setClientOutreachEmail] = useState('');
     const [reviewLink, setReviewLink] = useState('');
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -69,7 +68,6 @@ export default function SettingsPage() {
             if (!response.ok) {
                 if (response.status === 404) {
                     // No configuration exists yet, that's okay
-                    setClientOutreachEmail('');
                     setConfigId(null);
                     return;
                 }
@@ -86,15 +84,11 @@ export default function SettingsPage() {
 
             if (config) {
                 setConfigId(config.id);
-                setClientOutreachEmail(
-                    config.configuration?.client_outreach_email || ''
-                );
                 setReviewLink(
                     config.configuration?.review_link || ''
                 );
             } else {
                 setConfigId(null);
-                setClientOutreachEmail('');
                 setReviewLink('');
             }
 
@@ -154,7 +148,6 @@ export default function SettingsPage() {
             const configData = {
                 configuration_type: 'contractor_config',
                 configuration: {
-                    client_outreach_email: clientOutreachEmail,
                     review_link: reviewLink,
                     // Preserve logo fields if they exist
                     ...(existingConfig?.configuration?.logo_s3_key && {
@@ -216,11 +209,6 @@ export default function SettingsPage() {
         } finally {
             setSaving(false);
         }
-    };
-
-    const handleEmailChange = (value: string) => {
-        setClientOutreachEmail(value);
-        setHasChanges(true);
     };
 
     const handleReviewLinkChange = (value: string) => {
@@ -337,15 +325,6 @@ export default function SettingsPage() {
                                         {error}
                                     </Alert>
                                 )}
-
-                                <TextInput
-                                  label="Client Outreach Email"
-                                  placeholder="email@example.com"
-                                  description="Email address that client outreach messages should be sent from"
-                                  value={clientOutreachEmail}
-                                  onChange={(e) => handleEmailChange(e.target.value)}
-                                  type="email"
-                                />
 
                                 <TextInput
                                   label="Review Link"

@@ -269,8 +269,8 @@ export default function TemplatesTab() {
                         SES Email Identity
                     </Text>
                     <Text c="dimmed" size="sm">
-                        Configure the email address that will be used to send outreach messages.
-                        This email must be verified in AWS SES.
+                        Configure the email address that will be used to send client outreach
+                        messages. This email must be verified in AWS SES.
                     </Text>
                     <Group>
                         <TextInput
