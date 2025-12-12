@@ -4,6 +4,7 @@ import { getContractorId } from '@/app/api/utils/getContractorId';
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function POST(request: NextRequest) {
+    let contractorId: string | null = null;
     try {
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        const contractorId = await getContractorId(request);
+        contractorId = await getContractorId(request);
 
         if (!contractorId) {
             return NextResponse.json(
@@ -55,9 +56,33 @@ export async function POST(request: NextRequest) {
         );
 
         if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json();
+            let errorMessage = 'Failed to upload logo';
+            try {
+                // Read response as text first, then try to parse as JSON
+                const errorText = await uploadResponse.text();
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch {
+                        // If not JSON, use the text as error message
+                        errorMessage = errorText || errorMessage;
+                    }
+                }
+            } catch (parseError) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to read error response:', parseError);
+            }
+            // eslint-disable-next-line no-console
+            console.error('Logo upload failed:', {
+                status: uploadResponse.status,
+                statusText: uploadResponse.statusText,
+                errorMessage,
+                contractorId,
+                apiBaseUrl,
+            });
             return NextResponse.json(
-                { message: errorData.detail || 'Failed to upload logo' },
+                { message: errorMessage },
                 { status: uploadResponse.status }
             );
         }
@@ -66,15 +91,24 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(data);
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Upload logo error:', error);
+        console.error('Upload logo error:', {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            contractorId,
+        });
         return NextResponse.json(
-            { message: 'An error occurred while uploading logo' },
+            {
+                message: error instanceof Error
+                    ? `An error occurred while uploading logo: ${error.message}`
+                    : 'An error occurred while uploading logo',
+            },
             { status: 500 }
         );
     }
 }
 
 export async function GET(request: NextRequest) {
+    let contractorId: string | null = null;
     try {
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -87,7 +121,7 @@ export async function GET(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        const contractorId = await getContractorId(request);
+        contractorId = await getContractorId(request);
 
         if (!contractorId) {
             return NextResponse.json(
@@ -111,9 +145,32 @@ export async function GET(request: NextRequest) {
         );
 
         if (!logoResponse.ok) {
-            const errorData = await logoResponse.json();
+            let errorMessage = 'Failed to get logo URL';
+            try {
+                // Read response as text first, then try to parse as JSON
+                const errorText = await logoResponse.text();
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch {
+                        // If not JSON, use the text as error message
+                        errorMessage = errorText || errorMessage;
+                    }
+                }
+            } catch (parseError) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to read error response:', parseError);
+            }
+            // eslint-disable-next-line no-console
+            console.error('Get logo failed:', {
+                status: logoResponse.status,
+                statusText: logoResponse.statusText,
+                errorMessage,
+                contractorId,
+            });
             return NextResponse.json(
-                { message: errorData.detail || 'Failed to get logo URL' },
+                { message: errorMessage },
                 { status: logoResponse.status }
             );
         }
@@ -122,9 +179,17 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(data);
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Get logo error:', error);
+        console.error('Get logo error:', {
+            error: error instanceof Error ? error.message : String(error),
+            stack: error instanceof Error ? error.stack : undefined,
+            contractorId,
+        });
         return NextResponse.json(
-            { message: 'An error occurred while getting logo URL' },
+            {
+                message: error instanceof Error
+                    ? `An error occurred while getting logo URL: ${error.message}`
+                    : 'An error occurred while getting logo URL',
+            },
             { status: 500 }
         );
     }
