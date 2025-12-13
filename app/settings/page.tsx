@@ -243,22 +243,35 @@ export default function SettingsPage() {
 
         try {
             setUploadingLogo(true);
+
+            // Get access token from localStorage (same pattern as ImageUpload)
+            const accessToken = localStorage.getItem('access_token');
+            if (!accessToken) {
+                throw new Error('No access token found');
+            }
+
             const formData = new FormData();
             formData.append('file', file);
 
+            // Don't use getApiHeaders() for FormData - it sets Content-Type: application/json
+            // which breaks FormData uploads. Let the browser set Content-Type with boundary.
             const response = await fetch('/api/configurations/logo', {
                 method: 'POST',
-                headers: getApiHeaders(),
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
                 body: formData,
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to upload logo');
+                const errorData = await response.json().catch(() => ({}));
+                const errorMsg = errorData.message || errorData.detail || 'Failed to upload logo';
+                throw new Error(errorMsg);
             }
 
             const data = await response.json();
             setLogoUrl(data.logo_url);
+            setHasChanges(false);
 
             notifications.show({
                 title: 'Success',

@@ -4,7 +4,6 @@ import { getContractorId } from '@/app/api/utils/getContractorId';
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function POST(request: NextRequest) {
-    let contractorId: string | null = null;
     try {
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -17,18 +16,19 @@ export async function POST(request: NextRequest) {
         }
 
         const token = authHeader.substring(7);
-        contractorId = await getContractorId(request);
+        const apiBaseUrl = getApiBaseUrl();
+
+        // Get contractor_id from cache (header) or fetch from API
+        const contractorId = await getContractorId(request);
 
         if (!contractorId) {
             return NextResponse.json(
-                { message: 'Contractor ID not found' },
+                { message: 'User does not have a contractor ID' },
                 { status: 400 }
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
-
-        // Get the file from the form data
+        // Get form data (for file uploads)
         const formData = await request.formData();
         const file = formData.get('file') as File;
 
@@ -39,133 +39,36 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            return NextResponse.json(
-                { message: 'File must be an image (PNG, JPEG, etc.)' },
-                { status: 400 }
-            );
-        }
+        // Create form data for backend
+        const backendFormData = new FormData();
+        backendFormData.append('file', file);
 
-        // Validate file size (max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            return NextResponse.json(
-                { message: 'File size must be less than 5MB' },
-                { status: 400 }
-            );
-        }
-
-        // Step 1: Get presigned URL from backend
-        const presignedUrlResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo/presigned-url`,
+        // Upload logo via backend API (direct upload, same pattern as resources)
+        const uploadResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo`,
             {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    filename: file.name,
-                    content_type: file.type,
-                }),
+                body: backendFormData,
             }
         );
 
-        if (!presignedUrlResponse.ok) {
-            let errorMessage = 'Failed to get presigned URL';
-            try {
-                const errorText = await presignedUrlResponse.text();
-                if (errorText) {
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorData.message || errorMessage;
-                    } catch {
-                        errorMessage = errorText || errorMessage;
-                    }
-                }
-            } catch (parseError) {
-                // eslint-disable-next-line no-console
-                console.error('Failed to read error response:', parseError);
-            }
+        if (!uploadResponse.ok) {
+            const errorData = await uploadResponse.json().catch(() => ({}));
+            const errorMsg = errorData.detail || errorData.message || 'Failed to upload logo';
             return NextResponse.json(
-                { message: errorMessage },
-                { status: presignedUrlResponse.status }
+                { message: errorMsg },
+                { status: uploadResponse.status }
             );
         }
 
-        const { presigned_url, s3_key, s3_bucket } = await presignedUrlResponse.json();
-
-        // Step 2: Upload file directly to S3 using presigned URL
-        const fileBuffer = await file.arrayBuffer();
-        const s3UploadResponse = await fetch(presigned_url, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': file.type,
-            },
-            body: fileBuffer,
-        });
-
-        if (!s3UploadResponse.ok) {
-            const errorText = await s3UploadResponse.text().catch(() => 'Unknown error');
-            // eslint-disable-next-line no-console
-            console.error('S3 upload failed:', {
-                status: s3UploadResponse.status,
-                statusText: s3UploadResponse.statusText,
-                errorText,
-            });
-            return NextResponse.json(
-                { message: `Failed to upload to S3: ${s3UploadResponse.statusText}` },
-                { status: 500 }
-            );
-        }
-
-        // Step 3: Save S3 location to configuration
-        const saveLocationResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo/location`,
-            {
-                method: 'PUT',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    logo_s3_key: s3_key,
-                    logo_s3_bucket: s3_bucket,
-                }),
-            }
-        );
-
-        if (!saveLocationResponse.ok) {
-            let errorMessage = 'Failed to save logo location';
-            try {
-                const errorText = await saveLocationResponse.text();
-                if (errorText) {
-                    try {
-                        const errorData = JSON.parse(errorText);
-                        errorMessage = errorData.detail || errorData.message || errorMessage;
-                    } catch {
-                        errorMessage = errorText || errorMessage;
-                    }
-                }
-            } catch (parseError) {
-                // eslint-disable-next-line no-console
-                console.error('Failed to read error response:', parseError);
-            }
-            return NextResponse.json(
-                { message: errorMessage },
-                { status: saveLocationResponse.status }
-            );
-        }
-
-        const data = await saveLocationResponse.json();
+        const data = await uploadResponse.json();
         return NextResponse.json(data);
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Upload logo error:', {
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            contractorId,
-        });
+        console.error('Upload logo error:', error);
         return NextResponse.json(
             {
                 message: error instanceof Error
