@@ -13,6 +13,7 @@ import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useContractorLogo } from '@/hooks/useContractorLogo';
 
 const links = [
   { link: '/', label: 'Home' },
@@ -64,6 +65,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const pathname = usePathname();
   const { clients, estimates } = useSearchData();
   const { isAuthenticated, isLoading } = useAuth();
+  const { logoUrl } = useContractorLogo();
 
   const handleNavLinkClick = (
     event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
@@ -547,7 +549,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
               href="/"
               onClick={(event) => handleNavLinkClick(event, '/')}
             >
-              <JobsuiteLogo />
+              <JobsuiteLogo logoUrl={logoUrl} />
             </Link>
           </Group>
 
