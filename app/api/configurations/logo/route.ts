@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create form data for backend - same pattern as ImageUpload
+        // Create form data for backend - exactly matching estimate resources pattern
         const backendFormData = new FormData();
         backendFormData.append('file', file);
 
