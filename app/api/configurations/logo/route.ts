@@ -39,33 +39,47 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Create form data for backend - exactly matching estimate resources pattern
-        const backendFormData = new FormData();
-        backendFormData.append('file', file);
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            return NextResponse.json(
+                { message: 'File must be an image (PNG, JPEG, etc.)' },
+                { status: 400 }
+            );
+        }
 
-        // Upload logo via backend API - same pattern as estimate resources
-        const uploadResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo`,
+        // Validate file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            return NextResponse.json(
+                { message: 'File size must be less than 5MB' },
+                { status: 400 }
+            );
+        }
+
+        // Step 1: Get presigned URL from backend
+        const presignedUrlResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo/presigned-url`,
             {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
                 },
-                body: backendFormData,
+                body: JSON.stringify({
+                    filename: file.name,
+                    content_type: file.type,
+                }),
             }
         );
 
-        if (!uploadResponse.ok) {
-            let errorMessage = 'Failed to upload logo';
+        if (!presignedUrlResponse.ok) {
+            let errorMessage = 'Failed to get presigned URL';
             try {
-                // Read response as text first, then try to parse as JSON
-                const errorText = await uploadResponse.text();
+                const errorText = await presignedUrlResponse.text();
                 if (errorText) {
                     try {
                         const errorData = JSON.parse(errorText);
                         errorMessage = errorData.detail || errorData.message || errorMessage;
                     } catch {
-                        // If not JSON, use the text as error message
                         errorMessage = errorText || errorMessage;
                     }
                 }
@@ -73,21 +87,77 @@ export async function POST(request: NextRequest) {
                 // eslint-disable-next-line no-console
                 console.error('Failed to read error response:', parseError);
             }
-            // eslint-disable-next-line no-console
-            console.error('Logo upload failed:', {
-                status: uploadResponse.status,
-                statusText: uploadResponse.statusText,
-                errorMessage,
-                contractorId,
-                apiBaseUrl,
-            });
             return NextResponse.json(
                 { message: errorMessage },
-                { status: uploadResponse.status }
+                { status: presignedUrlResponse.status }
             );
         }
 
-        const data = await uploadResponse.json();
+        const { presigned_url, s3_key, s3_bucket } = await presignedUrlResponse.json();
+
+        // Step 2: Upload file directly to S3 using presigned URL
+        const fileBuffer = await file.arrayBuffer();
+        const s3UploadResponse = await fetch(presigned_url, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': file.type,
+            },
+            body: fileBuffer,
+        });
+
+        if (!s3UploadResponse.ok) {
+            const errorText = await s3UploadResponse.text().catch(() => 'Unknown error');
+            // eslint-disable-next-line no-console
+            console.error('S3 upload failed:', {
+                status: s3UploadResponse.status,
+                statusText: s3UploadResponse.statusText,
+                errorText,
+            });
+            return NextResponse.json(
+                { message: `Failed to upload to S3: ${s3UploadResponse.statusText}` },
+                { status: 500 }
+            );
+        }
+
+        // Step 3: Save S3 location to configuration
+        const saveLocationResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/logo/location`,
+            {
+                method: 'PUT',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    logo_s3_key: s3_key,
+                    logo_s3_bucket: s3_bucket,
+                }),
+            }
+        );
+
+        if (!saveLocationResponse.ok) {
+            let errorMessage = 'Failed to save logo location';
+            try {
+                const errorText = await saveLocationResponse.text();
+                if (errorText) {
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.detail || errorData.message || errorMessage;
+                    } catch {
+                        errorMessage = errorText || errorMessage;
+                    }
+                }
+            } catch (parseError) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to read error response:', parseError);
+            }
+            return NextResponse.json(
+                { message: errorMessage },
+                { status: saveLocationResponse.status }
+            );
+        }
+
+        const data = await saveLocationResponse.json();
         return NextResponse.json(data);
     } catch (error) {
         // eslint-disable-next-line no-console
