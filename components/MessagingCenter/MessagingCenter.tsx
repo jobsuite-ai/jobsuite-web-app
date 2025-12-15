@@ -709,6 +709,11 @@ export default function MessagingCenter() {
               onClose={() => setShowEmailConfigModal(false)}
               title="Email Configuration Required"
               centered
+              zIndex={400}
+              overlayProps={{
+                backgroundOpacity: 0.75,
+                blur: 3,
+              }}
             >
                 <Stack gap="md">
                     <Text>

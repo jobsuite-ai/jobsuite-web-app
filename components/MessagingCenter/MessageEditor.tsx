@@ -71,7 +71,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                 }
             }
         } catch (err) {
-            console.error('Error loading sub-clients:', err);
+            // Error loading sub-clients - silently fail as this is not critical
         }
     };
 
@@ -126,6 +126,12 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
           onClose={onClose}
           title="Edit Message"
           size="lg"
+          centered
+          zIndex={400}
+          overlayProps={{
+            backgroundOpacity: 0.75,
+            blur: 3,
+          }}
         >
             <Stack gap="md">
                 <TextInput
