@@ -349,10 +349,16 @@ export default function MessageCreator({
           title="Create New Message"
           size="lg"
           centered
-          zIndex={400}
+          zIndex={1000}
           overlayProps={{
             backgroundOpacity: 0.75,
             blur: 3,
+            zIndex: 1000,
+          }}
+          styles={{
+            body: { overflow: 'visible' },
+            content: { overflow: 'visible', position: 'relative' },
+            inner: { zIndex: 1000 },
           }}
         >
             {loadingData ? (
@@ -377,6 +383,7 @@ export default function MessageCreator({
                       onChange={setSelectedEstimateId}
                       required
                       searchable
+                      comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 
                     <NumberInput
@@ -398,6 +405,7 @@ export default function MessageCreator({
                       onChange={setSelectedUserId}
                       clearable
                       searchable
+                      comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 
                     <Select
@@ -409,6 +417,7 @@ export default function MessageCreator({
                       value={messageType}
                       onChange={(value) => setMessageType(value || 'SCHEDULED_MESSAGE')}
                       required
+                      comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 
                     <Divider label="Message Content" labelPosition="center" />
@@ -431,6 +440,7 @@ export default function MessageCreator({
                           value={selectedTemplateType}
                           onChange={setSelectedTemplateType}
                           required
+                          comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                         />
                     )}
 
@@ -461,6 +471,7 @@ export default function MessageCreator({
                                 ]}
                               value={recipientType}
                               onChange={(value) => setRecipientType(value || 'ALL_SUB_CLIENTS')}
+                              comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                             />
 
                             {recipientType === 'SINGLE_SUB_CLIENT' && (
@@ -471,6 +482,10 @@ export default function MessageCreator({
                                   onChange={setSelectedSubClientId}
                                   placeholder="Choose a recipient"
                                   required
+                                  comboboxProps={{ withinPortal: true, zIndex: 1001 }}
+                                  styles={{
+                                    dropdown: { zIndex: 500 },
+                                  }}
                                 />
                             )}
                         </>
