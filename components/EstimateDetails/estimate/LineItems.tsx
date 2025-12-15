@@ -20,7 +20,8 @@ export type LineItemsRef = {
 const LineItems = forwardRef<LineItemsRef, {
     estimateID: string;
     onLineItemsChange?:(count: number) => void;
-}>(({ estimateID, onLineItemsChange }, ref) => {
+    onEstimateUpdate?: () => void;
+}>(({ estimateID, onLineItemsChange, onEstimateUpdate }, ref) => {
     const [opened, setOpened] = useState(false);
     const [editingItem, setEditingItem] = useState<EstimateLineItem | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -149,6 +150,8 @@ const LineItems = forwardRef<LineItemsRef, {
                     message: 'Line item added successfully',
                     color: 'green',
                 });
+                // Refresh estimate data to update hours in sidebar
+                onEstimateUpdate?.();
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Error creating line item:', error);
@@ -221,6 +224,8 @@ const LineItems = forwardRef<LineItemsRef, {
                 message: 'Line item updated successfully',
                 color: 'green',
             });
+            // Refresh estimate data to update hours in sidebar
+            onEstimateUpdate?.();
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error updating line item:', error);
@@ -271,6 +276,8 @@ const LineItems = forwardRef<LineItemsRef, {
                 message: 'Line item deleted successfully',
                 color: 'green',
             });
+            // Refresh estimate data to update hours in sidebar
+            onEstimateUpdate?.();
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error deleting line item:', error);

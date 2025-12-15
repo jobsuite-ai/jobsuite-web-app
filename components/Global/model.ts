@@ -79,6 +79,7 @@ export type SingleComment = {
     comment_contents: string;
     commenter: string;
     timestamp: string;
+    updated_at?: string;
 };
 
 export type TypedDynamoStringReturn = {

@@ -49,6 +49,9 @@ interface OutreachMessage {
     status: string;
     created_at: string;
     updated_at: string;
+    from_email?: string;
+    to_emails?: string[];
+    owner_name?: string;
 }
 
 const MESSAGE_TYPE_LABELS: Record<string, string> = {
@@ -163,10 +166,6 @@ export default function MessagingCenter() {
     const [sending, setSending] = useState<string | null>(null);
     const [renderedMessages, setRenderedMessages] =
         useState<Record<string, { subject: string; body: string }>>({});
-    const [clientOutreachEmail, setClientOutreachEmail] = useState<string | null>(null);
-    const [messageRecipients, setMessageRecipients] = useState<
-        Record<string, string[]>
-    >({});
     const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
 
@@ -182,7 +181,6 @@ export default function MessagingCenter() {
             return undefined;
         }
 
-        loadClientOutreachEmail();
         loadMessages();
         loadCount();
         // Refresh count every minute
@@ -196,24 +194,6 @@ export default function MessagingCenter() {
             clearInterval(interval);
         };
     }, [isAuthenticated, isLoading]);
-
-    const loadClientOutreachEmail = async () => {
-        try {
-            const response = await fetch('/api/outreach-templates', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-            if (response.ok) {
-                const data = await response.json();
-                const sesEmail = data._ses_identity?.email;
-                if (sesEmail) {
-                    setClientOutreachEmail(sesEmail);
-                }
-            }
-        } catch (err) {
-            // Ignore errors, will fallback to default
-        }
-    };
 
     const loadMessages = async () => {
         // Don't make request if not authenticated
@@ -338,9 +318,8 @@ export default function MessagingCenter() {
                 if (estimateData) estimateMap.set(id, estimateData);
             });
 
-            // Render templates for each message and calculate recipients
+            // Render templates for each message
             const renderedRecord: Record<string, { subject: string; body: string }> = {};
-            const recipientsRecord: Record<string, string[]> = {};
 
             data.forEach((message) => {
                 const client = clientMap.get(message.client_id);
@@ -353,46 +332,9 @@ export default function MessagingCenter() {
                     subject: renderedSubject,
                     body: renderedBody,
                 };
-
-                // Calculate recipient emails
-                const recipients: string[] = [];
-                if (client) {
-                    // Default to ALL_SUB_CLIENTS if recipient_type is not set
-                    const recipientType = message.recipient_type || 'ALL_SUB_CLIENTS';
-
-                    if (recipientType === 'ALL_SUB_CLIENTS') {
-                        if (client.email) {
-                            recipients.push(client.email);
-                        }
-                        if (client.sub_clients) {
-                            client.sub_clients.forEach((subClient) => {
-                                if (subClient.email && !recipients.includes(subClient.email)) {
-                                    recipients.push(subClient.email);
-                                }
-                            });
-                        }
-                    } else if (recipientType === 'SINGLE_SUB_CLIENT') {
-                        if (message.recipient_sub_client_id && client.sub_clients) {
-                            const subClient = client.sub_clients.find(
-                                (sc) => sc.id === message.recipient_sub_client_id
-                            );
-                            if (subClient?.email) {
-                                recipients.push(subClient.email);
-                            } else if (client.email) {
-                                // Fallback to main client email if sub-client not found
-                                recipients.push(client.email);
-                            }
-                        } else if (client.email) {
-                            // No sub-client selected, use main client email
-                            recipients.push(client.email);
-                        }
-                    }
-                }
-                recipientsRecord[message.id] = recipients;
             });
 
             setRenderedMessages(renderedRecord);
-            setMessageRecipients(recipientsRecord);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load messages');
         } finally {
@@ -431,7 +373,7 @@ export default function MessagingCenter() {
 
     const handleSend = async (message: OutreachMessage) => {
         // Check if SES email identity is configured
-        if (!clientOutreachEmail) {
+        if (!message.from_email || message.from_email === 'info@jobsuite.app') {
             setShowEmailConfigModal(true);
             return;
         }
@@ -583,20 +525,9 @@ export default function MessagingCenter() {
                                   withBorder
                                 >
                                     <Stack gap="md">
-                                        <Group justify="space-between">
-                                            <div>
-                                                <Group gap="xs" mb="xs">
-                                                    <Badge variant="light">
-                                                        {MESSAGE_TYPE_LABELS[
-                                                            message.message_type
-                                                        ] || message.message_type}
-                                                    </Badge>
-                                                    {message.send_count > 0 && (
-                                                        <Badge variant="outline" size="sm">
-                                                            Sent {message.send_count}x
-                                                        </Badge>
-                                                    )}
-                                                </Group>
+                                        {/* Top: Subject/Due left, center, Badge right */}
+                                        <Group justify="space-between" align="flex-start">
+                                            <div style={{ flex: 1 }}>
                                                 <Text fw={600} size="lg">
                                                     {
                                                         renderedMessages[message.id]?.subject ||
@@ -606,34 +537,6 @@ export default function MessagingCenter() {
                                                 <Text c="dimmed" size="sm">
                                                     Due: {formatDate(message.to_be_sent_date)}
                                                 </Text>
-                                                <Group gap="xs" mt="xs">
-                                                    <Text c="dimmed" size="xs">
-                                                        From:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          c="white"
-                                                          fw={500}
-                                                          size="xs"
-                                                        >
-                                                            {clientOutreachEmail ||
-                                                                'info@jobsuite.app'}
-                                                        </Text>
-                                                    </Text>
-                                                    <Text c="dimmed" size="xs">
-                                                        To:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          c="white"
-                                                          fw={500}
-                                                          size="xs"
-                                                        >
-                                                            {messageRecipients[message.id] &&
-                                                            messageRecipients[message.id].length > 0
-                                                                ? messageRecipients[message.id].join(', ')
-                                                                : 'No recipients'}
-                                                        </Text>
-                                                    </Text>
-                                                </Group>
                                                 {message.estimate_id && (
                                                     <Text c="dimmed" size="xs" mt="xs">
                                                         Estimate:{' '}
@@ -650,6 +553,58 @@ export default function MessagingCenter() {
                                                             View Estimate
                                                         </Text>
                                                     </Text>
+                                                )}
+                                            </div>
+                                            <Stack gap={4} style={{ flex: 1, alignItems: 'center' }}>
+                                                <Text size="xs" fw={700}>
+                                                    Owner:{' '}
+                                                    <Text
+                                                      component="span"
+                                                      fw={500}
+                                                      size="xs"
+                                                      c="dimmed"
+                                                    >
+                                                        {message.owner_name || 'Unknown'}
+                                                    </Text>
+                                                </Text>
+                                                <Group gap="md">
+                                                    <Text fw={700} size="xs">
+                                                        From:{' '}
+                                                        <Text
+                                                          component="span"
+                                                          fw={500}
+                                                          size="xs"
+                                                          c="dimmed"
+                                                        >
+                                                            {message.from_email || 'info@jobsuite.app'}
+                                                        </Text>
+                                                    </Text>
+                                                    <Text fw={700} size="xs">
+                                                        To:{' '}
+                                                        <Text
+                                                          component="span"
+                                                          fw={500}
+                                                          size="xs"
+                                                          c="dimmed"
+                                                        >
+                                                            {message.to_emails &&
+                                                            message.to_emails.length > 0
+                                                                ? message.to_emails.join(', ')
+                                                                : 'No recipients'}
+                                                        </Text>
+                                                    </Text>
+                                                </Group>
+                                            </Stack>
+                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 'xs' }}>
+                                                <Badge variant="light">
+                                                    {MESSAGE_TYPE_LABELS[
+                                                        message.message_type
+                                                    ] || message.message_type}
+                                                </Badge>
+                                                {message.send_count > 0 && (
+                                                    <Badge variant="outline" size="sm">
+                                                        Sent {message.send_count}x
+                                                    </Badge>
                                                 )}
                                             </div>
                                         </Group>
