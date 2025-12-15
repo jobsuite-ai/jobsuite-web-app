@@ -357,7 +357,10 @@ export default function MessagingCenter() {
                 // Calculate recipient emails
                 const recipients: string[] = [];
                 if (client) {
-                    if (message.recipient_type === 'ALL_SUB_CLIENTS') {
+                    // Default to ALL_SUB_CLIENTS if recipient_type is not set
+                    const recipientType = message.recipient_type || 'ALL_SUB_CLIENTS';
+
+                    if (recipientType === 'ALL_SUB_CLIENTS') {
                         if (client.email) {
                             recipients.push(client.email);
                         }
@@ -368,15 +371,19 @@ export default function MessagingCenter() {
                                 }
                             });
                         }
-                    } else if (message.recipient_type === 'SINGLE_SUB_CLIENT') {
+                    } else if (recipientType === 'SINGLE_SUB_CLIENT') {
                         if (message.recipient_sub_client_id && client.sub_clients) {
                             const subClient = client.sub_clients.find(
                                 (sc) => sc.id === message.recipient_sub_client_id
                             );
                             if (subClient?.email) {
                                 recipients.push(subClient.email);
+                            } else if (client.email) {
+                                // Fallback to main client email if sub-client not found
+                                recipients.push(client.email);
                             }
                         } else if (client.email) {
+                            // No sub-client selected, use main client email
                             recipients.push(client.email);
                         }
                     }
@@ -609,28 +616,41 @@ export default function MessagingCenter() {
                                                           size="xs"
                                                         >
                                                             {clientOutreachEmail ||
-                                                                'noreply@jobsuite.app'}
+                                                                'info@jobsuite.app'}
                                                         </Text>
                                                     </Text>
-                                                    {messageRecipients[message.id] &&
-                                                        messageRecipients[
-                                                            message.id
-                                                        ].length > 0 && (
-                                                            <Text c="dimmed" size="xs">
-                                                                To:{' '}
-                                                                <Text
-                                                                  component="span"
-                                                                  c="white"
-                                                                  fw={500}
-                                                                  size="xs"
-                                                                >
-                                                                    {messageRecipients[
-                                                                        message.id
-                                                                    ].join(', ')}
-                                                                </Text>
-                                                            </Text>
-                                                        )}
+                                                    <Text c="dimmed" size="xs">
+                                                        To:{' '}
+                                                        <Text
+                                                          component="span"
+                                                          c="white"
+                                                          fw={500}
+                                                          size="xs"
+                                                        >
+                                                            {messageRecipients[message.id] &&
+                                                            messageRecipients[message.id].length > 0
+                                                                ? messageRecipients[message.id].join(', ')
+                                                                : 'No recipients'}
+                                                        </Text>
+                                                    </Text>
                                                 </Group>
+                                                {message.estimate_id && (
+                                                    <Text c="dimmed" size="xs" mt="xs">
+                                                        Estimate:{' '}
+                                                        <Text
+                                                          component="a"
+                                                          href={`/proposals/${message.estimate_id}`}
+                                                          target="_blank"
+                                                          rel="noopener noreferrer"
+                                                          c="blue"
+                                                          fw={500}
+                                                          size="xs"
+                                                          style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                                                        >
+                                                            View Estimate
+                                                        </Text>
+                                                    </Text>
+                                                )}
                                             </div>
                                         </Group>
 
