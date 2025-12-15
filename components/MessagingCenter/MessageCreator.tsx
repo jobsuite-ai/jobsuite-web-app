@@ -356,8 +356,6 @@ export default function MessageCreator({
             zIndex: 1000,
           }}
           styles={{
-            body: { overflow: 'visible' },
-            content: { overflow: 'visible', position: 'relative' },
             inner: { zIndex: 1000 },
           }}
         >
