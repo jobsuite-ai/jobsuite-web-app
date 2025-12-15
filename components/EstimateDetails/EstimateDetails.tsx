@@ -674,6 +674,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
+                                              onEstimateUpdate={getEstimate}
                                             />
                                         </CollapsibleSection>
                                     ) : (
@@ -684,6 +685,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
+                                              onEstimateUpdate={getEstimate}
                                             />
                                         </div>
                                     )}

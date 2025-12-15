@@ -238,7 +238,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     throw new Error(`Unknown cache key: ${key}`);
   }, [clients, estimates, projects]);
 
-  // Initial load from cache, then refresh in background if cache is empty
+  // Initial load: show cached data immediately, then always fetch fresh data in background
   useEffect(() => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -246,15 +246,10 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Check if we have any cached data
-    const hasCachedClients = getCachedData<ContractorClient>('clients');
-    const hasCachedEstimates = getCachedData<Estimate>('estimates');
-    const hasCachedProjects = getCachedData<Job>('projects');
-
-    // If no cache exists, fetch data
-    if (!hasCachedClients || !hasCachedEstimates || !hasCachedProjects) {
+    // Always fetch fresh data in the background, regardless of cache
+    // This ensures we have the latest data, especially important on iOS devices
+    // where cache timing can be inconsistent
       refreshData();
-    }
   }, [refreshData]);
 
   // Listen for storage changes (e.g., after login)
