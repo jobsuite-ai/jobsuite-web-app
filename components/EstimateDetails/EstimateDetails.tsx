@@ -75,7 +75,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     // const searchParams = useSearchParams();
     // const page = searchParams?.get('page');
 
-    // Fetch all initial data in a single effect
+    // Fetch all initial data in a single effect using consolidated endpoint
     useEffect(() => {
         isMountedRef.current = true;
         const accessToken = localStorage.getItem('access_token');
@@ -89,89 +89,39 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             try {
                 setInitialLoading(true);
 
-                // Fetch all data in parallel
-                const [estimateRes, resourcesRes, lineItemsRes] = await Promise.all([
-                    fetch(`/api/estimates/${estimateID}?include_change_orders=true`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }),
-                    fetch(`/api/estimates/${estimateID}/resources`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }),
-                    fetch(`/api/estimates/${estimateID}/line-items`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }),
-                ]);
+                // Fetch all data from consolidated endpoint
+                const detailsRes = await fetch(`/api/estimates/${estimateID}/details`, {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                });
 
                 if (!isMountedRef.current) return;
 
-                // Process estimate
-                if (estimateRes.ok) {
-                    const estimateData = await estimateRes.json();
-                    setEstimate(estimateData);
-
-                    // Fetch client if estimate has client_id
-                    if (estimateData.client_id) {
-                        try {
-                            const clientRes = await fetch(`/api/clients/${estimateData.client_id}`, {
-                                method: 'GET',
-                                headers: {
-                                    Authorization: `Bearer ${accessToken}`,
-                                    'Content-Type': 'application/json',
-                                },
-                            });
-                            if (clientRes.ok && isMountedRef.current) {
-                                const clientData = await clientRes.json();
-                                setClient(clientData.Item || clientData);
-                            }
-                        } catch (error) {
-                            // eslint-disable-next-line no-console
-                            console.error('Error fetching client:', error);
-                        }
-                    }
-
-                    // Fetch change orders if not a change order itself
-                    if (
-                        !estimateData.original_estimate_id &&
-                        estimateData.status !== EstimateStatus.ARCHIVED
-                    ) {
-                        try {
-                            const changeOrdersRes = await fetch(`/api/estimates/${estimateData.id}/change-orders`, {
-                                method: 'GET',
-                                headers: {
-                                    Authorization: `Bearer ${accessToken}`,
-                                    'Content-Type': 'application/json',
-                                },
-                            });
-                            if (changeOrdersRes.ok && isMountedRef.current) {
-                                const changeOrdersData = await changeOrdersRes.json();
-                                setChangeOrders(changeOrdersData || []);
-                            }
-                        } catch (error) {
-                            // eslint-disable-next-line no-console
-                            console.error('Error fetching change orders:', error);
-                        }
-                    }
-                } else {
+                if (!detailsRes.ok) {
                     // eslint-disable-next-line no-console
-                    console.error('Error fetching estimate:', await estimateRes.json().catch(() => ({})));
+                    console.error('Error fetching estimate details:', await detailsRes.json().catch(() => ({})));
+                    setInitialLoading(false);
+                    return;
+                }
+
+                const detailsData = await detailsRes.json();
+
+                // Process estimate
+                if (detailsData.estimate) {
+                    setEstimate(detailsData.estimate);
+                }
+
+                // Process client
+                if (detailsData.client && isMountedRef.current) {
+                    setClient(detailsData.client);
                 }
 
                 // Process resources
-                if (resourcesRes.ok) {
-                    const resourcesData = await resourcesRes.json();
-                    const resourcesArray = Array.isArray(resourcesData) ? resourcesData : [];
+                if (detailsData.resources && Array.isArray(detailsData.resources)) {
+                    const resourcesArray = detailsData.resources;
                     setResources(resourcesArray);
 
                     // Check if any video resource exists
@@ -179,47 +129,31 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     if (videoResource && isMountedRef.current) {
                         setObjectExists(true);
                     }
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.error('Error fetching resources:', await resourcesRes.json().catch(() => ({})));
                 }
 
                 // Process line items
-                if (lineItemsRes.ok) {
-                    const items = await lineItemsRes.json();
-                    const itemsArray = Array.isArray(items) ? items : [];
+                if (detailsData.line_items && Array.isArray(detailsData.line_items)) {
+                    const itemsArray = detailsData.line_items;
                     if (isMountedRef.current) {
                         setLineItems(itemsArray);
                         setLineItemsCount(itemsArray.length);
                     }
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.error('Error fetching line items:', await lineItemsRes.json().catch(() => ({})));
                 }
 
-                // Fetch comments
-                try {
-                    const commentsRes = await fetch(`/api/estimate-comments/${estimateID}`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    });
-                    if (commentsRes.ok && isMountedRef.current) {
-                        const commentsData = await commentsRes.json();
-                        // Comments API returns { Items: [...] }
-                        let commentsArray: any[] = [];
-                        if (commentsData.Items && Array.isArray(commentsData.Items)) {
-                            commentsArray = commentsData.Items;
-                        } else if (Array.isArray(commentsData)) {
-                            commentsArray = commentsData;
-                        }
+                // Process comments
+                if (detailsData.comments && Array.isArray(detailsData.comments)) {
+                    const commentsArray = detailsData.comments;
+                    if (isMountedRef.current) {
                         setComments(commentsArray);
                     }
-                } catch (error) {
-                    // eslint-disable-next-line no-console
-                    console.error('Error fetching comments:', error);
+                }
+
+                // Process change orders
+                if (detailsData.change_orders && Array.isArray(detailsData.change_orders)) {
+                    const changeOrdersArray = detailsData.change_orders;
+                    if (isMountedRef.current) {
+                        setChangeOrders(changeOrdersArray);
+                    }
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
@@ -740,6 +674,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
+                                              onEstimateUpdate={getEstimate}
                                             />
                                         </CollapsibleSection>
                                     ) : (
@@ -750,6 +685,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
+                                              onEstimateUpdate={getEstimate}
                                             />
                                         </div>
                                     )}

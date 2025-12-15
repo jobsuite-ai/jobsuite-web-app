@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
     Button,
+    Checkbox,
     Container,
     Divider,
     Group,
@@ -100,6 +101,7 @@ export function NewJobWorkflow() {
     const [existingClientSelected, setExistingClientSelected] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [referralSource, setReferralSource] = useState<string>('');
+    const [sameAsClientAddress, setSameAsClientAddress] = useState(false);
     const router = useRouter();
     const { refreshData } = useDataCache();
 
@@ -203,6 +205,23 @@ export function NewJobWorkflow() {
             return {};
         },
     });
+
+    // Helper function to copy client address to project address
+    const copyClientAddressToProject = () => {
+        const formValues = form.getValues();
+        form.setFieldValue('address_street', formValues.client_address_street || '');
+        form.setFieldValue('address_city', formValues.client_address_city || '');
+        form.setFieldValue('address_state', formValues.client_address_state || 'UT');
+        form.setFieldValue('address_zipcode', formValues.client_address_zipcode || '');
+        form.setFieldValue('address_country', formValues.client_address_country || 'USA');
+    };
+
+    // Handle copying client address to project address when checkbox is checked
+    useEffect(() => {
+        if (sameAsClientAddress) {
+            copyClientAddressToProject();
+        }
+    }, [sameAsClientAddress]);
 
     async function submitJob() {
         setIsSubmitting(true);
@@ -412,12 +431,24 @@ export function NewJobWorkflow() {
                                           placeholder="Street address"
                                           key={form.key('client_address_street')}
                                           {...form.getInputProps('client_address_street')}
+                                          onChange={(e) => {
+                                            form.getInputProps('client_address_street').onChange?.(e);
+                                            if (sameAsClientAddress) {
+                                              form.setFieldValue('address_street', e.currentTarget.value);
+                                            }
+                                          }}
                                         />
                                         <TextInput
                                           label="City"
                                           placeholder="City"
                                           key={form.key('client_address_city')}
                                           {...form.getInputProps('client_address_city')}
+                                          onChange={(e) => {
+                                            form.getInputProps('client_address_city').onChange?.(e);
+                                            if (sameAsClientAddress) {
+                                              form.setFieldValue('address_city', e.currentTarget.value);
+                                            }
+                                          }}
                                         />
                                         <Select
                                           label="State"
@@ -425,12 +456,24 @@ export function NewJobWorkflow() {
                                           data={USStatesMap}
                                           key={form.key('client_address_state')}
                                           {...form.getInputProps('client_address_state')}
+                                          onChange={(value) => {
+                                            form.getInputProps('client_address_state').onChange?.(value);
+                                            if (sameAsClientAddress) {
+                                              form.setFieldValue('address_state', value || 'UT');
+                                            }
+                                          }}
                                         />
                                         <TextInput
                                           label="Zip Code"
                                           placeholder="12345"
                                           key={form.key('client_address_zipcode')}
                                           {...form.getInputProps('client_address_zipcode')}
+                                          onChange={(e) => {
+                                            form.getInputProps('client_address_zipcode').onChange?.(e);
+                                            if (sameAsClientAddress) {
+                                              form.setFieldValue('address_zipcode', e.currentTarget.value);
+                                            }
+                                          }}
                                         />
                                     </Stack>
                                 )}
@@ -448,12 +491,20 @@ export function NewJobWorkflow() {
                                 <Text size="sm" c="dimmed" mt="xs" mb="xs">
                                     Project Address (where the work will be performed)
                                 </Text>
+                                <Checkbox
+                                  label="Project address is same as client address"
+                                  checked={sameAsClientAddress}
+                                  onChange={(event) => {
+                                    setSameAsClientAddress(event.currentTarget.checked);
+                                  }}
+                                />
                                 <TextInput
                                   withAsterisk
                                   label="Project Address"
                                   placeholder="Street address"
                                   key={form.key('address_street')}
                                   {...form.getInputProps('address_street')}
+                                  disabled={sameAsClientAddress}
                                 />
                                 <TextInput
                                   withAsterisk
@@ -461,6 +512,7 @@ export function NewJobWorkflow() {
                                   placeholder="City"
                                   key={form.key('address_city')}
                                   {...form.getInputProps('address_city')}
+                                  disabled={sameAsClientAddress}
                                 />
                                 <Select
                                   withAsterisk
@@ -469,6 +521,7 @@ export function NewJobWorkflow() {
                                   data={USStatesMap}
                                   key={form.key('address_state')}
                                   {...form.getInputProps('address_state')}
+                                  disabled={sameAsClientAddress}
                                 />
                                 <TextInput
                                   withAsterisk
@@ -476,6 +529,7 @@ export function NewJobWorkflow() {
                                   placeholder="12345"
                                   key={form.key('address_zipcode')}
                                   {...form.getInputProps('address_zipcode')}
+                                  disabled={sameAsClientAddress}
                                 />
                                 <Select
                                   withAsterisk

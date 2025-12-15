@@ -59,6 +59,7 @@ export default function JobComments({
             ? initialComments.map((comment: any) => ({
                   ...comment,
                   timestamp: comment.created_at || comment.timestamp,
+                  updated_at: comment.updated_at,
               })).sort((a: SingleComment, b: SingleComment) => {
                   const dateA = new Date(a.timestamp).getTime();
                   const dateB = new Date(b.timestamp).getTime();
@@ -122,6 +123,7 @@ export default function JobComments({
             const mappedComments = Items?.map((comment: any) => ({
                 ...comment,
                 timestamp: comment.created_at || comment.timestamp,
+                updated_at: comment.updated_at,
             })) || [];
             // Sort comments by timestamp descending (newest first)
             const sortedComments = mappedComments.sort((a: SingleComment, b: SingleComment) => {
@@ -644,7 +646,12 @@ export default function JobComments({
                         {jobComments && jobComments.length > 0 ? (
                             <>
                                 {displayedComments?.map((comment) => (
-                                    <JobComment key={comment.id} commentDetails={comment} />
+                                    <JobComment
+                                      key={comment.id}
+                                      commentDetails={comment}
+                                      estimateId={estimateID}
+                                      onCommentUpdated={getJobComments}
+                                    />
                                 ))}
                                 {hasMoreComments && !showAllComments && (
                                   <Button
