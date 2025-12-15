@@ -127,10 +127,16 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
           title="Edit Message"
           size="lg"
           centered
-          zIndex={400}
+          zIndex={1000}
           overlayProps={{
             backgroundOpacity: 0.75,
             blur: 3,
+            zIndex: 1000,
+          }}
+          styles={{
+            body: { overflow: 'visible' },
+            content: { overflow: 'visible', position: 'relative' },
+            inner: { zIndex: 1000 },
           }}
         >
             <Stack gap="md">
@@ -153,6 +159,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                     ]}
                   value={recipientType}
                   onChange={(value) => setRecipientType(value || 'ALL_SUB_CLIENTS')}
+                  comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                 />
                 {recipientType === 'SINGLE_SUB_CLIENT' && subClients.length > 0 && (
                     <Select
@@ -161,6 +168,10 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                       value={selectedSubClient}
                       onChange={setSelectedSubClient}
                       placeholder="Choose a sub-client"
+                      comboboxProps={{ withinPortal: true, zIndex: 1001 }}
+                      styles={{
+                        dropdown: { zIndex: 500 },
+                      }}
                     />
                 )}
                 <Group justify="flex-end" mt="md">
