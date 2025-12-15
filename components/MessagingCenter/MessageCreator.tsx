@@ -349,6 +349,11 @@ export default function MessageCreator({
           title="Create New Message"
           size="lg"
           centered
+          zIndex={400}
+          overlayProps={{
+            backgroundOpacity: 0.75,
+            blur: 3,
+          }}
         >
             {loadingData ? (
                 <Stack align="center" gap="md" py="xl">
