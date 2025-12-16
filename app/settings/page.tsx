@@ -87,23 +87,44 @@ export default function SettingsPage() {
                 setReviewLink(
                     config.configuration?.review_link || ''
                 );
+
+                // Check if logo fields exist in the configuration
+                const hasLogoFields =
+                    config.configuration?.logo_s3_key &&
+                    config.configuration?.logo_s3_bucket;
+
+                if (hasLogoFields) {
+                    // Try to load logo URL separately
+                    try {
+                        const logoResponse = await fetch('/api/configurations/logo', {
+                            method: 'GET',
+                            headers: getApiHeaders(),
+                        });
+                        if (logoResponse.ok) {
+                            const logoData = await logoResponse.json();
+                            if (logoData.logo_url) {
+                                setLogoUrl(logoData.logo_url);
+                            } else {
+                                // eslint-disable-next-line no-console
+                                console.warn('Logo fields exist but logo_url is null. Logo S3 key:', config.configuration.logo_s3_key);
+                                setLogoUrl(null);
+                            }
+                        } else {
+                            // eslint-disable-next-line no-console
+                            console.error('Failed to fetch logo URL:', logoResponse.status, logoResponse.statusText);
+                            setLogoUrl(null);
+                        }
+                    } catch (err) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error loading logo URL:', err);
+                        setLogoUrl(null);
+                    }
+                } else {
+                    setLogoUrl(null);
+                }
             } else {
                 setConfigId(null);
                 setReviewLink('');
-            }
-
-            // Load logo URL separately
-            try {
-                const logoResponse = await fetch('/api/configurations/logo', {
-                    method: 'GET',
-                    headers: getApiHeaders(),
-                });
-                if (logoResponse.ok) {
-                    const logoData = await logoResponse.json();
-                    setLogoUrl(logoData.logo_url || null);
-                }
-            } catch (err) {
-                // Logo loading failed, that's okay
                 setLogoUrl(null);
             }
         } catch (err) {

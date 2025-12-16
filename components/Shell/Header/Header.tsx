@@ -3,7 +3,7 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail } from '@tabler/icons-react';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail, IconHome, IconLayoutDashboard, IconUsers, IconFilePlus, IconFolder, IconFileText } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -75,6 +75,28 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     router.push(link);
   };
 
+  // Map links to their icons
+  const getLinkIcon = (linkPath: string) => {
+    switch (linkPath) {
+      case '/':
+        return <IconHome size={18} />;
+      case '/dashboard':
+        return <IconLayoutDashboard size={18} />;
+      case '/clients':
+        return <IconUsers size={18} />;
+      case '/add-proposal':
+        return <IconFilePlus size={18} />;
+      case '/projects':
+        return <IconFolder size={18} />;
+      case '/proposals':
+        return <IconFileText size={18} />;
+      case '/messaging-center':
+        return <IconMail size={18} />;
+      default:
+        return undefined;
+    }
+  };
+
   const navItems = links.map((link) => {
     // Check if the current pathname matches the link exactly or is a subroute
     const isActive =
@@ -91,7 +113,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         href={link.link}
         label={link.label}
         active={isActive}
-        leftSection={link.link === '/messaging-center' ? <IconMail size={18} /> : undefined}
+        leftSection={getLinkIcon(link.link)}
         rightSection={showBadge ? (
           <Badge size="xs" color="red" variant="filled">
             {messageCount > 99 ? '99+' : messageCount}

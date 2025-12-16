@@ -261,62 +261,76 @@ export default function MessagingCenter() {
 
             setMessages(data);
 
-            // Fetch client and estimate data for template rendering
+            // Check if any messages need client/estimate data for template rendering
+            // Only fetch if templates contain variables that need this data
+            const needsClientData = data.some(
+                (m) =>
+                    m.subject.includes('{{client_') ||
+                    m.body.includes('{{client_') ||
+                    m.subject.includes('{{estimate_') ||
+                    m.body.includes('{{estimate_')
+            );
 
-            // Fetch all unique client and estimate IDs
-            const uniqueClientIds = [...new Set(data.map(m => m.client_id))];
-            const uniqueEstimateIds = [...new Set(data.map(m => m.estimate_id))];
-
-            // Fetch all clients and estimates in parallel
-            const [clientPromises, estimatePromises] = [
-                uniqueClientIds.map(async (clientId) => {
-                    try {
-                        const clientResponse = await fetch(`/api/clients/${clientId}`, {
-                            method: 'GET',
-                            headers: getApiHeaders(),
-                        });
-                        if (clientResponse.ok) {
-                            const clientData = await clientResponse.json();
-                            return { id: clientId, data: clientData.Item || clientData };
-                        }
-                        return { id: clientId, data: null };
-                    } catch {
-                        return { id: clientId, data: null };
-                    }
-                }),
-                uniqueEstimateIds.map(async (estimateId) => {
-                    try {
-                        const estimatesResponse = await fetch(`/api/estimates/${estimateId}`, {
-                            method: 'GET',
-                            headers: getApiHeaders(),
-                        });
-                        if (estimatesResponse.ok) {
-                            const estimatesData = await estimatesResponse.json();
-                            return { id: estimateId, data: estimatesData.Item || estimatesData };
-                        }
-                        return { id: estimateId, data: null };
-                    } catch {
-                        return { id: estimateId, data: null };
-                    }
-                }),
-            ];
-
-            const [clientResults, estimateResults] = await Promise.all([
-                Promise.all(clientPromises),
-                Promise.all(estimatePromises),
-            ]);
-
-            // Create lookup maps
             const clientMap = new Map<string, Client>();
             const estimateMap = new Map<string, Estimate>();
 
-            clientResults.forEach(({ id, data: clientData }) => {
-                if (clientData) clientMap.set(id, clientData);
-            });
+            if (needsClientData && data.length > 0) {
+                // Fetch client and estimate data for template rendering
+                // Fetch all unique client and estimate IDs
+                const uniqueClientIds = [...new Set(data.map((m) => m.client_id))];
+                const uniqueEstimateIds = [...new Set(data.map((m) => m.estimate_id))];
 
-            estimateResults.forEach(({ id, data: estimateData }) => {
-                if (estimateData) estimateMap.set(id, estimateData);
-            });
+                // Fetch all clients and estimates in parallel
+                const [clientPromises, estimatePromises] = [
+                    uniqueClientIds.map(async (clientId) => {
+                        try {
+                            const clientResponse = await fetch(`/api/clients/${clientId}`, {
+                                method: 'GET',
+                                headers: getApiHeaders(),
+                            });
+                            if (clientResponse.ok) {
+                                const clientData = await clientResponse.json();
+                                return { id: clientId, data: clientData.Item || clientData };
+                            }
+                            return { id: clientId, data: null };
+                        } catch {
+                            return { id: clientId, data: null };
+                        }
+                    }),
+                    uniqueEstimateIds.map(async (estimateId) => {
+                        try {
+                            const estimatesResponse = await fetch(`/api/estimates/${estimateId}`, {
+                                method: 'GET',
+                                headers: getApiHeaders(),
+                            });
+                            if (estimatesResponse.ok) {
+                                const estimatesData = await estimatesResponse.json();
+                                return {
+                                    id: estimateId,
+                                    data: estimatesData.Item || estimatesData,
+                                };
+                            }
+                            return { id: estimateId, data: null };
+                        } catch {
+                            return { id: estimateId, data: null };
+                        }
+                    }),
+                ];
+
+                const [clientResults, estimateResults] = await Promise.all([
+                    Promise.all(clientPromises),
+                    Promise.all(estimatePromises),
+                ]);
+
+                // Create lookup maps
+                clientResults.forEach(({ id, data: clientData }) => {
+                    if (clientData) clientMap.set(id, clientData);
+                });
+
+                estimateResults.forEach(({ id, data: estimateData }) => {
+                    if (estimateData) estimateMap.set(id, estimateData);
+                });
+            }
 
             // Render templates for each message
             const renderedRecord: Record<string, { subject: string; body: string }> = {};
@@ -392,15 +406,25 @@ export default function MessagingCenter() {
                 throw new Error(errorData.message || 'Failed to send message');
             }
 
+            // Message was sent successfully - remove from state since it's no longer PENDING
+            // (sent messages have status SENT and won't show in PENDING filter)
+            setMessages((prev) => prev.filter((m) => m.id !== message.id));
+            // Remove rendered message
+            setRenderedMessages((prev) => {
+                const updated = { ...prev };
+                delete updated[message.id];
+                return updated;
+            });
+
+            // Update count without reloading all messages
+            await loadCount();
+
             notifications.show({
                 title: 'Success',
                 message: 'Message sent successfully',
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
-
-            await loadMessages();
-            await loadCount();
         } catch (err) {
             notifications.show({
                 title: 'Error',
@@ -424,15 +448,66 @@ export default function MessagingCenter() {
                 throw new Error('Failed to dismiss message');
             }
 
+            const dismissedMessage = await response.json();
+
+            // If message was deleted (null response), remove it from state
+            // If message was rescheduled (check-in messages), update it in state
+            if (!dismissedMessage || dismissedMessage === null) {
+                // Message was deleted - remove from state
+                setMessages((prev) => prev.filter((m) => m.id !== message.id));
+                // Remove rendered message if it exists
+                setRenderedMessages((prev) => {
+                    const updated = { ...prev };
+                    delete updated[message.id];
+                    return updated;
+                });
+            } else {
+                // Message was rescheduled - update in state
+                setMessages((prev) =>
+                    prev.map((m) => (m.id === message.id ? dismissedMessage : m))
+                );
+                // Re-render the updated message if needed
+                // We'll need to fetch client/estimate data for the updated message
+                const clientResponse = await fetch(`/api/clients/${dismissedMessage.client_id}`, {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                });
+                const estimateResponse = await fetch(
+                    `/api/estimates/${dismissedMessage.estimate_id}`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                const client = clientResponse.ok
+                    ? await clientResponse.json().then((data) => data.Item || data)
+                    : undefined;
+                const estimate = estimateResponse.ok
+                    ? await estimateResponse.json().then((data) => data.Item || data)
+                    : undefined;
+
+                const renderedSubject = renderTemplate(dismissedMessage.subject, client, estimate);
+                const renderedBody = renderTemplate(dismissedMessage.body, client, estimate);
+
+                setRenderedMessages((prev) => ({
+                    ...prev,
+                    [dismissedMessage.id]: {
+                        subject: renderedSubject,
+                        body: renderedBody,
+                    },
+                }));
+            }
+
+            // Update count without reloading all messages
+            await loadCount();
+
             notifications.show({
                 title: 'Success',
                 message: 'Message dismissed',
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
-
-            await loadMessages();
-            await loadCount();
         } catch (err) {
             notifications.show({
                 title: 'Error',
