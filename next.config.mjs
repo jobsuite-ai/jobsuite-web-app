@@ -11,9 +11,9 @@ export default withBundleAnalyzer({
   },
   env: {
     GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY || "",
-    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID || "",
-    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY || "",
-
+    // AWS credentials are now only used server-side in /app/api/log/route.ts
+    // They are accessed via process.env (injected by Amplify from Secrets Manager)
+    // and should NOT be exposed to the client for security reasons
 
     DOCU_SEAL_KEY: process.env.DOCU_SEAL_KEY || "HVUdoF47kb8oTFA4x3AAz3unoqBkUZ8TCHGhVtPfXBX",
     DOCUSEAL_WEBHOOK_URL: process.env.DOCUSEAL_WEBHOOK_URL || "https://6v86shktqvbhsi.docuseal.dev/api/docuseal_webhook",
