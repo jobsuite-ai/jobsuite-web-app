@@ -149,7 +149,15 @@ export async function GET(request: NextRequest) {
         }
 
         const data = await logoResponse.json();
-        return NextResponse.json(data);
+
+        // Add cache headers to reduce API calls
+        // Cache for 24 hours, but allow revalidation
+        const response = NextResponse.json(data);
+        response.headers.set(
+            'Cache-Control',
+            'private, max-age=86400, stale-while-revalidate=3600'
+        );
+        return response;
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get logo error:', {
