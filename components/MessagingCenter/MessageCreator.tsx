@@ -15,6 +15,8 @@ import {
     Radio,
     Divider,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
+import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
@@ -79,7 +81,9 @@ export default function MessageCreator({
     // Form state
     const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null);
     const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+    const [scheduleMode, setScheduleMode] = useState<'days' | 'date'>('days');
     const [daysOut, setDaysOut] = useState<number>(7);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [messageType, setMessageType] = useState<string>('SCHEDULED_MESSAGE');
     const [useTemplate, setUseTemplate] = useState<'template' | 'custom'>('template');
@@ -343,9 +347,24 @@ export default function MessageCreator({
             }
 
             // Calculate to_be_sent_date
-            const sendDate = new Date();
-            sendDate.setDate(sendDate.getDate() + daysOut);
-            sendDate.setHours(9, 0, 0, 0); // Set to 9 AM
+            let sendDate: Date;
+            if (scheduleMode === 'date') {
+                if (!selectedDate) {
+                    notifications.show({
+                        title: 'Error',
+                        message: 'Please select a date',
+                        color: 'red',
+                        icon: <IconX size={16} />,
+                    });
+                    return;
+                }
+                sendDate = new Date(selectedDate);
+                sendDate.setHours(9, 0, 0, 0); // Set to 9 AM
+            } else {
+                sendDate = new Date();
+                sendDate.setDate(sendDate.getDate() + daysOut);
+                sendDate.setHours(9, 0, 0, 0); // Set to 9 AM
+            }
 
             const createData: any = {
                 client_id: clientId,
@@ -391,7 +410,10 @@ export default function MessageCreator({
 
             // Reset form
             setSelectedEstimateId(null);
+            setSelectedClientId(null);
+            setScheduleMode('days');
             setDaysOut(7);
+            setSelectedDate(null);
             setSelectedUserId(null);
             setMessageType('SCHEDULED_MESSAGE');
             setUseTemplate('template');
@@ -466,6 +488,7 @@ export default function MessageCreator({
                         }}
                       clearable
                       searchable
+                      disabled={!!selectedClientId}
                       comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 
@@ -493,13 +516,36 @@ export default function MessageCreator({
                       comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 
-                    <NumberInput
-                      label="Schedule (days from now)"
-                      value={daysOut}
-                      onChange={(value) => setDaysOut(typeof value === 'number' ? value : 0)}
-                      min={0}
-                      required
-                    />
+                    <Radio.Group
+                      label="Schedule"
+                      value={scheduleMode}
+                      onChange={(value) => setScheduleMode(value as 'days' | 'date')}
+                    >
+                        <Stack gap="xs" mt="xs">
+                            <Radio value="days" label="Days from now" />
+                            <Radio value="date" label="Specific date" />
+                        </Stack>
+                    </Radio.Group>
+
+                    {scheduleMode === 'days' ? (
+                        <NumberInput
+                          label="Days from now"
+                          value={daysOut}
+                          onChange={(value) => setDaysOut(typeof value === 'number' ? value : 0)}
+                          min={0}
+                          required
+                        />
+                    ) : (
+                        <DatePickerInput
+                          label="Select Date"
+                          value={selectedDate}
+                          onChange={setSelectedDate}
+                          required
+                          minDate={new Date()}
+                          placeholder="Select a date"
+                          popoverProps={{ withinPortal: true, zIndex: 1001 }}
+                        />
+                    )}
 
                     <Select
                       label="Owning User"

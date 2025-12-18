@@ -196,6 +196,7 @@ export default function FollowUpSchedulingModal({
                   required
                   minDate={new Date()}
                   placeholder="Select a date"
+                  popoverProps={{ withinPortal: true, zIndex: 1001 }}
                 />
                 <TextInput
                   label="Subject"
