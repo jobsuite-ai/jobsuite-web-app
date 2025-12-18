@@ -19,7 +19,7 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 interface OutreachMessage {
     id: string;
     contractor_id: string;
-    estimate_id: string;
+    estimate_id?: string;
     client_id: string;
     message_type: string;
     subject: string;
