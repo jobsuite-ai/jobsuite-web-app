@@ -101,7 +101,13 @@ const renderTemplate = (
 
     // Client variables
     if (client) {
-        result = result.replace(/\{\{client_name\}\}/g, client.name || '');
+        // Extract first name from full name
+        let clientFirstName = '';
+        if (client.name) {
+            const nameParts = client.name.trim().split(/\s+/);
+            clientFirstName = nameParts[0] || '';
+        }
+        result = result.replace(/\{\{client_name\}\}/g, clientFirstName);
         result = result.replace(/\{\{client_email\}\}/g, client.email || '');
         result = result.replace(/\{\{client_phone\}\}/g, client.phone_number || '');
 
@@ -230,26 +236,28 @@ export default function MessagingCenter() {
 
             let data: OutreachMessage[] = await response.json();
 
-            // Filter by tab
+            // Filter by tab (using UTC to match backend count logic)
             const now = new Date();
             if (activeTab === 'upcoming') {
                 const tomorrow = new Date(now);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                tomorrow.setHours(0, 0, 0, 0);
+                tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+                tomorrow.setUTCHours(0, 0, 0, 0);
                 data = data.filter((msg) => new Date(msg.to_be_sent_date) >= tomorrow);
             } else if (activeTab === 'past') {
                 const today = new Date(now);
-                today.setHours(0, 0, 0, 0);
+                today.setUTCHours(0, 0, 0, 0);
                 data = data.filter((msg) => new Date(msg.to_be_sent_date) < today);
             } else if (activeTab === 'today') {
+                // Use UTC dates to match backend count calculation
                 const today = new Date(now);
-                today.setHours(0, 0, 0, 0);
+                today.setUTCHours(0, 0, 0, 0);
                 const tomorrow = new Date(today);
-                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
                 data = data.filter(
-                    (msg) =>
-                        new Date(msg.to_be_sent_date) >= today &&
-                        new Date(msg.to_be_sent_date) < tomorrow
+                    (msg) => {
+                        const msgDate = new Date(msg.to_be_sent_date);
+                        return msgDate >= today && msgDate < tomorrow;
+                    }
                 );
             }
 
