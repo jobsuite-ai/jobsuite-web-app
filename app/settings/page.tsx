@@ -22,6 +22,7 @@ import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
+import { clearLogoCache } from '@/hooks/useContractorLogo';
 
 interface ContractorConfiguration {
     id: string;
@@ -293,6 +294,9 @@ export default function SettingsPage() {
             const data = await response.json();
             setLogoUrl(data.logo_url);
             setHasChanges(false);
+
+            // Clear the logo cache so the new logo is displayed immediately
+            clearLogoCache();
 
             notifications.show({
                 title: 'Success',
