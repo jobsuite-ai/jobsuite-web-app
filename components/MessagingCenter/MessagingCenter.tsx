@@ -36,7 +36,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface OutreachMessage {
     id: string;
     contractor_id: string;
-    estimate_id: string;
+    estimate_id?: string;
     client_id: string;
     message_type: string;
     subject: string;
@@ -63,6 +63,7 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
     COLOR_SELECTION_REMINDER: 'Color Selection Reminder',
     IN_PROGRESS_MESSAGE: 'In-Progress Message',
     POST_COMPLETION_THANK_YOU: 'Post-Completion Thank You',
+    CLIENT_FOLLOW_UP: 'Client Follow-up',
 };
 
 interface Client {
@@ -278,7 +279,9 @@ export default function MessagingCenter() {
                 // Fetch client and estimate data for template rendering
                 // Fetch all unique client and estimate IDs
                 const uniqueClientIds = [...new Set(data.map((m) => m.client_id))];
-                const uniqueEstimateIds = [...new Set(data.map((m) => m.estimate_id))];
+                const uniqueEstimateIds = [
+                    ...new Set(data.map((m) => m.estimate_id).filter((id): id is string => !!id)),
+                ];
 
                 // Fetch all clients and estimates in parallel
                 const [clientPromises, estimatePromises] = [
@@ -337,7 +340,9 @@ export default function MessagingCenter() {
 
             data.forEach((message) => {
                 const client = clientMap.get(message.client_id);
-                const estimate = estimateMap.get(message.estimate_id);
+                const estimate = message.estimate_id
+                    ? estimateMap.get(message.estimate_id)
+                    : undefined;
 
                 const renderedSubject = renderTemplate(message.subject, client, estimate);
                 const renderedBody = renderTemplate(message.body, client, estimate);

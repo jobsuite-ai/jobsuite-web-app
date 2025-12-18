@@ -27,6 +27,12 @@ interface Estimate {
     title?: string;
 }
 
+interface Client {
+    id: string;
+    name?: string;
+    email?: string;
+}
+
 interface User {
     id: string;
     full_name?: string;
@@ -55,6 +61,7 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
     COLOR_SELECTION_REMINDER: 'Color Selection Reminder',
     IN_PROGRESS_MESSAGE: 'In-Progress Message',
     POST_COMPLETION_THANK_YOU: 'Post-Completion Thank You',
+    CLIENT_FOLLOW_UP: 'Client Follow-up',
 };
 
 export default function MessageCreator({
@@ -64,12 +71,14 @@ export default function MessageCreator({
 }: MessageCreatorProps) {
     const [loading, setLoading] = useState(false);
     const [estimates, setEstimates] = useState<Estimate[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [templates, setTemplates] = useState<Record<string, Template>>({});
     const [loadingData, setLoadingData] = useState(true);
 
     // Form state
     const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null);
+    const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
     const [daysOut, setDaysOut] = useState<number>(7);
     const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
     const [messageType, setMessageType] = useState<string>('SCHEDULED_MESSAGE');
@@ -91,11 +100,14 @@ export default function MessageCreator({
     useEffect(() => {
         if (selectedEstimateId) {
             loadSubClients();
+            setSelectedClientId(null); // Clear client selection when estimate is selected
+        } else if (selectedClientId) {
+            loadSubClientsForClient();
         } else {
             setSubClients([]);
             setClientEmail('');
         }
-    }, [selectedEstimateId]);
+    }, [selectedEstimateId, selectedClientId]);
 
     useEffect(() => {
         // If recipient type is SINGLE_SUB_CLIENT but there
@@ -135,6 +147,19 @@ export default function MessageCreator({
                     ? estimatesData
                     : estimatesData.Items || [];
                 setEstimates(estimatesArray);
+            }
+
+            // Load clients
+            const clientsResponse = await fetch('/api/clients', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+            if (clientsResponse.ok) {
+                const clientsData = await clientsResponse.json();
+                const clientsArray = Array.isArray(clientsData)
+                    ? clientsData
+                    : clientsData.Items || [];
+                setClients(clientsArray);
             }
 
             // Load users
@@ -211,11 +236,49 @@ export default function MessageCreator({
         }
     };
 
-    const handleCreate = async () => {
-        if (!selectedEstimateId) {
+    const loadSubClientsForClient = async () => {
+        if (!selectedClientId) return;
+
+        try {
+            const response = await fetch(`/api/clients/${selectedClientId}`, {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const client = data.Item || data;
+                setClientEmail(client.email || '');
+                if (client.sub_clients && client.sub_clients.length > 0) {
+                    // Include main client email as first option, then sub-clients
+                    const mainClientOption = {
+                        value: 'MAIN_CLIENT',
+                        label: `${client.name || 'Main Client'} (${client.email})`,
+                    };
+                    const subClientOptions = client.sub_clients.map((sc: any) => ({
+                        value: sc.id,
+                        label: sc.name || sc.email,
+                    }));
+                    setSubClients([mainClientOption, ...subClientOptions]);
+                } else {
+                    setSubClients([]);
+                }
+            }
+        } catch (err) {
             notifications.show({
                 title: 'Error',
-                message: 'Please select an estimate',
+                message: 'Error loading sub-clients',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const handleCreate = async () => {
+        if (!selectedEstimateId && !selectedClientId) {
+            notifications.show({
+                title: 'Error',
+                message: 'Please select an estimate or a client',
                 color: 'red',
                 icon: <IconX size={16} />,
             });
@@ -257,13 +320,26 @@ export default function MessageCreator({
         try {
             setLoading(true);
 
-            if (!Array.isArray(estimates)) {
-                throw new Error('Estimates data is not available');
-            }
+            let clientId: string;
+            let estimateId: string | null = null;
 
-            const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
-            if (!selectedEstimate) {
-                throw new Error('Selected estimate not found');
+            if (selectedEstimateId) {
+                if (!Array.isArray(estimates)) {
+                    throw new Error('Estimates data is not available');
+                }
+
+                const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
+                if (!selectedEstimate) {
+                    throw new Error('Selected estimate not found');
+                }
+
+                clientId = selectedEstimate.client_id;
+                estimateId = selectedEstimateId;
+            } else if (selectedClientId) {
+                clientId = selectedClientId;
+                estimateId = null; // Client-only message
+            } else {
+                throw new Error('No estimate or client selected');
             }
 
             // Calculate to_be_sent_date
@@ -272,13 +348,17 @@ export default function MessageCreator({
             sendDate.setHours(9, 0, 0, 0); // Set to 9 AM
 
             const createData: any = {
-                estimate_id: selectedEstimateId,
-                client_id: selectedEstimate.client_id,
+                client_id: clientId,
                 message_type: messageType,
                 subject: useTemplate === 'template' ? customSubject : customSubject,
                 body: useTemplate === 'template' ? customBody : customBody,
                 to_be_sent_date: sendDate.toISOString(),
             };
+
+            // Only include estimate_id if it's not null
+            if (estimateId) {
+                createData.estimate_id = estimateId;
+            }
 
             // Only include recipient_type if there are sub-clients
             if (subClients.length > 0) {
@@ -367,8 +447,8 @@ export default function MessageCreator({
             ) : (
                 <Stack gap="md">
                     <Select
-                      label="Estimate"
-                      placeholder="Select an estimate"
+                      label="Estimate (Optional)"
+                      placeholder="Select an estimate (or select a client below)"
                       data={
                             Array.isArray(estimates)
                                 ? estimates.map((e) => ({
@@ -378,9 +458,38 @@ export default function MessageCreator({
                                 : []
                         }
                       value={selectedEstimateId}
-                      onChange={setSelectedEstimateId}
-                      required
+                      onChange={(value) => {
+                            setSelectedEstimateId(value);
+                            if (value) {
+                                setSelectedClientId(null); // Clear client when estimate is selected
+                            }
+                        }}
+                      clearable
                       searchable
+                      comboboxProps={{ withinPortal: true, zIndex: 1001 }}
+                    />
+
+                    <Select
+                      label="Client (Optional - for client-only messages)"
+                      placeholder="Select a client (if no estimate selected)"
+                      data={
+                            Array.isArray(clients)
+                                ? clients.map((c) => ({
+                                      value: c.id,
+                                      label: c.name || c.email || c.id,
+                                  }))
+                                : []
+                        }
+                      value={selectedClientId}
+                      onChange={(value) => {
+                            setSelectedClientId(value);
+                            if (value) {
+                                setSelectedEstimateId(null);
+                            }
+                        }}
+                      clearable
+                      searchable
+                      disabled={!!selectedEstimateId}
                       comboboxProps={{ withinPortal: true, zIndex: 1001 }}
                     />
 

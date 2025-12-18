@@ -9,6 +9,7 @@ import { useForm } from '@mantine/form';
 import { IconChevronDown, IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
@@ -20,6 +21,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const [estimate, setEstimate] = useState(initialEstimate);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+    const [showFollowUpModal, setShowFollowUpModal] = useState(false);
     const [client, setClient] = useState<ContractorClient>();
     const [menuOpened, setMenuOpened] = useState(false);
     const router = useRouter();
@@ -206,6 +208,13 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const updateEstimateStatus = async (status: EstimateStatus) => {
         await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
+        // If status is NEEDS_FOLLOW_UP, show the follow-up modal instead of updating immediately
+        if (status === EstimateStatus.NEEDS_FOLLOW_UP) {
+            setMenuOpened(false);
+            setShowFollowUpModal(true);
+            return;
+        }
+
         try {
             const response = await fetch(
                 `/api/estimates/${estimate.id}`,
@@ -249,6 +258,34 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             }
         } catch (error) {
             logToCloudWatch(`Failed to update estimate status: ${error}`);
+        }
+    };
+
+    const handleFollowUpModalSuccess = async () => {
+        // After scheduling the follow-up, update the estimate status to NEEDS_FOLLOW_UP
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimate.id}`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: EstimateStatus.NEEDS_FOLLOW_UP }),
+                }
+            );
+
+            await response.json();
+
+            // Update local state
+            setEstimate(prevEstimate => ({
+                ...prevEstimate,
+                status: EstimateStatus.NEEDS_FOLLOW_UP,
+            }));
+
+            setMenuOpened(false);
+        } catch (error) {
+            logToCloudWatch(`Failed to update estimate status after follow-up: ${error}`);
         }
     };
 
@@ -424,6 +461,15 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                     </div>
                 </Modal>
             }
+            {client && (
+                <FollowUpSchedulingModal
+                  opened={showFollowUpModal}
+                  onClose={() => setShowFollowUpModal(false)}
+                  onSuccess={handleFollowUpModalSuccess}
+                  estimate={estimate}
+                  client={client}
+                />
+            )}
         </>
     );
 }
