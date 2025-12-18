@@ -139,9 +139,7 @@ export default function Dashboard() {
         });
 
         if (selectedMonth !== null && selectedMonth !== undefined) {
-          // Convert from JavaScript month (0-11) to Python month (1-12)
-          const pythonMonth = selectedMonth + 1;
-          queryParams.append('selected_month', pythonMonth.toString());
+          queryParams.append('selected_month', selectedMonth.toString());
         }
 
         if (selectedYear !== null && selectedYear !== undefined) {
