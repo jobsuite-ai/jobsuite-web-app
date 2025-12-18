@@ -9,6 +9,7 @@ import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
+import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
@@ -44,6 +45,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const [savingTentativeDate, setSavingTentativeDate] = useState(false);
   // Local state for optimistic status updates
   const [currentStatus, setCurrentStatus] = useState<EstimateStatus>(estimate.status);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData } = useDataCache();
@@ -123,6 +125,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
+    // If status is NEEDS_FOLLOW_UP, show the follow-up modal instead of updating immediately
+    if (status === EstimateStatus.NEEDS_FOLLOW_UP) {
+      setMenuOpened(false);
+      setShowFollowUpModal(true);
+      return;
+    }
+
     try {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
@@ -172,6 +181,44 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to update estimate status: ${error}`);
+    }
+  };
+
+  const handleFollowUpModalSuccess = async () => {
+    // After scheduling the follow-up, update the estimate status to NEEDS_FOLLOW_UP
+    try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        return;
+      }
+
+      const response = await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ status: EstimateStatus.NEEDS_FOLLOW_UP }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update estimate status');
+      }
+
+      await response.json();
+
+      // Optimistically update the status
+      setCurrentStatus(EstimateStatus.NEEDS_FOLLOW_UP);
+
+      // Refresh cache after status update
+      await refreshData('estimates');
+      await refreshData('projects');
+
+      onUpdate();
+    } catch (error) {
+      logToCloudWatch(`Failed to update estimate status after follow-up: ${error}`);
     }
   };
 
@@ -948,6 +995,15 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           )
         )}
       </Flex>
+      {client && (
+        <FollowUpSchedulingModal
+          opened={showFollowUpModal}
+          onClose={() => setShowFollowUpModal(false)}
+          onSuccess={handleFollowUpModalSuccess}
+          estimate={estimate}
+          client={client}
+        />
+      )}
     </Paper>
   );
 }

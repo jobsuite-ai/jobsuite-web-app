@@ -62,9 +62,17 @@ export default function RootLayout({ children }: { children: any }) {
     }
   }, []);
 
+  useEffect(() => {
+    // Ensure the document title is always "Jobsuite"
+    if (typeof document !== 'undefined') {
+      document.title = 'Jobsuite';
+    }
+  }, []);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <title>Jobsuite</title>
         <ColorSchemeScript />
         <link rel="icon" type="image/png" href="/jobsuite-no-text.png" />
         <link rel="shortcut icon" href="/jobsuite-no-text.png" />
