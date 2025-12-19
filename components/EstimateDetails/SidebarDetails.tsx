@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Badge, Flex, Menu, Paper, Select, Skeleton, Text } from '@mantine/core';
+import { ActionIcon, Badge, Button, Flex, Menu, Modal, Paper, Select, Skeleton, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
@@ -46,9 +46,128 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   // Local state for optimistic status updates
   const [currentStatus, setCurrentStatus] = useState<EstimateStatus>(estimate.status);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [quickbooksConnected, setQuickbooksConnected] = useState(false);
+  const [quickbooksCustomers, setQuickbooksCustomers] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+  }>>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(false);
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
+    estimate.quickbooks_customer_id || null);
+  const [savingCustomer, setSavingCustomer] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData } = useDataCache();
+
+  // Check QuickBooks connection status
+  useEffect(() => {
+    const checkQuickBooksStatus = async () => {
+      try {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+          return;
+        }
+
+        const response = await fetch('/api/quickbooks/status', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+
+        if (response.ok) {
+          const status = await response.json();
+          setQuickbooksConnected(status.connected || false);
+        }
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('Error checking QuickBooks status:', error);
+      }
+    };
+
+    checkQuickBooksStatus();
+  }, []);
+
+  // Load QuickBooks customers when modal opens
+  useEffect(() => {
+    if (showCustomerModal && quickbooksConnected && quickbooksCustomers.length === 0) {
+      loadQuickBooksCustomers();
+    }
+  }, [showCustomerModal, quickbooksConnected]);
+
+  const loadQuickBooksCustomers = async () => {
+    try {
+      setLoadingCustomers(true);
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        return;
+      }
+
+      const response = await fetch('/api/quickbooks/customers', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (response.ok) {
+        const customers = await response.json();
+        setQuickbooksCustomers(customers);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error loading QuickBooks customers:', error);
+    } finally {
+      setLoadingCustomers(false);
+    }
+  };
+
+  const handleUpdateQuickBooksCustomer = async () => {
+    if (savingCustomer) return;
+    setSavingCustomer(true);
+    try {
+      const accessToken = localStorage.getItem('access_token');
+      if (!accessToken) {
+        // eslint-disable-next-line no-console
+        console.error('No access token found');
+        setSavingCustomer(false);
+        return;
+      }
+
+      const response = await fetch(`/api/estimates/${estimateID}/quickbooks-customer`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ quickbooks_customer_id: selectedCustomerId }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update QuickBooks customer');
+      }
+
+      setShowCustomerModal(false);
+      onUpdate();
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to update QuickBooks customer:', error);
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
+
+  const getCurrentCustomerName = (): string => {
+    if (!estimate.quickbooks_customer_id) {
+      return '—';
+    }
+    const customer = quickbooksCustomers.find((c) => c.id === estimate.quickbooks_customer_id);
+    return customer ? customer.name : estimate.quickbooks_customer_id;
+  };
 
   useEffect(() => {
     const loadClientDetails = async () => {
@@ -994,6 +1113,26 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             </Flex>
           )
         )}
+
+        {/* QuickBooks Customer - Only show if QuickBooks is connected */}
+        {quickbooksConnected && (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              QuickBooks Customer:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => {
+                setSelectedCustomerId(estimate.quickbooks_customer_id || null);
+                setShowCustomerModal(true);
+              }}
+              c={estimate.quickbooks_customer_id ? 'dark' : 'dimmed'}
+            >
+              {getCurrentCustomerName()}
+            </Text>
+          </Flex>
+        )}
       </Flex>
       {client && (
         <FollowUpSchedulingModal
@@ -1004,6 +1143,50 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
           client={client}
         />
       )}
+
+      {/* QuickBooks Customer Selection Modal */}
+      <Modal
+        opened={showCustomerModal}
+        onClose={() => setShowCustomerModal(false)}
+        title="Select QuickBooks Customer"
+        size="md"
+      >
+        <Flex direction="column" gap="md">
+          {loadingCustomers ? (
+            <Skeleton height={200} />
+          ) : (
+            <>
+              <Select
+                label="QuickBooks Customer"
+                placeholder="Select a customer"
+                data={quickbooksCustomers.map((customer) => ({
+                  value: customer.id,
+                  label: `${customer.name}${customer.email ? ` (${customer.email})` : ''}`,
+                }))}
+                value={selectedCustomerId}
+                onChange={setSelectedCustomerId}
+                searchable
+                clearable
+              />
+              <Flex gap="md" justify="flex-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCustomerModal(false)}
+                  disabled={savingCustomer}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleUpdateQuickBooksCustomer}
+                  loading={savingCustomer}
+                >
+                  Save
+                </Button>
+              </Flex>
+            </>
+          )}
+        </Flex>
+      </Modal>
     </Paper>
   );
 }
