@@ -21,6 +21,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
 
@@ -346,6 +347,7 @@ export default function SettingsPage() {
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
                     <Tabs.Tab value="templates">Templates</Tabs.Tab>
+                    <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                 </Tabs.List>
 
@@ -427,6 +429,10 @@ export default function SettingsPage() {
 
                 <Tabs.Panel value="templates" pt="md">
                     <TemplatesTab />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="integrations" pt="md">
+                    <IntegrationsTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="notifications" pt="md">
