@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Skeleton, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -111,7 +111,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 // Process estimate
                 if (detailsData.estimate) {
-                    setEstimate(detailsData.estimate);
+                    const estimateData = { ...detailsData.estimate };
+                    // Add hours_worked to estimate if present
+                    if (
+                        detailsData.hours_worked !== undefined &&
+                        detailsData.hours_worked !== null &&
+                        isMountedRef.current
+                    ) {
+                        estimateData.hours_worked = detailsData.hours_worked;
+                    }
+                    setEstimate(estimateData);
                 }
 
                 // Process client
@@ -506,6 +515,46 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     </Flex>
                                 </div>
                                 <div className={classes.columnContent}>
+                                    {
+                                        estimate.hours_worked !== undefined &&
+                                        estimate.hours_worked !== null &&
+                                        estimate.hours_worked > 0 &&
+                                        isMountedRef.current && (
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <Flex justify="space-between" align="center" gap="md" mb="xs">
+                                                <Text size="sm" fw={500}>
+                                                    Hours Worked
+                                                </Text>
+                                                <Text size="sm" c="dimmed">
+                                                    {estimate.hours_worked.toFixed(2)} / {estimate.hours_bid ? estimate.hours_bid.toFixed(2) : '0.00'} hours
+                                                </Text>
+                                            </Flex>
+                                            <Progress
+                                              value={
+                                                estimate.hours_bid && estimate.hours_bid > 0
+                                                    ? Math.min(
+                                                        (estimate.hours_worked / estimate.hours_bid
+                                                        ) * 100,
+                                                        100
+                                                    )
+                                                    : 0
+                                                }
+                                              color={estimate.hours_worked > (estimate.hours_bid || 0) ? 'red' : 'green'}
+                                              size="lg"
+                                              radius="md"
+                                            />
+                                            {estimate.hours_worked > (estimate.hours_bid || 0) && (
+                                                <Text size="xs" c="red" mt="xs">
+                                                    Over budget by {
+                                                    ((
+                                                        estimate.hours_worked -
+                                                        (estimate.hours_bid || 0)
+                                                    )).toFixed(2)} hours
+                                                </Text>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Video Section - Only show if video exists */}
                                     {hasVideo && (
                                         <CollapsibleSection title="Video" defaultOpen>
