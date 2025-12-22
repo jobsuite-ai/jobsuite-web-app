@@ -241,6 +241,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     }
   }, [estimate.tentative_scheduling_date, editingTentativeDate]);
 
+  // Sync selectedCustomerId when estimate changes (but not when modal is open)
+  useEffect(() => {
+    if (!showCustomerModal) {
+      setSelectedCustomerId(estimate.quickbooks_customer_id || null);
+    }
+  }, [estimate.quickbooks_customer_id, showCustomerModal]);
+
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
 
