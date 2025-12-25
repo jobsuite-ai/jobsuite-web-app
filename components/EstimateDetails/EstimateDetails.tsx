@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -71,6 +71,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [initialLoading, setInitialLoading] = useState(true);
     const [comments, setComments] = useState<any[]>([]);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
+    const [timeEntries, setTimeEntries] = useState<any[]>([]);
+    const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
 
     // const searchParams = useSearchParams();
     // const page = searchParams?.get('page');
@@ -162,6 +164,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     const changeOrdersArray = detailsData.change_orders;
                     if (isMountedRef.current) {
                         setChangeOrders(changeOrdersArray);
+                    }
+                }
+
+                // Process time entries
+                if (detailsData.time_entries && Array.isArray(detailsData.time_entries)) {
+                    const timeEntriesArray = detailsData.time_entries;
+                    if (isMountedRef.current) {
+                        setTimeEntries(timeEntriesArray);
                     }
                 }
             } catch (error) {
@@ -551,6 +561,51 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                         (estimate.hours_bid || 0)
                                                     )).toFixed(2)} hours
                                                 </Text>
+                                            )}
+                                            {timeEntries.length > 0 && (
+                                                <Button
+                                                  variant="subtle"
+                                                  size="xs"
+                                                  mt="xs"
+                                                  onClick={() =>
+                                                    setShowTimeEntryDetails(!showTimeEntryDetails)
+                                                  }
+                                                >
+                                                    {showTimeEntryDetails ? 'Hide' : 'Show'} Details
+                                                </Button>
+                                            )}
+                                            {showTimeEntryDetails && timeEntries.length > 0 && (
+                                                <div style={{ marginTop: '1rem' }}>
+                                                    <Table
+                                                      striped
+                                                      highlightOnHover
+                                                      withTableBorder
+                                                      withColumnBorders
+                                                    >
+                                                        <Table.Thead>
+                                                            <Table.Tr>
+                                                                <Table.Th>Employee</Table.Th>
+                                                                <Table.Th>Hours</Table.Th>
+                                                                <Table.Th>Date</Table.Th>
+                                                            </Table.Tr>
+                                                        </Table.Thead>
+                                                        <Table.Tbody>
+                                                            {timeEntries.map((entry: any) => (
+                                                                <Table.Tr key={entry.id}>
+                                                                    <Table.Td>{entry.employee_name || 'N/A'}</Table.Td>
+                                                                    <Table.Td>{typeof entry.hours === 'number' ? entry.hours.toFixed(2) : entry.hours || '0.00'}</Table.Td>
+                                                                    <Table.Td>
+                                                                        {entry.date
+                                                                            ? new Date(
+                                                                                entry.date
+                                                                            ).toLocaleDateString()
+                                                                            : 'N/A'}
+                                                                    </Table.Td>
+                                                                </Table.Tr>
+                                                            ))}
+                                                        </Table.Tbody>
+                                                    </Table>
+                                                </div>
                                             )}
                                         </div>
                                     )}
