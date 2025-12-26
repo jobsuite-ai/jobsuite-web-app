@@ -73,11 +73,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
     const [timeEntries, setTimeEntries] = useState<any[]>([]);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
+    const [detailsLoaded, setDetailsLoaded] = useState(false);
 
-    // const searchParams = useSearchParams();
-    // const page = searchParams?.get('page');
-
-    // Fetch all initial data in a single effect using consolidated endpoint
+    // Fetch initial summary data for fast page load
     useEffect(() => {
         isMountedRef.current = true;
         const accessToken = localStorage.getItem('access_token');
@@ -87,12 +85,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             return;
         }
 
-        const fetchAllData = async () => {
+        const fetchSummary = async () => {
             try {
                 setInitialLoading(true);
 
-                // Fetch all data from consolidated endpoint
-                const detailsRes = await fetch(`/api/estimates/${estimateID}/details`, {
+                // Fetch lightweight summary for initial render
+                const summaryRes = await fetch(`/api/estimates/${estimateID}/summary`, {
                     method: 'GET',
                     headers: {
                         Authorization: `Bearer ${accessToken}`,
@@ -102,81 +100,45 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 if (!isMountedRef.current) return;
 
-                if (!detailsRes.ok) {
+                if (!summaryRes.ok) {
                     // eslint-disable-next-line no-console
-                    console.error('Error fetching estimate details:', await detailsRes.json().catch(() => ({})));
+                    console.error('Error fetching estimate summary:', await summaryRes.json().catch(() => ({})));
                     setInitialLoading(false);
                     return;
                 }
 
-                const detailsData = await detailsRes.json();
+                const summaryData = await summaryRes.json();
 
-                // Process estimate
-                if (detailsData.estimate) {
-                    const estimateData = { ...detailsData.estimate };
+                // Process estimate from summary
+                if (summaryData.estimate && isMountedRef.current) {
+                    const estimateData = { ...summaryData.estimate };
                     // Add hours_worked to estimate if present
                     if (
-                        detailsData.hours_worked !== undefined &&
-                        detailsData.hours_worked !== null &&
-                        isMountedRef.current
+                        summaryData.hours_worked !== undefined &&
+                        summaryData.hours_worked !== null
                     ) {
-                        estimateData.hours_worked = detailsData.hours_worked;
+                        estimateData.hours_worked = summaryData.hours_worked;
                     }
                     setEstimate(estimateData);
                 }
 
-                // Process client
-                if (detailsData.client && isMountedRef.current) {
-                    setClient(detailsData.client);
+                // Process client from summary
+                if (summaryData.client && isMountedRef.current) {
+                    setClient(summaryData.client);
                 }
 
-                // Process resources
-                if (detailsData.resources && Array.isArray(detailsData.resources)) {
-                    const resourcesArray = detailsData.resources;
-                    setResources(resourcesArray);
-
-                    // Check if any video resource exists
-                    const videoResource = resourcesArray.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
-                    if (videoResource && isMountedRef.current) {
-                        setObjectExists(true);
-                    }
+                // Set flags from summary
+                if (summaryData.has_video && isMountedRef.current) {
+                    setObjectExists(true);
                 }
 
-                // Process line items
-                if (detailsData.line_items && Array.isArray(detailsData.line_items)) {
-                    const itemsArray = detailsData.line_items;
-                    if (isMountedRef.current) {
-                        setLineItems(itemsArray);
-                        setLineItemsCount(itemsArray.length);
-                    }
-                }
-
-                // Process comments
-                if (detailsData.comments && Array.isArray(detailsData.comments)) {
-                    const commentsArray = detailsData.comments;
-                    if (isMountedRef.current) {
-                        setComments(commentsArray);
-                    }
-                }
-
-                // Process change orders
-                if (detailsData.change_orders && Array.isArray(detailsData.change_orders)) {
-                    const changeOrdersArray = detailsData.change_orders;
-                    if (isMountedRef.current) {
-                        setChangeOrders(changeOrdersArray);
-                    }
-                }
-
-                // Process time entries
-                if (detailsData.time_entries && Array.isArray(detailsData.time_entries)) {
-                    const timeEntriesArray = detailsData.time_entries;
-                    if (isMountedRef.current) {
-                        setTimeEntries(timeEntriesArray);
-                    }
+                // Set counts from summary
+                if (isMountedRef.current) {
+                    setLineItemsCount(summaryData.line_items_count || 0);
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
-                console.error('Error fetching data:', error);
+                console.error('Error fetching summary:', error);
             } finally {
                 if (isMountedRef.current) {
                     setInitialLoading(false);
@@ -184,13 +146,142 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         };
 
-        fetchAllData();
+        fetchSummary();
 
         // eslint-disable-next-line consistent-return
         return function cleanup() {
             isMountedRef.current = false;
         };
     }, [estimateID]);
+
+    // Load full details in background after initial render
+    useEffect(() => {
+        if (initialLoading || detailsLoaded) {
+            return;
+        }
+
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            return;
+        }
+
+        const fetchFullDetails = async () => {
+            try {
+                // Fetch all data from consolidated endpoint in background
+                const detailsRes = await fetch(
+                    `/api/estimates/${estimateID}/details`,
+                    {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }
+                );
+
+                if (!isMountedRef.current) return;
+
+                if (!detailsRes.ok) {
+                    // eslint-disable-next-line no-console
+                    const errorData = await detailsRes.json().catch(() => ({}));
+                    console.error('Error fetching estimate details:', errorData);
+                    return;
+                }
+
+                const detailsData = await detailsRes.json();
+
+                // Process resources
+                if (
+                    detailsData.resources &&
+                    Array.isArray(detailsData.resources) &&
+                    isMountedRef.current
+                ) {
+                    const resourcesArray = detailsData.resources;
+                    setResources(resourcesArray);
+
+                    // Check if any video resource exists
+                    const videoResource = resourcesArray.find(
+                        (r: EstimateResource) =>
+                            r.resource_type === 'VIDEO' &&
+                            r.upload_status === 'COMPLETED'
+                    );
+                    if (videoResource) {
+                        setObjectExists(true);
+                    }
+                }
+
+                // Process line items
+                if (
+                    detailsData.line_items &&
+                    Array.isArray(detailsData.line_items) &&
+                    isMountedRef.current
+                ) {
+                    const itemsArray = detailsData.line_items;
+                    setLineItems(itemsArray);
+                    setLineItemsCount(itemsArray.length);
+                }
+
+                // Process comments
+                if (
+                    detailsData.comments &&
+                    Array.isArray(detailsData.comments) &&
+                    isMountedRef.current
+                ) {
+                    const commentsArray = detailsData.comments;
+                    setComments(commentsArray);
+                }
+
+                // Process change orders
+                if (
+                    detailsData.change_orders &&
+                    Array.isArray(detailsData.change_orders) &&
+                    isMountedRef.current
+                ) {
+                    const changeOrdersArray = detailsData.change_orders;
+                    setChangeOrders(changeOrdersArray);
+                }
+
+                // Process time entries
+                if (
+                    detailsData.time_entries &&
+                    Array.isArray(detailsData.time_entries) &&
+                    isMountedRef.current
+                ) {
+                    const timeEntriesArray = detailsData.time_entries;
+                    setTimeEntries(timeEntriesArray);
+                }
+
+                // Update estimate with any additional data from details
+                if (detailsData.estimate && isMountedRef.current) {
+                    const estimateData = { ...detailsData.estimate };
+                    if (
+                        detailsData.hours_worked !== undefined &&
+                        detailsData.hours_worked !== null
+                    ) {
+                        estimateData.hours_worked = detailsData.hours_worked;
+                    }
+                    setEstimate(estimateData);
+                }
+
+                if (isMountedRef.current) {
+                    setDetailsLoaded(true);
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error fetching full details:', error);
+            }
+        };
+
+        // Small delay to ensure initial render completes first
+        const timeoutId = setTimeout(() => {
+            fetchFullDetails();
+        }, 100);
+
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
+            clearTimeout(timeoutId);
+        };
+    }, [estimateID, initialLoading, detailsLoaded]);
 
     // Separate functions for refreshing data after initial load
     const getEstimate = useCallback(async () => {

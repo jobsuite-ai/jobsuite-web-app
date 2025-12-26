@@ -122,7 +122,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     return Array.isArray(projectsList) ? projectsList : [];
   }, []);
 
-  // Refresh data for a specific key or all keys
+  // Refresh data for a specific key or all keys using stale-while-revalidate pattern
   const refreshData = useCallback(async (key?: CacheKey) => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -136,9 +136,18 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
 
     const keysToRefresh: CacheKey[] = key ? [key] : ['clients', 'estimates', 'projects'];
 
-    // Set loading states
+    // Check cache validity - only show loading if cache is missing or expired
+    const hasValidCache: Record<CacheKey, boolean> = {
+      clients: !!getCachedData<ContractorClient>('clients'),
+      estimates: !!getCachedData<Estimate>('estimates'),
+      projects: !!getCachedData<Job>('projects'),
+    };
+
+    // Set loading states only for keys without valid cache
     keysToRefresh.forEach((k) => {
-      setLoading((prev) => ({ ...prev, [k]: true }));
+      if (!hasValidCache[k]) {
+        setLoading((prev) => ({ ...prev, [k]: true }));
+      }
       setErrors((prev) => ({ ...prev, [k]: null }));
     });
 
@@ -238,7 +247,8 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     throw new Error(`Unknown cache key: ${key}`);
   }, [clients, estimates, projects]);
 
-  // Initial load: show cached data immediately, then always fetch fresh data in background
+  // Initial load: show cached data immediately,
+  // then fetch fresh data in background if cache expired
   useEffect(() => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -246,10 +256,9 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Always fetch fresh data in the background, regardless of cache
-    // This ensures we have the latest data, especially important on iOS devices
-    // where cache timing can be inconsistent
-      refreshData();
+    // Use stale-while-revalidate: show cached data immediately, refresh in background
+    // Only fetch if cache is expired or missing (refreshData handles this)
+    refreshData();
   }, [refreshData]);
 
   // Listen for storage changes (e.g., after login)
