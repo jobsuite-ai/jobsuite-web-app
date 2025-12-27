@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
+import { clearCachedAuthMe, getCachedAuthMe, setCachedAuthMe } from '@/app/utils/dataCache';
 
 export interface User {
   id: string;
@@ -62,7 +63,52 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         return;
       }
 
-      // Set loading state when checking auth
+      // Check cache first
+      const cachedUserData = getCachedAuthMe<User>();
+      if (cachedUserData) {
+        // Use cached data immediately
+        setIsAuthenticated(true);
+        if (fetchUser) {
+          setUser(cachedUserData);
+        }
+        if (cachedUserData.contractor_id) {
+          setCachedContractorId(cachedUserData.contractor_id);
+        }
+        setIsLoading(false);
+        setError(null);
+
+        // Still fetch fresh data in background (stale-while-revalidate)
+        fetch('/api/auth/me', {
+          method: 'GET',
+          headers: getApiHeaders(),
+        })
+          .then((response) => {
+            if (response.ok) {
+              return response.json();
+            }
+            // If token is invalid, clear cache
+            clearCachedAuthMe();
+            return null;
+          })
+          .then((userData) => {
+            if (userData) {
+              setCachedAuthMe(userData);
+              setIsAuthenticated(true);
+              if (fetchUser) {
+                setUser(userData);
+              }
+              if (userData.contractor_id) {
+                setCachedContractorId(userData.contractor_id);
+              }
+            }
+          })
+          .catch(() => {
+            // Silently fail background refresh
+          });
+        return;
+      }
+
+      // Set loading state when checking auth (no cache)
       setIsLoading(true);
 
       // Validate token and optionally fetch user
@@ -76,6 +122,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
           // Token is invalid
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
+          clearCachedAuthMe();
           setIsAuthenticated(false);
           setIsLoading(false);
 
@@ -91,6 +138,9 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         setIsAuthenticated(true);
 
         const userData = await response.json();
+
+        // Cache the response
+        setCachedAuthMe(userData);
 
         if (fetchUser) {
           // Fetch user data
@@ -108,6 +158,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
         // Error checking token
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        clearCachedAuthMe();
         setIsAuthenticated(false);
         setIsLoading(false);
 
