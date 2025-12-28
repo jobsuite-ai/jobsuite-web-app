@@ -681,19 +681,42 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                             </Table.Tr>
                                                         </Table.Thead>
                                                         <Table.Tbody>
-                                                            {timeEntries.map((entry: any) => (
-                                                                <Table.Tr key={entry.id}>
-                                                                    <Table.Td>{entry.employee_name || 'N/A'}</Table.Td>
-                                                                    <Table.Td>{typeof entry.hours === 'number' ? entry.hours.toFixed(2) : entry.hours || '0.00'}</Table.Td>
-                                                                    <Table.Td>
-                                                                        {entry.date
-                                                                            ? new Date(
-                                                                                entry.date
-                                                                            ).toLocaleDateString()
-                                                                            : 'N/A'}
-                                                                    </Table.Td>
-                                                                </Table.Tr>
-                                                            ))}
+                                                            {[...timeEntries]
+                                                                .sort((a: any, b: any) => {
+                                                                    const dateA = a.date
+                                                                        ? new Date(a.date).getTime()
+                                                                        : 0;
+                                                                    const dateB = b.date
+                                                                        ? new Date(b.date).getTime()
+                                                                        : 0;
+                                                                    // Newest first (descending)
+                                                                    return dateB - dateA;
+                                                                })
+                                                                .map((entry: any) => {
+                                                                    const hoursDisplay =
+                                                                        typeof entry.hours === 'number'
+                                                                            ? entry.hours.toFixed(2)
+                                                                            : entry.hours || '0.00';
+                                                                    const dateDisplay = entry.date
+                                                                        ? new Date(entry.date)
+                                                                              .toLocaleDateString()
+                                                                        : 'N/A';
+                                                                    const employeeName =
+                                                                        entry.employee_name || 'N/A';
+                                                                    return (
+                                                                        <Table.Tr key={entry.id}>
+                                                                            <Table.Td>
+                                                                                {employeeName}
+                                                                            </Table.Td>
+                                                                            <Table.Td>
+                                                                                {hoursDisplay}
+                                                                            </Table.Td>
+                                                                            <Table.Td>
+                                                                                {dateDisplay}
+                                                                            </Table.Td>
+                                                                        </Table.Tr>
+                                                                    );
+                                                                })}
                                                         </Table.Tbody>
                                                     </Table>
                                                 </div>
