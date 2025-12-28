@@ -103,7 +103,7 @@ export function NewJobWorkflow() {
     const [referralSource, setReferralSource] = useState<string>('');
     const [sameAsClientAddress, setSameAsClientAddress] = useState(false);
     const router = useRouter();
-    const { refreshData } = useDataCache();
+    const { refreshData, updateEstimate } = useDataCache();
 
     const form = useForm<FormValues>({
         mode: 'uncontrolled',
@@ -337,13 +337,19 @@ export function NewJobWorkflow() {
                 }
             }
 
-            // Refresh cache for estimates and projects after creating new estimate
-            await refreshData('estimates');
-            await refreshData('projects');
-            // Also refresh clients if a new client was created
+            // Update cache immediately with the new estimate
+            updateEstimate(estimate);
+
+            // Also update client cache if a new client was created
             if (clientType === 'new' || !formValues.client_id) {
-                await refreshData('clients');
+                // Try to get the client from the response if available
+                // Otherwise, refresh in background
+                refreshData('clients').catch(() => {});
             }
+
+            // Optionally refresh in background for consistency (non-blocking)
+            refreshData('estimates').catch(() => {});
+            refreshData('projects').catch(() => {});
 
             notifications.show({
                 title: 'Success!',

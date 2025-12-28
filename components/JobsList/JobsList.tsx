@@ -199,17 +199,6 @@ function KanbanColumn({
 
     const isHistorical = column.id === 'historical';
 
-    // Calculate total price for accounts-receivable and billing-needed columns
-    const shouldShowPrice = column.id === 'accounts-receivable' || column.id === 'billing-needed';
-    const totalPrice = shouldShowPrice
-        ? jobs.reduce((sum, job) => {
-              const estimate = job as Estimate;
-              const hours = estimate.hours_bid || 0;
-              const rate = estimate.hourly_rate || 0;
-              return sum + hours * rate;
-          }, 0)
-        : 0;
-
     if (isHistorical && isCollapsed) {
         const collapsedClassName = `${classes.kanbanColumn} ${classes.historicalCollapsed} ${
             isOver ? classes.kanbanColumnOver : classes.kanbanColumnNotOver
@@ -236,11 +225,6 @@ function KanbanColumn({
                         >
                             {column.title}
                         </Title>
-                        {shouldShowPrice && totalPrice > 0 && (
-                            <Text size="sm" fw={600} ta="center" c="dimmed">
-                                ${totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </Text>
-                        )}
                     </Stack>
                     <Badge size="lg" variant="light">{jobs.length}</Badge>
                     <Center>
@@ -277,11 +261,6 @@ function KanbanColumn({
                     <Title order={5} ta="center">
                         {column.title}
                     </Title>
-                    {shouldShowPrice && totalPrice > 0 && (
-                        <Text size="sm" fw={600} ta="center" c="dimmed">
-                            ${totalPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </Text>
-                    )}
                 </Stack>
                 {isHistorical && onToggleCollapse ? (
                     <Group gap="xs">
@@ -357,7 +336,7 @@ function saveJobOrder(orderMap: JobOrderMap): void {
 }
 
 export default function JobsList() {
-    const { projects, loading: cacheLoading, refreshData } = useDataCache();
+    const { projects, loading: cacheLoading, refreshData, updateEstimate } = useDataCache();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -673,12 +652,21 @@ export default function JobsList() {
         // Moving to a different column - update estimate status
         const newStatus = targetColumn.defaultStatus as EstimateStatus;
 
+        // Store original estimate for potential revert
+        const originalEstimate = { ...estimate };
+
+        // Create optimistic update
+        const optimisticEstimate = { ...estimate, status: newStatus };
+
         // Optimistically update the UI
         setJobs((prevJobs) =>
             prevJobs.map((j) =>
                 j.id === estimateId ? { ...j, status: newStatus } : j
             )
         );
+
+        // Optimistically update the cache
+        updateEstimate(optimisticEstimate);
 
         // Remove from old column's order and add to new column's order
         const oldColumn = columns.find((col) =>
@@ -736,9 +724,11 @@ export default function JobsList() {
             // Revert if no token
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === estimateId ? { ...j, status: estimate.status } : j
+                    j.id === estimateId ? { ...j, status: originalEstimate.status } : j
                 )
             );
+            // Revert cache update
+            updateEstimate(originalEstimate);
             return;
         }
 
@@ -759,24 +749,32 @@ export default function JobsList() {
                 setJobs((prevJobs) =>
                     prevJobs.map((j) =>
                         j.id === estimateId
-                            ? { ...j, status: estimate.status }
+                            ? { ...j, status: originalEstimate.status }
                             : j
                     )
                 );
+                // Revert cache update
+                updateEstimate(originalEstimate);
                 const errorData = await response.json().catch(() => ({}));
                 // eslint-disable-next-line no-console
                 console.error('Error updating estimate status:', errorData);
             } else {
-                // Refresh cache after successful update
-                refreshData('projects');
+                // Get the updated estimate from response
+                const updatedEstimate = await response.json();
+                // Update cache with the confirmed estimate from server
+                updateEstimate(updatedEstimate);
+                // Optionally refresh in background for consistency (non-blocking)
+                refreshData('projects').catch(() => {});
             }
         } catch (error) {
             // Revert on error
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === estimateId ? { ...j, status: estimate.status } : j
+                    j.id === estimateId ? { ...j, status: originalEstimate.status } : j
                 )
             );
+            // Revert cache update
+            updateEstimate(originalEstimate);
             // eslint-disable-next-line no-console
             console.error('Error updating estimate status:', error);
         }

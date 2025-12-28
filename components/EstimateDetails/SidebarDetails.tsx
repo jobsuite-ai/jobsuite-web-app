@@ -59,7 +59,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const [savingCustomer, setSavingCustomer] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
-  const { refreshData } = useDataCache();
+  const { refreshData, updateEstimate } = useDataCache();
 
   // Check QuickBooks connection status
   useEffect(() => {
@@ -258,6 +258,9 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       return;
     }
 
+    // Store original status for potential revert
+    const originalStatus = currentStatus;
+
     try {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
@@ -265,6 +268,10 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         console.error('No access token found');
         return;
       }
+
+      // Optimistically update the status immediately
+      setCurrentStatus(status);
+      setMenuOpened(false);
 
       const response = await fetch(`/api/estimates/${estimateID}`, {
         method: 'PUT',
@@ -276,14 +283,12 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       });
 
       if (!response.ok) {
+        // Revert optimistic update on error
+        setCurrentStatus(originalStatus);
         throw new Error('Failed to update estimate status');
       }
 
-      await response.json();
-
-      // Optimistically update the status immediately
-      setCurrentStatus(status);
-      setMenuOpened(false);
+      const updatedEstimate = await response.json();
 
       if (status === EstimateStatus.CONTRACTOR_SIGNED && client) {
         const jiraResponse = await fetch('/api/jira', {
@@ -296,13 +301,18 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         });
 
         if (!jiraResponse.ok) {
+          // Revert optimistic update if JIRA creation fails
+          setCurrentStatus(originalStatus);
           throw new Error('Failed to create JIRA ticket');
         }
       }
 
-      // Refresh cache after status update
-      await refreshData('estimates');
-      await refreshData('projects');
+      // Update cache immediately with the returned estimate
+      updateEstimate(updatedEstimate);
+
+      // Optionally refresh in background for consistency (non-blocking)
+      refreshData('estimates').catch(() => {});
+      refreshData('projects').catch(() => {});
 
       onUpdate();
     } catch (error) {
@@ -312,6 +322,9 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
   const handleFollowUpModalSuccess = async () => {
     // After scheduling the follow-up, update the estimate status to NEEDS_FOLLOW_UP
+    // Store original status for potential revert
+    const originalStatus = currentStatus;
+
     try {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
@@ -319,6 +332,9 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         console.error('No access token found');
         return;
       }
+
+      // Optimistically update the status
+      setCurrentStatus(EstimateStatus.NEEDS_FOLLOW_UP);
 
       const response = await fetch(`/api/estimates/${estimateID}`, {
         method: 'PUT',
@@ -330,17 +346,19 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
       });
 
       if (!response.ok) {
+        // Revert optimistic update on error
+        setCurrentStatus(originalStatus);
         throw new Error('Failed to update estimate status');
       }
 
-      await response.json();
+      const updatedEstimate = await response.json();
 
-      // Optimistically update the status
-      setCurrentStatus(EstimateStatus.NEEDS_FOLLOW_UP);
+      // Update cache immediately with the returned estimate
+      updateEstimate(updatedEstimate);
 
-      // Refresh cache after status update
-      await refreshData('estimates');
-      await refreshData('projects');
+      // Optionally refresh in background for consistency (non-blocking)
+      refreshData('estimates').catch(() => {});
+      refreshData('projects').catch(() => {});
 
       onUpdate();
     } catch (error) {
