@@ -119,8 +119,23 @@ export async function POST(request: Request) {
       }
     }
 
-    if (estimate.status !== EstimateStatus.CONTRACTOR_SIGNED &&
-      estimate.status !== EstimateStatus.ACCOUNTING_NEEDED) {
+    // Block updates from any status that comes after signing
+    // (ACCOUNTING_NEEDED or any PROJECT_* status)
+    // This prevents DocuSeal "viewed" events from reverting signed estimates
+    const postSigningStatuses = [
+      EstimateStatus.CONTRACTOR_SIGNED,
+      EstimateStatus.ACCOUNTING_NEEDED,
+      EstimateStatus.PROJECT_NOT_SCHEDULED,
+      EstimateStatus.PROJECT_SCHEDULED,
+      EstimateStatus.PROJECT_IN_PROGRESS,
+      EstimateStatus.PROJECT_BILLING_NEEDED,
+      EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE,
+      EstimateStatus.PROJECT_PAYMENTS_RECEIVED,
+      EstimateStatus.PROJECT_COMPLETED,
+      EstimateStatus.PROJECT_CANCELLED,
+    ];
+
+    if (!postSigningStatuses.includes(estimate.status as EstimateStatus)) {
       // Update estimate via job engine API
       // Reuse the same token (it's cached, so this is efficient)
       const updateResponse = await fetch(
