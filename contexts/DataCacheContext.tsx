@@ -38,6 +38,10 @@ interface DataCacheContextType {
     : T extends 'projects'
     ? Job[]
     : never;
+  // Optimistic update methods
+  updateEstimate: (updatedEstimate: Estimate) => void;
+  updateProject: (updatedProject: Job) => void;
+  updateClient: (updatedClient: ContractorClient) => void;
 }
 
 const DataCacheContext = createContext<DataCacheContextType | undefined>(undefined);
@@ -122,7 +126,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     return Array.isArray(projectsList) ? projectsList : [];
   }, []);
 
-  // Refresh data for a specific key or all keys
+  // Refresh data for a specific key or all keys using stale-while-revalidate pattern
   const refreshData = useCallback(async (key?: CacheKey) => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -136,9 +140,18 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
 
     const keysToRefresh: CacheKey[] = key ? [key] : ['clients', 'estimates', 'projects'];
 
-    // Set loading states
+    // Check cache validity - only show loading if cache is missing or expired
+    const hasValidCache: Record<CacheKey, boolean> = {
+      clients: !!getCachedData<ContractorClient>('clients'),
+      estimates: !!getCachedData<Estimate>('estimates'),
+      projects: !!getCachedData<Job>('projects'),
+    };
+
+    // Set loading states only for keys without valid cache
     keysToRefresh.forEach((k) => {
-      setLoading((prev) => ({ ...prev, [k]: true }));
+      if (!hasValidCache[k]) {
+        setLoading((prev) => ({ ...prev, [k]: true }));
+      }
       setErrors((prev) => ({ ...prev, [k]: null }));
     });
 
@@ -238,7 +251,89 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     throw new Error(`Unknown cache key: ${key}`);
   }, [clients, estimates, projects]);
 
-  // Initial load: show cached data immediately, then always fetch fresh data in background
+  // Optimistic update methods - update single items in cache immediately
+  const updateEstimate = useCallback((updatedEstimate: Estimate) => {
+    // Update estimates array
+    setEstimates((prev) => {
+      const index = prev.findIndex((e) => e.id === updatedEstimate.id);
+      const newEstimates = index >= 0
+        ? [...prev.slice(0, index), updatedEstimate, ...prev.slice(index + 1)]
+        : [...prev, updatedEstimate];
+
+      // Update localStorage cache
+      setCachedData('estimates', newEstimates);
+      return newEstimates;
+    });
+
+    // Also update projects array if this estimate is a project
+    // (estimates and projects share the same data structure, just different views)
+    setProjects((prev) => {
+      const index = prev.findIndex((p) => p.id === updatedEstimate.id);
+      if (index >= 0) {
+        const newProjects = [
+          ...prev.slice(0, index),
+          updatedEstimate as Job,
+          ...prev.slice(index + 1),
+        ];
+        setCachedData('projects', newProjects);
+        return newProjects;
+      }
+      // If not found in projects but is a project, add it
+      if (updatedEstimate.is_project) {
+        const newProjects = [...prev, updatedEstimate as Job];
+        setCachedData('projects', newProjects);
+        return newProjects;
+      }
+      return prev;
+    });
+  }, []);
+
+  const updateProject = useCallback((updatedProject: Job) => {
+    setProjects((prev) => {
+      const index = prev.findIndex((p) => p.id === updatedProject.id);
+      const newProjects = index >= 0
+        ? [...prev.slice(0, index), updatedProject, ...prev.slice(index + 1)]
+        : [...prev, updatedProject];
+
+      // Update localStorage cache
+      setCachedData('projects', newProjects);
+      return newProjects;
+    });
+
+    // Also update estimates array since projects are estimates
+    setEstimates((prev) => {
+      const index = prev.findIndex((e) => e.id === updatedProject.id);
+      if (index >= 0) {
+        const newEstimates = [
+          ...prev.slice(0, index),
+          updatedProject as Estimate,
+          ...prev.slice(index + 1),
+        ];
+        setCachedData('estimates', newEstimates);
+        return newEstimates;
+      }
+      // If not found in estimates, add it
+      const newEstimates = [...prev, updatedProject as Estimate];
+      setCachedData('estimates', newEstimates);
+      return newEstimates;
+    });
+  }, []);
+
+  const updateClient = useCallback((updatedClient: ContractorClient) => {
+    setClients((prev) => {
+      const index = prev.findIndex((c) => c.id === updatedClient.id);
+      const newClients = index >= 0
+        ? [...prev.slice(0, index), updatedClient, ...prev.slice(index + 1)]
+        : [...prev, updatedClient];
+
+      // Update localStorage cache
+      setCachedData('clients', newClients);
+      return newClients;
+    });
+  }, []);
+
+  // Initial load: show cached data immediately,
+  // then fetch fresh data in background if cache expired
   useEffect(() => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
@@ -246,10 +341,9 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Always fetch fresh data in the background, regardless of cache
-    // This ensures we have the latest data, especially important on iOS devices
-    // where cache timing can be inconsistent
-      refreshData();
+    // Use stale-while-revalidate: show cached data immediately, refresh in background
+    // Only fetch if cache is expired or missing (refreshData handles this)
+    refreshData();
   }, [refreshData]);
 
   // Listen for storage changes (e.g., after login)
@@ -293,6 +387,9 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         refreshData,
         invalidateCache,
         getData,
+        updateEstimate,
+        updateProject,
+        updateClient,
       }}
     >
       {children}

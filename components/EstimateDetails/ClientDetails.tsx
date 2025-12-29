@@ -15,6 +15,7 @@ import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialEstimate }: { initialEstimate: Estimate }) {
@@ -25,6 +26,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const [client, setClient] = useState<ContractorClient>();
     const [menuOpened, setMenuOpened] = useState(false);
     const router = useRouter();
+    const { updateEstimate } = useDataCache();
 
     useEffect(() => {
         const loadClientDetails = async () => {
@@ -215,7 +217,16 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             return;
         }
 
+        // Store original estimate for potential revert
+        const originalEstimate = { ...estimate };
+
         try {
+            // Optimistically update local state
+            setEstimate(prevEstimate => ({
+                ...prevEstimate,
+                status,
+            }));
+
             const response = await fetch(
                 `/api/estimates/${estimate.id}`,
                 {
@@ -227,13 +238,16 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 }
             );
 
-            await response.json();
+            if (!response.ok) {
+                // Revert optimistic update on error
+                setEstimate(originalEstimate);
+                throw new Error('Failed to update estimate status');
+            }
 
-            // Update local state
-            setEstimate(prevEstimate => ({
-                ...prevEstimate,
-                status,
-            }));
+            const updatedEstimate = await response.json();
+
+            // Update cache immediately with the returned estimate
+            updateEstimate(updatedEstimate);
 
             if (status === EstimateStatus.CONTRACTOR_SIGNED && client) {
                 const jiraResponse = await fetch('/api/jira', {
@@ -245,6 +259,9 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 });
 
                 if (!jiraResponse.ok) {
+                    // Revert optimistic update if JIRA creation fails
+                    setEstimate(originalEstimate);
+                    updateEstimate(originalEstimate);
                     throw new Error('Failed to create JIRA ticket');
                 }
             }
@@ -263,7 +280,16 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
 
     const handleFollowUpModalSuccess = async () => {
         // After scheduling the follow-up, update the estimate status to NEEDS_FOLLOW_UP
+        // Store original estimate for potential revert
+        const originalEstimate = { ...estimate };
+
         try {
+            // Optimistically update local state
+            setEstimate(prevEstimate => ({
+                ...prevEstimate,
+                status: EstimateStatus.NEEDS_FOLLOW_UP,
+            }));
+
             const response = await fetch(
                 `/api/estimates/${estimate.id}`,
                 {
@@ -275,13 +301,16 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 }
             );
 
-            await response.json();
+            if (!response.ok) {
+                // Revert optimistic update on error
+                setEstimate(originalEstimate);
+                throw new Error('Failed to update estimate status');
+            }
 
-            // Update local state
-            setEstimate(prevEstimate => ({
-                ...prevEstimate,
-                status: EstimateStatus.NEEDS_FOLLOW_UP,
-            }));
+            const updatedEstimate = await response.json();
+
+            // Update cache immediately with the returned estimate
+            updateEstimate(updatedEstimate);
 
             setMenuOpened(false);
         } catch (error) {
