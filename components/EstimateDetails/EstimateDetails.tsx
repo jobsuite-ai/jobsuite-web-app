@@ -239,6 +239,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 ) {
                     const changeOrdersArray = detailsData.change_orders;
                     setChangeOrders(changeOrdersArray);
+                } else if (isMountedRef.current) {
+                    // Fallback: fetch change orders separately if not in details response
+                    fetchChangeOrders();
                 }
 
                 // Process time entries
@@ -340,6 +343,33 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching resources:', error);
+        }
+    }, [estimateID]);
+
+    const fetchChangeOrders = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/change-orders`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok && isMountedRef.current) {
+                const changeOrdersData = await response.json();
+                const changeOrdersArray = Array.isArray(changeOrdersData) ? changeOrdersData : [];
+                setChangeOrders(changeOrdersArray);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching change orders:', error);
         }
     }, [estimateID]);
 
@@ -916,9 +946,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <ChangeOrders
                                               estimate={estimate}
                                               initialChangeOrders={changeOrders}
-                                              skipInitialFetch
+                                              skipInitialFetch={changeOrders.length > 0}
                                               onUpdate={() => {
                                                 getEstimate();
+                                                fetchChangeOrders();
                                               }}
                                             />
                                         </CollapsibleSection>
