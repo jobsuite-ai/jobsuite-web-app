@@ -229,6 +229,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 ) {
                     const commentsArray = detailsData.comments;
                     setComments(commentsArray);
+                } else if (isMountedRef.current) {
+                    // Fallback: fetch comments separately if not in details response
+                    fetchComments();
                 }
 
                 // Process change orders
@@ -370,6 +373,38 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching change orders:', error);
+        }
+    }, [estimateID]);
+
+    const fetchComments = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimate-comments/${estimateID}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok && isMountedRef.current) {
+                const commentsData = await response.json();
+                // API returns { Items: [...] } format
+                const commentsArray = Array.isArray(commentsData.Items)
+                    ? commentsData.Items
+                    : Array.isArray(commentsData)
+                    ? commentsData
+                    : [];
+                setComments(commentsArray);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching comments:', error);
         }
     }, [estimateID]);
 
@@ -773,7 +808,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         <JobComments
                                           estimateID={estimateID}
                                           initialComments={comments}
-                                          skipInitialFetch
+                                          skipInitialFetch={comments.length > 0}
                                         />
                                     </CollapsibleSection>
 

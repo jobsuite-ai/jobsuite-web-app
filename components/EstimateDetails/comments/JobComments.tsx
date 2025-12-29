@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
     ActionIcon,
@@ -81,7 +81,7 @@ export default function JobComments({
 
     const showQuickReplies = !commentContents || commentContents.trim().length === 0;
 
-    async function getJobComments() {
+    const getJobComments = useCallback(async () => {
         try {
             const accessToken = localStorage.getItem('access_token');
             if (!accessToken) {
@@ -143,7 +143,7 @@ export default function JobComments({
             });
             setJobComments([]);
         }
-    }
+    }, [estimateID]);
 
     const onLoadingChangeRef = useRef(onLoadingChange);
 
@@ -152,9 +152,26 @@ export default function JobComments({
         onLoadingChangeRef.current = onLoadingChange;
     }, [onLoadingChange]);
 
+    // Sync initialComments with state when they change
     useEffect(() => {
-        // Skip initial fetch if initialComments are provided
-        if (skipInitialFetch && initialComments) {
+        if (initialComments && Array.isArray(initialComments) && initialComments.length > 0) {
+            const mappedComments = initialComments.map((comment: any) => ({
+                ...comment,
+                timestamp: comment.created_at || comment.timestamp,
+                updated_at: comment.updated_at,
+            })).sort((a: SingleComment, b: SingleComment) => {
+                const dateA = new Date(a.timestamp).getTime();
+                const dateB = new Date(b.timestamp).getTime();
+                return dateB - dateA;
+            });
+            setJobComments(mappedComments);
+        }
+    }, [initialComments]);
+
+    useEffect(() => {
+        // Skip initial fetch if initialComments are provided and not empty
+        if (skipInitialFetch && initialComments && initialComments.length > 0) {
+            setLoading(false);
             return;
         }
 
@@ -164,7 +181,7 @@ export default function JobComments({
             setLoading(false);
             onLoadingChangeRef.current?.(false);
         });
-    }, [estimateID]);
+    }, [estimateID, skipInitialFetch, initialComments, getJobComments]);
 
     // Extract mentioned user IDs from comment contents (keep original text with usernames)
     function processMentions(text: string): { processedText: string; mentionedUserIds: string[] } {
