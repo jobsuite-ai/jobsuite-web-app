@@ -80,6 +80,7 @@ export type SingleComment = {
     commenter: string;
     timestamp: string;
     updated_at?: string;
+    reactions?: Array<{ user_id: string; emoji: string }>;
 };
 
 export type TypedDynamoStringReturn = {

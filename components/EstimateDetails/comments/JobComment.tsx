@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   ActionIcon,
@@ -18,6 +18,8 @@ import { notifications } from '@mantine/notifications';
 import { IconClock, IconEdit, IconTrash, IconX, IconCheck } from '@tabler/icons-react';
 import { format } from 'date-fns';
 
+import { CommentReactions } from './CommentReactions';
+
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { SingleComment } from '@/components/Global/model';
 
@@ -33,12 +35,18 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [currentComment, setCurrentComment] = useState<SingleComment>(commentDetails);
 
-  const dateObj = new Date(commentDetails.timestamp);
-  const updatedDateObj = commentDetails.updated_at ? new Date(commentDetails.updated_at) : null;
+  // Update current comment when commentDetails prop changes
+  useEffect(() => {
+    setCurrentComment(commentDetails);
+  }, [commentDetails]);
+
+  const dateObj = new Date(currentComment.timestamp);
+  const updatedDateObj = currentComment.updated_at ? new Date(currentComment.updated_at) : null;
   const isEdited = updatedDateObj && updatedDateObj.getTime() !== dateObj.getTime();
 
-  const initials = commentDetails.commenter
+  const initials = currentComment.commenter
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -46,12 +54,12 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
     .slice(0, 2);
 
   const handleEdit = () => {
-    setEditedContent(commentDetails.comment_contents);
+    setEditedContent(currentComment.comment_contents);
     setIsEditing(true);
   };
 
   const handleCancel = () => {
-    setEditedContent(commentDetails.comment_contents);
+    setEditedContent(currentComment.comment_contents);
     setIsEditing(false);
   };
 
@@ -78,7 +86,7 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
       }
 
       const response = await fetch(
-        `/api/estimate-comments/${estimateId}/${commentDetails.id}`,
+        `/api/estimate-comments/${estimateId}/${currentComment.id}`,
         {
           method: 'PUT',
           headers: getApiHeaders(),
@@ -92,6 +100,13 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to update comment');
       }
+
+      const updatedComment = await response.json();
+      setCurrentComment({
+        ...currentComment,
+        comment_contents: updatedComment.comment_contents,
+        updated_at: updatedComment.updated_at,
+      });
 
       notifications.show({
         title: 'Success',
@@ -131,7 +146,7 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
       }
 
       const response = await fetch(
-        `/api/estimate-comments/${estimateId}/${commentDetails.id}`,
+        `/api/estimate-comments/${estimateId}/${currentComment.id}`,
         {
           method: 'DELETE',
           headers: getApiHeaders(),
@@ -161,9 +176,16 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
     }
   };
 
+  const handleReactionUpdated = (updatedComment: SingleComment) => {
+    // Update local state with new reactions
+    setCurrentComment(updatedComment);
+    // Also trigger parent refresh to ensure consistency
+    onCommentUpdated?.();
+  };
+
   return (
     <Card
-      key={commentDetails.id}
+      key={currentComment.id}
       shadow="xs"
       padding="md"
       radius="md"
@@ -183,7 +205,7 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
             </Avatar>
             <div>
               <Text size="sm" fw={500} lineClamp={1}>
-                {commentDetails.commenter}
+                {currentComment.commenter}
               </Text>
               <Group gap={4} mt={2}>
                 <IconClock size={12} style={{ opacity: 0.6 }} />
@@ -262,9 +284,14 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
             }}
             pl={rem(48)}
           >
-            {commentDetails.comment_contents}
+            {currentComment.comment_contents}
           </Text>
         )}
+        <CommentReactions
+          comment={currentComment}
+          estimateId={estimateId}
+          onReactionUpdated={handleReactionUpdated}
+        />
       </Stack>
       <Modal
         opened={showDeleteModal}

@@ -20,8 +20,8 @@ const ESTIMATE_SUMMARY_PREFIX = 'jobsuite_estimate_summary_';
 // Cache expiration times in milliseconds
 const CACHE_EXPIRATION: Record<CacheKey, number> = {
   clients: 10 * 60 * 1000, // 10 minutes
-  estimates: 5 * 60 * 1000, // 5 minutes
-  projects: Infinity, // No expiration for projects
+  estimates: 10 * 60 * 1000, // 10 minutes
+  projects: 10 * 60 * 1000, // 10 minutes
 };
 
 const ESTIMATE_SUMMARY_EXPIRATION = 2 * 60 * 1000; // 2 minutes
@@ -50,6 +50,17 @@ function isCacheExpired(key: CacheKey, timestamp: number): boolean {
   }
   const now = Date.now();
   return now - timestamp > expirationTime;
+}
+
+/**
+ * Check if cache exists and is still valid (not expired)
+ */
+export function isCacheValid(key: CacheKey): boolean {
+  const timestamp = getCacheTimestamp(key);
+  if (timestamp === null) {
+    return false; // No cache
+  }
+  return !isCacheExpired(key, timestamp);
 }
 
 /**
