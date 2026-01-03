@@ -44,9 +44,12 @@ import SidebarDetails from './SidebarDetails';
 import classes from './styles/EstimateDetails.module.css';
 import VideoUploader from './VideoUploader';
 
+import { getCachedEstimateSummary, setCachedEstimateSummary } from '@/app/utils/dataCache';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
+import { useDataCache } from '@/contexts/DataCacheContext';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
+    const { estimates: cachedEstimates, clients: cachedClients } = useDataCache();
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -69,11 +72,33 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     // Single initial loading state - true until all initial data is loaded
     const [initialLoading, setInitialLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
     const [comments, setComments] = useState<any[]>([]);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
     const [timeEntries, setTimeEntries] = useState<any[]>([]);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
+
+    // Load cached estimate data immediately for instant display
+    useEffect(() => {
+        if (cachedEstimates.length > 0) {
+            const cachedEstimate = cachedEstimates.find((e) => e.id === estimateID);
+            if (cachedEstimate && isMountedRef.current) {
+                // Use cached estimate data immediately - this provides instant UI
+                setEstimate(cachedEstimate);
+
+                // Also try to find cached client
+                if (cachedEstimate.client_id && cachedClients.length > 0) {
+                    const cachedClient = cachedClients.find(
+                        (c) => c.id === cachedEstimate.client_id
+                    );
+                    if (cachedClient && isMountedRef.current) {
+                        setClient(cachedClient);
+                    }
+                }
+            }
+        }
+    }, [cachedEstimates, cachedClients, estimateID]);
 
     // Fetch initial summary data for fast page load
     useEffect(() => {
@@ -82,12 +107,43 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
         if (!accessToken) {
             setInitialLoading(false);
+            setHasError(true);
             return;
+        }
+
+        // Check cache first to avoid unnecessary fetch
+        const cachedSummary = getCachedEstimateSummary<any>(estimateID);
+        if (cachedSummary) {
+            // Use cached summary data
+            if (cachedSummary.estimate && isMountedRef.current) {
+                const estimateData = { ...cachedSummary.estimate };
+                if (
+                    cachedSummary.hours_worked !== undefined &&
+                    cachedSummary.hours_worked !== null
+                ) {
+                    estimateData.hours_worked = cachedSummary.hours_worked;
+                }
+                setEstimate(estimateData);
+            }
+            if (cachedSummary.client && isMountedRef.current) {
+                setClient(cachedSummary.client);
+            }
+            if (cachedSummary.has_video && isMountedRef.current) {
+                setObjectExists(true);
+            }
+            if (isMountedRef.current) {
+                setLineItemsCount(cachedSummary.line_items_count || 0);
+            }
+            setInitialLoading(false);
         }
 
         const fetchSummary = async () => {
             try {
-                setInitialLoading(true);
+                // Only show loading if we don't have cached data
+                if (!cachedSummary) {
+                    setInitialLoading(true);
+                }
+                setHasError(false);
 
                 // Fetch lightweight summary for initial render
                 const summaryRes = await fetch(`/api/estimates/${estimateID}/summary`, {
@@ -101,13 +157,24 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (!isMountedRef.current) return;
 
                 if (!summaryRes.ok) {
+                    const errorData = await summaryRes.json().catch(() => ({}));
                     // eslint-disable-next-line no-console
-                    console.error('Error fetching estimate summary:', await summaryRes.json().catch(() => ({})));
-                    setInitialLoading(false);
+                    console.error('Error fetching estimate summary:', errorData);
+
+                    // Only set error if we don't have cached data to show
+                    if (!cachedSummary && !estimate) {
+                        setHasError(true);
+                    }
+                    if (!cachedSummary) {
+                        setInitialLoading(false);
+                    }
                     return;
                 }
 
                 const summaryData = await summaryRes.json();
+
+                // Cache the summary data
+                setCachedEstimateSummary(estimateID, summaryData);
 
                 // Process estimate from summary
                 if (summaryData.estimate && isMountedRef.current) {
@@ -139,6 +206,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             } catch (error) {
                 // eslint-disable-next-line no-console
                 console.error('Error fetching summary:', error);
+                // Only set error if we don't have cached data to show
+                if (!cachedSummary && !estimate) {
+                    setHasError(true);
+                }
             } finally {
                 if (isMountedRef.current) {
                     setInitialLoading(false);
@@ -146,7 +217,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         };
 
-        fetchSummary();
+        // Only fetch if cache is expired or missing
+        if (!cachedSummary) {
+            fetchSummary();
+        }
 
         // eslint-disable-next-line consistent-return
         return function cleanup() {
@@ -409,6 +483,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     }, [estimateID]);
 
     // Fallback: If loading takes too long, force completion after 10 seconds
+    // But only show error if we truly don't have any data
     useEffect(() => {
         if (!initialLoading) {
             return;
@@ -418,13 +493,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             // eslint-disable-next-line no-console
             console.warn('Initial loading timeout - forcing completion');
             setInitialLoading(false);
+            // Only set error if we don't have cached estimate data
+            if (!estimate) {
+                setHasError(true);
+            }
         }, 10000);
 
         // eslint-disable-next-line consistent-return
         return function cleanup() {
             clearTimeout(timeout);
         };
-    }, [initialLoading]);
+    }, [initialLoading, estimate]);
 
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const hasUploadingVideoRef = useRef(false);
@@ -597,9 +676,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const OverviewDetails = useMemo(() => (
         <>
-            {initialLoading ? <EstimateDetailsSkeleton /> : <>
-                {estimate ?
-                    <>
+            {initialLoading && !estimate ? (
+                <EstimateDetailsSkeleton />
+            ) : estimate ? (
+                <>
                         <div className={classes.twoColumnLayout}>
                             {/* Column 1: Main Content - Video, Images, Description, Activity */}
                             <div className={classes.mainColumn}>
@@ -1059,9 +1139,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 </div>
                             </div>
                         </div>
-                    </> : <UniversalError message="Unable to access estimate details" />
-                }
-                                                            </>}
+                </>
+            ) : null}
+            {/* Only show error if we truly don't have data and we're not loading */}
+            {hasError && !estimate && !initialLoading && (
+                <UniversalError message="Unable to access estimate details" />
+            )}
+
             {/* Archive Confirmation Modal */}
             <Modal
               opened={isModalOpen}

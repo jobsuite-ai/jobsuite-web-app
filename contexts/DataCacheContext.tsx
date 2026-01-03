@@ -3,7 +3,7 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { clearCachedData, getCachedData, setCachedData, type CacheKey } from '@/app/utils/dataCache';
+import { clearCachedData, getCachedData, isCacheValid, setCachedData, type CacheKey } from '@/app/utils/dataCache';
 import { ContractorClient, Estimate, Job } from '@/components/Global/model';
 
 interface DataCacheContextType {
@@ -140,25 +140,31 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
 
     const keysToRefresh: CacheKey[] = key ? [key] : ['clients', 'estimates', 'projects'];
 
-    // Check cache validity - only show loading if cache is missing or expired
-    const hasValidCache: Record<CacheKey, boolean> = {
-      clients: !!getCachedData<ContractorClient>('clients'),
-      estimates: !!getCachedData<Estimate>('estimates'),
-      projects: !!getCachedData<Job>('projects'),
+    // Check cache validity - only fetch if cache is missing or expired
+    const cacheValid: Record<CacheKey, boolean> = {
+      clients: isCacheValid('clients'),
+      estimates: isCacheValid('estimates'),
+      projects: isCacheValid('projects'),
     };
 
-    // Set loading states only for keys without valid cache
-    keysToRefresh.forEach((k) => {
-      if (!hasValidCache[k]) {
-        setLoading((prev) => ({ ...prev, [k]: true }));
-      }
+    // Filter out keys that have valid cache - don't fetch those
+    const keysToFetch = keysToRefresh.filter((k) => !cacheValid[k]);
+
+    // If all keys have valid cache, skip fetching
+    if (keysToFetch.length === 0) {
+      return;
+    }
+
+    // Set loading states only for keys that need fetching
+    keysToFetch.forEach((k) => {
+      setLoading((prev) => ({ ...prev, [k]: true }));
       setErrors((prev) => ({ ...prev, [k]: null }));
     });
 
     try {
       const promises: Promise<void>[] = [];
 
-      if (keysToRefresh.includes('clients')) {
+      if (keysToFetch.includes('clients')) {
         promises.push(
           fetchClients()
             .then((data) => {
@@ -174,7 +180,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      if (keysToRefresh.includes('estimates')) {
+      if (keysToFetch.includes('estimates')) {
         promises.push(
           fetchEstimates()
             .then((data) => {
@@ -190,7 +196,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      if (keysToRefresh.includes('projects')) {
+      if (keysToFetch.includes('projects')) {
         promises.push(
           fetchProjects()
             .then((data) => {
@@ -212,7 +218,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       console.error('Error refreshing data:', err);
     } finally {
       // Clear loading states
-      keysToRefresh.forEach((k) => {
+      keysToFetch.forEach((k) => {
         setLoading((prev) => ({ ...prev, [k]: false }));
       });
     }
