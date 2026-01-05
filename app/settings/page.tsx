@@ -22,6 +22,7 @@ import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
+import SignaturePageTab from '@/components/Settings/SignaturePageTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
 
@@ -178,6 +179,10 @@ export default function SettingsPage() {
                     }),
                     ...(existingConfig?.configuration?.logo_s3_bucket && {
                         logo_s3_bucket: existingConfig.configuration.logo_s3_bucket,
+                    }),
+                    // Preserve signature page config if it exists
+                    ...(existingConfig?.configuration?.signature_page_config && {
+                        signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
                 },
             };
@@ -346,6 +351,7 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
+                    <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
@@ -425,6 +431,10 @@ export default function SettingsPage() {
                             </Stack>
                         )}
                     </Card>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="signature-page" pt="md">
+                    <SignaturePageTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="templates" pt="md">

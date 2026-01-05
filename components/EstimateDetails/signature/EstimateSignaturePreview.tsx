@@ -1,0 +1,171 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+
+import { Paper } from '@mantine/core';
+import { remark } from 'remark';
+import html from 'remark-html';
+
+import { EstimateLineItem } from '../estimate/LineItem';
+import classes from '../styles/EstimateDetails.module.css';
+
+import { generateTemplate } from '@/app/api/estimate_template/template_builder';
+import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
+import LoadingState from '@/components/Global/LoadingState';
+import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
+
+interface EstimateSignaturePreviewProps {
+    estimate: Estimate;
+    imageResources?: EstimateResource[];
+    videoResources?: EstimateResource[];
+    lineItems?: EstimateLineItem[];
+    client?: ContractorClient;
+}
+
+export default function EstimateSignaturePreview({
+    estimate,
+    imageResources = [],
+    lineItems = [],
+    client,
+}: EstimateSignaturePreviewProps) {
+    const [loading, setLoading] = useState(true);
+    const [template, setTemplate] = useState<string>('');
+
+    // Get image path from resources - prioritize cover photo
+    const getImagePath = useCallback(() => {
+        if (!imageResources || imageResources.length === 0) {
+            return '';
+        }
+
+        // Find cover photo if specified, otherwise use first image
+        let selectedImage = imageResources[0];
+        if (estimate.cover_photo_resource_id) {
+            const coverPhoto = imageResources.find(
+                (img) => img.id === estimate.cover_photo_resource_id
+            );
+            if (coverPhoto) {
+                selectedImage = coverPhoto;
+            }
+        }
+
+        // If we have s3_bucket and s3_key, construct the correct S3 URL
+        if (selectedImage.s3_bucket && selectedImage.s3_key) {
+            const bucket = selectedImage.s3_bucket;
+            const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
+            return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.s3_key}`;
+        }
+
+        // Legacy fallback: use resource_location
+        if (selectedImage.resource_location) {
+            const getImageBucket = () => {
+                const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+                return `jobsuite-resource-images-${env}`;
+            };
+            const bucket = selectedImage.s3_bucket || getImageBucket();
+            const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
+            return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.resource_location}`;
+        }
+
+        return '';
+    }, [imageResources, estimate.cover_photo_resource_id]);
+
+    const buildTemplate = useCallback(async () => {
+        const result = await remark().use(html).process(estimate.transcription_summary || '');
+        const htmlString = result.toString();
+
+        // Use line items from props
+        const templateLineItems: TemplateDescription[] = lineItems.map((item) => ({
+            header: item.title,
+            content: item.description,
+            price: item.hours * item.rate,
+            hours: item.hours,
+        }));
+
+        const imagePath = getImagePath();
+
+        if (client) {
+            const estimateNumber = estimate.id.split('-')[0];
+            const templateInput: TemplateInput = {
+                client: {
+                    name: client.name || 'Undefined Name',
+                    city: estimate.address_city || estimate.city || '',
+                    state: estimate.address_state || estimate.state || '',
+                    email: client.email || 'Undefined Email',
+                    address: estimate.address_street || estimate.client_address || '',
+                    phone: client.phone_number || 'Undefined Phone Number',
+                },
+                items: templateLineItems,
+                image: imagePath,
+                notes: htmlString,
+                discountReason: estimate.discount_reason,
+                discountPercentage: estimate.discount_percentage,
+                estimateNumber,
+                rate: estimate.hourly_rate,
+            };
+
+            const fullTemplate = generateTemplate(templateInput);
+
+            // Extract body content from the full HTML document
+            const bodyMatch = fullTemplate.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+            let bodyContent = bodyMatch ? bodyMatch[1].trim() : '';
+
+            // If body extraction failed, try alternative extraction
+            if (!bodyContent) {
+                const bodyStart = fullTemplate.indexOf('<body');
+                const bodyEnd = fullTemplate.indexOf('</body>');
+                if (bodyStart !== -1 && bodyEnd !== -1) {
+                    const bodyTagEnd = fullTemplate.indexOf('>', bodyStart) + 1;
+                    bodyContent = fullTemplate.substring(bodyTagEnd, bodyEnd).trim();
+                }
+            }
+
+            // Extract styles from head
+            const styleMatch = fullTemplate.match(/<style[^>]*>([\s\S]*)<\/style>/i);
+            const styles = styleMatch ? styleMatch[1] : '';
+
+            // Body content already has full-page-wrapper and container divs
+            const wrappedContent = bodyContent
+                ? `<div class="body-wrapper">${bodyContent}</div>`
+                : bodyContent;
+
+            // Combine styles and wrapped body content
+            if (wrappedContent) {
+                setTemplate(`<style>${styles}</style>${wrappedContent}`);
+            } else {
+                // eslint-disable-next-line no-console
+                console.error('Failed to extract template content');
+                setTemplate('');
+            }
+        } else {
+            setTemplate('');
+        }
+    }, [
+        client,
+        estimate,
+        imageResources,
+        lineItems,
+        getImagePath,
+        estimate.cover_photo_resource_id,
+    ]);
+
+    useEffect(() => {
+        setLoading(true);
+        buildTemplate().finally(() => setLoading(false));
+    }, [buildTemplate]);
+
+    if (loading || !client) {
+        return <LoadingState />;
+    }
+
+    if (!template) {
+        return null;
+    }
+
+    return (
+        <div className={classes.estimatePreviewWrapper}>
+            <Paper shadow="sm" radius="md" withBorder>
+                <div dangerouslySetInnerHTML={{ __html: template }} />
+            </Paper>
+        </div>
+    );
+}

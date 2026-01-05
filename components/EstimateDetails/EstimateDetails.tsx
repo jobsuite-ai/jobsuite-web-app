@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
+import ContractorSignatureRequired from './ContractorSignatureRequired';
 import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
@@ -1222,31 +1223,44 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Estimate Preview Section - Only show when
-                                     all three steps are completed */}
-                                    {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
+                                    {/* Estimate Preview or Signature Requirement Section */}
+                                    {estimate && (
                                         <CollapsibleSection
-                                          title="Estimate Preview"
+                                          title={
+                                            estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
+                                                ? 'Signature Required'
+                                                : 'Estimate Preview'
+                                          }
                                           defaultOpen
                                           headerActions={
-                                              <ActionIcon
-                                                variant="subtle"
-                                                onClick={() => {
-                                                    window.open(`/proposals/${estimateID}/print`, '_blank');
-                                                }}
-                                                title="Print Estimate"
-                                              >
-                                                <IconPrinter size={18} />
-                                              </ActionIcon>
+                                              estimate.status !== EstimateStatus.ESTIMATE_ACCEPTED &&
+                                              hasVideo && hasImages && lineItemsCount > 0 ? (
+                                                  <ActionIcon
+                                                    variant="subtle"
+                                                    onClick={() => {
+                                                        window.open(`/proposals/${estimateID}/print`, '_blank');
+                                                    }}
+                                                    title="Print Estimate"
+                                                  >
+                                                    <IconPrinter size={18} />
+                                                  </ActionIcon>
+                                              ) : undefined
                                           }
                                         >
-                                            <EstimatePreview
-                                              estimate={estimate}
-                                              imageResources={imageResources}
-                                              videoResources={videoResources}
-                                              lineItems={lineItems}
-                                              client={client}
-                                            />
+                                            {estimate.status === EstimateStatus.ESTIMATE_ACCEPTED ? (
+                                                <ContractorSignatureRequired
+                                                  estimateId={estimateID}
+                                                  onSignatureComplete={getEstimate}
+                                                />
+                                            ) : (
+                                                <EstimatePreview
+                                                  estimate={estimate}
+                                                  imageResources={imageResources}
+                                                  videoResources={videoResources}
+                                                  lineItems={lineItems}
+                                                  client={client}
+                                                />
+                                            )}
                                         </CollapsibleSection>
                                     )}
                                 </div>
