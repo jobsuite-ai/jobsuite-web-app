@@ -60,6 +60,7 @@ export default function JobComments({
                   ...comment,
                   timestamp: comment.created_at || comment.timestamp,
                   updated_at: comment.updated_at,
+                  reactions: comment.reactions || [],
               })).sort((a: SingleComment, b: SingleComment) => {
                   const dateA = new Date(a.timestamp).getTime();
                   const dateB = new Date(b.timestamp).getTime();
@@ -124,6 +125,7 @@ export default function JobComments({
                 ...comment,
                 timestamp: comment.created_at || comment.timestamp,
                 updated_at: comment.updated_at,
+                reactions: comment.reactions || [],
             })) || [];
             // Sort comments by timestamp descending (newest first)
             const sortedComments = mappedComments.sort((a: SingleComment, b: SingleComment) => {
@@ -159,6 +161,7 @@ export default function JobComments({
                 ...comment,
                 timestamp: comment.created_at || comment.timestamp,
                 updated_at: comment.updated_at,
+                reactions: comment.reactions || [],
             })).sort((a: SingleComment, b: SingleComment) => {
                 const dateA = new Date(a.timestamp).getTime();
                 const dateB = new Date(b.timestamp).getTime();
@@ -308,6 +311,7 @@ export default function JobComments({
                 comment_contents: createdComment.comment_contents,
                 timestamp: createdComment.created_at || createdComment.timestamp ||
                     new Date().toISOString(),
+                reactions: createdComment.reactions || [],
             };
             // Prepend new comment to the beginning (newest first)
             jobComments ? setJobComments([newComment, ...jobComments])
