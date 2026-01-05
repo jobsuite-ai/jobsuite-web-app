@@ -21,12 +21,47 @@ export function VideoFrame({ resource, estimateID, refresh }: {
         setIsMobile(window.innerWidth <= 768);
     }, []);
 
+    /**
+     * Determines if the environment is production based on env variables or
+     * fallback to window.location.
+     * Uses NEXT_PUBLIC_ENV (from .env), or NODE_ENV as a fallback.
+     * - If NEXT_PUBLIC_ENV is set to 'production', returns true.
+     * - If NEXT_PUBLIC_ENV is 'development' or 'qa', returns false.
+     * - Otherwise, falls back to window.location.hostname for runtime detection (client-side only).
+     */
+    const isProduction = () => {
+        // First, try to use the system environment variable (set via .env file)
+        if (typeof process !== 'undefined' && process.env && process.env.NEXT_PUBLIC_ENV) {
+            // You should set NEXT_PUBLIC_ENV in your .env files
+            // (.env.production, .env.qa, .env.development)
+            // e.g. NEXT_PUBLIC_ENV="production" for prod, "qa" for QA, etc.
+            return process.env.NEXT_PUBLIC_ENV === 'production';
+        }
+        // Fallback: check NODE_ENV
+        if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV) {
+            return process.env.NODE_ENV === 'production';
+        }
+        // Last resort: determine at runtime via window.location (client-side only)
+        if (typeof window !== 'undefined') {
+            const { hostname } = window.location;
+            // If hostname contains 'qa', it's QA environment → use dev bucket
+            if (hostname.includes('qa')) {
+                return false;
+            }
+            // Production domain is jobsuite.app (or www.jobsuite.app)
+            // Only use prod bucket for production domain
+            return hostname === 'jobsuite.app' || hostname === 'www.jobsuite.app';
+        }
+        // Fallback: default to dev for safety
+        return false;
+    };
+
     const getVideoBucket = () => {
-        const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+        const env = isProduction() ? 'prod' : 'dev';
         return `jobsuite-resource-videos-${env}`;
     };
 
-    const getVideoBucketRegion = () => process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
+    const getVideoBucketRegion = () => isProduction() ? 'us-east-1' : 'us-west-2';
 
     const videoUrl = resource.s3_key
         ? `https://${getVideoBucket()}.s3.${getVideoBucketRegion()}.amazonaws.com/${resource.s3_key}`
