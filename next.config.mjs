@@ -20,7 +20,12 @@ export default withBundleAnalyzer({
   },
   experimental: {
     optimizePackageImports: ['@mantine/core', '@mantine/hooks'],
+    serverActions: {
+      bodySizeLimit: '50mb',
+    },
   },
+  // Note: For API routes, body size limit may also need to be configured
+  // via NEXT_BODY_SIZE_LIMIT environment variable in deployment (e.g., Amplify)
 
   webpack: (config) => {
     
