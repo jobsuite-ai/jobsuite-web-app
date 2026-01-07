@@ -45,6 +45,34 @@ export default function ImageUpload({ estimateID, setImage, setShowModal }: Imag
         };
     }, []);
 
+    // Handle drag events to ensure they reach the Dropzone even when modal is open
+    useEffect(() => {
+        const handleGlobalDragOver = (e: DragEvent) => {
+            // Allow drag over events to prevent default browser behavior
+            // This enables dropping on the dropzone
+            if (e.dataTransfer?.types.includes('Files')) {
+                e.preventDefault();
+            }
+        };
+
+        const handleGlobalDrop = (e: DragEvent) => {
+            // Prevent default drop behavior outside the dropzone
+            // The dropzone will handle its own drop events
+            if (!e.target || !(e.target as Element).closest('[data-mantine-dropzone]')) {
+                e.preventDefault();
+            }
+        };
+
+        // Add listeners with capture to catch events early
+        window.addEventListener('dragover', handleGlobalDragOver, true);
+        window.addEventListener('drop', handleGlobalDrop, true);
+
+        return () => {
+            window.removeEventListener('dragover', handleGlobalDragOver, true);
+            window.removeEventListener('drop', handleGlobalDrop, true);
+        };
+    }, []);
+
     const validateFile = (file: FileWithPath): string | null => {
         // Validate file size
         const maxSize = 150 * 1024 * 1024; // 150MB

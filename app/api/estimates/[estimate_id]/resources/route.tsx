@@ -4,6 +4,10 @@ import { getContractorId } from '../../../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
+// Increase max duration and allow larger body sizes for file uploads
+export const maxDuration = 300; // 5 minutes for large file uploads
+export const runtime = 'nodejs';
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }

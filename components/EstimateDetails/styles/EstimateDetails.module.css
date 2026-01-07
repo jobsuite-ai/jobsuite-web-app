@@ -290,6 +290,21 @@
     max-width: 600px;
 }
 
+/* Allow drag and drop events to pass through modal overlay for upload modals */
+/* When a file is being dragged, we need to allow pointer events on the modal */
+.uploadModal :global(.mantine-Modal-overlay) {
+    pointer-events: auto;
+}
+
+.uploadModal :global(.mantine-Modal-body) {
+    pointer-events: auto;
+}
+
+/* Ensure dropzone can receive drag events */
+.uploadModal :global([data-mantine-dropzone]) {
+    pointer-events: auto;
+}
+
 .archiveModalButtons {
     flex-direction: column;
 }
