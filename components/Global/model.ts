@@ -80,6 +80,7 @@ export type SingleComment = {
     commenter: string;
     timestamp: string;
     updated_at?: string;
+    user_id?: string;
     reactions?: Array<{ user_id: string; emoji: string }>;
 };
 
