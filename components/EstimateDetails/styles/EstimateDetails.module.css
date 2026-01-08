@@ -357,6 +357,30 @@
     display: flex;
     justify-content: flex-start;
     align-items: center;
+    position: relative;
+}
+
+.addButtonWrapper {
+    position: relative;
+}
+
+/* Fixed add button on desktop only */
+@media (min-width: 769px) {
+    .addButtonFixed {
+        position: fixed;
+        top: calc(64px + var(--mantine-spacing-lg));
+        right: calc(400px + var(--mantine-spacing-lg) + var(--mantine-spacing-xs) + 40px);
+        z-index: 100;
+        will-change: transform;
+    }
+}
+
+@media (max-width: 768px) {
+    .addButtonFixed {
+        position: relative;
+        right: auto;
+        top: auto;
+    }
 }
 
 .jobTitleContainer {

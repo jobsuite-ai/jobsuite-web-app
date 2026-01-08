@@ -22,6 +22,7 @@ import { CommentReactions } from './CommentReactions';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { SingleComment } from '@/components/Global/model';
+import { useAuth } from '@/hooks/useAuth';
 
 interface JobCommentProps {
   commentDetails: SingleComment;
@@ -30,12 +31,16 @@ interface JobCommentProps {
 }
 
 export function JobComment({ commentDetails, estimateId, onCommentUpdated }: JobCommentProps) {
+  const { user } = useAuth({ fetchUser: true });
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(commentDetails.comment_contents);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentComment, setCurrentComment] = useState<SingleComment>(commentDetails);
+
+  // Check if current user is the comment author
+  const isCommentAuthor = user?.id && currentComment.user_id && user.id === currentComment.user_id;
 
   // Update current comment when commentDetails prop changes
   useEffect(() => {
@@ -225,23 +230,27 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
           </Group>
           {!isEditing && (
             <Group gap="xs">
-              <ActionIcon
-                variant="subtle"
-                color="blue"
-                onClick={handleEdit}
-                size="sm"
-              >
-                <IconEdit size={16} />
-              </ActionIcon>
-              <ActionIcon
-                variant="subtle"
-                color="red"
-                onClick={handleDeleteClick}
-                loading={isDeleting}
-                size="sm"
-              >
-                <IconTrash size={16} />
-              </ActionIcon>
+              {isCommentAuthor && (
+                <>
+                  <ActionIcon
+                    variant="subtle"
+                    color="blue"
+                    onClick={handleEdit}
+                    size="sm"
+                  >
+                    <IconEdit size={16} />
+                  </ActionIcon>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    onClick={handleDeleteClick}
+                    loading={isDeleting}
+                    size="sm"
+                  >
+                    <IconTrash size={16} />
+                  </ActionIcon>
+                </>
+              )}
             </Group>
           )}
         </Group>

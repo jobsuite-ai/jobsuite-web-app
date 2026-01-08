@@ -2,6 +2,21 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    DragEndEvent,
+} from '@dnd-kit/core';
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { Button, Group, Modal, NumberInput, TextInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -27,6 +42,14 @@ const LineItems = forwardRef<LineItemsRef, {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
     const [isFetching, setIsFetching] = useState(true);
+    const [isReordering, setIsReordering] = useState(false);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
+        })
+    );
 
     const form = useForm({
         mode: 'uncontrolled',
@@ -83,6 +106,16 @@ const LineItems = forwardRef<LineItemsRef, {
 
             const items = await response.json();
             const itemsArray = items || [];
+            // Validate that items have proper IDs
+            itemsArray.forEach((item: EstimateLineItem, index: number) => {
+                if (!item.id) {
+                    // eslint-disable-next-line no-console
+                    console.error(`Line item at index ${index} is missing an ID:`, item);
+                } else if (item.id === item.contractor_id) {
+                    // eslint-disable-next-line no-console
+                    console.warn(`Line item at index ${index} has ID matching contractor_id:`, item);
+                }
+            });
             setLineItems(itemsArray);
             onLineItemsChange?.(itemsArray.length);
         } catch (error) {
@@ -312,6 +345,79 @@ const LineItems = forwardRef<LineItemsRef, {
         setOpened(true);
     };
 
+    async function reorderLineItems(lineItemIds: string[]) {
+        const accessToken = localStorage.getItem('access_token');
+
+        if (!accessToken) {
+            return;
+        }
+
+        setIsReordering(true);
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items/reorder`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        line_item_ids: lineItemIds,
+                    }),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Error',
+                    message: errorData.message || 'Failed to reorder line items',
+                    color: 'red',
+                });
+                // Revert to original order on error
+                fetchLineItems();
+                return;
+            }
+
+            const reorderedItems = await response.json();
+            setLineItems(reorderedItems);
+            notifications.show({
+                title: 'Success',
+                message: 'Line items reordered successfully',
+                color: 'green',
+            });
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error reordering line items:', error);
+            notifications.show({
+                title: 'Error',
+                message: 'An error occurred while reordering line items',
+                color: 'red',
+            });
+            // Revert to original order on error
+            fetchLineItems();
+        } finally {
+            setIsReordering(false);
+        }
+    }
+
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+
+        if (over && active.id !== over.id) {
+            const oldIndex = lineItems.findIndex((item) => item.id === active.id);
+            const newIndex = lineItems.findIndex((item) => item.id === over.id);
+
+            const newItems = arrayMove(lineItems, oldIndex, newIndex);
+            setLineItems(newItems);
+
+            // Update order on backend
+            const newOrder = newItems.map((item) => item.id);
+            reorderLineItems(newOrder);
+        }
+    }
+
     // Expose methods via ref
     useImperativeHandle(ref, () => ({
         openAddModal,
@@ -325,16 +431,26 @@ const LineItems = forwardRef<LineItemsRef, {
     return (
         <div className={classes.lineItemsContainer}>
             {lineItems && lineItems.length > 0 ?
-                <>
-                    {lineItems.map((item) => (
-                        <LineItem
-                          key={item.id}
-                          lineItem={item}
-                          onEdit={() => handleEdit(item)}
-                          onDelete={() => deleteLineItem(item.id)}
-                        />
-                    ))}
-                </>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                    <SortableContext
+                      items={lineItems.map((item) => item.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                        {lineItems.map((item) => (
+                            <LineItem
+                              key={item.id}
+                              lineItem={item}
+                              onEdit={() => handleEdit(item)}
+                              onDelete={() => deleteLineItem(item.id)}
+                              disabled={isReordering}
+                            />
+                        ))}
+                    </SortableContext>
+                </DndContext>
                 :
                 null
             }
