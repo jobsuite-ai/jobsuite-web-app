@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import EditableField from './EditableField';
 import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
-import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
@@ -34,9 +34,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   );
   const [savingOwner, setSavingOwner] = useState(false);
   const [editingJobType, setEditingJobType] = useState(false);
-  const [selectedJobType, setSelectedJobType] = useState<string | null>(
-    estimate.estimate_type || null
-  );
+  const [selectedJobType, setSelectedJobType] = useState<string | null>(null);
   const [savingJobType, setSavingJobType] = useState(false);
   const [editingTentativeDate, setEditingTentativeDate] = useState(false);
   const [selectedTentativeDate, setSelectedTentativeDate] = useState<Date | null>(
@@ -220,10 +218,35 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     }
   }, [estimate.owned_by, estimate.created_by, editingOwner]);
 
+  // Helper function to normalize estimate_type for Select component
+  const normalizeEstimateTypeForSelect = (
+    estimateType: EstimateType | string | null | undefined
+  ): string | null => {
+    if (!estimateType) return null;
+
+    // Normalize to uppercase string for comparison
+    const normalizedType = typeof estimateType === 'string'
+        ? estimateType.toUpperCase().trim()
+        : String(estimateType).toUpperCase().trim();
+
+    // Map to Select component values
+    if (normalizedType === 'BOTH' || normalizedType === EstimateType.BOTH) {
+      return 'Full House';
+    }
+    if (normalizedType === 'INTERIOR' || normalizedType === EstimateType.INTERIOR) {
+      return EstimateType.INTERIOR;
+    }
+    if (normalizedType === 'EXTERIOR' || normalizedType === EstimateType.EXTERIOR) {
+      return EstimateType.EXTERIOR;
+    }
+
+    return estimateType as string;
+  };
+
   // Sync selectedJobType when estimate changes (but not when editing)
   useEffect(() => {
     if (!editingJobType) {
-      setSelectedJobType(estimate.estimate_type || null);
+      setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
     }
   }, [estimate.estimate_type, editingJobType]);
 
@@ -684,39 +707,15 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
   const handleJobTypeClick = () => {
     setEditingJobType(true);
-    // Normalize BOTH to 'Full House' for the Select component
-    const normalizedType =
-      estimate.estimate_type === EstimateType.BOTH || estimate.estimate_type === 'BOTH'
-        ? 'Full House'
-        : estimate.estimate_type || null;
-    setSelectedJobType(normalizedType);
+    setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
   };
 
   const handleJobTypeCancel = () => {
-    // Reset to original estimate type (normalized for display)
-    const normalizedType =
-      estimate.estimate_type === EstimateType.BOTH || estimate.estimate_type === 'BOTH'
-        ? 'Full House'
-        : estimate.estimate_type || null;
-    setSelectedJobType(normalizedType);
+    setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
     setEditingJobType(false);
   };
 
-  const getJobTypeDisplayName = (): string => {
-    const jobType = estimate.estimate_type;
-    if (!jobType) return '—';
-    // Map "BOTH" to "Full House" for display
-    if (jobType === EstimateType.BOTH || jobType === 'BOTH') {
-      return 'Full House';
-    }
-    if (jobType === EstimateType.INTERIOR || jobType === 'INTERIOR') {
-      return 'Interior';
-    }
-    if (jobType === EstimateType.EXTERIOR || jobType === 'EXTERIOR') {
-      return 'Exterior';
-    }
-    return jobType;
-  };
+  const getJobTypeDisplayName = (): string => getFormattedEstimateType(estimate.estimate_type);
 
   const statusOptions = Object.values(EstimateStatus).filter(
     (status) => status !== currentStatus

@@ -1,4 +1,4 @@
-import { EstimateStatus } from './model';
+import { EstimateStatus, EstimateType } from './model';
 
 export const BADGE_COLORS = {
     SUCCESS: '#7DBA84',
@@ -115,6 +115,35 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
         default:
             return 'Estimate Not Finished';
     }
+};
+
+export const getFormattedEstimateType = (
+    estimateType: EstimateType | string | null | undefined
+): string => {
+    if (!estimateType) {
+        return '—';
+    }
+
+    // Convert to string and normalize to uppercase for comparison
+    // Handle both enum values and string values
+    const typeString = typeof estimateType === 'string'
+        ? estimateType
+        : String(estimateType);
+    const normalizedType = typeString.toUpperCase().trim();
+
+    // Map to display names - compare against both string literals and enum values
+    if (normalizedType === 'BOTH' || normalizedType === EstimateType.BOTH || estimateType === EstimateType.BOTH) {
+        return 'Full House';
+    }
+    if (normalizedType === 'INTERIOR' || normalizedType === EstimateType.INTERIOR || estimateType === EstimateType.INTERIOR) {
+        return 'Interior';
+    }
+    if (normalizedType === 'EXTERIOR' || normalizedType === EstimateType.EXTERIOR || estimateType === EstimateType.EXTERIOR) {
+        return 'Exterior';
+    }
+
+    // Fallback: return the original value if it doesn't match known types
+    return typeString;
 };
 
 export const formatPhoneNumber = (phoneNumber: string | null | undefined): string => {

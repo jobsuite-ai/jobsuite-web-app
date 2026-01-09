@@ -39,7 +39,7 @@ import classes from './JobsList.module.css';
 import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
-import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
+import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { useDataCache } from '@/contexts/DataCacheContext';
 
@@ -142,7 +142,7 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
 
             {project.estimate_type && (
                 <Text size="xs" c="dimmed" mb="xs">
-                    {project.estimate_type}
+                    {getFormattedEstimateType(project.estimate_type)}
                 </Text>
             )}
 
@@ -868,7 +868,7 @@ export default function JobsList() {
 
                     {(activeJob as Estimate).estimate_type && (
                       <Text size="xs" c="dimmed" mb="xs">
-                        {(activeJob as Estimate).estimate_type}
+                        {getFormattedEstimateType((activeJob as Estimate).estimate_type)}
                       </Text>
                     )}
 

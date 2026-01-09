@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Table, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Stepper, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -68,6 +68,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const isMountedRef = useRef(true);
+    const mainColumnRef = useRef<HTMLDivElement>(null);
+    const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
 
     // Single initial loading state - true until all initial data is loaded
@@ -547,6 +549,95 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         };
     }, [hasUploadingVideo, initialLoading]);
 
+    // Scroll listener for "living" button effect
+    useEffect(() => {
+        const scrollElement = mainColumnRef.current;
+        if (!scrollElement) return;
+
+        let lastScrollTop = scrollElement.scrollTop;
+        let scrollVelocity = 0;
+        let rafId: number | null = null;
+        let returnToCenterRafId: number | null = null;
+        let returnToCenterTimeoutId: NodeJS.Timeout | null = null;
+        let lastScrollTime = Date.now();
+
+        const animateReturnToCenter = () => {
+            setButtonTransform(prev => {
+                const newX = prev.x * 0.9;
+                const newY = prev.y * 0.9;
+
+                // Continue animating if not close enough to center
+                if (Math.abs(newX) > 0.1 || Math.abs(newY) > 0.1) {
+                    returnToCenterRafId = requestAnimationFrame(animateReturnToCenter);
+                    return { x: newX, y: newY };
+                }
+                return { x: 0, y: 0 };
+            });
+        };
+
+        const handleScroll = () => {
+            const currentScrollTop = scrollElement.scrollTop;
+            const currentTime = Date.now();
+            const timeDelta = Math.max(1, currentTime - lastScrollTime);
+            const scrollDelta = currentScrollTop - lastScrollTop;
+
+            // Calculate velocity (with damping)
+            scrollVelocity = scrollVelocity * 0.6 + (scrollDelta / timeDelta) * 0.4;
+
+            // Apply subtle transform based on scroll velocity
+            // Limit the movement to a small range for subtlety
+            const maxMovement = 10;
+            const movementX = Math.max(-maxMovement, Math.min(maxMovement, scrollVelocity * 2));
+            const movementY = Math.max(-maxMovement, Math.min(maxMovement, scrollVelocity * 1.5));
+
+            // Cancel any ongoing return-to-center animation
+            if (returnToCenterRafId) {
+                cancelAnimationFrame(returnToCenterRafId);
+                returnToCenterRafId = null;
+            }
+            if (returnToCenterTimeoutId) {
+                clearTimeout(returnToCenterTimeoutId);
+                returnToCenterTimeoutId = null;
+            }
+
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
+
+            rafId = requestAnimationFrame(() => {
+                setButtonTransform({ x: movementX, y: movementY });
+            });
+
+            lastScrollTop = currentScrollTop;
+            lastScrollTime = currentTime;
+
+            // Start return-to-center animation after scroll stops
+            returnToCenterTimeoutId = setTimeout(() => {
+                returnToCenterRafId = requestAnimationFrame(animateReturnToCenter);
+            }, 150);
+        };
+
+        scrollElement.addEventListener('scroll', handleScroll, { passive: true });
+
+        // Cleanup function
+        function cleanup() {
+            if (scrollElement) {
+                scrollElement.removeEventListener('scroll', handleScroll);
+            }
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+            }
+            if (returnToCenterRafId) {
+                cancelAnimationFrame(returnToCenterRafId);
+            }
+            if (returnToCenterTimeoutId) {
+                clearTimeout(returnToCenterTimeoutId);
+            }
+        }
+        // eslint-disable-next-line consistent-return
+        return cleanup;
+    }, []);
+
     const handleOpenExternalLink = (link: string) => {
         window.open(link, '_blank');
     };
@@ -682,7 +773,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 <>
                         <div className={classes.twoColumnLayout}>
                             {/* Column 1: Main Content - Video, Images, Description, Activity */}
-                            <div className={classes.mainColumn}>
+                            <div className={classes.mainColumn} ref={mainColumnRef}>
                                 <div className={classes.jobTitleWrapper}>
                                     <Flex justify="space-between" align="center" gap="md" w="100%" direction={{ base: 'column', sm: 'row' }}>
                                         <Flex align="center" gap="md" wrap="wrap">
@@ -704,62 +795,102 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 </Flex>
                                             )}
                                         </Flex>
-                                        <Menu shadow="md" width={200} position="bottom-start" offset={5}>
-                                            <Menu.Target>
-                                                <ActionIcon
-                                                  variant="filled"
-                                                  color="blue"
-                                                  size="lg"
-                                                  radius="md"
-                                                >
-                                                    <IconPlus size={20} />
-                                                </ActionIcon>
-                                            </Menu.Target>
-                                            <Menu.Dropdown>
-                                                {!hasVideo && (
+                                        <div
+                                          className={`${classes.addButtonWrapper} ${classes.addButtonFixed}`}
+                                          style={{
+                                                transform: `translate(${buttonTransform.x}px, ${buttonTransform.y}px)`,
+                                                transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            }}
+                                        >
+                                            <Menu shadow="md" width={200} position="bottom-start" offset={5}>
+                                                <Menu.Target>
+                                                    <ActionIcon
+                                                      variant="filled"
+                                                      color="blue"
+                                                      size="lg"
+                                                      radius="md"
+                                                    >
+                                                        <IconPlus size={20} />
+                                                    </ActionIcon>
+                                                </Menu.Target>
+                                                <Menu.Dropdown>
+                                                    {!hasVideo && (
+                                                        <Menu.Item
+                                                          leftSection={<IconVideo size={16} />}
+                                                          onClick={() =>
+                                                            setShowVideoUploaderModal(true)
+                                                          }
+                                                        >
+                                                            Add Video
+                                                        </Menu.Item>
+                                                    )}
                                                     <Menu.Item
-                                                      leftSection={<IconVideo size={16} />}
+                                                      leftSection={<IconPhoto size={16} />}
+                                                      onClick={() => setShowImageUploadModal(true)}
+                                                    >
+                                                        Add Images
+                                                    </Menu.Item>
+                                                    <Menu.Item
+                                                      leftSection={<IconFile size={16} />}
+                                                      onClick={() => setShowFileUploadModal(true)}
+                                                    >
+                                                        Add Files
+                                                    </Menu.Item>
+                                                    <Menu.Item
+                                                      leftSection={<IconList size={16} />}
                                                       onClick={() =>
-                                                        setShowVideoUploaderModal(true)
+                                                          lineItemsRef.current?.openAddModal()
                                                       }
                                                     >
-                                                        Add Video
+                                                        Add Line Item
                                                     </Menu.Item>
-                                                )}
-                                                <Menu.Item
-                                                  leftSection={<IconPhoto size={16} />}
-                                                  onClick={() => setShowImageUploadModal(true)}
-                                                >
-                                                    Add Images
-                                                </Menu.Item>
-                                                <Menu.Item
-                                                  leftSection={<IconFile size={16} />}
-                                                  onClick={() => setShowFileUploadModal(true)}
-                                                >
-                                                    Add Files
-                                                </Menu.Item>
-                                                <Menu.Item
-                                                  leftSection={<IconList size={16} />}
-                                                  onClick={() =>
-                                                      lineItemsRef.current?.openAddModal()
-                                                  }
-                                                >
-                                                    Add Line Item
-                                                </Menu.Item>
-                                                {!estimate?.original_estimate_id && (
-                                                    <Menu.Item
-                                                      leftSection={<IconReceipt size={16} />}
-                                                      onClick={() =>
-                                                        setShowCreateChangeOrderModal(true)
-                                                      }
-                                                    >
-                                                        Create Change Order
-                                                    </Menu.Item>
-                                                )}
-                                            </Menu.Dropdown>
-                                        </Menu>
+                                                    {!estimate?.original_estimate_id && (
+                                                        <Menu.Item
+                                                          leftSection={<IconReceipt size={16} />}
+                                                          onClick={() =>
+                                                            setShowCreateChangeOrderModal(true)
+                                                          }
+                                                        >
+                                                            Create Change Order
+                                                        </Menu.Item>
+                                                    )}
+                                                </Menu.Dropdown>
+                                            </Menu>
+                                        </div>
                                     </Flex>
                                 </div>
+
+                                {/* Timeline/Stepper showing progress - Hide once all steps are
+                                complete and preview is visible */}
+                                {(!hasVideo || !hasImages || lineItemsCount === 0) && (
+                                    <div style={{ marginBottom: '1.5rem' }}>
+                                        <Stepper
+                                          active={
+                                            !hasVideo ? 0 :
+                                            !hasImages ? 1 :
+                                            lineItemsCount === 0 ? 2 : 3
+                                          }
+                                          size="sm"
+                                        >
+                                            <Stepper.Step
+                                              label="Upload Video"
+                                              description={hasVideo ? 'Complete' : 'Required'}
+                                              completedIcon={<IconVideo size={18} />}
+                                            />
+                                            <Stepper.Step
+                                              label="Upload Image"
+                                              description={hasImages ? 'Complete' : 'Required'}
+                                              completedIcon={<IconPhoto size={18} />}
+                                            />
+                                            <Stepper.Step
+                                              label="Add Line Items"
+                                              description={lineItemsCount > 0 ? 'Complete' : 'Required'}
+                                              completedIcon={<IconList size={18} />}
+                                            />
+                                        </Stepper>
+                                    </div>
+                                )}
+
                                 <div className={classes.columnContent}>
                                     {
                                         estimate.hours_worked !== undefined &&
@@ -1053,10 +1184,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </div>
                                     )}
 
-                                    {/* Change Orders Section - Only show if not archived */}
+                                    {/* Change Orders Section - Only show if not archived and
+                                    there are change orders */}
                                     {estimate &&
                                     !estimate.original_estimate_id &&
-                                    estimate.status !== EstimateStatus.ARCHIVED && (
+                                    estimate.status !== EstimateStatus.ARCHIVED &&
+                                    changeOrders.length > 0 && (
                                         <CollapsibleSection title="Change Orders" defaultOpen>
                                             <ChangeOrders
                                               estimate={estimate}
@@ -1070,8 +1203,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Estimate Preview Section */}
-                                    {estimate && (
+                                    {/* Estimate Preview Section - Only show when
+                                     all three steps are completed */}
+                                    {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
                                         <CollapsibleSection title="Estimate Preview" defaultOpen>
                                             <EstimatePreview
                                               estimate={estimate}
