@@ -24,6 +24,7 @@ interface EstimatePreviewProps {
     videoResources?: EstimateResource[];
     lineItems?: EstimateLineItem[];
     client?: ContractorClient;
+    hideTodo?: boolean;
 }
 
 export default function EstimatePreview({
@@ -32,6 +33,7 @@ export default function EstimatePreview({
     videoResources = [],
     lineItems = [],
     client,
+    hideTodo = false,
 }: EstimatePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -176,18 +178,20 @@ export default function EstimatePreview({
             <div className={classes.estimatePreviewWrapper}>
                 {estimate ?
                     <Flex direction="column" gap="md" justify="center" align="center">
-                        <EstimateTodo
-                          hasImages={imageResources.length > 0}
-                          hasVideo={videoResources.length > 0}
-                          hasTranscriptionSummary={!!estimate.transcription_summary}
-                          hasLineItems={lineItems.length > 0}
-                        />
+                        {!hideTodo && (
+                            <EstimateTodo
+                              hasImages={imageResources.length > 0}
+                              hasVideo={videoResources.length > 0}
+                              hasTranscriptionSummary={!!estimate.transcription_summary}
+                              hasLineItems={lineItems.length > 0}
+                            />
+                        )}
                         {hasAllItems && template && (
                             <Paper shadow="sm" radius="md" withBorder>
                                 <div dangerouslySetInnerHTML={{ __html: template }} />
                             </Paper>
                         )}
-                        {hasAllItems && (
+                        {!hideTodo && hasAllItems && (
                             <UploadNewTemplate
                               template={template}
                               estimate={estimate}

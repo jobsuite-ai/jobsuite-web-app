@@ -27,7 +27,7 @@ interface DataCacheContextType {
   };
 
   // Functions
-  refreshData: (key?: CacheKey) => Promise<void>;
+  refreshData: (key?: CacheKey, force?: boolean) => Promise<void>;
   invalidateCache: (key?: CacheKey) => void;
   getData: <T extends CacheKey>(
     key: T
@@ -127,7 +127,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Refresh data for a specific key or all keys using stale-while-revalidate pattern
-  const refreshData = useCallback(async (key?: CacheKey) => {
+  const refreshData = useCallback(async (key?: CacheKey, force: boolean = false) => {
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
     if (!accessToken) {
@@ -140,19 +140,25 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
 
     const keysToRefresh: CacheKey[] = key ? [key] : ['clients', 'estimates', 'projects'];
 
-    // Check cache validity - only fetch if cache is missing or expired
-    const cacheValid: Record<CacheKey, boolean> = {
-      clients: isCacheValid('clients'),
-      estimates: isCacheValid('estimates'),
-      projects: isCacheValid('projects'),
-    };
+    // If force is true, fetch all keys regardless of cache validity
+    let keysToFetch: CacheKey[];
+    if (force) {
+      keysToFetch = keysToRefresh;
+    } else {
+      // Check cache validity - only fetch if cache is missing or expired
+      const cacheValid: Record<CacheKey, boolean> = {
+        clients: isCacheValid('clients'),
+        estimates: isCacheValid('estimates'),
+        projects: isCacheValid('projects'),
+      };
 
-    // Filter out keys that have valid cache - don't fetch those
-    const keysToFetch = keysToRefresh.filter((k) => !cacheValid[k]);
+      // Filter out keys that have valid cache - don't fetch those
+      keysToFetch = keysToRefresh.filter((k) => !cacheValid[k]);
 
-    // If all keys have valid cache, skip fetching
-    if (keysToFetch.length === 0) {
-      return;
+      // If all keys have valid cache, skip fetching
+      if (keysToFetch.length === 0) {
+        return;
+      }
     }
 
     // Set loading states only for keys that need fetching

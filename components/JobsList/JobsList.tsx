@@ -336,7 +336,13 @@ function saveJobOrder(orderMap: JobOrderMap): void {
 }
 
 export default function JobsList() {
-    const { projects, loading: cacheLoading, refreshData, updateEstimate } = useDataCache();
+    const {
+        projects,
+        loading: cacheLoading,
+        refreshData,
+        updateEstimate,
+        invalidateCache,
+    } = useDataCache();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -457,7 +463,8 @@ export default function JobsList() {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            await refreshData('projects');
+            invalidateCache('projects');
+            await refreshData('projects', true);
         } finally {
             setRefreshing(false);
         }

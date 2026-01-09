@@ -717,9 +717,238 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
   const getJobTypeDisplayName = (): string => getFormattedEstimateType(estimate.estimate_type);
 
-  const statusOptions = Object.values(EstimateStatus).filter(
-    (status) => status !== currentStatus
-  );
+  // Function to get valid next statuses based on current status
+  const getValidNextStatuses = (status: EstimateStatus): EstimateStatus[] => {
+    switch (status) {
+      // Initial lead statuses
+      case EstimateStatus.NEW_LEAD:
+        return [
+          EstimateStatus.ESTIMATE_NOT_SCHEDULED,
+          EstimateStatus.ESTIMATE_SCHEDULED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Scheduling phase
+      case EstimateStatus.ESTIMATE_NOT_SCHEDULED:
+        return [
+          EstimateStatus.ESTIMATE_SCHEDULED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.ESTIMATE_SCHEDULED:
+        return [
+          EstimateStatus.ESTIMATE_IN_PROGRESS,
+          EstimateStatus.ESTIMATE_NOT_SCHEDULED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Estimate creation phase
+      case EstimateStatus.ESTIMATE_IN_PROGRESS:
+        return [
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.ESTIMATE_SCHEDULED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Estimate sent phase
+      case EstimateStatus.ESTIMATE_SENT:
+        return [
+          EstimateStatus.ESTIMATE_OPENED,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.ESTIMATE_DECLINED,
+          EstimateStatus.ESTIMATE_IN_PROGRESS,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.ESTIMATE_OPENED:
+        return [
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.ESTIMATE_DECLINED,
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Client decision phase
+      case EstimateStatus.ESTIMATE_ACCEPTED:
+        return [
+          EstimateStatus.CONTRACTOR_OPENED,
+          EstimateStatus.ESTIMATE_DECLINED,
+          EstimateStatus.ESTIMATE_OPENED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.ESTIMATE_DECLINED:
+        return [
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.ESTIMATE_OPENED,
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Contractor review phase
+      case EstimateStatus.CONTRACTOR_OPENED:
+        return [
+          EstimateStatus.CONTRACTOR_SIGNED,
+          EstimateStatus.CONTRACTOR_DECLINED,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.CONTRACTOR_DECLINED:
+        return [
+          EstimateStatus.CONTRACTOR_OPENED,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Signed phase - can move to accounting and project statuses
+      case EstimateStatus.CONTRACTOR_SIGNED:
+        return [
+          EstimateStatus.ACCOUNTING_NEEDED,
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.CONTRACTOR_DECLINED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Accounting phase
+      case EstimateStatus.ACCOUNTING_NEEDED:
+        return [
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.CONTRACTOR_SIGNED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Project scheduling phase
+      case EstimateStatus.PROJECT_NOT_SCHEDULED:
+        return [
+          EstimateStatus.PROJECT_SCHEDULED,
+          EstimateStatus.ACCOUNTING_NEEDED,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_SCHEDULED:
+        return [
+          EstimateStatus.PROJECT_IN_PROGRESS,
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Project execution phase
+      case EstimateStatus.PROJECT_IN_PROGRESS:
+        return [
+          EstimateStatus.PROJECT_BILLING_NEEDED,
+          EstimateStatus.PROJECT_SCHEDULED,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_BILLING_NEEDED:
+        return [
+          EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE,
+          EstimateStatus.PROJECT_IN_PROGRESS,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE:
+        return [
+          EstimateStatus.PROJECT_PAYMENTS_RECEIVED,
+          EstimateStatus.PROJECT_BILLING_NEEDED,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_PAYMENTS_RECEIVED:
+        return [
+          EstimateStatus.PROJECT_COMPLETED,
+          EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE,
+          EstimateStatus.PROJECT_CANCELLED,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_COMPLETED:
+        return [
+          EstimateStatus.PROJECT_PAYMENTS_RECEIVED,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.PROJECT_CANCELLED:
+        return [
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.PROJECT_SCHEDULED,
+          EstimateStatus.PROJECT_IN_PROGRESS,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      // Special statuses
+      case EstimateStatus.NEEDS_FOLLOW_UP:
+        return [
+          // Can move back to most statuses, but prioritize common next steps
+          EstimateStatus.ESTIMATE_SCHEDULED,
+          EstimateStatus.ESTIMATE_IN_PROGRESS,
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.CONTRACTOR_OPENED,
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.PROJECT_SCHEDULED,
+          EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.STALE_ESTIMATE:
+        return [
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ARCHIVED,
+        ];
+
+      case EstimateStatus.ARCHIVED:
+        return [
+          // Can unarchive to most statuses, but prioritize common ones
+          EstimateStatus.ESTIMATE_SENT,
+          EstimateStatus.ESTIMATE_ACCEPTED,
+          EstimateStatus.CONTRACTOR_SIGNED,
+          EstimateStatus.PROJECT_NOT_SCHEDULED,
+          EstimateStatus.PROJECT_COMPLETED,
+        ];
+
+      default:
+        // Fallback: return all statuses except current
+        return Object.values(EstimateStatus).filter(
+          (s) => s !== status
+        );
+    }
+  };
+
+  const statusOptions = getValidNextStatuses(currentStatus);
 
   const statusDropdownOptions = statusOptions.map((status) => (
     <Menu.Item key={status} onClick={() => updateEstimateStatus(status)}>
