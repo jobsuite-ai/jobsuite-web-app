@@ -15,6 +15,7 @@ import {
     IconPencil,
     IconPhoto,
     IconPlus,
+    IconPrinter,
     IconReceipt,
     IconVideo,
 } from '@tabler/icons-react';
@@ -258,8 +259,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (!isMountedRef.current) return;
 
                 if (!detailsRes.ok) {
-                    // eslint-disable-next-line no-console
                     const errorData = await detailsRes.json().catch(() => ({}));
+                    // eslint-disable-next-line no-console
                     console.error('Error fetching estimate details:', errorData);
                     return;
                 }
@@ -1206,7 +1207,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {/* Estimate Preview Section - Only show when
                                      all three steps are completed */}
                                     {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
-                                        <CollapsibleSection title="Estimate Preview" defaultOpen>
+                                        <CollapsibleSection
+                                          title="Estimate Preview"
+                                          defaultOpen
+                                          headerActions={
+                                              <ActionIcon
+                                                variant="subtle"
+                                                onClick={() => {
+                                                    window.open(`/proposals/${estimateID}/print`, '_blank');
+                                                }}
+                                                title="Print Estimate"
+                                              >
+                                                <IconPrinter size={18} />
+                                              </ActionIcon>
+                                          }
+                                        >
                                             <EstimatePreview
                                               estimate={estimate}
                                               imageResources={imageResources}
