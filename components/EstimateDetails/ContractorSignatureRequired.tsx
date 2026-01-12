@@ -1,0 +1,295 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+
+import {
+    Alert,
+    Button,
+    Paper,
+    Stack,
+    Text,
+    Title,
+} from '@mantine/core';
+import { notifications } from '@mantine/notifications';
+import { IconCheck, IconSignature } from '@tabler/icons-react';
+
+import SignatureForm from './signature/SignatureForm';
+
+import { getApiHeaders } from '@/app/utils/apiClient';
+
+interface SignatureInfo {
+    estimate_id: string;
+    signature_links: Array<{
+        id: string;
+        signature_hash: string;
+        client_email: string;
+        status: string;
+    }>;
+    signatures: Array<{
+        id: string;
+        signature_type: string;
+        signer_name: string;
+        signer_email: string;
+        signed_at: string;
+    }>;
+}
+
+interface ContractorSignatureRequiredProps {
+    estimateId: string;
+    onSignatureComplete: () => void;
+}
+
+export default function ContractorSignatureRequired({
+    estimateId,
+    onSignatureComplete,
+}: ContractorSignatureRequiredProps) {
+    const [loading, setLoading] = useState(true);
+    const [signatureInfo, setSignatureInfo] = useState<SignatureInfo | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [signed, setSigned] = useState(false);
+    const [contractorSignatureHash, setContractorSignatureHash] = useState<string | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [signatureModalOpened, setSignatureModalOpened] = useState(false);
+
+    useEffect(() => {
+        fetchUserEmail();
+        fetchSignatures();
+    }, [estimateId]);
+
+    const fetchUserEmail = async () => {
+        try {
+            const response = await fetch('/api/auth/me', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+
+            if (response.ok) {
+                const user = await response.json();
+                setUserEmail(user.email || null);
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching user email:', err);
+        }
+    };
+
+    const fetchSignatures = async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const response = await fetch(
+                `/api/estimates/${estimateId}/signatures`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.error || 'Failed to fetch signatures');
+            }
+
+            const data = await response.json();
+            setSignatureInfo(data);
+
+            // Check if contractor has already signed
+            const contractorSignature = data.signatures?.find(
+                (sig: any) => sig.signature_type === 'CONTRACTOR'
+            );
+            if (contractorSignature) {
+                setSigned(true);
+                return;
+            }
+
+            // If contractor hasn't signed, check if we need to generate a signature link
+            // Look for an existing contractor signature link, or use client's link
+            const contractorLink = data.signature_links?.find(
+                (link: any) => link.client_email === userEmail
+            );
+            const clientSignedLink = data.signature_links?.find(
+                (link: any) => link.status === 'SIGNED'
+            );
+
+            // Use contractor's link if exists, otherwise use client's signed link
+            // (contractors can sign using client's link hash with CONTRACTOR type)
+            if (contractorLink) {
+                setContractorSignatureHash(contractorLink.signature_hash);
+            } else if (clientSignedLink) {
+                setContractorSignatureHash(clientSignedLink.signature_hash);
+            } else if (userEmail) {
+                // Generate a signature link for the contractor
+                await generateContractorSignatureLink();
+            }
+        } catch (err: any) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching signatures:', err);
+            setError(err.message || 'Failed to load signature information');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const generateContractorSignatureLink = async () => {
+        if (!userEmail) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateId}/signature-links`,
+                {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({
+                        client_email: userEmail,
+                        expires_in_days: 30,
+                    }),
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                setContractorSignatureHash(data.signature_hash);
+            } else {
+                // If generation fails, we can still use client's link
+                // eslint-disable-next-line no-console
+                console.warn('Failed to generate contractor signature link, will use client link');
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error generating contractor signature link:', err);
+        }
+    };
+
+    const handleSignatureSuccess = async () => {
+        setSigned(true);
+        notifications.show({
+            title: 'Success',
+            message: 'Estimate signed successfully',
+            color: 'green',
+            icon: <IconCheck size={16} />,
+        });
+        // Refresh signatures to get updated status
+        await fetchSignatures();
+        onSignatureComplete();
+    };
+
+    if (loading) {
+        return (
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Stack align="center" gap="md">
+                    <Text c="dimmed">Loading signature information...</Text>
+                </Stack>
+            </Paper>
+        );
+    }
+
+    if (error) {
+        return (
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Alert color="red" title="Error">
+                    {error}
+                </Alert>
+            </Paper>
+        );
+    }
+
+    if (signed) {
+        const contractorSignature = signatureInfo?.signatures?.find(
+            (sig) => sig.signature_type === 'CONTRACTOR'
+        );
+        return (
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Stack align="center" gap="md">
+                    <IconCheck size={48} color="green" />
+                    <Title order={3}>Estimate Signed</Title>
+                    <Text c="dimmed" ta="center">
+                        This estimate has been signed by both parties.
+                    </Text>
+                    {contractorSignature && (
+                        <Text size="sm" c="dimmed">
+                            Signed by {contractorSignature.signer_name || contractorSignature.signer_email} on{' '}
+                            {new Date(contractorSignature.signed_at).toLocaleDateString()}
+                        </Text>
+                    )}
+                </Stack>
+            </Paper>
+        );
+    }
+
+    // Check if client has signed
+    const clientSignature = signatureInfo?.signatures?.find(
+        (sig) => sig.signature_type === 'CLIENT'
+    );
+    const clientSignatureLink = signatureInfo?.signature_links?.find(
+        (link) => link.status === 'SIGNED'
+    );
+
+    if (!clientSignature && !clientSignatureLink) {
+        return (
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Stack align="center" gap="md">
+                    <Text c="dimmed" ta="center">
+                        Waiting for client to sign the estimate...
+                    </Text>
+                </Stack>
+            </Paper>
+        );
+    }
+
+    // Get the signature hash - prefer contractor's hash, fallback to client's signed link
+    const signatureHash = contractorSignatureHash || clientSignatureLink?.signature_hash;
+
+    if (!signatureHash) {
+        return (
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Alert color="yellow" title="Signature Link Required">
+                    A signature link is required to sign this estimate. Please generate one first.
+                </Alert>
+            </Paper>
+        );
+    }
+
+    return (
+        <>
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Stack gap="xl">
+                    <Stack align="center" gap="md">
+                        <IconSignature size={48} color="blue" />
+                        <Title order={2}>Contractor Signature Required</Title>
+                        <Text c="dimmed" ta="center">
+                            The client has signed this estimate.
+                            Please sign to complete the agreement.
+                        </Text>
+                        {clientSignature && (
+                            <Alert color="green" title="Client Signed">
+                              <Text size="sm">
+                                Signed by {clientSignature.signer_name || clientSignature.signer_email} on{' '}
+                                {new Date(clientSignature.signed_at).toLocaleDateString()}
+                              </Text>
+                            </Alert>
+                        )}
+                    </Stack>
+
+                    <Button
+                      size="lg"
+                      leftSection={<IconSignature size={20} />}
+                      onClick={() => setSignatureModalOpened(true)}
+                      fullWidth
+                    >
+                        Sign Estimate
+                    </Button>
+                </Stack>
+            </Paper>
+
+            <SignatureForm
+              signatureHash={signatureHash}
+              clientEmail={userEmail || ''}
+              onSignatureSuccess={handleSignatureSuccess}
+              signatureType="CONTRACTOR"
+              opened={signatureModalOpened}
+              onClose={() => setSignatureModalOpened(false)}
+            />
+        </>
+    );
+}

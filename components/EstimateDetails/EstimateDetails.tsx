@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
+import ContractorSignatureRequired from './ContractorSignatureRequired';
 import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
@@ -45,6 +46,7 @@ import SidebarDetails from './SidebarDetails';
 import classes from './styles/EstimateDetails.module.css';
 import VideoUploader from './VideoUploader';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { getCachedEstimateSummary, setCachedEstimateSummary } from '@/app/utils/dataCache';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
@@ -66,6 +68,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const [firstPdfUrl, setFirstPdfUrl] = useState<string | null>(null);
     const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
+    const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+    const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
+    const [signatureRefreshKey, setSignatureRefreshKey] = useState(0);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const isMountedRef = useRef(true);
@@ -426,6 +431,34 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimateID]);
 
+    const getLineItems = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok) {
+                const itemsData = await response.json();
+                const itemsArray = Array.isArray(itemsData) ? itemsData : [];
+                setLineItems(itemsArray);
+                setLineItemsCount(itemsArray.length);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching line items:', error);
+        }
+    }, [estimateID]);
+
     const fetchChangeOrders = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
         if (!accessToken) return;
@@ -643,6 +676,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         window.open(link, '_blank');
     };
 
+    const handleVideoUploadComplete = useCallback(async () => {
+        await getResources();
+        // Refresh estimate to ensure all data is up to date
+        await getEstimate();
+        setShowVideoUploaderModal(false);
+    }, [getResources, getEstimate]);
+
+    const handleImageUploadComplete = useCallback(async () => {
+        await getResources();
+        // Refresh estimate to ensure all data is up to date
+        await getEstimate();
+        setShowImageUploadModal(false);
+    }, [getResources, getEstimate]);
+
     const handleCopySpanishTranscription = async () => {
         if (!estimate?.spanish_transcription) {
             return;
@@ -765,6 +812,97 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
         && estimate.spanish_transcription.trim().length > 0;
+
+    // Check if all resources are ready for signature link generation
+    const allResourcesReady = useMemo(() => (
+        hasVideo && hasImages && lineItemsCount > 0 && !initialLoading && detailsLoaded
+    ), [hasVideo, hasImages, lineItemsCount, initialLoading, detailsLoaded]);
+
+    // Track previous state to detect when all resources become ready
+    const prevAllResourcesReadyRef = useRef(false);
+
+    // Generate or fetch signature link when all resources are ready
+    useEffect(() => {
+        // Only proceed if all resources are ready and we have required data
+        if (!allResourcesReady || !client?.email || !estimate) {
+            prevAllResourcesReadyRef.current = allResourcesReady;
+            return;
+        }
+
+        // Skip if we already processed this state (avoid duplicate calls)
+        if (prevAllResourcesReadyRef.current === allResourcesReady && signatureUrl) {
+            return;
+        }
+
+        // Mark that we're processing this state
+        prevAllResourcesReadyRef.current = allResourcesReady;
+
+        const fetchOrGenerateSignatureLink = async () => {
+            try {
+                setLoadingSignatureUrl(true);
+
+                // First, try to fetch existing signature links
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    const existingLink = signaturesData.signature_links?.find(
+                        (link: any) => link.client_email === client.email
+                    );
+
+                    if (existingLink) {
+                        // Use existing signature link
+                        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
+                        setSignatureUrl(`${baseUrl}/sign/${existingLink.signature_hash}`);
+                        setLoadingSignatureUrl(false);
+                        return;
+                    }
+                }
+
+                // No existing link found, generate a new one
+                const generateResponse = await fetch(
+                    `/api/estimates/${estimateID}/signature-links`,
+                    {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            client_email: client.email,
+                            expires_in_days: 30,
+                        }),
+                    }
+                );
+
+                if (generateResponse.ok) {
+                    const generateData = await generateResponse.json();
+                    setSignatureUrl(generateData.signature_url);
+                } else {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to generate signature link');
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error fetching/generating signature link:', error);
+            } finally {
+                setLoadingSignatureUrl(false);
+            }
+        };
+
+        // Small delay to ensure resources are fully processed
+        const timeoutId = setTimeout(() => {
+            fetchOrGenerateSignatureLink();
+        }, 500);
+
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
+            clearTimeout(timeoutId);
+        };
+    }, [allResourcesReady, client?.email, estimateID, estimate]);
 
     const OverviewDetails = useMemo(() => (
         <>
@@ -1187,7 +1325,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={getEstimate}
+                                              onEstimateUpdate={() => {
+                                                getEstimate();
+                                                getLineItems();
+                                              }}
                                             />
                                         </CollapsibleSection>
                                     ) : (
@@ -1198,7 +1339,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={getEstimate}
+                                              onEstimateUpdate={() => {
+                                                getEstimate();
+                                                getLineItems();
+                                              }}
                                             />
                                         </div>
                                     )}
@@ -1222,31 +1366,51 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Estimate Preview Section - Only show when
-                                     all three steps are completed */}
-                                    {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
+                                    {/* Estimate Preview or Signature Requirement Section */}
+                                    {estimate && (
                                         <CollapsibleSection
-                                          title="Estimate Preview"
+                                          title={
+                                            estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
+                                                ? 'Signature Required'
+                                                : 'Estimate Preview'
+                                          }
                                           defaultOpen
                                           headerActions={
-                                              <ActionIcon
-                                                variant="subtle"
-                                                onClick={() => {
-                                                    window.open(`/proposals/${estimateID}/print`, '_blank');
-                                                }}
-                                                title="Print Estimate"
-                                              >
-                                                <IconPrinter size={18} />
-                                              </ActionIcon>
+                                              estimate.status !== EstimateStatus.ESTIMATE_ACCEPTED
+                                              && hasVideo && hasImages && lineItemsCount > 0 ? (
+                                                  <ActionIcon
+                                                    variant="subtle"
+                                                    onClick={() => {
+                                                        window.open(`/proposals/${estimateID}/print`, '_blank');
+                                                    }}
+                                                    title="Print Estimate"
+                                                  >
+                                                    <IconPrinter size={18} />
+                                                  </ActionIcon>
+                                              ) : undefined
                                           }
                                         >
-                                            <EstimatePreview
-                                              estimate={estimate}
-                                              imageResources={imageResources}
-                                              videoResources={videoResources}
-                                              lineItems={lineItems}
-                                              client={client}
-                                            />
+                                            {estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
+                                            ? (
+                                                <ContractorSignatureRequired
+                                                  estimateId={estimateID}
+                                                  onSignatureComplete={() => {
+                                                      getEstimate();
+                                                      setSignatureRefreshKey((prev) => prev + 1);
+                                                  }}
+                                                />
+                                            ) : (
+                                                <EstimatePreview
+                                                  estimate={estimate}
+                                                  imageResources={imageResources}
+                                                  videoResources={videoResources}
+                                                  lineItems={lineItems}
+                                                  client={client}
+                                                  signatureUrl={signatureUrl}
+                                                  loadingSignatureUrl={loadingSignatureUrl}
+                                                  signatureRefreshKey={signatureRefreshKey}
+                                                />
+                                            )}
                                         </CollapsibleSection>
                                     )}
                                 </div>
@@ -1346,10 +1510,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             >
                 <VideoUploader
                   estimateID={estimateID}
-                  refresh={() => {
-                    getResources();
-                    setShowVideoUploaderModal(false);
-                  }}
+                  refresh={handleVideoUploadComplete}
                 />
             </Modal>
 
@@ -1365,8 +1526,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 <ImageUpload
                   estimateID={estimateID}
                   setImage={() => {
-                    getResources();
-                    setShowImageUploadModal(false);
+                    handleImageUploadComplete();
                   }}
                   setShowModal={setShowImageUploadModal}
                 />

@@ -1,49 +1,47 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Flex, Paper } from '@mantine/core';
+import { Paper } from '@mantine/core';
 import { remark } from 'remark';
 import html from 'remark-html';
-import { v4 as uuidv4 } from 'uuid';
 
-import EstimateTodo from './EstimateTodo';
-import { EstimateLineItem } from './LineItem';
+import { EstimateLineItem } from '../estimate/LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { UploadNewTemplate } from '@/components/EstimateDetails/estimate/UploadNewTemplate';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
-import UniversalError from '@/components/Global/UniversalError';
 
-interface EstimatePreviewProps {
+interface EstimateSignaturePreviewProps {
     estimate: Estimate;
     imageResources?: EstimateResource[];
     videoResources?: EstimateResource[];
     lineItems?: EstimateLineItem[];
     client?: ContractorClient;
-    hideTodo?: boolean;
-    signatureUrl?: string | null;
-    loadingSignatureUrl?: boolean;
-    signatureRefreshKey?: number; // When this changes, refresh signatures
+    onSignatureClick?: () => void;
+    showSignatureClickable?: boolean;
+    signatures?: Array<{
+        signature_type: string;
+        signature_data: string;
+        signer_name?: string;
+        signer_email: string;
+        signed_at: string;
+    }>;
 }
 
-export default function EstimatePreview({
+export default function EstimateSignaturePreview({
     estimate,
     imageResources = [],
-    videoResources = [],
     lineItems = [],
     client,
-    hideTodo = false,
-    signatureUrl,
-    loadingSignatureUrl = false,
-    signatureRefreshKey,
-}: EstimatePreviewProps) {
+    onSignatureClick,
+    showSignatureClickable = false,
+    signatures: propSignatures = [],
+}: EstimateSignaturePreviewProps) {
     const [loading, setLoading] = useState(true);
-    const [isSending, setIsSending] = useState(false);
     const [template, setTemplate] = useState<string>('');
     const templateRef = useRef<HTMLDivElement>(null);
     const [signatures, setSignatures] = useState<Array<{
@@ -78,8 +76,6 @@ export default function EstimatePreview({
 
         // Legacy fallback: use resource_location
         if (selectedImage.resource_location) {
-            // Try to extract bucket and key from resource_location if it's a full path
-            // Otherwise, use the old format
             const getImageBucket = () => {
                 const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
                 return `jobsuite-resource-images-${env}`;
@@ -107,7 +103,7 @@ export default function EstimatePreview({
         const imagePath = getImagePath();
 
         if (client) {
-            const estimateNumber = uuidv4().split('-')[0];
+            const estimateNumber = estimate.id.split('-')[0];
             const templateInput: TemplateInput = {
                 client: {
                     name: client.name || 'Undefined Name',
@@ -129,7 +125,6 @@ export default function EstimatePreview({
             const fullTemplate = generateTemplate(templateInput);
 
             // Extract body content from the full HTML document
-            // Body contains: <div class="full-page-wrapper">...</div>
             const bodyMatch = fullTemplate.match(/<body[^>]*>([\s\S]*)<\/body>/i);
             let bodyContent = bodyMatch ? bodyMatch[1].trim() : '';
 
@@ -148,10 +143,53 @@ export default function EstimatePreview({
             const styles = styleMatch ? styleMatch[1] : '';
 
             // Body content already has full-page-wrapper and container divs
-            // Just wrap with body-wrapper class for proper styling context
-            const wrappedContent = bodyContent
+            let wrappedContent = bodyContent
                 ? `<div class="body-wrapper">${bodyContent}</div>`
                 : bodyContent;
+
+            // Add clickable signature section above Property Owner signature at bottom if enabled
+            if (showSignatureClickable && wrappedContent && client) {
+                // Find the Property Owner signature section and add clickable signature
+                // line directly above it
+                // We need to insert it inside the second signature-field-wrapper, at the beginning
+                const signatureClickableSection = `
+                    <div class="signature-clickable-section" data-signature-clickable="true" style="
+                        margin-bottom: 15px;
+                        padding: 15px;
+                        border: 2px dashed #2c3e50;
+                        border-radius: 6px;
+                        text-align: center;
+                        cursor: pointer;
+                        background-color: #f8f9fa;
+                        transition: all 0.2s ease;
+                        width: 100%;
+                        box-sizing: border-box;
+                    ">
+                        <p style="margin: 0; color: #2c3e50; font-weight: 600; font-size: 16px;">
+                            Click here to sign this estimate
+                        </p>
+                    </div>
+                `;
+
+                const clientNameEscaped = client.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+                // Insert the clickable section inside the second signature-field-wrapper
+                // (Property Owner). Match the opening tag of the second
+                // signature-field-wrapper and insert right after it
+                wrappedContent = wrappedContent.replace(
+                    /(<div class="signature-field-wrapper">[\s\S]*?<signature-field[^>]*role="Property Owner"[^>]*>)/i,
+                    `$1${signatureClickableSection}`
+                );
+
+                // If that didn't work, try inserting at the start of the wrapper that contains
+                // the client name
+                if (!wrappedContent.includes('signature-clickable-section')) {
+                    wrappedContent = wrappedContent.replace(
+                        new RegExp(`(<div class="signature-field-wrapper">[\\s\\S]*?)(<signature-field[^>]*>[\\s\\S]*?<div class="signature-label">${clientNameEscaped}</div>)`, 'i'),
+                        `$1${signatureClickableSection}$2`
+                    );
+                }
+            }
 
             // Combine styles and wrapped body content
             if (wrappedContent) {
@@ -162,7 +200,6 @@ export default function EstimatePreview({
                 setTemplate('');
             }
         } else {
-            // If no client, clear template
             setTemplate('');
         }
     }, [
@@ -174,8 +211,19 @@ export default function EstimatePreview({
         estimate.cover_photo_resource_id,
     ]);
 
-    // Fetch signatures for the estimate
+    // Fetch signatures for the estimate (if not provided as prop)
     useEffect(() => {
+        // If signatures are provided as props, use them
+        if (propSignatures.length > 0) {
+            setSignatures(propSignatures.map(sig => ({
+                signature_type: sig.signature_type,
+                signature_data: sig.signature_data,
+                signer_name: sig.signer_name,
+            })));
+            return;
+        }
+
+        // Otherwise, fetch from API
         const fetchSignatures = async () => {
             try {
                 const response = await fetch(
@@ -197,7 +245,7 @@ export default function EstimatePreview({
         };
 
         fetchSignatures();
-    }, [estimate.id, signatureRefreshKey]);
+    }, [estimate.id, propSignatures]);
 
     useEffect(() => {
         setLoading(true);
@@ -279,62 +327,55 @@ export default function EstimatePreview({
         };
     }, [template, signatures]);
 
-    // Check if estimate has been signed by both parties (using existing signatures state)
-    const isFullySigned = useMemo(() => {
-        if (signatures.length === 0) return false;
-        const hasClient = signatures.some((sig) => sig.signature_type === 'CLIENT');
-        const hasContractor = signatures.some((sig) => sig.signature_type === 'CONTRACTOR');
-        return hasClient && hasContractor;
-    }, [signatures]);
+    // Add click handler and hover effects to signature clickable section after template is rendered
+    useEffect(() => {
+        if (!template || !showSignatureClickable || !onSignatureClick || !templateRef.current) {
+            return;
+        }
 
-    // Check if all required todos are complete
-    const hasAllItems =
-        imageResources.length > 0 &&
-        videoResources.length > 0 &&
-        !!estimate.transcription_summary &&
-        lineItems.length > 0;
+        const clickableSection = templateRef.current.querySelector('[data-signature-clickable="true"]') as HTMLElement;
+        if (!clickableSection) {
+            return;
+        }
 
-    // If estimate is fully signed, always show preview regardless of resource completion
-    const shouldShowPreview = isFullySigned || hasAllItems;
+        // Add click handler
+        const clickHandler = onSignatureClick;
+        clickableSection.addEventListener('click', clickHandler);
+
+        // Add hover effects
+        const handleMouseEnter = () => {
+            clickableSection.style.backgroundColor = '#e9ecef';
+            clickableSection.style.borderColor = '#1a1f2e';
+        };
+        const handleMouseLeave = () => {
+            clickableSection.style.backgroundColor = '#f8f9fa';
+            clickableSection.style.borderColor = '#2c3e50';
+        };
+
+        clickableSection.addEventListener('mouseenter', handleMouseEnter);
+        clickableSection.addEventListener('mouseleave', handleMouseLeave);
+
+        // eslint-disable-next-line consistent-return
+        return () => {
+            clickableSection.removeEventListener('click', clickHandler);
+            clickableSection.removeEventListener('mouseenter', handleMouseEnter);
+            clickableSection.removeEventListener('mouseleave', handleMouseLeave);
+        };
+    }, [template, showSignatureClickable, onSignatureClick]);
+
+    if (loading || !client) {
+        return <LoadingState />;
+    }
+
+    if (!template) {
+        return null;
+    }
 
     return (
-        <>{loading || isSending || !client ? <LoadingState /> :
-            <div className={classes.estimatePreviewWrapper}>
-                {estimate ?
-                    <Flex direction="column" gap="md" justify="center" align="center">
-                        {!hideTodo && !isFullySigned && (
-                            <EstimateTodo
-                              hasImages={imageResources.length > 0}
-                              hasVideo={videoResources.length > 0}
-                              hasTranscriptionSummary={!!estimate.transcription_summary}
-                              hasLineItems={lineItems.length > 0}
-                            />
-                        )}
-                        {shouldShowPreview && template && (
-                            <Paper shadow="sm" radius="md" withBorder>
-                                <div
-                                  ref={templateRef}
-                                  dangerouslySetInnerHTML={{ __html: template }}
-                                />
-                            </Paper>
-                        )}
-                        {!hideTodo && hasAllItems && (
-                            <UploadNewTemplate
-                              estimate={estimate}
-                              client={client}
-                              setLoading={setIsSending}
-                              imageResources={imageResources}
-                              videoResources={videoResources}
-                              lineItems={lineItems}
-                              signatureUrl={signatureUrl}
-                              loadingSignatureUrl={loadingSignatureUrl}
-                            />
-                        )}
-                    </Flex>
-                    : <UniversalError message="Unable to access estimate details" />
-                }
-            </div>
-        }
-        </>
+        <div className={classes.estimatePreviewWrapper}>
+            <Paper shadow="sm" radius="md" withBorder>
+                <div ref={templateRef} dangerouslySetInnerHTML={{ __html: template }} />
+            </Paper>
+        </div>
     );
 }
