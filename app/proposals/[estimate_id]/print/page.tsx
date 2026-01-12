@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import html2pdf from 'html2pdf.js';
 import { useParams, useRouter } from 'next/navigation';
 
 import EstimatePreview from '@/components/EstimateDetails/estimate/EstimatePreview';
@@ -22,6 +23,8 @@ export default function PrintEstimate() {
     const [client, setClient] = useState<ContractorClient | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [pdfGenerated, setPdfGenerated] = useState(false);
+    const printRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -96,16 +99,67 @@ export default function PrintEstimate() {
         fetchData();
     }, [estimateID, isAuthenticated, isLoading, router]);
 
-    // Trigger print dialog when page loads
+    // Generate PDF when content is ready
     useEffect(() => {
-        if (!loading && estimate && client && lineItems.length > 0) {
-            // Small delay to ensure content is rendered
-            const timer = setTimeout(() => {
-                window.print();
-            }, 500);
+        const shouldGeneratePdf = !loading
+            && estimate
+            && client
+            && lineItems.length > 0
+            && !pdfGenerated
+            && printRef.current;
+
+        if (shouldGeneratePdf) {
+            // Wait for images and content to fully load
+            const timer = setTimeout(async () => {
+                const element = printRef.current;
+                if (!element) return;
+
+                // Wait for all images to load
+                const images = element.querySelectorAll('img');
+                const imagePromises = Array.from(images).map((img) => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise<void>((resolve) => {
+                        img.onload = () => resolve();
+                        img.onerror = () => resolve(); // Continue even if image fails
+                        // Timeout after 5 seconds
+                        setTimeout(() => resolve(), 5000);
+                    });
+                });
+
+                await Promise.all(imagePromises);
+
+                // Configure PDF options
+                const opt = {
+                    margin: [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
+                    filename: `estimate-${estimateID}.pdf`,
+                    image: { type: 'jpeg' as const, quality: 0.98 },
+                    html2canvas: {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        letterRendering: true,
+                    },
+                    jsPDF: {
+                        unit: 'in',
+                        format: 'letter',
+                        orientation: 'portrait' as const,
+                    },
+                };
+
+                try {
+                    await html2pdf().set(opt).from(element).save();
+                    setPdfGenerated(true);
+                } catch (err) {
+                    // eslint-disable-next-line no-console
+                    console.error('Error generating PDF:', err);
+                    // Fallback to browser print if PDF generation fails
+                    window.print();
+                }
+            }, 1000);
             return () => clearTimeout(timer);
-        } return () => {};
-    }, [loading, estimate, client, lineItems]);
+        }
+        return () => {};
+    }, [loading, estimate, client, lineItems, pdfGenerated, estimateID]);
 
     if (isLoading || loading) {
         return <LoadingState />;
@@ -125,33 +179,29 @@ export default function PrintEstimate() {
     return (
         <>
             <style>{`
-                @media print {
-                    @page {
-                        margin: 0.5in;
-                    }
-                    body {
-                        margin: 0;
-                        padding: 0;
-                        background: white;
-                    }
-                    /* Hide navigation and other non-print elements */
-                    nav, header, footer, button, .no-print {
-                        display: none !important;
-                    }
-                    /* Ensure content fits on page */
-                    * {
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                    }
+                body {
+                    margin: 0;
+                    padding: 0;
+                    background: white;
                 }
-                @media screen {
-                    body {
-                        background: white;
-                    }
+                /* Hide navigation and other non-print elements */
+                nav, header, footer, button, .no-print {
+                    display: none !important;
+                }
+                /* Ensure content fits on page */
+                * {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+                /* PDF generation container */
+                .pdf-container {
+                    background: white;
+                    padding: 0;
+                    margin: 0;
                 }
             `}
             </style>
-            <div style={{ padding: '20px' }}>
+            <div ref={printRef} className="pdf-container">
                 <EstimatePreview
                   estimate={estimate}
                   imageResources={imageResources}
