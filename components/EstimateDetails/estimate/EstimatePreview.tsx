@@ -58,6 +58,11 @@ export default function EstimatePreview({
             return '';
         }
 
+        // Determine region based on branch (not NODE_ENV, which is always 'production' in builds)
+        const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
+        const isProduction = branch === 'production' || branch === 'prod';
+        const region = isProduction ? 'us-east-1' : 'us-west-2';
+
         // Find cover photo if specified, otherwise use first image
         let selectedImage = imageResources[0];
         if (estimate.cover_photo_resource_id) {
@@ -72,7 +77,6 @@ export default function EstimatePreview({
         // If we have s3_bucket and s3_key, construct the correct S3 URL
         if (selectedImage.s3_bucket && selectedImage.s3_key) {
             const bucket = selectedImage.s3_bucket;
-            const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
             return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.s3_key}`;
         }
 
@@ -81,11 +85,10 @@ export default function EstimatePreview({
             // Try to extract bucket and key from resource_location if it's a full path
             // Otherwise, use the old format
             const getImageBucket = () => {
-                const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+                const env = isProduction ? 'prod' : 'dev';
                 return `jobsuite-resource-images-${env}`;
             };
             const bucket = selectedImage.s3_bucket || getImageBucket();
-            const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
             return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.resource_location}`;
         }
 
