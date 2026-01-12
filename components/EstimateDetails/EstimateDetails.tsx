@@ -862,8 +862,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 </div>
 
                                 {/* Timeline/Stepper showing progress - Hide once all steps are
-                                complete and preview is visible. Only show when page is loaded. */}
+                                complete and preview is visible. Only show when page is loaded
+                                and resources have been checked. */}
                                 {!initialLoading
+                                    && detailsLoaded
                                     && (!hasVideo || !hasImages || lineItemsCount === 0) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
