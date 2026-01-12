@@ -45,6 +45,8 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reviewLink, setReviewLink] = useState('');
+    const [clientCommunicationEmail, setClientCommunicationEmail] = useState('');
+    const [clientCommunicationName, setClientCommunicationName] = useState('');
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [configId, setConfigId] = useState<string | null>(null);
@@ -90,6 +92,12 @@ export default function SettingsPage() {
                 setReviewLink(
                     config.configuration?.review_link || ''
                 );
+                setClientCommunicationEmail(
+                    config.configuration?.client_communication_email || ''
+                );
+                setClientCommunicationName(
+                    config.configuration?.client_communication_name || ''
+                );
 
                 // Check if logo fields exist in the configuration
                 const hasLogoFields =
@@ -128,6 +136,8 @@ export default function SettingsPage() {
             } else {
                 setConfigId(null);
                 setReviewLink('');
+                setClientCommunicationEmail('');
+                setClientCommunicationName('');
                 setLogoUrl(null);
             }
         } catch (err) {
@@ -173,6 +183,8 @@ export default function SettingsPage() {
                 configuration_type: 'contractor_config',
                 configuration: {
                     review_link: reviewLink,
+                    client_communication_email: clientCommunicationEmail,
+                    client_communication_name: clientCommunicationName,
                     // Preserve logo fields if they exist
                     ...(existingConfig?.configuration?.logo_s3_key && {
                         logo_s3_key: existingConfig.configuration.logo_s3_key,
@@ -241,6 +253,16 @@ export default function SettingsPage() {
 
     const handleReviewLinkChange = (value: string) => {
         setReviewLink(value);
+        setHasChanges(true);
+    };
+
+    const handleClientCommunicationEmailChange = (value: string) => {
+        setClientCommunicationEmail(value);
+        setHasChanges(true);
+    };
+
+    const handleClientCommunicationNameChange = (value: string) => {
+        setClientCommunicationName(value);
         setHasChanges(true);
     };
 
@@ -378,6 +400,26 @@ export default function SettingsPage() {
                                   description="Review link to include in post-completion thank you messages"
                                   value={reviewLink}
                                   onChange={(e) => handleReviewLinkChange(e.target.value)}
+                                />
+
+                                <TextInput
+                                  label="Display Email"
+                                  placeholder="email@example.com"
+                                  description="This email will be used for sending estimate signature emails and outreach messages to clients"
+                                  value={clientCommunicationEmail}
+                                  onChange={(e) =>
+                                    handleClientCommunicationEmailChange(e.target.value)
+                                  }
+                                />
+
+                                <TextInput
+                                  label="Display Name"
+                                  placeholder="Your Company Name"
+                                  description="This name will appear as the sender in client emails (e.g., 'Your Company Name Team')"
+                                  value={clientCommunicationName}
+                                  onChange={(e) =>
+                                    handleClientCommunicationNameChange(e.target.value)
+                                  }
                                 />
 
                                 {/* Logo Upload */}
