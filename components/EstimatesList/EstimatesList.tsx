@@ -58,7 +58,12 @@ const ACCEPTED_STATUSES = [
 const ALL_STATUSES = Object.values(EstimateStatus);
 
 export default function EstimatesList() {
-    const { estimates: cachedEstimates, loading: cacheLoading, refreshData } = useDataCache();
+    const {
+        estimates: cachedEstimates,
+        loading: cacheLoading,
+        refreshData,
+        invalidateCache,
+    } = useDataCache();
     const [estimates, setEstimates] = useState(new Array<Estimate>());
     const [columnOneEstimates, setColumnOneEstimates] = useState(new Array<Estimate>());
     const [columnTwoEstimates, setColumnTwoEstimates] = useState(new Array<Estimate>());
@@ -221,7 +226,8 @@ export default function EstimatesList() {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            await refreshData('estimates');
+            invalidateCache('estimates');
+            await refreshData('estimates', true);
         } finally {
             setRefreshing(false);
         }

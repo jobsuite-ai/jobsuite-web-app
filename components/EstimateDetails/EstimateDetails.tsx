@@ -15,6 +15,7 @@ import {
     IconPencil,
     IconPhoto,
     IconPlus,
+    IconPrinter,
     IconReceipt,
     IconVideo,
 } from '@tabler/icons-react';
@@ -258,8 +259,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (!isMountedRef.current) return;
 
                 if (!detailsRes.ok) {
-                    // eslint-disable-next-line no-console
                     const errorData = await detailsRes.json().catch(() => ({}));
+                    // eslint-disable-next-line no-console
                     console.error('Error fetching estimate details:', errorData);
                     return;
                 }
@@ -861,16 +862,32 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 </div>
 
                                 {/* Timeline/Stepper showing progress - Hide once all steps are
-                                complete and preview is visible */}
-                                {(!hasVideo || !hasImages || lineItemsCount === 0) && (
+                                complete and preview is visible. Only show when page is loaded
+                                and resources have been checked. */}
+                                {!initialLoading
+                                    && detailsLoaded
+                                    && (!hasVideo || !hasImages || lineItemsCount === 0) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
-                                          active={
-                                            !hasVideo ? 0 :
-                                            !hasImages ? 1 :
-                                            lineItemsCount === 0 ? 2 : 3
-                                          }
+                                          active={(() => {
+                                            // Find the first incomplete step
+                                            const firstIncomplete = !hasVideo ? 0 :
+                                                !hasImages ? 1 :
+                                                lineItemsCount === 0 ? 2 : 3;
+
+                                            // If all steps are complete, set to 3
+                                            if (firstIncomplete === 3) return 3;
+
+                                            // Set active to first incomplete step
+                                            // Note: Mantine Stepper marks steps before active as
+                                            // completed, so out-of-order completion won't show
+                                            // perfectly in the stepper visual, but the
+                                            // description text ("Complete" vs "Required") shows
+                                            // the actual status
+                                            return firstIncomplete;
+                                          })()}
                                           size="sm"
+                                          allowNextStepsSelect={false}
                                         >
                                             <Stepper.Step
                                               label="Upload Video"
@@ -884,7 +901,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             />
                                             <Stepper.Step
                                               label="Add Line Items"
-                                              description={lineItemsCount > 0 ? 'Complete' : 'Required'}
+                                              description={
+                                                  lineItemsCount > 0 ? 'Complete' : 'Required'
+                                              }
                                               completedIcon={<IconList size={18} />}
                                             />
                                         </Stepper>
@@ -1206,7 +1225,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {/* Estimate Preview Section - Only show when
                                      all three steps are completed */}
                                     {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
-                                        <CollapsibleSection title="Estimate Preview" defaultOpen>
+                                        <CollapsibleSection
+                                          title="Estimate Preview"
+                                          defaultOpen
+                                          headerActions={
+                                              <ActionIcon
+                                                variant="subtle"
+                                                onClick={() => {
+                                                    window.open(`/proposals/${estimateID}/print`, '_blank');
+                                                }}
+                                                title="Print Estimate"
+                                              >
+                                                <IconPrinter size={18} />
+                                              </ActionIcon>
+                                          }
+                                        >
                                             <EstimatePreview
                                               estimate={estimate}
                                               imageResources={imageResources}

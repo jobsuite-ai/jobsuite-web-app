@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Card, Divider, Flex, Group, Paper, Text, Title } from '@mantine/core';
+import { ActionIcon, Badge, Card, Divider, Flex, Group, Paper, Text, Title } from '@mantine/core';
+import { IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './Clients.module.css';
@@ -17,10 +18,13 @@ export default function ClientsList() {
     clients: cachedClients,
     projects: cachedProjects,
     loading: cacheLoading,
+    refreshData,
+    invalidateCache,
   } = useDataCache();
   const [clients, setClients] = useState(new Array<ContractorClient>());
   const [jobs, setJobs] = useState(new Array<Job>());
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
   // Update clients and jobs when cache data changes
@@ -36,6 +40,18 @@ export default function ClientsList() {
       setLoading(true);
     }
   }, [cachedClients, cachedProjects, cacheLoading.clients, cacheLoading.projects]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      invalidateCache('clients');
+      invalidateCache('projects');
+      await refreshData('clients', true);
+      await refreshData('projects', true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const getJobsForClient = (clientID: string): Job[] =>
     jobs.filter((job) => job.client_id === clientID);
@@ -83,10 +99,22 @@ export default function ClientsList() {
       {loading ? (
         <LoadingState />
       ) : (
-        <div className={classes.flexWrapper}>
-          {clients && clients.length > 0 ? (
-            <>
-              <h1 style={{ color: 'var(--mantine-color-gray-1)' }}>Clients</h1>
+        <div style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <div className={classes.refreshButton}>
+            <ActionIcon
+              variant="light"
+              onClick={handleRefresh}
+              loading={refreshing || cacheLoading.clients || cacheLoading.projects}
+              title="Refresh clients"
+              size={40}
+            >
+              <IconRefresh size={24} />
+            </ActionIcon>
+          </div>
+          <div className={classes.flexWrapper}>
+            {clients && clients.length > 0 ? (
+              <>
+                <h1 style={{ color: 'var(--mantine-color-gray-1)' }}>Clients</h1>
               {getGroupedClients().map(({ letter, clients: letterClients }) => (
                 <div key={letter} style={{ width: '85%', marginBottom: '2rem' }}>
                   <Title order={2} size="h3" mb="md" style={{ color: 'var(--mantine-color-gray-6)' }}>
@@ -217,18 +245,19 @@ export default function ClientsList() {
                   })}
                 </div>
               ))}
-            </>
-          ) : clients && clients.length === 0 ? (
-            <div style={{ marginTop: '100px' }}>
-              <Text size="lg" c="dimmed" ta="center">
-                No clients found. Start by adding your first client.
-              </Text>
-            </div>
-          ) : (
-            <div style={{ marginTop: '100px' }}>
-              <UniversalError message="Unable to access list of clients" />
-            </div>
-          )}
+              </>
+            ) : clients && clients.length === 0 ? (
+              <div style={{ marginTop: '100px' }}>
+                <Text size="lg" c="dimmed" ta="center">
+                  No clients found. Start by adding your first client.
+                </Text>
+              </div>
+            ) : (
+              <div style={{ marginTop: '100px' }}>
+                <UniversalError message="Unable to access list of clients" />
+              </div>
+            )}
+          </div>
         </div>
       )}
     </>
