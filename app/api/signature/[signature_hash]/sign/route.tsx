@@ -4,10 +4,10 @@ import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function POST(
     request: NextRequest,
-    { params }: { params: { signature_hash: string } }
+    { params }: { params: Promise<{ signature_hash: string }> }
 ) {
     try {
-        const { signature_hash } = params;
+        const { signature_hash } = await params;
 
         if (!signature_hash) {
             return NextResponse.json(
