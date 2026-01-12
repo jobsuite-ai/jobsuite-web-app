@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import {
     Alert,
+    Button,
     Paper,
     Stack,
     Text,
@@ -48,6 +49,7 @@ export default function ContractorSignatureRequired({
     const [signed, setSigned] = useState(false);
     const [contractorSignatureHash, setContractorSignatureHash] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [signatureModalOpened, setSignatureModalOpened] = useState(false);
 
     useEffect(() => {
         fetchUserEmail();
@@ -249,31 +251,45 @@ export default function ContractorSignatureRequired({
     }
 
     return (
-        <Paper shadow="sm" p="xl" radius="md" withBorder>
-            <Stack gap="xl">
-                <Stack align="center" gap="md">
-                    <IconSignature size={48} color="blue" />
-                    <Title order={2}>Contractor Signature Required</Title>
-                    <Text c="dimmed" ta="center">
-                        The client has signed this estimate. Please sign to complete the agreement.
-                    </Text>
-                    {clientSignature && (
-                        <Alert color="green" title="Client Signed">
-                          <Text size="sm">
-                            Signed by {clientSignature.signer_name || clientSignature.signer_email} on{' '}
-                            {new Date(clientSignature.signed_at).toLocaleDateString()}
-                          </Text>
-                        </Alert>
-                    )}
-                </Stack>
+        <>
+            <Paper shadow="sm" p="xl" radius="md" withBorder>
+                <Stack gap="xl">
+                    <Stack align="center" gap="md">
+                        <IconSignature size={48} color="blue" />
+                        <Title order={2}>Contractor Signature Required</Title>
+                        <Text c="dimmed" ta="center">
+                            The client has signed this estimate.
+                            Please sign to complete the agreement.
+                        </Text>
+                        {clientSignature && (
+                            <Alert color="green" title="Client Signed">
+                              <Text size="sm">
+                                Signed by {clientSignature.signer_name || clientSignature.signer_email} on{' '}
+                                {new Date(clientSignature.signed_at).toLocaleDateString()}
+                              </Text>
+                            </Alert>
+                        )}
+                    </Stack>
 
-                <SignatureForm
-                  signatureHash={signatureHash}
-                  clientEmail={clientSignature?.signer_email || clientSignatureLink?.client_email || ''}
-                  onSignatureSuccess={handleSignatureSuccess}
-                  signatureType="CONTRACTOR"
-                />
-            </Stack>
-        </Paper>
+                    <Button
+                      size="lg"
+                      leftSection={<IconSignature size={20} />}
+                      onClick={() => setSignatureModalOpened(true)}
+                      fullWidth
+                    >
+                        Sign Estimate
+                    </Button>
+                </Stack>
+            </Paper>
+
+            <SignatureForm
+              signatureHash={signatureHash}
+              clientEmail={userEmail || ''}
+              onSignatureSuccess={handleSignatureSuccess}
+              signatureType="CONTRACTOR"
+              opened={signatureModalOpened}
+              onClose={() => setSignatureModalOpened(false)}
+            />
+        </>
     );
 }

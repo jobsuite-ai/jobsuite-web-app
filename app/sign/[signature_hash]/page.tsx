@@ -32,6 +32,14 @@ interface SignatureLinkInfo {
         about_text: string;
         past_projects_count: number;
     };
+    viewer_type?: 'contractor' | 'client';
+    signatures?: Array<{
+        signature_type: string;
+        signature_data: string;
+        signer_name?: string;
+        signer_email: string;
+        signed_at: string;
+    }>;
 }
 
 export default function SignaturePage() {
@@ -42,6 +50,8 @@ export default function SignaturePage() {
     const [linkInfo, setLinkInfo] = useState<SignatureLinkInfo | null>(null);
     const [signed, setSigned] = useState(false);
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
+    const [isContractorViewer, setIsContractorViewer] = useState(false);
+    const [signatureModalOpened, setSignatureModalOpened] = useState(false);
 
     useEffect(() => {
         if (!signatureHash) return;
@@ -51,14 +61,21 @@ export default function SignaturePage() {
                 setLoading(true);
                 setError(null);
 
+                // Check if user is authenticated (contractor)
+                const accessToken = localStorage.getItem('access_token');
+                const headers: Record<string, string> = {
+                    'Content-Type': 'application/json',
+                };
+                if (accessToken) {
+                    headers.Authorization = `Bearer ${accessToken}`;
+                }
+
                 // Use Next.js API route as proxy
                 const response = await fetch(
                     `/api/signature/${signatureHash}`,
                     {
                         method: 'GET',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
+                        headers,
                     }
                 );
 
@@ -74,8 +91,11 @@ export default function SignaturePage() {
                 const data = await response.json();
                 setLinkInfo(data);
 
-                // Check if already signed
-                if (data.status === 'SIGNED') {
+                // Check if viewer is contractor
+                setIsContractorViewer(data.viewer_type === 'contractor' || data.is_contractor_viewer === true);
+
+                // Check if already signed - check both link status and if signatures exist
+                if (data.status === 'SIGNED' || (data.signatures && data.signatures.length > 0)) {
                     setSigned(true);
                 }
             } catch (err: any) {
@@ -121,20 +141,7 @@ export default function SignaturePage() {
         return null;
     }
 
-    if (signed) {
-        return (
-            <Container size="md" py="xl">
-                <Paper shadow="sm" p="xl" radius="md" withBorder>
-                    <Stack align="center" gap="md">
-                        <Title order={2}>Thank You!</Title>
-                        <Text c="dimmed" ta="center">
-                            This estimate has already been signed. Thank you for your confirmation.
-                        </Text>
-                    </Stack>
-                </Paper>
-            </Container>
-        );
-    }
+    // Don't return early if signed - show the estimate with signatures instead
 
     const imageResources = linkInfo.resources.filter(
         (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
@@ -214,23 +221,94 @@ export default function SignaturePage() {
             <AppShell.Main>
                 <Container size="lg" py="xl">
                   <Stack gap="xl">
+                    {/* Preview Mode Banner for Contractors */}
+                    {isContractorViewer && (
+                      <Alert
+                        icon={<IconInfoCircle size={16} />}
+                        title="Preview Mode"
+                        color="blue"
+                        variant="light"
+                      >
+                        You are viewing this signature page as a contractor.
+                        Your access will not affect the estimate status.
+                      </Alert>
+                    )}
+
                     {/* Estimate Tab Content */}
                     {activeTab === 'estimate' && (
                       <>
+                        {signed && (
+                          <Alert
+                            icon={<IconInfoCircle size={16} />}
+                            title="Thank You!"
+                            color="green"
+                            variant="light"
+                            mb="xl"
+                          >
+                            This estimate has already been signed. Thank you for your confirmation.
+                          </Alert>
+                        )}
                         <EstimateSignaturePreview
                           estimate={linkInfo.estimate}
                           imageResources={imageResources}
                           videoResources={videoResources}
                           lineItems={lineItems}
                           client={linkInfo.client || undefined}
+                          onSignatureClick={() => {
+                            if (!isContractorViewer) {
+                              setSignatureModalOpened(true);
+                            }
+                          }}
+                          showSignatureClickable={!isContractorViewer && !signed}
+                          signatures={linkInfo.signatures || []}
                         />
 
-                        {/* Signature Form */}
-                        <SignatureForm
-                          signatureHash={signatureHash}
-                          clientEmail={linkInfo.client?.email || ''}
-                          onSignatureSuccess={() => setSigned(true)}
-                        />
+                        {/* Signature Form Modal - Hide for contractors in preview mode */}
+                        {!isContractorViewer && (
+                          <SignatureForm
+                            signatureHash={signatureHash}
+                            clientEmail={linkInfo.client?.email || ''}
+                            onSignatureSuccess={async () => {
+                              setSigned(true);
+                              setSignatureModalOpened(false);
+                              // Refresh linkInfo to get updated signatures
+                              try {
+                                const accessToken = localStorage.getItem('access_token');
+                                const headers: Record<string, string> = {
+                                  'Content-Type': 'application/json',
+                                };
+                                if (accessToken) {
+                                  headers.Authorization = `Bearer ${accessToken}`;
+                                }
+                                const response = await fetch(
+                                  `/api/signature/${signatureHash}`,
+                                  {
+                                    method: 'GET',
+                                    headers,
+                                  }
+                                );
+                                if (response.ok) {
+                                  const data = await response.json();
+                                  setLinkInfo(data);
+                                }
+                              } catch (err) {
+                                // eslint-disable-next-line no-console
+                                console.error('Error refreshing signature info:', err);
+                              }
+                            }}
+                            opened={signatureModalOpened}
+                            onClose={() => setSignatureModalOpened(false)}
+                          />
+                        )}
+                        {isContractorViewer && (
+                          <Paper shadow="sm" p="xl" radius="md" withBorder>
+                            <Text c="dimmed" ta="center">
+                              Signature form is hidden in preview mode.
+                              Clients will see a clickable section above
+                              their name to sign the estimate.
+                            </Text>
+                          </Paper>
+                        )}
                       </>
                     )}
 

@@ -1,16 +1,16 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
     Alert,
     Button,
     Checkbox,
-    Paper,
+    Modal,
+    Radio,
     Stack,
     Text,
     TextInput,
-    Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
@@ -20,6 +20,8 @@ interface SignatureFormProps {
     clientEmail: string;
     onSignatureSuccess: () => void;
     signatureType?: 'CLIENT' | 'CONTRACTOR';
+    opened: boolean;
+    onClose: () => void;
 }
 
 export default function SignatureForm({
@@ -27,6 +29,8 @@ export default function SignatureForm({
     clientEmail,
     onSignatureSuccess,
     signatureType = 'CLIENT',
+    opened,
+    onClose,
 }: SignatureFormProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
@@ -36,6 +40,8 @@ export default function SignatureForm({
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasSignature, setHasSignature] = useState(false);
+    const [signatureMethod, setSignatureMethod] = useState<'draw' | 'type'>('draw');
+    const [typedSignature, setTypedSignature] = useState('');
 
     const getCoordinates = (
         e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
@@ -114,7 +120,68 @@ export default function SignatureForm({
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         setHasSignature(false);
+        if (signatureMethod === 'type') {
+            setTypedSignature('');
+        }
     };
+
+    const renderTypedSignature = useCallback(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!typedSignature.trim()) {
+            setHasSignature(false);
+            return;
+        }
+
+        // Set cursive font styling
+        ctx.fillStyle = '#000000';
+        ctx.font = 'italic 94px "Brush Script MT", "Lucida Handwriting", "Comic Sans MS", cursive';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        // Calculate text position (centered vertically, left-aligned with padding)
+        const padding = 20;
+        const x = padding;
+        const y = canvas.height / 2;
+
+        // Draw the signature text
+        ctx.fillText(typedSignature.trim(), x, y);
+
+        setHasSignature(true);
+    }, [typedSignature]);
+
+    // Update typed signature on canvas when typedSignature changes
+    const handleTypedSignatureChange = (value: string) => {
+        setTypedSignature(value);
+        // Render will happen in useEffect
+    };
+
+    // Render typed signature when it changes
+    useEffect(() => {
+        if (signatureMethod === 'type') {
+            renderTypedSignature();
+        }
+    }, [typedSignature, signatureMethod, renderTypedSignature]);
+
+    // Clear canvas when switching methods
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        setHasSignature(false);
+        setTypedSignature('');
+    }, [signatureMethod]);
 
     const handleSubmit = async () => {
         setError(null);
@@ -135,8 +202,13 @@ export default function SignatureForm({
             return;
         }
 
-        if (!hasSignature) {
+        if (signatureMethod === 'draw' && !hasSignature) {
             setError('Please provide your signature');
+            return;
+        }
+
+        if (signatureMethod === 'type' && !typedSignature.trim()) {
+            setError('Please enter your signature name');
             return;
         }
 
@@ -183,6 +255,7 @@ export default function SignatureForm({
                 icon: <IconCheck size={16} />,
             });
 
+            onClose();
             onSignatureSuccess();
         } catch (err: any) {
             setError(err.message || 'An error occurred while submitting your signature');
@@ -198,10 +271,14 @@ export default function SignatureForm({
     };
 
     return (
-        <Paper shadow="sm" p="xl" radius="md" withBorder>
+        <Modal
+          opened={opened}
+          onClose={onClose}
+          title="Sign Estimate"
+          size="lg"
+          centered
+        >
             <Stack gap="md">
-                <Title order={3}>Sign Estimate</Title>
-
                 {error && (
                     <Alert color="red" title="Error" variant="light">
                         {error}
@@ -229,6 +306,28 @@ export default function SignatureForm({
                     <Text size="sm" fw={500} mb="xs">
                         Signature
                     </Text>
+
+                    <Radio.Group
+                      value={signatureMethod}
+                      onChange={(value) => setSignatureMethod(value as 'draw' | 'type')}
+                      mb="sm"
+                    >
+                        <Stack gap="xs">
+                            <Radio value="draw" label="Draw signature" />
+                            <Radio value="type" label="Type name (cursive font)" />
+                        </Stack>
+                    </Radio.Group>
+
+                    {signatureMethod === 'type' && (
+                        <TextInput
+                          label="Signature Name"
+                          placeholder="Enter your name as you'd like it to appear"
+                          value={typedSignature}
+                          onChange={(e) => handleTypedSignatureChange(e.target.value)}
+                          mb="sm"
+                        />
+                    )}
+
                     <div
                       style={{
                             border: '2px solid #dee2e6',
@@ -243,18 +342,18 @@ export default function SignatureForm({
                           height={200}
                           style={{
                                 display: 'block',
-                                cursor: 'crosshair',
+                                cursor: signatureMethod === 'draw' ? 'crosshair' : 'default',
                                 width: '100%',
                                 height: '200px',
-                                touchAction: 'none',
+                                touchAction: signatureMethod === 'draw' ? 'none' : 'auto',
                             }}
-                          onMouseDown={startDrawing}
-                          onMouseMove={draw}
-                          onMouseUp={stopDrawing}
-                          onMouseLeave={stopDrawing}
-                          onTouchStart={startDrawing}
-                          onTouchMove={draw}
-                          onTouchEnd={stopDrawing}
+                          onMouseDown={signatureMethod === 'draw' ? startDrawing : undefined}
+                          onMouseMove={signatureMethod === 'draw' ? draw : undefined}
+                          onMouseUp={signatureMethod === 'draw' ? stopDrawing : undefined}
+                          onMouseLeave={signatureMethod === 'draw' ? stopDrawing : undefined}
+                          onTouchStart={signatureMethod === 'draw' ? startDrawing : undefined}
+                          onTouchMove={signatureMethod === 'draw' ? draw : undefined}
+                          onTouchEnd={signatureMethod === 'draw' ? stopDrawing : undefined}
                         />
                         <Button
                           variant="subtle"
@@ -266,7 +365,9 @@ export default function SignatureForm({
                         </Button>
                     </div>
                     <Text size="xs" c="dimmed" mt="xs">
-                        Please sign above using your mouse or touch screen
+                        {signatureMethod === 'draw'
+                            ? 'Please sign above using your mouse or touch screen'
+                            : 'Your typed name will appear in cursive above'}
                     </Text>
                 </div>
 
@@ -280,13 +381,19 @@ export default function SignatureForm({
                 <Button
                   onClick={handleSubmit}
                   loading={submitting}
-                  disabled={!signerName || !signerEmail || !consentGiven || !hasSignature}
+                  disabled={
+                      !signerName ||
+                      !signerEmail ||
+                      !consentGiven ||
+                      (signatureMethod === 'draw' && !hasSignature) ||
+                      (signatureMethod === 'type' && !typedSignature.trim())
+                  }
                   fullWidth
                   size="lg"
                 >
                     Submit Signature
                 </Button>
             </Stack>
-        </Paper>
+        </Modal>
     );
 }

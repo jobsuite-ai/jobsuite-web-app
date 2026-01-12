@@ -20,13 +20,20 @@ export async function GET(
         // eslint-disable-next-line no-console
         console.log(`Fetching signature link from: ${apiBaseUrl}/api/v1/signature/${signature_hash}`);
 
+        // Forward Authorization header if present (for contractor detection)
+        const authHeader = request.headers.get('Authorization');
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        if (authHeader) {
+            headers.Authorization = authHeader;
+        }
+
         const response = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}`,
             {
                 method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers,
             }
         );
 
