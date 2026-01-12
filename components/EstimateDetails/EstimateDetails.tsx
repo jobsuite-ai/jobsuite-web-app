@@ -862,16 +862,30 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 </div>
 
                                 {/* Timeline/Stepper showing progress - Hide once all steps are
-                                complete and preview is visible */}
-                                {(!hasVideo || !hasImages || lineItemsCount === 0) && (
+                                complete and preview is visible. Only show when page is loaded. */}
+                                {!initialLoading
+                                    && (!hasVideo || !hasImages || lineItemsCount === 0) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
-                                          active={
-                                            !hasVideo ? 0 :
-                                            !hasImages ? 1 :
-                                            lineItemsCount === 0 ? 2 : 3
-                                          }
+                                          active={(() => {
+                                            // Find the first incomplete step
+                                            const firstIncomplete = !hasVideo ? 0 :
+                                                !hasImages ? 1 :
+                                                lineItemsCount === 0 ? 2 : 3;
+
+                                            // If all steps are complete, set to 3
+                                            if (firstIncomplete === 3) return 3;
+
+                                            // Set active to first incomplete step
+                                            // Note: Mantine Stepper marks steps before active as
+                                            // completed, so out-of-order completion won't show
+                                            // perfectly in the stepper visual, but the
+                                            // description text ("Complete" vs "Required") shows
+                                            // the actual status
+                                            return firstIncomplete;
+                                          })()}
                                           size="sm"
+                                          allowNextStepsSelect={false}
                                         >
                                             <Stepper.Step
                                               label="Upload Video"
@@ -885,7 +899,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             />
                                             <Stepper.Step
                                               label="Add Line Items"
-                                              description={lineItemsCount > 0 ? 'Complete' : 'Required'}
+                                              description={
+                                                  lineItemsCount > 0 ? 'Complete' : 'Required'
+                                              }
                                               completedIcon={<IconList size={18} />}
                                             />
                                         </Stepper>
