@@ -77,8 +77,8 @@ export default function CreateChangeOrder({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <Text size="sm" c="dimmed" mb="md">
                     A new estimate will be created with the following information copied from the
-                    original estimate. Video, images, line items, comments, description, and
-                    Spanish transcription will not be copied.
+                    original estimate. The cover image will be copied, but video, additional images,
+                    line items, comments, description, and Spanish transcription will not be copied.
                 </Text>
 
                 <Paper p="md" withBorder>
@@ -193,7 +193,7 @@ export default function CreateChangeOrder({
                             <Text size="sm" c="dimmed">
                                 • Video
                                 <br />
-                                • Images
+                                • Additional Images (cover image will be copied)
                                 <br />
                                 • Line Items
                                 <br />
