@@ -256,11 +256,11 @@ export default function SignaturePageTab() {
             return;
         }
 
-        // Validate file size (10MB max)
-        if (file.size > 10 * 1024 * 1024) {
+        // Validate file size (50MB max)
+        if (file.size > 50 * 1024 * 1024) {
             notifications.show({
                 title: 'Error',
-                message: 'File size must be less than 10MB',
+                message: 'File size must be less than 50MB',
                 color: 'red',
                 icon: <IconX size={16} />,
             });
@@ -407,7 +407,7 @@ export default function SignaturePageTab() {
                             </Text>
                             <Text size="xs" c="dimmed" mb="md">
                                 Upload a PDF document containing your license information.
-                                Max file size: 10MB.
+                                Max file size: 50MB.
                             </Text>
                             <Group gap="md" align="flex-start">
                                 {licensePdfUrl && (
@@ -467,7 +467,7 @@ export default function SignaturePageTab() {
                             </Text>
                             <Text size="xs" c="dimmed" mb="md">
                                 Upload a PDF document containing your insurance information.
-                                Max file size: 10MB.
+                                Max file size: 50MB.
                             </Text>
                             <Group gap="md" align="flex-start">
                                 {insurancePdfUrl && (
