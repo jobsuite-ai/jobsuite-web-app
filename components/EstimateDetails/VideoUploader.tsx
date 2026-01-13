@@ -214,6 +214,42 @@ async function uploadFileParts(
     return parts;
 }
 
+async function getResourceStatus(
+    estimateID: string,
+    resourceID: string
+): Promise<{ upload_status: string } | null> {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+        return null;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/estimates/${estimateID}/resources`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (response.ok) {
+            const resources = await response.json();
+            const resource = Array.isArray(resources)
+                ? resources.find((r: any) => r.id === resourceID)
+                : null;
+            return resource ? { upload_status: resource.upload_status } : null;
+        }
+    } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn('Failed to check resource status:', error);
+    }
+
+    return null;
+}
+
 async function completeMultipartUpload(
     estimateID: string,
     resourceID: string,
@@ -239,6 +275,23 @@ async function completeMultipartUpload(
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.message || errorData.error || 'Failed to complete multipart upload';
+
+        // Check if the error is because the upload was already completed
+        // This can happen if the completion succeeded on the backend but the response
+        // didn't reach the frontend (network timeout, etc.)
+        if (errorMessage.includes('upload does not exist') ||
+            errorMessage.includes('upload ID may be invalid') ||
+            errorMessage.includes('upload may have been aborted or completed')) {
+            // Verify the resource status - if it's already COMPLETED, treat as success
+            const resourceStatus = await getResourceStatus(estimateID, resourceID);
+            if (resourceStatus?.upload_status === 'COMPLETED') {
+                // Upload actually completed successfully, just the response didn't come back
+                // eslint-disable-next-line no-console
+                console.log('Upload was already completed, treating as success');
+                return;
+            }
+        }
+
         throw new Error(errorMessage);
     }
 }

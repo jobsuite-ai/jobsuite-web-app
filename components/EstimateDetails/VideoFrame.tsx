@@ -132,11 +132,12 @@ export function VideoFrame({ resource, estimateID, refresh }: {
               opened={isModalOpen}
               onClose={() => setIsModalOpen(false)}
               size="lg"
+              centered
               title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
                     <Flex direction="column">
-                        <Flex direction="row" gap="lg" justify="center" align="cemter">
+                        <Flex direction="row" gap="lg" justify="center" align="center">
                             <Button type="submit" onClick={deleteVideo}>Confirm</Button>
                             <Button type="submit" onClick={() => setIsModalOpen(false)}>Cancel</Button>
                         </Flex>
