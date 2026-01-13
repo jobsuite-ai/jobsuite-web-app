@@ -94,8 +94,13 @@ export default function SignaturePage() {
                 // Check if viewer is contractor
                 setIsContractorViewer(data.viewer_type === 'contractor' || data.is_contractor_viewer === true);
 
-                // Check if already signed - check both link status and if signatures exist
-                if (data.status === 'SIGNED' || (data.signatures && data.signatures.length > 0)) {
+                // Check if already signed - only if link status is SIGNED and there are
+                // valid signature. Don't treat as signed if link is REVOKED (estimate was
+                // re-sent) or if there are no valid signatures
+                const hasValidSignatures = data.signatures && data.signatures.length > 0;
+                const isLinkSigned = data.status === 'SIGNED';
+                const isLinkRevoked = data.status === 'REVOKED';
+                if (!isLinkRevoked && isLinkSigned && hasValidSignatures) {
                     setSigned(true);
                 }
             } catch (err: any) {
