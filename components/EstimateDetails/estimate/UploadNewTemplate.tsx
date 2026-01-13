@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconCopy, IconLink } from '@tabler/icons-react';
 
 import { EstimateLineItem } from './LineItem';
+import { ResendConfirmModal } from './ResendConfirmModal';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../../Global/model';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
@@ -15,6 +16,7 @@ export function UploadNewTemplate({
     estimate,
     client,
     setLoading,
+    loading = false,
     imageResources = [],
     videoResources = [],
     lineItems = [],
@@ -24,6 +26,7 @@ export function UploadNewTemplate({
     estimate: Estimate,
     client?: ContractorClient,
     setLoading: Function,
+    loading?: boolean,
     imageResources?: EstimateResource[],
     videoResources?: EstimateResource[],
     lineItems?: EstimateLineItem[],
@@ -33,6 +36,7 @@ export function UploadNewTemplate({
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
     const [hasBeenSent, setHasBeenSent] = useState(false);
+    const [showResendModal, setShowResendModal] = useState(false);
 
     // Collect all available emails (deduplicated by email value)
     const availableEmails = useMemo(() => {
@@ -128,6 +132,21 @@ export function UploadNewTemplate({
             return;
         }
 
+        // If estimate has been sent before, show confirmation modal
+        if (hasBeenSent) {
+            setShowResendModal(true);
+            return;
+        }
+
+        // Proceed with sending
+        await sendEstimate();
+    }
+
+    async function sendEstimate() {
+        if (!client) {
+            return;
+        }
+
         // Determine which emails to send to
         let emailsToSend: string[] = [];
         if (sendToAll) {
@@ -147,6 +166,7 @@ export function UploadNewTemplate({
         }
 
         setLoading(true);
+        setShowResendModal(false);
         try {
             // Send estimate with signature links
             // Note: Backend automatically revokes old signature links when generating new ones
@@ -243,6 +263,16 @@ export function UploadNewTemplate({
 
     return (
         <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <ResendConfirmModal
+              opened={showResendModal}
+              onClose={() => {
+                    if (!loading) {
+                        setShowResendModal(false);
+                    }
+                }}
+              onConfirm={sendEstimate}
+              loading={loading}
+            />
             {hasMultipleEmails && (
                 <div style={{
                     marginBottom: 16,
