@@ -11,11 +11,15 @@ import {
     Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconExternalLink, IconCheck, IconSignature } from '@tabler/icons-react';
+import { IconExternalLink, IconCheck, IconSignature, IconUpload } from '@tabler/icons-react';
 
+import { EstimateLineItem } from './estimate/LineItem';
 import SignatureForm from './signature/SignatureForm';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
+import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
+import { uploadPdfFromSignature } from '@/utils/signaturePdfUpload';
 
 interface SignatureInfo {
     estimate_id: string;
@@ -50,6 +54,7 @@ export default function ContractorSignatureRequired({
     const [contractorSignatureHash, setContractorSignatureHash] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
+    const [pdfUploading, setPdfUploading] = useState(false);
 
     useEffect(() => {
         fetchUserEmail();
@@ -180,6 +185,103 @@ export default function ContractorSignatureRequired({
         });
         // Refresh signatures to get updated status
         await fetchSignatures();
+
+        // Check if both parties have signed and upload PDF
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateId}/signatures`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                const validSignatures = (data.signatures || []).filter(
+                    (sig: any) => sig.is_valid !== false
+                );
+                const contractorSignature = validSignatures.find(
+                    (sig: any) => sig.signature_type === 'CONTRACTOR'
+                );
+                const clientSignature = validSignatures.find(
+                    (sig: any) => sig.signature_type === 'CLIENT'
+                );
+
+                // If both parties have signed, generate and upload PDF
+                if (contractorSignature && clientSignature && contractorSignatureHash) {
+                    setPdfUploading(true);
+                    try {
+                        // Fetch estimate details
+                        const detailsResponse = await fetch(
+                            `/api/estimates/${estimateId}/details`,
+                            {
+                                method: 'GET',
+                                headers: getApiHeaders(),
+                            }
+                        );
+
+                        if (!detailsResponse.ok) {
+                            throw new Error('Failed to fetch estimate details');
+                        }
+
+                        const detailsData = await detailsResponse.json();
+                        const estimate = detailsData.estimate as Estimate;
+                        const client = detailsData.client as ContractorClient;
+                        const lineItems = (detailsData.line_items || []) as EstimateLineItem[];
+                        const resources = (detailsData.resources || []) as EstimateResource[];
+
+                        // Filter resources
+                        const imageResources = resources.filter(
+                            (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+                        );
+
+                        // Prepare signatures for PDF generation
+                        const signaturesForPdf = validSignatures.map((sig: any) => ({
+                            signature_type: sig.signature_type,
+                            signature_data: sig.signature_data || '',
+                            signer_name: sig.signer_name,
+                            is_valid: sig.is_valid !== false,
+                        }));
+
+                        // Generate PDF
+                        const pdfBlob = await generateEstimatePdf({
+                            estimate,
+                            client,
+                            lineItems,
+                            imageResources,
+                            signatures: signaturesForPdf,
+                        });
+
+                        // Upload PDF
+                        await uploadPdfFromSignature(contractorSignatureHash, pdfBlob);
+
+                        notifications.show({
+                            title: 'PDF Uploaded',
+                            message: 'Signed estimate PDF has been uploaded successfully',
+                            color: 'green',
+                            icon: <IconUpload size={16} />,
+                        });
+                    } catch (pdfError: any) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error generating or uploading PDF:', pdfError);
+                        // Don't block signature completion if PDF upload fails
+                        notifications.show({
+                            title: 'PDF Upload Failed',
+                            message: 'Estimate was signed but PDF upload failed. You can try again later.',
+                            color: 'yellow',
+                            icon: <IconUpload size={16} />,
+                        });
+                    } finally {
+                        setPdfUploading(false);
+                    }
+                }
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error checking signatures for PDF upload:', err);
+        }
+
         onSignatureComplete();
     };
 
@@ -238,6 +340,13 @@ export default function ContractorSignatureRequired({
                     <Text c="dimmed" ta="center">
                         This estimate has been signed by both parties.
                     </Text>
+                    {pdfUploading && (
+                        <Alert color="blue" title="Uploading PDF">
+                            <Text size="sm">
+                                Generating and uploading signed estimate PDF...
+                            </Text>
+                        </Alert>
+                    )}
                     {contractorSignature && (
                         <Text size="sm" c="dimmed">
                             Contractor: {contractorSignature.signer_name || contractorSignature.signer_email} on{' '}
@@ -329,8 +438,10 @@ export default function ContractorSignatureRequired({
                       leftSection={<IconSignature size={20} />}
                       onClick={() => setSignatureModalOpened(true)}
                       fullWidth
+                      loading={pdfUploading}
+                      disabled={pdfUploading}
                     >
-                        Sign Estimate
+                        {pdfUploading ? 'Uploading PDF...' : 'Sign Estimate'}
                     </Button>
                 </Stack>
             </Paper>
