@@ -50,6 +50,7 @@ export default function EstimatePreview({
         signature_type: string;
         signature_data: string;
         signer_name?: string;
+        is_valid?: boolean;
     }>>([]);
 
     // Get image path from resources - prioritize cover photo
@@ -191,7 +192,13 @@ export default function EstimatePreview({
 
                 if (response.ok) {
                     const data = await response.json();
-                    setSignatures(data.signatures || []);
+                    // This endpoint returns the full audit trail
+                    // (including invalidated signatures). Filter out invalid signatures
+                    // so previews never show signatures after a re-send.
+                    const validSignatures = (data.signatures || []).filter(
+                        (sig: any) => sig.is_valid !== false
+                    );
+                    setSignatures(validSignatures);
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
@@ -285,8 +292,12 @@ export default function EstimatePreview({
     // Check if estimate has been signed by both parties (using existing signatures state)
     const isFullySigned = useMemo(() => {
         if (signatures.length === 0) return false;
-        const hasClient = signatures.some((sig) => sig.signature_type === 'CLIENT');
-        const hasContractor = signatures.some((sig) => sig.signature_type === 'CONTRACTOR');
+        const hasClient = signatures.some(
+            (sig) => sig.signature_type === 'CLIENT' && sig.is_valid !== false
+        );
+        const hasContractor = signatures.some(
+            (sig) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false
+        );
         return hasClient && hasContractor;
     }, [signatures]);
 
