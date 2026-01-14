@@ -41,6 +41,7 @@ interface SignatureLinkInfo {
         signer_name?: string;
         signer_email: string;
         signed_at: string;
+        is_valid?: boolean;
     }>;
 }
 
