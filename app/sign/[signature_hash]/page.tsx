@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
-import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding } from '@tabler/icons-react';
+import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding, IconFileInvoice } from '@tabler/icons-react';
 import { useParams } from 'next/navigation';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
@@ -26,6 +26,7 @@ interface SignatureLinkInfo {
     signature_page_config: {
         show_license: boolean;
         show_insurance: boolean;
+        show_w9: boolean;
         show_past_projects: boolean;
         show_about: boolean;
         license_info: string;
@@ -174,6 +175,9 @@ export default function SignaturePage() {
             : []),
         ...(config.show_insurance === true
             ? [{ value: 'insurance', label: 'Insurance', icon: IconShield }]
+            : []),
+        ...(config.show_w9 === true
+            ? [{ value: 'w9', label: 'W9', icon: IconFileInvoice }]
             : []),
         ...(config.show_about === true
             ? [{ value: 'about', label: 'About', icon: IconInfoCircle }]
@@ -332,6 +336,7 @@ export default function SignaturePage() {
                           ...linkInfo.signature_page_config,
                           show_license: true,
                           show_insurance: false,
+                          show_w9: false,
                           show_about: false,
                           show_past_projects: false,
                         }}
@@ -347,6 +352,23 @@ export default function SignaturePage() {
                           ...linkInfo.signature_page_config,
                           show_license: false,
                           show_insurance: true,
+                          show_w9: false,
+                          show_about: false,
+                          show_past_projects: false,
+                        }}
+                        signatureHash={signatureHash}
+                      />
+                    )}
+
+                    {/* W9 Tab Content */}
+                    {activeTab === 'w9' && (
+                      <SignaturePageSections
+                        contractor={linkInfo.contractor}
+                        signaturePageConfig={{
+                          ...linkInfo.signature_page_config,
+                          show_license: false,
+                          show_insurance: false,
+                          show_w9: true,
                           show_about: false,
                           show_past_projects: false,
                         }}
@@ -362,6 +384,7 @@ export default function SignaturePage() {
                           ...linkInfo.signature_page_config,
                           show_license: false,
                           show_insurance: false,
+                          show_w9: false,
                           show_about: true,
                           show_past_projects: false,
                         }}
@@ -377,6 +400,7 @@ export default function SignaturePage() {
                           ...linkInfo.signature_page_config,
                           show_license: false,
                           show_insurance: false,
+                          show_w9: false,
                           show_about: false,
                           show_past_projects: true,
                         }}
