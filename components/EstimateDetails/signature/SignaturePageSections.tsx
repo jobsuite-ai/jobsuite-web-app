@@ -9,12 +9,14 @@ interface SignaturePageSectionsProps {
     signaturePageConfig: {
         show_license: boolean;
         show_insurance: boolean;
+        show_w9: boolean;
         show_past_projects: boolean;
         show_about: boolean;
         license_info?: string;
         license_pdf_url?: string;
         insurance_info?: string;
         insurance_pdf_url?: string;
+        w9_pdf_url?: string;
         about_text: string;
         past_projects_count: number;
     };
@@ -142,6 +144,33 @@ export default function SignaturePageSections({
                             {signaturePageConfig.insurance_info}
                         </Text>
                     )}
+                </Paper>
+            )}
+
+            {/* W9 Section */}
+            {signaturePageConfig.show_w9 && signaturePageConfig.w9_pdf_url && (
+                <Paper shadow="xs" p="md" radius="md" withBorder>
+                    <Title order={4} mb="sm">
+                        W9 Form
+                    </Title>
+                    <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        minHeight: '500px',
+                        width: '100%',
+                    }}>
+                        <iframe
+                          title="W9 PDF"
+                          src={signaturePageConfig.w9_pdf_url}
+                          style={{
+                                width: '100%',
+                                height: '600px',
+                                border: 'none',
+                                borderRadius: '4px',
+                            }}
+                        />
+                    </div>
                 </Paper>
             )}
 

@@ -45,9 +45,9 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        if (type !== 'license' && type !== 'insurance') {
+        if (type !== 'license' && type !== 'insurance' && type !== 'w9') {
             return NextResponse.json(
-                { message: 'Invalid type. Must be "license" or "insurance"' },
+                { message: 'Invalid type. Must be "license", "insurance", or "w9"' },
                 { status: 400 }
             );
         }

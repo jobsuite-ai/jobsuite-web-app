@@ -29,6 +29,7 @@ interface EstimateSignaturePreviewProps {
         signer_name?: string;
         signer_email: string;
         signed_at: string;
+        is_valid?: boolean;
     }>;
 }
 
@@ -39,7 +40,7 @@ export default function EstimateSignaturePreview({
     client,
     onSignatureClick,
     showSignatureClickable = false,
-    signatures: propSignatures = [],
+    signatures: propSignatures,
 }: EstimateSignaturePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [template, setTemplate] = useState<string>('');
@@ -216,9 +217,15 @@ export default function EstimateSignaturePreview({
 
     // Fetch signatures for the estimate (if not provided as prop)
     useEffect(() => {
-        // If signatures are provided as props, use them
-        if (propSignatures.length > 0) {
-            setSignatures(propSignatures.map(sig => ({
+        // If signatures are provided as props, use them (even if empty array)
+        // This ensures we use the filtered valid signatures from the signature page API
+        // rather than fetching all signatures (including invalid ones) from the audit endpoint
+        if (propSignatures !== undefined) {
+            // Filter to only valid signatures if is_valid field is present
+            const validSignatures = propSignatures.filter((sig) =>
+                sig.is_valid !== false // Default to true if not specified
+            );
+            setSignatures(validSignatures.map((sig) => ({
                 signature_type: sig.signature_type,
                 signature_data: sig.signature_data,
                 signer_name: sig.signer_name,
@@ -226,7 +233,7 @@ export default function EstimateSignaturePreview({
             return;
         }
 
-        // Otherwise, fetch from API
+        // Otherwise, fetch from API (only if propSignatures is not provided at all)
         const fetchSignatures = async () => {
             try {
                 const response = await fetch(
@@ -239,7 +246,15 @@ export default function EstimateSignaturePreview({
 
                 if (response.ok) {
                     const data = await response.json();
-                    setSignatures(data.signatures || []);
+                    // Filter to only valid signatures from audit trail
+                    const validSignatures = (data.signatures || []).filter((sig: any) =>
+                        sig.is_valid !== false
+                    );
+                    setSignatures(validSignatures.map((sig: any) => ({
+                        signature_type: sig.signature_type,
+                        signature_data: sig.signature_data,
+                        signer_name: sig.signer_name,
+                    })));
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console

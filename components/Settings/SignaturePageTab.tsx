@@ -33,12 +33,15 @@ import { Estimate, EstimateResource, EstimateStatus } from '@/components/Global/
 interface SignaturePageConfig {
     show_license: boolean;
     show_insurance: boolean;
+    show_w9: boolean;
     show_past_projects: boolean;
     show_about: boolean;
     license_pdf_url?: string;
     license_pdf_s3_key?: string;
     insurance_pdf_url?: string;
     insurance_pdf_s3_key?: string;
+    w9_pdf_url?: string;
+    w9_pdf_s3_key?: string;
     about_text: string;
     past_projects_count: number;
 }
@@ -62,14 +65,17 @@ export default function SignaturePageTab() {
     // Signature page configuration state
     const [showLicense, setShowLicense] = useState(false);
     const [showInsurance, setShowInsurance] = useState(false);
+    const [showW9, setShowW9] = useState(false);
     const [showPastProjects, setShowPastProjects] = useState(false);
     const [showAbout, setShowAbout] = useState(false);
     const [licensePdfUrl, setLicensePdfUrl] = useState<string | null>(null);
     const [insurancePdfUrl, setInsurancePdfUrl] = useState<string | null>(null);
+    const [w9PdfUrl, setW9PdfUrl] = useState<string | null>(null);
     const [aboutText, setAboutText] = useState('');
     const [pastProjectsCount, setPastProjectsCount] = useState(5);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingInsurance, setUploadingInsurance] = useState(false);
+    const [uploadingW9, setUploadingW9] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
     const isMountedRef = useRef(true);
 
@@ -117,6 +123,7 @@ export default function SignaturePageTab() {
                     config.configuration?.signature_page_config || {
                         show_license: false,
                         show_insurance: false,
+                        show_w9: false,
                         show_past_projects: false,
                         show_about: false,
                         about_text: '',
@@ -124,10 +131,12 @@ export default function SignaturePageTab() {
                     };
                 setShowLicense(sigConfig.show_license || false);
                 setShowInsurance(sigConfig.show_insurance || false);
+                setShowW9(sigConfig.show_w9 || false);
                 setShowPastProjects(sigConfig.show_past_projects || false);
                 setShowAbout(sigConfig.show_about || false);
                 setLicensePdfUrl(sigConfig.license_pdf_url || null);
                 setInsurancePdfUrl(sigConfig.insurance_pdf_url || null);
+                setW9PdfUrl(sigConfig.w9_pdf_url || null);
                 setAboutText(sigConfig.about_text || '');
                 setPastProjectsCount(sigConfig.past_projects_count || 5);
             } else {
@@ -135,10 +144,12 @@ export default function SignaturePageTab() {
                 // Reset to defaults
                 setShowLicense(false);
                 setShowInsurance(false);
+                setShowW9(false);
                 setShowPastProjects(false);
                 setShowAbout(false);
                 setLicensePdfUrl(null);
                 setInsurancePdfUrl(null);
+                setW9PdfUrl(null);
                 setAboutText('');
                 setPastProjectsCount(5);
             }
@@ -188,10 +199,12 @@ export default function SignaturePageTab() {
                     signature_page_config: {
                         show_license: showLicense,
                         show_insurance: showInsurance,
+                        show_w9: showW9,
                         show_past_projects: showPastProjects,
                         show_about: showAbout,
                         license_pdf_url: licensePdfUrl,
                         insurance_pdf_url: insurancePdfUrl,
+                        w9_pdf_url: w9PdfUrl,
                         about_text: aboutText,
                         past_projects_count: pastProjectsCount,
                     },
@@ -250,7 +263,7 @@ export default function SignaturePageTab() {
     // Helper functions for multipart upload
     async function initiateMultipartUpload(
         file: File,
-        type: 'license' | 'insurance'
+        type: 'license' | 'insurance' | 'w9'
     ): Promise<any> {
         const accessToken = localStorage.getItem('access_token');
         if (!accessToken) {
@@ -481,7 +494,7 @@ export default function SignaturePageTab() {
 
     const handlePdfUpload = async (
         file: File | null,
-        type: 'license' | 'insurance'
+        type: 'license' | 'insurance' | 'w9'
     ) => {
         if (!file) return;
 
@@ -514,8 +527,10 @@ export default function SignaturePageTab() {
         try {
             if (type === 'license') {
                 setUploadingLicense(true);
-            } else {
+            } else if (type === 'insurance') {
                 setUploadingInsurance(true);
+            } else {
+                setUploadingW9(true);
             }
             setUploadProgress(0);
 
@@ -571,8 +586,10 @@ export default function SignaturePageTab() {
 
                 if (type === 'license') {
                     setLicensePdfUrl(result.pdf_url);
-                } else {
+                } else if (type === 'insurance') {
                     setInsurancePdfUrl(result.pdf_url);
+                } else {
+                    setW9PdfUrl(result.pdf_url);
                 }
             } catch (uploadError) {
                 // Abort upload on error
@@ -584,9 +601,10 @@ export default function SignaturePageTab() {
 
             setHasChanges(true);
 
+            const typeLabel = type === 'license' ? 'License' : type === 'insurance' ? 'Insurance' : 'W9';
             notifications.show({
                 title: 'Success',
-                message: `${type === 'license' ? 'License' : 'Insurance'} PDF uploaded successfully`,
+                message: `${typeLabel} PDF uploaded successfully`,
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
@@ -602,8 +620,10 @@ export default function SignaturePageTab() {
         } finally {
             if (type === 'license') {
                 setUploadingLicense(false);
-            } else {
+            } else if (type === 'insurance') {
                 setUploadingInsurance(false);
+            } else {
+                setUploadingW9(false);
             }
             setUploadProgress(0);
         }
@@ -618,10 +638,12 @@ export default function SignaturePageTab() {
         signaturePageConfig: {
             show_license: showLicense,
             show_insurance: showInsurance,
+            show_w9: showW9,
             show_past_projects: showPastProjects,
             show_about: showAbout,
-            license_info: licensePdfUrl ? 'PDF uploaded' : '',
-            insurance_info: insurancePdfUrl ? 'PDF uploaded' : '',
+            license_pdf_url: licensePdfUrl || undefined,
+            insurance_pdf_url: insurancePdfUrl || undefined,
+            w9_pdf_url: w9PdfUrl || undefined,
             about_text: aboutText,
             past_projects_count: pastProjectsCount,
         },
@@ -796,6 +818,72 @@ export default function SignaturePageTab() {
                                         )}
                                     </FileButton>
                                     {uploadingInsurance && uploadProgress > 0 && (
+                                        <Progress value={uploadProgress} size="sm" />
+                                    )}
+                                </Stack>
+                            </Group>
+                        </Box>
+                    )}
+
+                    <Switch
+                      label="Show W9 Form"
+                      checked={showW9}
+                      onChange={(e) => {
+                            setShowW9(e.currentTarget.checked);
+                            setHasChanges(true);
+                        }}
+                    />
+
+                    {showW9 && (
+                        <Box>
+                            <Text size="sm" fw={500} mb="xs">
+                                W9 PDF
+                            </Text>
+                            <Text size="xs" c="dimmed" mb="md">
+                                Upload a PDF document containing your W9 form.
+                                Max file size: 50MB.
+                            </Text>
+                            <Group gap="md" align="flex-start" wrap="nowrap">
+                                {w9PdfUrl && (
+                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
+                                        <Group gap="xs" wrap="nowrap">
+                                            <IconFile size={24} color="red" />
+                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                                                W9 PDF
+                                            </Text>
+                                        </Group>
+                                        <Button
+                                          component="a"
+                                          href={w9PdfUrl}
+                                          target="_blank"
+                                          size="xs"
+                                          variant="subtle"
+                                          mt="xs"
+                                          fullWidth
+                                        >
+                                            View PDF
+                                        </Button>
+                                    </Paper>
+                                )}
+                                <Stack gap="xs" style={{ flex: w9PdfUrl ? 0 : 1, minWidth: 200 }}>
+                                    <FileButton
+                                      onChange={(file) => handlePdfUpload(file, 'w9')}
+                                      accept="application/pdf"
+                                      disabled={uploadingW9}
+                                    >
+                                        {(props) => (
+                                            <Button
+                                              {...props}
+                                              leftSection={<IconUpload size={16} />}
+                                              loading={uploadingW9}
+                                              variant="outline"
+                                              fullWidth
+                                            >
+                                                {w9PdfUrl ? 'Change W9 PDF' : 'Upload W9 PDF'}
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                    {uploadingW9 && uploadProgress > 0 && (
                                         <Progress value={uploadProgress} size="sm" />
                                     )}
                                 </Stack>
