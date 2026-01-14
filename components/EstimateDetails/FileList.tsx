@@ -148,9 +148,19 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
       const data = await response.json();
       const presignedUrl = data.presigned_url || data.url;
 
+      if (!presignedUrl) {
+        // eslint-disable-next-line no-console
+        console.error('No presigned URL in response:', data);
+        setPreviewStates(prev => ({
+          ...prev,
+          [resource.id]: { url: null, loading: false, isOpen: true },
+        }));
+        return;
+      }
+
       setPreviewStates(prev => ({
         ...prev,
-        [resource.id]: { url: presignedUrl || null, loading: false, isOpen: true },
+        [resource.id]: { url: presignedUrl, loading: false, isOpen: true },
       }));
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -243,22 +253,47 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
                         ) : previewState.url ? (
                           <div style={{
                             display: 'flex',
+                            flexDirection: 'column',
                             justifyContent: 'center',
                             alignItems: 'center',
                             minHeight: '500px',
                             width: '100%',
+                            position: 'relative',
+                            backgroundColor: '#f5f5f5',
                           }}>
                             <iframe
                               title={`PDF preview for ${resource.resource_location}`}
-                              src={previewState.url}
+                              src={previewState.url || ''}
                               style={{
                                 width: '100%',
                                 height: '600px',
                                 border: 'none',
                                 borderRadius: '8px',
                                 maxHeight: '70vh',
+                                minHeight: '500px',
+                                backgroundColor: '#fff',
+                              }}
+                              onLoad={() => {
+                                // eslint-disable-next-line no-console
+                                console.log('PDF iframe loaded successfully');
+                              }}
+                              onError={() => {
+                                // eslint-disable-next-line no-console
+                                console.error('PDF iframe failed to load');
                               }}
                             />
+                            <Button
+                              variant="light"
+                              size="sm"
+                              mt="md"
+                              onClick={() => {
+                                if (previewState.url) {
+                                  window.open(previewState.url, '_blank');
+                                }
+                              }}
+                            >
+                              Open PDF in New Tab
+                            </Button>
                           </div>
                         ) : (
                           <Text c="dimmed" ta="center" p="md">

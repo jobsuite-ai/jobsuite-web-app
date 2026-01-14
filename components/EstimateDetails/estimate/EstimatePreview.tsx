@@ -301,6 +301,13 @@ export default function EstimatePreview({
         return hasClient && hasContractor;
     }, [signatures]);
 
+    // Check if any signatures exist (even if not fully signed)
+    const hasAnySignatures = useMemo(() => (
+        signatures.length > 0 && signatures.some(
+            (sig) => sig.is_valid !== false && sig.signature_data
+        )
+    ), [signatures]);
+
     // Check if all required todos are complete
     const hasAllItems =
         imageResources.length > 0 &&
@@ -308,8 +315,8 @@ export default function EstimatePreview({
         !!estimate.transcription_summary &&
         lineItems.length > 0;
 
-    // If estimate is fully signed, always show preview regardless of resource completion
-    const shouldShowPreview = isFullySigned || hasAllItems;
+    // Show preview if fully signed, has all items, OR has any signatures
+    const shouldShowPreview = isFullySigned || hasAllItems || hasAnySignatures;
 
     return (
         <>{loading || isSending || !client ? <LoadingState /> :
