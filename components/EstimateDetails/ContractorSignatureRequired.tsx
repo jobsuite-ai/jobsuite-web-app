@@ -11,7 +11,7 @@ import {
     Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconSignature } from '@tabler/icons-react';
+import { IconExternalLink, IconCheck, IconSignature } from '@tabler/icons-react';
 
 import SignatureForm from './signature/SignatureForm';
 
@@ -94,11 +94,20 @@ export default function ContractorSignatureRequired({
             const data = await response.json();
             setSignatureInfo(data);
 
-            // Check if contractor has already signed
-            const contractorSignature = data.signatures?.find(
+            // Check if contractor has already signed (only valid signatures)
+            // Filter out invalidated signatures from re-sends
+            const validSignatures = (data.signatures || []).filter(
+                (sig: any) => sig.is_valid !== false
+            );
+            const contractorSignature = validSignatures.find(
                 (sig: any) => sig.signature_type === 'CONTRACTOR'
             );
-            if (contractorSignature) {
+            const clientSignature = validSignatures.find(
+                (sig: any) => sig.signature_type === 'CLIENT'
+            );
+
+            // Only mark as signed if BOTH parties have valid signatures
+            if (contractorSignature && clientSignature) {
                 setSigned(true);
                 return;
             }
@@ -195,9 +204,32 @@ export default function ContractorSignatureRequired({
     }
 
     if (signed) {
-        const contractorSignature = signatureInfo?.signatures?.find(
+        // Filter to only valid signatures
+        const validSignatures = (signatureInfo?.signatures || []).filter(
+            (sig: any) => sig.is_valid !== false
+        );
+        const contractorSignature = validSignatures.find(
             (sig) => sig.signature_type === 'CONTRACTOR'
         );
+        const clientSignature = validSignatures.find(
+            (sig) => sig.signature_type === 'CLIENT'
+        );
+
+        // Find the most recent active (SIGNED and not REVOKED) signature link to generate view URL
+        const activeLinks = (signatureInfo?.signature_links || []).filter(
+            (link: any) => link.status === 'SIGNED' && link.status !== 'REVOKED' && link.status !== 'EXPIRED'
+        );
+        // Sort by created_at descending to get the most recent
+        activeLinks.sort((a: any, b: any) => {
+            const dateA = new Date(a.created_at || 0).getTime();
+            const dateB = new Date(b.created_at || 0).getTime();
+            return dateB - dateA;
+        });
+        const activeLink = activeLinks[0];
+
+        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
+        const signedEstimateUrl = activeLink ? `${baseUrl}/sign/${activeLink.signature_hash}` : null;
+
         return (
             <Paper shadow="sm" p="xl" radius="md" withBorder>
                 <Stack align="center" gap="md">
@@ -208,17 +240,38 @@ export default function ContractorSignatureRequired({
                     </Text>
                     {contractorSignature && (
                         <Text size="sm" c="dimmed">
-                            Signed by {contractorSignature.signer_name || contractorSignature.signer_email} on{' '}
+                            Contractor: {contractorSignature.signer_name || contractorSignature.signer_email} on{' '}
                             {new Date(contractorSignature.signed_at).toLocaleDateString()}
                         </Text>
+                    )}
+                    {clientSignature && (
+                        <Text size="sm" c="dimmed">
+                            Client: {clientSignature.signer_name || clientSignature.signer_email} on{' '}
+                            {new Date(clientSignature.signed_at).toLocaleDateString()}
+                        </Text>
+                    )}
+                    {signedEstimateUrl && (
+                        <Button
+                          component="a"
+                          href={signedEstimateUrl}
+                          target="_blank"
+                          variant="light"
+                          leftSection={<IconExternalLink size={16} />}
+                          mt="md"
+                        >
+                            View Signed Estimate
+                        </Button>
                     )}
                 </Stack>
             </Paper>
         );
     }
 
-    // Check if client has signed
-    const clientSignature = signatureInfo?.signatures?.find(
+    // Check if client has signed (only valid signatures)
+    const validSignatures = (signatureInfo?.signatures || []).filter(
+        (sig: any) => sig.is_valid !== false
+    );
+    const clientSignature = validSignatures.find(
         (sig) => sig.signature_type === 'CLIENT'
     );
     const clientSignatureLink = signatureInfo?.signature_links?.find(
