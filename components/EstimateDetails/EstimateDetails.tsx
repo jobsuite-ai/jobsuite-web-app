@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Stepper, Table, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Paper, Progress, Skeleton, Stack, Stepper, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -86,6 +86,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [timeEntries, setTimeEntries] = useState<any[]>([]);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
+    const [signatures, setSignatures] = useState<Array<{
+        signature_type: string;
+        signer_name?: string;
+        signer_email?: string;
+        signed_at?: string;
+        is_valid?: boolean;
+    }>>([]);
 
     // Load cached estimate data immediately for instant display
     useEffect(() => {
@@ -236,6 +243,33 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         };
     }, [estimateID]);
 
+    const fetchSignatures = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/signatures`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (response.ok && isMountedRef.current) {
+                const signaturesData = await response.json();
+                // Filter out invalid signatures
+                const validSignatures = (signaturesData.signatures || []).filter(
+                    (sig: any) => sig.is_valid !== false
+                );
+                setSignatures(validSignatures);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching signatures:', error);
+        }
+    }, [estimateID]);
+
     // Load full details in background after initial render
     useEffect(() => {
         if (initialLoading || detailsLoaded) {
@@ -353,6 +387,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 if (isMountedRef.current) {
                     setDetailsLoaded(true);
+                    // Fetch signatures after details are loaded
+                    fetchSignatures();
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
@@ -369,7 +405,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         return function cleanup() {
             clearTimeout(timeoutId);
         };
-    }, [estimateID, initialLoading, detailsLoaded]);
+    }, [estimateID, initialLoading, detailsLoaded, fetchSignatures]);
 
     // Separate functions for refreshing data after initial load
     const getEstimate = useCallback(async () => {
@@ -754,10 +790,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const firstPdfResource = useMemo(() => (
         fileResources.find(r => r.resource_location?.toLowerCase().endsWith('.pdf'))
     ), [fileResources]);
+    const signedPdfResource = useMemo(() => (
+        fileResources.find(r => r.resource_location?.toLowerCase().startsWith('signed-estimate-'))
+    ), [fileResources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
     const hasPdfPreview = firstPdfResource !== undefined;
+    const hasSignedPdf = signedPdfResource !== undefined;
 
     const getPdfPresignedUrl = useCallback(async (resource: EstimateResource) => {
         const accessToken = localStorage.getItem('access_token');
@@ -813,6 +853,18 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const hasSpanishTranscription = estimate?.spanish_transcription
         && estimate.spanish_transcription.trim().length > 0;
 
+    // Check if both parties have signed
+    const isFullySigned = useMemo(() => {
+        if (signatures.length === 0) return false;
+        const hasClient = signatures.some(
+            (sig) => sig.signature_type === 'CLIENT' && sig.is_valid !== false
+        );
+        const hasContractor = signatures.some(
+            (sig) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false
+        );
+        return hasClient && hasContractor;
+    }, [signatures]);
+
     // Check if all resources are ready for signature link generation
     const allResourcesReady = useMemo(() => (
         hasVideo && hasImages && lineItemsCount > 0 && !initialLoading && detailsLoaded
@@ -821,10 +873,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     // Track previous state to detect when all resources become ready
     const prevAllResourcesReadyRef = useRef(false);
 
-    // Generate or fetch signature link when all resources are ready
+    // Generate or fetch signature link when all resources are ready OR when we have a signed PDF
     useEffect(() => {
-        // Only proceed if all resources are ready and we have required data
-        if (!allResourcesReady || !client?.email || !estimate) {
+        // Proceed if all resources are ready, OR if we have a signed PDF (need URL for link)
+        const shouldFetch = (
+            allResourcesReady || (hasSignedPdf && isFullySigned)
+        ) && client?.email && estimate;
+
+        if (!shouldFetch) {
             prevAllResourcesReadyRef.current = allResourcesReady;
             return;
         }
@@ -854,12 +910,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (signaturesResponse.ok) {
                     const signaturesData = await signaturesResponse.json();
                     // Filter out REVOKED and EXPIRED links, only use active ones
-                    const activeLinks = signaturesData.signature_links?.filter(
+                    let activeLinks = signaturesData.signature_links?.filter(
                         (link: any) =>
                             link.client_email === client.email &&
                             link.status !== 'REVOKED' &&
                             link.status !== 'EXPIRED'
                     ) || [];
+
+                    // If we have a signed PDF, prefer SIGNED links
+                    if (hasSignedPdf && isFullySigned) {
+                        const signedLinks = activeLinks.filter((link: any) => link.status === 'SIGNED');
+                        if (signedLinks.length > 0) {
+                            activeLinks = signedLinks;
+                        }
+                    }
 
                     // Sort by created_at descending to get the most recent active link
                     activeLinks.sort((a: any, b: any) => {
@@ -916,7 +980,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         return function cleanup() {
             clearTimeout(timeoutId);
         };
-    }, [allResourcesReady, client?.email, estimateID, estimate]);
+    }, [
+        allResourcesReady,
+        hasSignedPdf,
+        isFullySigned,
+        client?.email,
+        estimateID,
+        estimate,
+        signatureUrl,
+        fetchSignatures,
+    ]);
 
     const OverviewDetails = useMemo(() => (
         <>
@@ -1386,12 +1459,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                           title={
                                             estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
                                                 ? 'Signature Required'
+                                                : hasSignedPdf && isFullySigned
+                                                ? 'Signed Estimate'
                                                 : 'Estimate Preview'
                                           }
                                           defaultOpen
                                           headerActions={
                                               estimate.status !== EstimateStatus.ESTIMATE_ACCEPTED
-                                              && hasVideo && hasImages && lineItemsCount > 0 ? (
+                                              && hasVideo && hasImages && lineItemsCount > 0
+                                              && !(hasSignedPdf && isFullySigned) ? (
                                                   <ActionIcon
                                                     variant="subtle"
                                                     onClick={() => {
@@ -1410,9 +1486,35 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   estimateId={estimateID}
                                                   onSignatureComplete={() => {
                                                       getEstimate();
+                                                      getResources();
+                                                      fetchSignatures();
                                                       setSignatureRefreshKey((prev) => prev + 1);
                                                   }}
                                                 />
+                                            ) : hasSignedPdf && isFullySigned ? (
+                                                <Paper shadow="sm" p="xl" radius="md" withBorder>
+                                                    <Stack align="center" gap="md">
+                                                        <Text c="dimmed" ta="center">
+                                                            This estimate has been signed
+                                                            by both parties. The signed PDF
+                                                            is available in the Files section.
+                                                        </Text>
+                                                        {signatureUrl && (
+                                                            <Button
+                                                              component="a"
+                                                              href={signatureUrl}
+                                                              target="_blank"
+                                                              variant="light"
+                                                              leftSection={
+                                                                <IconExternalLink size={16} />
+                                                              }
+                                                              mt="md"
+                                                            >
+                                                                View Signed Estimate
+                                                            </Button>
+                                                        )}
+                                                    </Stack>
+                                                </Paper>
                                             ) : (
                                                 <EstimatePreview
                                                   estimate={estimate}
