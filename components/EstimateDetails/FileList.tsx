@@ -282,24 +282,28 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
                                 console.error('PDF iframe failed to load');
                               }}
                             />
-                            <Button
-                              variant="light"
-                              size="sm"
-                              mt="md"
-                              onClick={() => {
-                                if (previewState.url) {
-                                  window.open(previewState.url, '_blank');
-                                }
-                              }}
-                            >
-                              Open PDF in New Tab
-                            </Button>
                           </div>
                         ) : (
                           <Text c="dimmed" ta="center" p="md">
                             Unable to load PDF preview
                           </Text>
                         )}
+
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                          <Button
+                            variant="light"
+                            size="sm"
+                            w="50%"
+                            mt="md"
+                            onClick={() => {
+                              if (previewState.url) {
+                                  window.open(previewState.url, '_blank');
+                              }
+                            }}
+                          >
+                              Open PDF in New Tab
+                          </Button>
+                        </div>
                       </Card>
                     )}
                   </div>
