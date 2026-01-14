@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Paper, Progress, Skeleton, Stack, Stepper, Table, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Stepper, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -66,8 +66,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
-    const [firstPdfUrl, setFirstPdfUrl] = useState<string | null>(null);
-    const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
     const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
     const [signatureRefreshKey, setSignatureRefreshKey] = useState(0);
@@ -787,67 +785,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const fileResources = useMemo(() => (
         resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
     ), [resources]);
-    const firstPdfResource = useMemo(() => (
-        fileResources.find(r => r.resource_location?.toLowerCase().endsWith('.pdf'))
-    ), [fileResources]);
     const signedPdfResource = useMemo(() => (
         fileResources.find(r => r.resource_location?.toLowerCase().startsWith('signed-estimate-'))
     ), [fileResources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
-    const hasPdfPreview = firstPdfResource !== undefined;
     const hasSignedPdf = signedPdfResource !== undefined;
-
-    const getPdfPresignedUrl = useCallback(async (resource: EstimateResource) => {
-        const accessToken = localStorage.getItem('access_token');
-        if (!accessToken) return;
-
-        setLoadingPdfUrl(true);
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching PDF presigned URL:', errorData);
-                setFirstPdfUrl(null);
-                return;
-            }
-
-            const data = await response.json();
-            const presignedUrl = data.presigned_url || data.url;
-            setFirstPdfUrl(presignedUrl || null);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching PDF presigned URL:', error);
-            setFirstPdfUrl(null);
-        } finally {
-            setLoadingPdfUrl(false);
-        }
-    }, [estimateID]);
-
-    // Fetch PDF URL only after initial load is complete
-    useEffect(() => {
-        if (initialLoading) {
-            return;
-        }
-
-        if (firstPdfResource) {
-            getPdfPresignedUrl(firstPdfResource);
-        } else {
-            setFirstPdfUrl(null);
-        }
-    }, [firstPdfResource, getPdfPresignedUrl, initialLoading]);
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
@@ -1284,40 +1228,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* PDF Preview - Show if first file is a PDF */}
-                                    {hasPdfPreview && firstPdfResource && (
-                                        <CollapsibleSection title="PDF Preview" defaultOpen>
-                                            {loadingPdfUrl ? (
-                                                <Skeleton height={800} radius="md" />
-                                            ) : firstPdfUrl ? (
-                                                <div style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center',
-                                                    minHeight: '500px',
-                                                    width: '100%',
-                                                }}>
-                                                    <iframe
-                                                      title={`PDF preview for ${firstPdfResource.resource_location}`}
-                                                      src={firstPdfUrl}
-                                                      className={classes.pdfIframe}
-                                                      style={{
-                                                          width: '100%',
-                                                          height: '800px',
-                                                          border: 'none',
-                                                          borderRadius: '8px',
-                                                          maxHeight: '70vh',
-                                                      }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <Text c="dimmed" ta="center" p="md">
-                                                    Unable to load PDF preview
-                                                </Text>
-                                            )}
-                                        </CollapsibleSection>
-                                    )}
-
                                     {/* File List - Show if files exist */}
                                     {hasFiles && (
                                         <CollapsibleSection title="Files" defaultOpen>
@@ -1463,7 +1373,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                 ? 'Signed Estimate'
                                                 : 'Estimate Preview'
                                           }
-                                          defaultOpen
+                                          defaultOpen={!(hasSignedPdf && isFullySigned)}
                                           headerActions={
                                               estimate.status !== EstimateStatus.ESTIMATE_ACCEPTED
                                               && hasVideo && hasImages && lineItemsCount > 0
@@ -1491,30 +1401,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                       setSignatureRefreshKey((prev) => prev + 1);
                                                   }}
                                                 />
-                                            ) : hasSignedPdf && isFullySigned ? (
-                                                <Paper shadow="sm" p="xl" radius="md" withBorder>
-                                                    <Stack align="center" gap="md">
-                                                        <Text c="dimmed" ta="center">
-                                                            This estimate has been signed
-                                                            by both parties. The signed PDF
-                                                            is available in the Files section.
-                                                        </Text>
-                                                        {signatureUrl && (
-                                                            <Button
-                                                              component="a"
-                                                              href={signatureUrl}
-                                                              target="_blank"
-                                                              variant="light"
-                                                              leftSection={
-                                                                <IconExternalLink size={16} />
-                                                              }
-                                                              mt="md"
-                                                            >
-                                                                View Signed Estimate
-                                                            </Button>
-                                                        )}
-                                                    </Stack>
-                                                </Paper>
                                             ) : (
                                                 <EstimatePreview
                                                   estimate={estimate}
@@ -1689,15 +1575,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         hasVideo,
         hasImages,
         hasFiles,
-        hasPdfPreview,
         hasDescription,
         hasSpanishTranscription,
         videoResources,
         imageResources,
         fileResources,
-        firstPdfResource,
-        firstPdfUrl,
-        loadingPdfUrl,
         showVideoUploaderModal,
         showImageUploadModal,
         showFileUploadModal,
