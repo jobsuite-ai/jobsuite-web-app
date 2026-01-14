@@ -3,10 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getContractorId } from '@/app/api/utils/getContractorId';
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
-// Increase max duration and allow larger body sizes for file uploads
-// Note: For large file uploads (>4.5MB), you may also need to configure
-// NEXT_BODY_SIZE_LIMIT environment variable in your deployment platform (e.g., Amplify)
-// For AWS Amplify, set this in the Amplify Console under App settings > Environment variables
+// Increase max duration for large file uploads
 export const maxDuration = 300; // 5 minutes for large file uploads
 export const runtime = 'nodejs';
 
@@ -35,19 +32,20 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get form data (for file uploads)
+        // Get form data
         const formData = await request.formData();
-        const file = formData.get('file') as File;
+        const filename = formData.get('filename') as string;
+        const content_type = formData.get('content_type') as string;
         const type = formData.get('type') as string;
 
-        if (!file) {
+        if (!filename || !content_type || !type) {
             return NextResponse.json(
-                { message: 'No file provided' },
+                { message: 'filename, content_type, and type are required' },
                 { status: 400 }
             );
         }
 
-        if (!type || (type !== 'license' && type !== 'insurance')) {
+        if (type !== 'license' && type !== 'insurance') {
             return NextResponse.json(
                 { message: 'Invalid type. Must be "license" or "insurance"' },
                 { status: 400 }
@@ -56,12 +54,13 @@ export async function POST(request: NextRequest) {
 
         // Create form data for backend
         const backendFormData = new FormData();
-        backendFormData.append('file', file);
+        backendFormData.append('filename', filename);
+        backendFormData.append('content_type', content_type);
         backendFormData.append('type', type);
 
-        // Upload PDF via backend API
-        const uploadResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/signature-pdf`,
+        // Initiate multipart upload via backend API
+        const initiateResponse = await fetch(
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/configurations/signature-pdf/multipart/initiate`,
             {
                 method: 'POST',
                 headers: {
@@ -71,26 +70,21 @@ export async function POST(request: NextRequest) {
             }
         );
 
-        if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json().catch(() => ({}));
-            const errorMsg = errorData.detail || errorData.message || 'Failed to upload PDF';
+        if (!initiateResponse.ok) {
+            const errorData = await initiateResponse.json().catch(() => ({}));
             return NextResponse.json(
-                { message: errorMsg },
-                { status: uploadResponse.status }
+                { message: errorData.detail || errorData.message || 'Failed to initiate multipart upload' },
+                { status: initiateResponse.status }
             );
         }
 
-        const data = await uploadResponse.json();
-        return NextResponse.json(data);
+        const pdfUpload = await initiateResponse.json();
+        return NextResponse.json(pdfUpload);
     } catch (error) {
         // eslint-disable-next-line no-console
-        console.error('Upload signature PDF error:', error);
+        console.error('Initiate multipart upload error:', error);
         return NextResponse.json(
-            {
-                message: error instanceof Error
-                    ? `An error occurred while uploading PDF: ${error.message}`
-                    : 'An error occurred while uploading PDF',
-            },
+            { message: 'An error occurred while initiating multipart upload' },
             { status: 500 }
         );
     }

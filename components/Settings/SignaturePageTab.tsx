@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
     Button,
@@ -19,6 +19,7 @@ import {
     Paper,
     Title,
     Container,
+    Progress,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload, IconEye, IconFile } from '@tabler/icons-react';
@@ -69,6 +70,15 @@ export default function SignaturePageTab() {
     const [pastProjectsCount, setPastProjectsCount] = useState(5);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingInsurance, setUploadingInsurance] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const isMountedRef = useRef(true);
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
 
     useEffect(() => {
         loadConfiguration();
@@ -237,6 +247,238 @@ export default function SignaturePageTab() {
         }
     };
 
+    // Helper functions for multipart upload
+    async function initiateMultipartUpload(
+        file: File,
+        type: 'license' | 'insurance'
+    ): Promise<any> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const parsedFileName = file.name.replaceAll(' ', '_');
+        const formData = new FormData();
+        formData.append('filename', parsedFileName);
+        formData.append('content_type', file.type);
+        formData.append('type', type);
+
+        const response = await fetch(
+            '/api/configurations/signature-pdf/multipart/initiate',
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: formData,
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to initiate multipart upload';
+            throw new Error(errorMessage);
+        }
+
+        return response.json();
+    }
+
+    async function getPresignedUrlForPart(
+        pdfId: string,
+        partNumber: number
+    ): Promise<string> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const response = await fetch(
+            `/api/configurations/signature-pdf/${pdfId}/multipart/presigned-url?part_number=${partNumber}`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to get presigned URL';
+            throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        return data.presigned_url;
+    }
+
+    async function uploadFilePartWithRetry(
+        pdfId: string,
+        partNumber: number,
+        chunk: Blob,
+        maxRetries: number = 3
+    ): Promise<{ PartNumber: number; ETag: string }> {
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+            try {
+                // Get presigned URL for this part
+                const presignedUrl = await getPresignedUrlForPart(pdfId, partNumber);
+
+                // Upload part directly to S3 with timeout
+                const controller = new AbortController();
+                // 5 minute timeout per part
+                const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+                try {
+                    const uploadResponse = await fetch(presignedUrl, {
+                        method: 'PUT',
+                        body: chunk,
+                        signal: controller.signal,
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!uploadResponse.ok) {
+                        const errorText = await uploadResponse.text().catch(() => 'Unknown error');
+                        throw new Error(
+                            `Failed to upload part ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText}. ${errorText}`
+                        );
+                    }
+
+                    const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
+                    if (!etag) {
+                        throw new Error(
+                            `No ETag received for part ${partNumber}. This is likely a CORS configuration issue.`
+                        );
+                    }
+
+                    return {
+                        PartNumber: partNumber,
+                        ETag: etag,
+                    };
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                        throw new Error(`Upload timeout for part ${partNumber} (attempt ${attempt}/${maxRetries})`);
+                    }
+                    throw fetchError;
+                }
+            } catch (uploadError) {
+                lastError = uploadError instanceof Error
+                    ? uploadError
+                    : new Error(String(uploadError));
+                if (attempt < maxRetries) {
+                    // Exponential backoff: wait 1s, 2s, 4s before retrying
+                    const delay = Math.min(1000 * (2 ** (attempt - 1)), 10000);
+                    // eslint-disable-next-line no-console
+                    console.warn(
+                        `Failed to upload part ${partNumber} (attempt ${attempt}/${maxRetries}): ` +
+                        `${lastError.message}. Retrying in ${delay}ms...`
+                    );
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, delay);
+                    });
+                }
+            }
+        }
+
+        // All retries failed
+        throw new Error(
+            `Failed to upload part ${partNumber} after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`
+        );
+    }
+
+    async function uploadFileParts(
+        file: File,
+        pdfId: string,
+        onProgress?: (uploaded: number, total: number) => void
+    ): Promise<Array<{ PartNumber: number; ETag: string }>> {
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+        const parts: Array<{ PartNumber: number; ETag: string }> = [];
+        const partProgress: Map<number, number> = new Map();
+
+        for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+            const start = (partNumber - 1) * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+
+            const partResult = await uploadFilePartWithRetry(
+                pdfId,
+                partNumber,
+                chunk,
+                3 // maxRetries
+            );
+
+            partProgress.set(partNumber, 100);
+            if (onProgress) {
+                const totalProgress = Array.from(
+                    partProgress.values()
+                ).reduce((sum, p) => sum + p, 0);
+                onProgress(totalProgress, totalParts * 100);
+            }
+
+            parts.push(partResult);
+        }
+
+        return parts;
+    }
+
+    async function completeMultipartUpload(
+        pdfId: string,
+        parts: Array<{ PartNumber: number; ETag: string }>
+    ): Promise<any> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const response = await fetch(
+            `/api/configurations/signature-pdf/${pdfId}/multipart/complete`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ parts }),
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to complete multipart upload';
+            throw new Error(errorMessage);
+        }
+
+        return response.json();
+    }
+
+    async function abortMultipartUpload(pdfId: string): Promise<void> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            return;
+        }
+
+        try {
+            await fetch(
+                `/api/configurations/signature-pdf/${pdfId}/multipart/abort`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+        } catch (abortError) {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to abort multipart upload:', abortError);
+        }
+    }
+
     const handlePdfUpload = async (
         file: File | null,
         type: 'license' | 'insurance'
@@ -267,42 +509,109 @@ export default function SignaturePageTab() {
             return;
         }
 
+        // Use multipart upload for files larger than 10MB, or always use multipart for consistency
+        const USE_MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10MB
+        const useMultipart = file.size > USE_MULTIPART_THRESHOLD;
+
         try {
             if (type === 'license') {
                 setUploadingLicense(true);
             } else {
                 setUploadingInsurance(true);
             }
+            setUploadProgress(0);
 
             const accessToken = localStorage.getItem('access_token');
             if (!accessToken) {
                 throw new Error('No access token found');
             }
 
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('type', type);
+            if (useMultipart) {
+                // Use multipart upload for large files
+                let pdfId: string | null = null;
 
-            const response = await fetch('/api/configurations/signature-pdf', {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                },
-                body: formData,
-            });
+                try {
+                    // Initiate multipart upload
+                    const pdfUpload = await initiateMultipartUpload(file, type);
+                    pdfId = pdfUpload.id;
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMsg = errorData.message || errorData.detail || 'Failed to upload PDF';
-                throw new Error(errorMsg);
-            }
+                    if (!isMountedRef.current) {
+                        if (pdfId) {
+                            await abortMultipartUpload(pdfId);
+                        }
+                        return;
+                    }
 
-            const data = await response.json();
-            if (type === 'license') {
-                setLicensePdfUrl(data.pdf_url);
+                    if (!pdfId) {
+                        throw new Error('PDF ID not found after initiating upload');
+                    }
+
+                    // Upload file in parts with progress tracking
+                    const parts = await uploadFileParts(
+                        file,
+                        pdfId,
+                        (uploaded, total) => {
+                            if (isMountedRef.current) {
+                                setUploadProgress((uploaded / total) * 100);
+                            }
+                        }
+                    );
+
+                    if (!isMountedRef.current) {
+                        if (pdfId) {
+                            await abortMultipartUpload(pdfId);
+                        }
+                        return;
+                    }
+
+                    // Complete multipart upload
+                    setUploadProgress(95);
+                    const result = await completeMultipartUpload(pdfId, parts);
+
+                    if (!isMountedRef.current) return;
+
+                    setUploadProgress(100);
+
+                    if (type === 'license') {
+                        setLicensePdfUrl(result.pdf_url);
+                    } else {
+                        setInsurancePdfUrl(result.pdf_url);
+                    }
+                } catch (uploadError) {
+                    // Abort upload on error
+                    if (pdfId) {
+                        await abortMultipartUpload(pdfId);
+                    }
+                    throw uploadError;
+                }
             } else {
-                setInsurancePdfUrl(data.pdf_url);
+                // Use simple upload for small files
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('type', type);
+
+                const response = await fetch('/api/configurations/signature-pdf', {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMsg = errorData.message || errorData.detail || 'Failed to upload PDF';
+                    throw new Error(errorMsg);
+                }
+
+                const data = await response.json();
+                if (type === 'license') {
+                    setLicensePdfUrl(data.pdf_url);
+                } else {
+                    setInsurancePdfUrl(data.pdf_url);
+                }
             }
+
             setHasChanges(true);
 
             notifications.show({
@@ -326,6 +635,7 @@ export default function SignaturePageTab() {
             } else {
                 setUploadingInsurance(false);
             }
+            setUploadProgress(0);
         }
     };
 
@@ -431,22 +741,27 @@ export default function SignaturePageTab() {
                                         </Button>
                                     </Paper>
                                 )}
-                                <FileButton
-                                  onChange={(file) => handlePdfUpload(file, 'license')}
-                                  accept="application/pdf"
-                                  disabled={uploadingLicense}
-                                >
-                                    {(props) => (
-                                        <Button
-                                          {...props}
-                                          leftSection={<IconUpload size={16} />}
-                                          loading={uploadingLicense}
-                                          variant="outline"
-                                        >
-                                            {licensePdfUrl ? 'Change License PDF' : 'Upload License PDF'}
-                                        </Button>
+                                <Stack gap="xs" style={{ flex: 1 }}>
+                                    <FileButton
+                                      onChange={(file) => handlePdfUpload(file, 'license')}
+                                      accept="application/pdf"
+                                      disabled={uploadingLicense}
+                                    >
+                                        {(props) => (
+                                            <Button
+                                              {...props}
+                                              leftSection={<IconUpload size={16} />}
+                                              loading={uploadingLicense}
+                                              variant="outline"
+                                            >
+                                                {licensePdfUrl ? 'Change License PDF' : 'Upload License PDF'}
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                    {uploadingLicense && uploadProgress > 0 && (
+                                        <Progress value={uploadProgress} size="sm" />
                                     )}
-                                </FileButton>
+                                </Stack>
                             </Group>
                         </Box>
                     )}
@@ -491,22 +806,27 @@ export default function SignaturePageTab() {
                                         </Button>
                                     </Paper>
                                 )}
-                                <FileButton
-                                  onChange={(file) => handlePdfUpload(file, 'insurance')}
-                                  accept="application/pdf"
-                                  disabled={uploadingInsurance}
-                                >
-                                    {(props) => (
-                                        <Button
-                                          {...props}
-                                          leftSection={<IconUpload size={16} />}
-                                          loading={uploadingInsurance}
-                                          variant="outline"
-                                        >
-                                            {insurancePdfUrl ? 'Change Insurance PDF' : 'Upload Insurance PDF'}
-                                        </Button>
+                                <Stack gap="xs" style={{ flex: 1 }}>
+                                    <FileButton
+                                      onChange={(file) => handlePdfUpload(file, 'insurance')}
+                                      accept="application/pdf"
+                                      disabled={uploadingInsurance}
+                                    >
+                                        {(props) => (
+                                            <Button
+                                              {...props}
+                                              leftSection={<IconUpload size={16} />}
+                                              loading={uploadingInsurance}
+                                              variant="outline"
+                                            >
+                                                {insurancePdfUrl ? 'Change Insurance PDF' : 'Upload Insurance PDF'}
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                    {uploadingInsurance && uploadProgress > 0 && (
+                                        <Progress value={uploadProgress} size="sm" />
                                     )}
-                                </FileButton>
+                                </Stack>
                             </Group>
                         </Box>
                     )}
