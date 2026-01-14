@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react';
 
 import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
-import { IconAlertCircle, IconFileText, IconInfoCircle, IconLicense, IconShield, IconBuilding } from '@tabler/icons-react';
+import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding } from '@tabler/icons-react';
 import { useParams } from 'next/navigation';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
 import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
+import SignatureAuditHistory from '@/components/EstimateDetails/signature/SignatureAuditHistory';
 import SignatureForm from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
@@ -164,19 +165,25 @@ export default function SignaturePage() {
     }));
 
     // Build available tabs based on configuration
+    // Ensure signature_page_config has defaults to handle cases where config might be empty
+    const config = linkInfo.signature_page_config || {};
     const availableTabs = [
         { value: 'estimate', label: 'Estimate', icon: IconFileText },
-        ...(linkInfo.signature_page_config.show_license
+        ...(config.show_license === true
             ? [{ value: 'license', label: 'License', icon: IconLicense }]
             : []),
-        ...(linkInfo.signature_page_config.show_insurance
+        ...(config.show_insurance === true
             ? [{ value: 'insurance', label: 'Insurance', icon: IconShield }]
             : []),
-        ...(linkInfo.signature_page_config.show_about
+        ...(config.show_about === true
             ? [{ value: 'about', label: 'About', icon: IconInfoCircle }]
             : []),
-        ...(linkInfo.signature_page_config.show_past_projects
+        ...(config.show_past_projects === true
             ? [{ value: 'projects', label: 'Past Projects', icon: IconBuilding }]
+            : []),
+        // Audit History tab - only visible to contractors
+        ...(isContractorViewer
+            ? [{ value: 'audit', label: 'Audit History', icon: IconHistory }]
             : []),
     ];
 
@@ -375,6 +382,11 @@ export default function SignaturePage() {
                         }}
                         signatureHash={signatureHash}
                       />
+                    )}
+
+                    {/* Audit History Tab Content - Only visible to contractors */}
+                    {activeTab === 'audit' && isContractorViewer && (
+                      <SignatureAuditHistory estimateId={linkInfo.estimate_id} />
                     )}
                   </Stack>
                 </Container>
