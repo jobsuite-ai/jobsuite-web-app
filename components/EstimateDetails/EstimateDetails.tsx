@@ -830,6 +830,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
 
         // Skip if we already processed this state (avoid duplicate calls)
+        // Note: This will still refresh when estimate changes since estimate is in dependency array
         if (prevAllResourcesReadyRef.current === allResourcesReady && signatureUrl) {
             return;
         }
@@ -852,9 +853,22 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 if (signaturesResponse.ok) {
                     const signaturesData = await signaturesResponse.json();
-                    const existingLink = signaturesData.signature_links?.find(
-                        (link: any) => link.client_email === client.email
-                    );
+                    // Filter out REVOKED and EXPIRED links, only use active ones
+                    const activeLinks = signaturesData.signature_links?.filter(
+                        (link: any) =>
+                            link.client_email === client.email &&
+                            link.status !== 'REVOKED' &&
+                            link.status !== 'EXPIRED'
+                    ) || [];
+
+                    // Sort by created_at descending to get the most recent active link
+                    activeLinks.sort((a: any, b: any) => {
+                        const dateA = new Date(a.created_at || 0).getTime();
+                        const dateB = new Date(b.created_at || 0).getTime();
+                        return dateB - dateA;
+                    });
+
+                    const existingLink = activeLinks[0];
 
                     if (existingLink) {
                         // Use existing signature link

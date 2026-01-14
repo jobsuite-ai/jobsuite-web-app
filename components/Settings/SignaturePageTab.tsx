@@ -509,10 +509,8 @@ export default function SignaturePageTab() {
             return;
         }
 
-        // Use multipart upload for files larger than 10MB, or always use multipart for consistency
-        const USE_MULTIPART_THRESHOLD = 10 * 1024 * 1024; // 10MB
-        const useMultipart = file.size > USE_MULTIPART_THRESHOLD;
-
+        // Always use multipart upload for both license and insurance PDFs
+        // This ensures reliable uploads and avoids 413 errors for larger files
         try {
             if (type === 'license') {
                 setUploadingLicense(true);
@@ -526,90 +524,62 @@ export default function SignaturePageTab() {
                 throw new Error('No access token found');
             }
 
-            if (useMultipart) {
-                // Use multipart upload for large files
-                let pdfId: string | null = null;
+            // Use multipart upload for all PDFs
+            let pdfId: string | null = null;
 
-                try {
-                    // Initiate multipart upload
-                    const pdfUpload = await initiateMultipartUpload(file, type);
-                    pdfId = pdfUpload.id;
+            try {
+                // Initiate multipart upload
+                const pdfUpload = await initiateMultipartUpload(file, type);
+                pdfId = pdfUpload.id;
 
-                    if (!isMountedRef.current) {
-                        if (pdfId) {
-                            await abortMultipartUpload(pdfId);
-                        }
-                        return;
-                    }
-
-                    if (!pdfId) {
-                        throw new Error('PDF ID not found after initiating upload');
-                    }
-
-                    // Upload file in parts with progress tracking
-                    const parts = await uploadFileParts(
-                        file,
-                        pdfId,
-                        (uploaded, total) => {
-                            if (isMountedRef.current) {
-                                setUploadProgress((uploaded / total) * 100);
-                            }
-                        }
-                    );
-
-                    if (!isMountedRef.current) {
-                        if (pdfId) {
-                            await abortMultipartUpload(pdfId);
-                        }
-                        return;
-                    }
-
-                    // Complete multipart upload
-                    setUploadProgress(95);
-                    const result = await completeMultipartUpload(pdfId, parts);
-
-                    if (!isMountedRef.current) return;
-
-                    setUploadProgress(100);
-
-                    if (type === 'license') {
-                        setLicensePdfUrl(result.pdf_url);
-                    } else {
-                        setInsurancePdfUrl(result.pdf_url);
-                    }
-                } catch (uploadError) {
-                    // Abort upload on error
+                if (!isMountedRef.current) {
                     if (pdfId) {
                         await abortMultipartUpload(pdfId);
                     }
-                    throw uploadError;
-                }
-            } else {
-                // Use simple upload for small files
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('type', type);
-
-                const response = await fetch('/api/configurations/signature-pdf', {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                    },
-                    body: formData,
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
-                    const errorMsg = errorData.message || errorData.detail || 'Failed to upload PDF';
-                    throw new Error(errorMsg);
+                    return;
                 }
 
-                const data = await response.json();
+                if (!pdfId) {
+                    throw new Error('PDF ID not found after initiating upload');
+                }
+
+                // Upload file in parts with progress tracking
+                const parts = await uploadFileParts(
+                    file,
+                    pdfId,
+                    (uploaded, total) => {
+                        if (isMountedRef.current) {
+                            setUploadProgress((uploaded / total) * 100);
+                        }
+                    }
+                );
+
+                if (!isMountedRef.current) {
+                    if (pdfId) {
+                        await abortMultipartUpload(pdfId);
+                    }
+                    return;
+                }
+
+                // Complete multipart upload
+                setUploadProgress(95);
+                const result = await completeMultipartUpload(pdfId, parts);
+
+                if (!isMountedRef.current) return;
+
+                setUploadProgress(100);
+
                 if (type === 'license') {
-                    setLicensePdfUrl(data.pdf_url);
+                    setLicensePdfUrl(result.pdf_url);
                 } else {
-                    setInsurancePdfUrl(data.pdf_url);
+                    setInsurancePdfUrl(result.pdf_url);
                 }
+            } catch (uploadError) {
+                // Abort upload on error
+                if (pdfId) {
+                    await abortMultipartUpload(pdfId);
+                }
+                throw uploadError;
             }
 
             setHasChanges(true);
@@ -719,12 +689,12 @@ export default function SignaturePageTab() {
                                 Upload a PDF document containing your license information.
                                 Max file size: 50MB.
                             </Text>
-                            <Group gap="md" align="flex-start">
+                            <Group gap="md" align="flex-start" wrap="nowrap">
                                 {licensePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ maxWidth: 200 }}>
-                                        <Group gap="xs">
+                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
+                                        <Group gap="xs" wrap="nowrap">
                                             <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate>
+                                            <Text size="sm" truncate style={{ flex: 1 }}>
                                                 License PDF
                                             </Text>
                                         </Group>
@@ -741,7 +711,7 @@ export default function SignaturePageTab() {
                                         </Button>
                                     </Paper>
                                 )}
-                                <Stack gap="xs" style={{ flex: 1 }}>
+                                <Stack gap="xs" style={{ flex: licensePdfUrl ? 0 : 1, minWidth: 200 }}>
                                     <FileButton
                                       onChange={(file) => handlePdfUpload(file, 'license')}
                                       accept="application/pdf"
@@ -753,6 +723,7 @@ export default function SignaturePageTab() {
                                               leftSection={<IconUpload size={16} />}
                                               loading={uploadingLicense}
                                               variant="outline"
+                                              fullWidth
                                             >
                                                 {licensePdfUrl ? 'Change License PDF' : 'Upload License PDF'}
                                             </Button>
@@ -784,12 +755,12 @@ export default function SignaturePageTab() {
                                 Upload a PDF document containing your insurance information.
                                 Max file size: 50MB.
                             </Text>
-                            <Group gap="md" align="flex-start">
+                            <Group gap="md" align="flex-start" wrap="nowrap">
                                 {insurancePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ maxWidth: 200 }}>
-                                        <Group gap="xs">
+                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
+                                        <Group gap="xs" wrap="nowrap">
                                             <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate>
+                                            <Text size="sm" truncate style={{ flex: 1 }}>
                                                 Insurance PDF
                                             </Text>
                                         </Group>
@@ -806,7 +777,7 @@ export default function SignaturePageTab() {
                                         </Button>
                                     </Paper>
                                 )}
-                                <Stack gap="xs" style={{ flex: 1 }}>
+                                <Stack gap="xs" style={{ flex: insurancePdfUrl ? 0 : 1, minWidth: 200 }}>
                                     <FileButton
                                       onChange={(file) => handlePdfUpload(file, 'insurance')}
                                       accept="application/pdf"
@@ -818,6 +789,7 @@ export default function SignaturePageTab() {
                                               leftSection={<IconUpload size={16} />}
                                               loading={uploadingInsurance}
                                               variant="outline"
+                                              fullWidth
                                             >
                                                 {insurancePdfUrl ? 'Change Insurance PDF' : 'Upload Insurance PDF'}
                                             </Button>
