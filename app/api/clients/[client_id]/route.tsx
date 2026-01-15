@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../../utils/backendHeaders';
+
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(
@@ -75,9 +77,10 @@ export async function GET(
         }
 
         const client = await clientResponse.json();
+        const backendHeaders = extractBackendHeaders(clientResponse);
 
         // Return in the format expected by the frontend (wrapped in Item)
-        return NextResponse.json({ Item: client });
+        return NextResponse.json({ Item: client }, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get client error:', error);
@@ -165,7 +168,8 @@ export async function PUT(
         }
 
         const client = await updateResponse.json();
-        return NextResponse.json(client);
+        const backendHeaders = extractBackendHeaders(updateResponse);
+        return NextResponse.json(client, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Update client error:', error);
@@ -249,7 +253,8 @@ export async function DELETE(
         }
 
         const result = await deleteResponse.json();
-        return NextResponse.json(result);
+        const backendHeaders = extractBackendHeaders(deleteResponse);
+        return NextResponse.json(result, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Delete client error:', error);

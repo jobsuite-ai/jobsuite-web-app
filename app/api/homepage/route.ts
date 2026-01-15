@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../utils/backendHeaders';
 import { getContractorId } from '../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
@@ -50,7 +51,8 @@ export async function GET(request: NextRequest) {
     }
 
     const homepageData = await homepageResponse.json();
-    return NextResponse.json(homepageData);
+    const backendHeaders = extractBackendHeaders(homepageResponse);
+    return NextResponse.json(homepageData, { headers: backendHeaders });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching homepage data:', error);

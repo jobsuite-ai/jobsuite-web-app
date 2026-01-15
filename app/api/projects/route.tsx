@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../utils/backendHeaders';
 import { getContractorId } from '../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
@@ -67,9 +68,10 @@ export async function GET(request: NextRequest) {
         }
 
         const estimates = await estimatesResponse.json();
+        const backendHeaders = extractBackendHeaders(estimatesResponse);
 
         // Return in the format expected by the frontend (wrapped in Items)
-        return NextResponse.json({ Items: estimates });
+        return NextResponse.json({ Items: estimates }, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get jobs error:', error);
@@ -130,7 +132,8 @@ export async function POST(request: NextRequest) {
         }
 
         const job = await createResponse.json();
-        return NextResponse.json(job, { status: 201 });
+        const backendHeaders = extractBackendHeaders(createResponse);
+        return NextResponse.json(job, { status: 201, headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Create job error:', error);

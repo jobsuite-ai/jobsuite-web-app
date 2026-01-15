@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../utils/backendHeaders';
+
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(request: Request) {
@@ -81,9 +83,10 @@ export async function GET(request: Request) {
         }
 
         const data = await clientsResponse.json();
+        const backendHeaders = extractBackendHeaders(clientsResponse);
 
         // Return in the format expected by the frontend (wrapped in Items)
-        return NextResponse.json({ Items: data });
+        return NextResponse.json({ Items: data }, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get clients error:', error);
@@ -166,7 +169,8 @@ export async function POST(request: Request) {
         }
 
         const client = await createResponse.json();
-        return NextResponse.json(client, { status: 201 });
+        const backendHeaders = extractBackendHeaders(createResponse);
+        return NextResponse.json(client, { status: 201, headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Create client error:', error);
