@@ -142,7 +142,7 @@ export default function SignatureForm({
 
         // Set cursive font styling
         ctx.fillStyle = '#000000';
-        ctx.font = 'italic 94px "Brush Script MT", "Lucida Handwriting", "Comic Sans MS", cursive';
+        ctx.font = 'italic 82px "Brush Script MT", "Lucida Handwriting", "Comic Sans MS", cursive';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
 

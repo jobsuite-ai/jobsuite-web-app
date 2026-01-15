@@ -87,6 +87,7 @@ export function UploadNewTemplate({
                 estimate.status === EstimateStatus.ESTIMATE_OPENED ||
                 estimate.status === EstimateStatus.ESTIMATE_ACCEPTED ||
                 estimate.status === EstimateStatus.ACCOUNTING_NEEDED ||
+                estimate.status === EstimateStatus.CONTRACTOR_SIGNED ||
                 estimate.status?.toString().startsWith('PROJECT_');
 
             if (statusHasBeenSent) {
@@ -107,9 +108,9 @@ export function UploadNewTemplate({
                 if (response.ok) {
                     const data = await response.json();
                     const links = data.signature_links || [];
-                    // Check if any link has been sent (not PENDING)
+                    // Only treat links as sent when they were opened or signed
                     const hasSentLinks = links.some((link: any) =>
-                        link.status && link.status !== 'PENDING'
+                        link.status === 'OPENED' || link.status === 'SIGNED'
                     );
                     setHasBeenSent(hasSentLinks);
                 }

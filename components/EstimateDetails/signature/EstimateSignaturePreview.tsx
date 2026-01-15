@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import { Paper } from '@mantine/core';
 import { remark } from 'remark';
@@ -33,7 +33,7 @@ interface EstimateSignaturePreviewProps {
     }>;
 }
 
-export default function EstimateSignaturePreview({
+function EstimateSignaturePreviewBase({
     estimate,
     imageResources = [],
     lineItems = [],
@@ -397,3 +397,7 @@ export default function EstimateSignaturePreview({
         </div>
     );
 }
+
+const EstimateSignaturePreview = memo(EstimateSignaturePreviewBase);
+
+export default EstimateSignaturePreview;

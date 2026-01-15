@@ -809,6 +809,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         return hasClient && hasContractor;
     }, [signatures]);
 
+    const hasClientSignature = useMemo(() => (
+        signatures.some((sig) => sig.signature_type === 'CLIENT' && sig.is_valid !== false)
+    ), [signatures]);
+
+    const hasContractorSignature = useMemo(() => (
+        signatures.some((sig) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false)
+    ), [signatures]);
+
+    const isSignatureRequired = hasClientSignature && !hasContractorSignature;
+
     // Check if all resources are ready for signature link generation
     const allResourcesReady = useMemo(() => (
         hasVideo && hasImages && lineItemsCount > 0 && !initialLoading && detailsLoaded
@@ -934,6 +944,33 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         signatureUrl,
         fetchSignatures,
     ]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const handleFocus = () => {
+            getEstimate();
+            getResources();
+            fetchSignatures();
+            setSignatureRefreshKey((prev) => prev + 1);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                handleFocus();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchSignatures, getEstimate, getResources]);
 
     const OverviewDetails = useMemo(() => (
         <>
@@ -1367,17 +1404,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {estimate && (
                                         <CollapsibleSection
                                           title={
-                                            estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
+                                            isSignatureRequired
                                                 ? 'Signature Required'
-                                                : hasSignedPdf && isFullySigned
+                                                : isFullySigned
                                                 ? 'Signed Estimate'
                                                 : 'Estimate Preview'
                                           }
-                                          defaultOpen={!(hasSignedPdf && isFullySigned)}
+                                          defaultOpen={!isFullySigned}
                                           headerActions={
-                                              estimate.status !== EstimateStatus.ESTIMATE_ACCEPTED
-                                              && hasVideo && hasImages && lineItemsCount > 0
-                                              && !(hasSignedPdf && isFullySigned) ? (
+                                              !isSignatureRequired
+                                              && !isFullySigned
+                                              && hasVideo && hasImages && lineItemsCount > 0 ? (
                                                   <ActionIcon
                                                     variant="subtle"
                                                     onClick={() => {
@@ -1390,8 +1427,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               ) : undefined
                                           }
                                         >
-                                            {estimate.status === EstimateStatus.ESTIMATE_ACCEPTED
-                                            ? (
+                                            {isSignatureRequired ? (
                                                 <ContractorSignatureRequired
                                                   estimateId={estimateID}
                                                   onSignatureComplete={() => {

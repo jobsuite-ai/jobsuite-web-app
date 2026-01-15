@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Alert, AppShell, Box, Button, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -13,7 +13,7 @@ import SignatureAuditHistory from '@/components/EstimateDetails/signature/Signat
 import SignatureForm from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
-import { generatePdfFromElement } from '@/utils/pdfGenerator';
+import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 import { uploadPdfFromSignature } from '@/utils/signaturePdfUpload';
 
 interface SignatureLinkInfo {
@@ -58,7 +58,6 @@ export default function SignaturePage() {
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
     const [isContractorViewer, setIsContractorViewer] = useState(false);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
-    const estimatePreviewRef = useRef<HTMLDivElement>(null);
     const [pdfUploading, setPdfUploading] = useState(false);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
 
@@ -125,6 +124,35 @@ export default function SignaturePage() {
         fetchLinkInfo();
     }, [signatureHash]);
 
+    const imageResources = useMemo(() => {
+        if (!linkInfo) return [];
+        return linkInfo.resources.filter(
+            (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+        );
+    }, [linkInfo]);
+    const videoResources = useMemo(() => {
+        if (!linkInfo) return [];
+        return linkInfo.resources.filter(
+            (r) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED'
+        );
+    }, [linkInfo]);
+    const lineItems: EstimateLineItem[] = useMemo(() => {
+        if (!linkInfo) return [];
+        return linkInfo.line_items.map((item) => ({
+            id: item.id,
+            title: item.title || '',
+            description: item.description || '',
+            hours: item.hours || 0,
+            rate: item.rate || 0,
+            created_at: item.created_at || new Date().toISOString(),
+        }));
+    }, [linkInfo]);
+    const handleSignatureClick = useCallback(() => {
+        if (!isContractorViewer) {
+            setSignatureModalOpened(true);
+        }
+    }, [isContractorViewer]);
+
     if (loading) {
         return (
             <Center style={{ minHeight: '100vh' }}>
@@ -157,20 +185,7 @@ export default function SignaturePage() {
 
     // Don't return early if signed - show the estimate with signatures instead
 
-    const imageResources = linkInfo.resources.filter(
-        (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
-    );
-    const videoResources = linkInfo.resources.filter(
-        (r) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED'
-    );
-    const lineItems: EstimateLineItem[] = linkInfo.line_items.map((item) => ({
-        id: item.id,
-        title: item.title || '',
-        description: item.description || '',
-        hours: item.hours || 0,
-        rate: item.rate || 0,
-        created_at: item.created_at || new Date().toISOString(),
-    }));
+    // Don't return early if signed - show the estimate with signatures instead
 
     // Build available tabs based on configuration
     // Ensure signature_page_config has defaults to handle cases where config might be empty
@@ -202,6 +217,42 @@ export default function SignaturePage() {
     if (activeTab === null && availableTabs.length > 0) {
         setActiveTab(availableTabs[0].value);
     }
+
+    const buildPdfBlob = async (sourceInfo: SignatureLinkInfo): Promise<Blob> => {
+        if (!sourceInfo.client) {
+            throw new Error('Client information is required to generate the PDF.');
+        }
+
+        const pdfLineItems: EstimateLineItem[] = (sourceInfo.line_items || []).map((item) => ({
+            id: item.id,
+            title: item.title || '',
+            description: item.description || '',
+            hours: item.hours || 0,
+            rate: item.rate || 0,
+            created_at: item.created_at || new Date().toISOString(),
+        }));
+
+        const pdfImageResources = sourceInfo.resources.filter(
+            (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+        );
+
+        const pdfSignatures = (sourceInfo.signatures || [])
+            .filter((sig) => sig.is_valid !== false)
+            .map((sig) => ({
+                signature_type: sig.signature_type,
+                signature_data: sig.signature_data || '',
+                signer_name: sig.signer_name,
+                is_valid: sig.is_valid !== false,
+            }));
+
+        return generateEstimatePdf({
+            estimate: sourceInfo.estimate,
+            client: sourceInfo.client,
+            lineItems: pdfLineItems,
+            imageResources: pdfImageResources,
+            signatures: pdfSignatures,
+        });
+    };
 
     return (
         <AppShell
@@ -282,22 +333,16 @@ export default function SignaturePage() {
                             Generating and uploading the signed estimate PDF...
                           </Alert>
                         )}
-                        <div ref={estimatePreviewRef}>
-                          <EstimateSignaturePreview
-                            estimate={linkInfo.estimate}
-                            imageResources={imageResources}
-                            videoResources={videoResources}
-                            lineItems={lineItems}
-                            client={linkInfo.client || undefined}
-                            onSignatureClick={() => {
-                              if (!isContractorViewer) {
-                                setSignatureModalOpened(true);
-                              }
-                            }}
-                            showSignatureClickable={!isContractorViewer && !signed}
-                            signatures={linkInfo.signatures || []}
-                          />
-                        </div>
+                        <EstimateSignaturePreview
+                          estimate={linkInfo.estimate}
+                          imageResources={imageResources}
+                          videoResources={videoResources}
+                          lineItems={lineItems}
+                          client={linkInfo.client || undefined}
+                          onSignatureClick={handleSignatureClick}
+                          showSignatureClickable={!isContractorViewer && !signed}
+                          signatures={linkInfo.signatures || []}
+                        />
 
                         {/* Download Button - Only show for clients when signed */}
                         {!isContractorViewer &&
@@ -308,51 +353,40 @@ export default function SignaturePage() {
                             <Button
                               leftSection={<IconDownload size={16} />}
                               onClick={async () => {
-                                if (!estimatePreviewRef.current || downloadingPdf) {
+                                if (downloadingPdf) {
                                   return;
                                 }
 
-                                try {
-                                  setDownloadingPdf(true);
-                                  // Find the Paper component containing the estimate preview
-                                  const paperElement = estimatePreviewRef.current.querySelector(
-                                    'div[class*="mantine-Paper"]'
-                                  ) as HTMLElement;
-                                  if (!paperElement) {
+                                  try {
+                                    setDownloadingPdf(true);
+                                    const pdfBlob = await buildPdfBlob(linkInfo);
+
+                                    // Create download link
+                                    const url = URL.createObjectURL(pdfBlob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `signed-estimate-${linkInfo.estimate_id}.pdf`;
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                    URL.revokeObjectURL(url);
+                                  } catch (err) {
                                     // eslint-disable-next-line no-console
-                                    console.error('Could not find estimate preview paper element');
-                                    return;
+                                    console.error('Error generating PDF for download:', err);
+                                    notifications.show({
+                                      title: 'Error',
+                                      message: 'Failed to generate PDF. Please try again.',
+                                      color: 'red',
+                                    });
+                                  } finally {
+                                    setDownloadingPdf(false);
                                   }
-
-                                  // Generate PDF from the preview element
-                                  const pdfBlob = await generatePdfFromElement(paperElement);
-
-                                  // Create download link
-                                  const url = URL.createObjectURL(pdfBlob);
-                                  const link = document.createElement('a');
-                                  link.href = url;
-                                  link.download = `signed-estimate-${linkInfo.estimate_id}.pdf`;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                  URL.revokeObjectURL(url);
-                                } catch (err) {
-                                  // eslint-disable-next-line no-console
-                                  console.error('Error generating PDF for download:', err);
-                                  notifications.show({
-                                    title: 'Error',
-                                    message: 'Failed to generate PDF. Please try again.',
-                                    color: 'red',
-                                  });
-                                } finally {
-                                  setDownloadingPdf(false);
-                                }
-                              }}
+                                }}
                               loading={downloadingPdf}
                               variant="filled"
                               size="md"
-                            >
-                              Download Signed Estimate PDF
+                              >
+                                Download Signed Estimate PDF
                             </Button>
                           </Box>
                         )}
@@ -398,24 +432,9 @@ export default function SignaturePage() {
                                   if (hasClientSignature && hasContractorSignature) {
                                     // Wait a bit for DOM to update with signatures
                                     setTimeout(async () => {
-                                      if (!estimatePreviewRef.current) {
-                                        // eslint-disable-next-line no-console
-                                        console.error('Estimate preview element not found');
-                                        return;
-                                      }
-
                                       try {
                                         setPdfUploading(true);
-                                        // Find the Paper component containing the estimate preview
-                                        const paperElement = estimatePreviewRef.current.querySelector('div[class*="mantine-Paper"]') as HTMLElement;
-                                        if (!paperElement) {
-                                          // eslint-disable-next-line no-console
-                                          console.error('Could not find estimate preview paper element');
-                                          return;
-                                        }
-
-                                        // Generate PDF from the preview element
-                                        const pdfBlob = await generatePdfFromElement(paperElement);
+                                        const pdfBlob = await buildPdfBlob(data);
 
                                         // Upload PDF
                                         await uploadPdfFromSignature(signatureHash, pdfBlob);
