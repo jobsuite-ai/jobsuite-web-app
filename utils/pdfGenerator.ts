@@ -7,7 +7,20 @@ import html2pdf from 'html2pdf.js';
  * @param element - The HTML element to convert to PDF
  * @returns Promise that resolves to a Blob containing the PDF
  */
-export async function generatePdfFromElement(element: HTMLElement): Promise<Blob> {
+export async function generatePdfFromElement(
+    element: HTMLElement,
+    options?: {
+        html2canvas?: {
+            width?: number;
+            height?: number;
+            windowWidth?: number;
+            windowHeight?: number;
+        };
+        pagebreak?: {
+            mode?: Array<'avoid-all' | 'css' | 'legacy'>;
+        };
+    }
+): Promise<Blob> {
     // Wait for all images to load before generating PDF
     const images = element.querySelectorAll('img');
     const imagePromises = Array.from(images).map((img) => {
@@ -31,7 +44,9 @@ export async function generatePdfFromElement(element: HTMLElement): Promise<Blob
             useCORS: true,
             logging: false,
             letterRendering: true,
+            ...options?.html2canvas,
         },
+        pagebreak: options?.pagebreak,
         jsPDF: {
             unit: 'in',
             format: 'letter',
@@ -41,5 +56,32 @@ export async function generatePdfFromElement(element: HTMLElement): Promise<Blob
 
     // Generate PDF and return as blob
     const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+    return pdfBlob;
+}
+
+/**
+ * Generates a PDF blob from an HTML string using html2pdf.js
+ *
+ * @param htmlString - HTML string to convert to PDF
+ * @returns Promise that resolves to a Blob containing the PDF
+ */
+export async function generatePdfFromHtmlString(htmlString: string): Promise<Blob> {
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            letterRendering: true,
+        },
+        jsPDF: {
+            unit: 'in',
+            format: 'letter',
+            orientation: 'portrait' as const,
+        },
+    };
+
+    const pdfBlob = await html2pdf().set(opt).from(htmlString).output('blob');
     return pdfBlob;
 }
