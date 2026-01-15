@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../utils/backendHeaders';
 import { getContractorId } from '../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
@@ -65,7 +66,8 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    return NextResponse.json(data);
+    const backendHeaders = extractBackendHeaders(response);
+    return NextResponse.json(data, { headers: backendHeaders });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Error fetching dashboard metrics:', error);

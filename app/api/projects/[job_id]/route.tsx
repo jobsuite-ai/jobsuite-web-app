@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../../utils/backendHeaders';
 import { getContractorId } from '../../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
@@ -54,7 +55,8 @@ export async function GET(
         }
 
         const job = await jobResponse.json();
-        return NextResponse.json(job);
+        const backendHeaders = extractBackendHeaders(jobResponse);
+        return NextResponse.json(job, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get job error:', error);
@@ -119,7 +121,8 @@ export async function PUT(
         }
 
         const job = await updateResponse.json();
-        return NextResponse.json(job);
+        const backendHeaders = extractBackendHeaders(updateResponse);
+        return NextResponse.json(job, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Update job error:', error);
@@ -180,7 +183,8 @@ export async function DELETE(
         }
 
         const result = await deleteResponse.json();
-        return NextResponse.json(result);
+        const backendHeaders = extractBackendHeaders(deleteResponse);
+        return NextResponse.json(result, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Delete job error:', error);

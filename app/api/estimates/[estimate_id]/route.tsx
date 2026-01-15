@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+import { extractBackendHeaders } from '../../utils/backendHeaders';
 import { getContractorId } from '../../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
@@ -65,7 +66,8 @@ export async function GET(
         }
 
         const estimate = await estimateResponse.json();
-        return NextResponse.json(estimate);
+        const backendHeaders = extractBackendHeaders(estimateResponse);
+        return NextResponse.json(estimate, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Get estimate error:', error);
@@ -131,7 +133,8 @@ export async function PUT(
         }
 
         const estimate = await updateResponse.json();
-        return NextResponse.json(estimate);
+        const backendHeaders = extractBackendHeaders(updateResponse);
+        return NextResponse.json(estimate, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Update estimate error:', error);
@@ -193,7 +196,8 @@ export async function DELETE(
         }
 
         const result = await deleteResponse.json();
-        return NextResponse.json(result);
+        const backendHeaders = extractBackendHeaders(deleteResponse);
+        return NextResponse.json(result, { headers: backendHeaders });
     } catch (error) {
         // eslint-disable-next-line no-console
         console.error('Delete estimate error:', error);
