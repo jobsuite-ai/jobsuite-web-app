@@ -8,7 +8,6 @@ import EstimateTodo from './EstimateTodo';
 import { EstimateLineItem } from './LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
 import { UploadNewTemplate } from '@/components/EstimateDetails/estimate/UploadNewTemplate';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
@@ -24,7 +23,12 @@ interface EstimatePreviewProps {
     hideTodo?: boolean;
     signatureUrl?: string | null;
     loadingSignatureUrl?: boolean;
-    signatureRefreshKey?: number; // When this changes, refresh signatures
+    signatures?: Array<{
+        signature_type: string;
+        signature_data?: string;
+        signer_name?: string;
+        is_valid?: boolean;
+    }>; // Signatures passed from parent (already loaded)
 }
 
 export default function EstimatePreview({
@@ -36,18 +40,14 @@ export default function EstimatePreview({
     hideTodo = false,
     signatureUrl,
     loadingSignatureUrl = false,
-    signatureRefreshKey,
+    signatures: propSignatures = [],
 }: EstimatePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
     const [template, setTemplate] = useState<string>('');
     const templateRef = useRef<HTMLDivElement>(null);
-    const [signatures, setSignatures] = useState<Array<{
-        signature_type: string;
-        signature_data: string;
-        signer_name?: string;
-        is_valid?: boolean;
-    }>>([]);
+    // Use signatures from props (already loaded by parent)
+    const signatures = propSignatures.filter((sig) => sig.is_valid !== false);
 
     const buildTemplate = useCallback(async () => {
         if (!client) {
@@ -75,36 +75,7 @@ export default function EstimatePreview({
         imageResources,
     ]);
 
-    // Fetch signatures for the estimate
-    useEffect(() => {
-        const fetchSignatures = async () => {
-            try {
-                const response = await fetch(
-                    `/api/estimates/${estimate.id}/signatures`,
-                    {
-                        method: 'GET',
-                        headers: getApiHeaders(),
-                    }
-                );
-
-                if (response.ok) {
-                    const data = await response.json();
-                    // This endpoint returns the full audit trail
-                    // (including invalidated signatures). Filter out invalid signatures
-                    // so previews never show signatures after a re-send.
-                    const validSignatures = (data.signatures || []).filter(
-                        (sig: any) => sig.is_valid !== false
-                    );
-                    setSignatures(validSignatures);
-                }
-            } catch (error) {
-                // eslint-disable-next-line no-console
-                console.error('Error fetching signatures:', error);
-            }
-        };
-
-        fetchSignatures();
-    }, [estimate.id, signatureRefreshKey]);
+    // Signatures are now passed as props from parent, no need to fetch independently
 
     useEffect(() => {
         setLoading(true);
