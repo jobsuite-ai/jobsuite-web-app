@@ -79,6 +79,11 @@ export default function SignaturePage() {
                 }
 
                 // Use Next.js API route as proxy
+                // Note: The backend returns locked estimate data (estimate, line_items,
+                // resources, client, signature_page_config) that was stored when the
+                // estimate was sent for signing. This ensures the signed document doesn't change
+                // even if the estimate is edited later. The only way to change it is to resend
+                // the estimate.
                 const response = await fetch(
                     `/api/signature/${signatureHash}`,
                     {
@@ -97,6 +102,8 @@ export default function SignaturePage() {
                 }
 
                 const data = await response.json();
+                // Data contains locked estimate content that was stored when the estimate
+                // was sent for signing
                 setLinkInfo(data);
 
                 // Check if viewer is contractor
