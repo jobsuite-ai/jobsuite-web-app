@@ -69,7 +69,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
     const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
-    const [signatureRefreshKey, setSignatureRefreshKey] = useState(0);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
@@ -88,11 +87,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [detailsLoaded, setDetailsLoaded] = useState(false);
     const [signatures, setSignatures] = useState<Array<{
         signature_type: string;
+        signature_data?: string;
         signer_name?: string;
         signer_email?: string;
         signed_at?: string;
         is_valid?: boolean;
     }>>([]);
+    const [signaturesLoaded, setSignaturesLoaded] = useState(false);
 
     // Load cached estimate data immediately for instant display
     useEffect(() => {
@@ -245,9 +246,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const fetchSignatures = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
-        if (!accessToken) return;
+        if (!accessToken) {
+            // Mark as loaded even if no token (to avoid infinite waiting)
+            setSignaturesLoaded(true);
+            return;
+        }
 
         try {
+            setSignaturesLoaded(false);
             const response = await fetch(
                 `/api/estimates/${estimateID}/signatures`,
                 {
@@ -267,6 +273,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching signatures:', error);
+        } finally {
+            if (isMountedRef.current) {
+                setSignaturesLoaded(true);
+            }
         }
     }, [estimateID]);
 
@@ -1328,7 +1338,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             getEstimate();
             getResources();
             fetchSignatures();
-            setSignatureRefreshKey((prev) => prev + 1);
         };
 
         const handleVisibilityChange = () => {
@@ -1775,7 +1784,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     )}
 
                                     {/* Estimate Preview or Signature Requirement Section */}
-                                    {estimate && (
+                                    {/* Only show when details and signatures are loaded */}
+                                    {estimate && detailsLoaded && signaturesLoaded && (
                                         <CollapsibleSection
                                           title={
                                             isSignatureRequired
@@ -1806,7 +1816,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                       getEstimate();
                                                       getResources();
                                                       fetchSignatures();
-                                                      setSignatureRefreshKey((prev) => prev + 1);
                                                   }}
                                                 />
                                             ) : (
@@ -1818,7 +1827,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   client={client}
                                                   signatureUrl={signatureUrl}
                                                   loadingSignatureUrl={loadingSignatureUrl}
-                                                  signatureRefreshKey={signatureRefreshKey}
+                                                  signatures={signatures}
                                                 />
                                             )}
                                         </CollapsibleSection>

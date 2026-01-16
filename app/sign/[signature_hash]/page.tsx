@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Alert, AppShell, Box, Button, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconAlertCircle, IconDownload, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding, IconFileInvoice } from '@tabler/icons-react';
+import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconPrinter, IconShield, IconBuilding, IconFileInvoice } from '@tabler/icons-react';
 import { useParams } from 'next/navigation';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
@@ -13,7 +13,7 @@ import SignatureAuditHistory from '@/components/EstimateDetails/signature/Signat
 import SignatureForm from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
-import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
+import { buildEstimateTemplateHtml } from '@/utils/estimatePdfGenerator';
 import { uploadPdfFromSignature } from '@/utils/signaturePdfUpload';
 
 interface SignatureLinkInfo {
@@ -59,7 +59,6 @@ export default function SignaturePage() {
     const [isContractorViewer, setIsContractorViewer] = useState(false);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
     const [pdfUploading, setPdfUploading] = useState(false);
-    const [downloadingPdf, setDownloadingPdf] = useState(false);
 
     useEffect(() => {
         if (!signatureHash) return;
@@ -252,6 +251,8 @@ export default function SignaturePage() {
                 is_valid: sig.is_valid !== false,
             }));
 
+        // Import generateEstimatePdf dynamically to avoid loading it unless needed
+        const { generateEstimatePdf } = await import('@/utils/estimatePdfGenerator');
         return generateEstimatePdf({
             estimate: sourceInfo.estimate,
             client: sourceInfo.client,
@@ -259,6 +260,232 @@ export default function SignaturePage() {
             imageResources: pdfImageResources,
             signatures: pdfSignatures,
         });
+    };
+
+    const handlePrint = async () => {
+        if (!linkInfo || !linkInfo.client || lineItems.length === 0) {
+            notifications.show({
+                title: 'Error',
+                message: 'Unable to print: Missing required data',
+                color: 'red',
+                position: 'top-center',
+            });
+            return;
+        }
+
+        try {
+            // Prepare signatures for print
+            const pdfSignatures = (linkInfo.signatures || [])
+                .filter((sig) => sig.is_valid !== false)
+                .map((sig) => ({
+                    signature_type: sig.signature_type,
+                    signature_data: sig.signature_data || '',
+                    signer_name: sig.signer_name,
+                    is_valid: sig.is_valid !== false,
+                }));
+
+            // Build the template HTML (same as preview)
+            const fullHtml = await buildEstimateTemplateHtml({
+                estimate: linkInfo.estimate,
+                client: linkInfo.client,
+                lineItems,
+                imageResources,
+            });
+
+            // Extract styles and body content
+            const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+            const styles = styleMatch ? styleMatch[1] : '';
+            const htmlWithoutStyles = fullHtml.replace(/<style[\s\S]*?<\/style>/i, '');
+
+            // Create a new tab with just the estimate content
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                notifications.show({
+                    title: 'Error',
+                    message: 'Please allow popups to print the estimate',
+                    color: 'red',
+                    position: 'top-center',
+                });
+                return;
+            }
+
+            // Write the HTML with print-specific styles
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Estimate ${linkInfo.estimate_id}</title>
+                    <style>
+                        ${styles}
+                        /* Print-specific styles - minimize page margins to account for browser headers/footers */
+                        @page {
+                            margin: 0;
+                            size: letter;
+                        }
+                        @media print {
+                            /* Remove body margins and padding */
+                            body {
+                                margin: 0 !important;
+                                padding: 0.5in !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Ensure container uses available width and is centered */
+                            .container {
+                                margin: 0 auto !important;
+                                max-width: 100% !important;
+                                width: 100% !important;
+                                padding: 40px !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Hide any potential header/footer elements in content */
+                            header, footer, .header, .footer {
+                                display: none !important;
+                            }
+                            /* Prevent overflow and ensure proper sizing */
+                            html, body {
+                                width: 100% !important;
+                                overflow: visible !important;
+                                box-sizing: border-box !important;
+                            }
+                            * {
+                                box-sizing: border-box !important;
+                            }
+                        }
+                        /* Ensure signature fields have visible borders */
+                        signature-field,
+                        signature-field.signature-field,
+                        .signature-field {
+                            display: block !important;
+                            border-bottom: 1px solid #333 !important;
+                            width: 300px !important;
+                            height: 80px !important;
+                            min-height: 80px !important;
+                            box-sizing: border-box !important;
+                            margin-bottom: 5px !important;
+                        }
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${htmlWithoutStyles}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+
+            // Wait for content to load, then place signatures and print
+            const placeSignaturesAndPrint = () => {
+                // Place signatures in the print window
+                if (pdfSignatures.length > 0) {
+                    const signatureFields = printWindow.document.querySelectorAll('signature-field');
+                    signatureFields.forEach((field) => {
+                        const role = field.getAttribute('role');
+                        if (!role) return;
+
+                        let signatureType: string | null = null;
+                        if (role === 'Service Provider') {
+                            signatureType = 'CONTRACTOR';
+                        } else if (role === 'Property Owner') {
+                            signatureType = 'CLIENT';
+                        }
+
+                        if (!signatureType) return;
+
+                        const signature = pdfSignatures.find(
+                            (sig) => sig.signature_type === signatureType && sig.is_valid !== false
+                        );
+
+                        const signatureField = field as HTMLElement;
+                        signatureField.style.borderBottom = '1px solid #333';
+                        signatureField.style.display = 'block';
+                        signatureField.style.width = '300px';
+                        signatureField.style.height = '80px';
+                        signatureField.style.minHeight = '80px';
+                        signatureField.style.boxSizing = 'border-box';
+
+                        if (signature && signature.signature_data) {
+                            let signatureDataUrl = signature.signature_data;
+                            if (!signatureDataUrl.startsWith('data:')) {
+                                signatureDataUrl = `data:image/png;base64,${signatureDataUrl}`;
+                            }
+
+                            const img = printWindow.document.createElement('img');
+                            img.src = signatureDataUrl;
+                            img.style.width = '100%';
+                            img.style.height = 'auto';
+                            img.style.maxHeight = '80px';
+                            img.style.objectFit = 'contain';
+                            img.style.display = 'block';
+
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(img);
+                        } else {
+                            const spacer = printWindow.document.createElement('div');
+                            spacer.style.width = '100%';
+                            spacer.style.height = '79px';
+                            spacer.style.minHeight = '79px';
+                            spacer.style.display = 'block';
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(spacer);
+                        }
+                    });
+                }
+
+                // Wait for images to load, then print
+                const images = printWindow.document.querySelectorAll('img');
+                const imagePromises = Array.from(images).map((img) => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise<void>((resolve) => {
+                        img.onload = () => resolve();
+                        img.onerror = () => resolve();
+                        setTimeout(() => resolve(), 2000);
+                    });
+                });
+
+                Promise.all(imagePromises).then(() => {
+                    setTimeout(() => {
+                        // Focus the print window and print
+                        printWindow.focus();
+                        printWindow.print();
+
+                        // Close the print window after a delay to free up resources
+                        setTimeout(() => {
+                            try {
+                                if (printWindow && !printWindow.closed) {
+                                    printWindow.close();
+                                }
+                            } catch (e) {
+                                // Window might already be closed, ignore
+                            }
+                            // Refocus the parent window
+                            window.focus();
+                        }, 3000);
+                    }, 300);
+                });
+            };
+
+            // Use both onload and a timeout as fallback
+            if (printWindow.document.readyState === 'complete') {
+                setTimeout(placeSignaturesAndPrint, 100);
+            } else {
+                printWindow.onload = () => {
+                    setTimeout(placeSignaturesAndPrint, 100);
+                };
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error preparing print:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to prepare print. Please try again.',
+                color: 'red',
+                position: 'top-center',
+            });
+        }
     };
 
     return (
@@ -340,63 +567,31 @@ export default function SignaturePage() {
                             Generating and uploading the signed estimate PDF...
                           </Alert>
                         )}
-                        <EstimateSignaturePreview
-                          estimate={linkInfo.estimate}
-                          imageResources={imageResources}
-                          videoResources={videoResources}
-                          lineItems={lineItems}
-                          client={linkInfo.client || undefined}
-                          onSignatureClick={handleSignatureClick}
-                          showSignatureClickable={!isContractorViewer && !signed}
-                          signatures={linkInfo.signatures || []}
-                        />
-
-                        {/* Download Button - Only show for clients when signed */}
-                        {!isContractorViewer &&
-                          signed &&
-                          linkInfo.signatures &&
-                          linkInfo.signatures.length > 0 && (
-                          <Box mt="xl">
-                            <Button
-                              leftSection={<IconDownload size={16} />}
-                              onClick={async () => {
-                                if (downloadingPdf) {
-                                  return;
-                                }
-
-                                  try {
-                                    setDownloadingPdf(true);
-                                    const pdfBlob = await buildPdfBlob(linkInfo);
-
-                                    // Create download link
-                                    const url = URL.createObjectURL(pdfBlob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `signed-estimate-${linkInfo.estimate_id}.pdf`;
-                                    document.body.appendChild(link);
-                                    link.click();
-                                    document.body.removeChild(link);
-                                    URL.revokeObjectURL(url);
-                                  } catch (err) {
-                                    // eslint-disable-next-line no-console
-                                    console.error('Error generating PDF for download:', err);
-                                    notifications.show({
-                                      title: 'Error',
-                                      message: 'Failed to generate PDF. Please try again.',
-                                      color: 'red',
-                                    });
-                                  } finally {
-                                    setDownloadingPdf(false);
-                                  }
-                                }}
-                              loading={downloadingPdf}
-                              variant="filled"
-                              size="md"
+                        <Box style={{ position: 'relative' }}>
+                          {/* Print Button - Show when signed or when contractor is viewing */}
+                          {(signed || isContractorViewer) && (
+                            <Box style={{ position: 'fixed', top: 20, right: 20, zIndex: 1000 }}>
+                              <ActionIcon
+                                variant="subtle"
+                                onClick={handlePrint}
+                                title="Print Estimate"
+                                size="xl"
                               >
-                                Download Signed Estimate PDF
-                            </Button>
-                          </Box>
-                        )}
+                                <IconPrinter size={24} />
+                              </ActionIcon>
+                            </Box>
+                          )}
+                          <EstimateSignaturePreview
+                            estimate={linkInfo.estimate}
+                            imageResources={imageResources}
+                            videoResources={videoResources}
+                            lineItems={lineItems}
+                            client={linkInfo.client || undefined}
+                            onSignatureClick={handleSignatureClick}
+                            showSignatureClickable={!isContractorViewer && !signed}
+                            signatures={linkInfo.signatures || []}
+                          />
+                        </Box>
 
                         {/* Signature Form Modal - Hide for contractors in preview mode */}
                         {!isContractorViewer && (
