@@ -60,12 +60,33 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [messageCount, setMessageCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
   const unacknowledgedCountRef = useRef<number>(0);
   const router = useRouter();
   const pathname = usePathname();
   const { clients, estimates } = useSearchData();
   const { isAuthenticated, isLoading } = useAuth();
   const { logoUrl } = useContractorLogo();
+
+  // Utility function to extract estimate_id from notification link
+  const extractEstimateId = useCallback((link: string | null): string | null => {
+    if (!link) return null;
+    const match = link.match(/\/proposals\/([^/?]+)/);
+    return match ? match[1] : null;
+  }, []);
+
+  // Utility function to strip HTML tags from notification messages
+  const stripHtmlTags = useCallback((html: string): string => {
+    // Create a temporary div element to parse HTML
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+
+    // Replace <br> tags with newlines, then get text content
+    const text = tmp.innerText || tmp.textContent || '';
+
+    // Clean up multiple consecutive newlines/spaces
+    return text.replace(/\n\s*\n/g, '\n').trim();
+  }, []);
 
   const handleNavLinkClick = (
     event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
@@ -432,6 +453,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           setMessageCount(data.count || 0);
         }
       } catch (err) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching message count:', err);
       }
     };
@@ -492,12 +514,57 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
+    // Listen for notification acknowledgment events to update count immediately
+    const handleNotificationAcknowledged = () => {
+      fetchUnacknowledgedCount();
+    };
+    window.addEventListener('notificationAcknowledged', handleNotificationAcknowledged);
+
     return () => {
       clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('notificationAcknowledged', handleNotificationAcknowledged);
       clearInterval(messageInterval);
     };
   }, [isAuthenticated, isLoading]);
+
+  // Fetch job title for a notification
+  const fetchJobTitle = useCallback(async (estimateId: string) => {
+    // Check cache first
+    const cachedEstimate = estimates.find((e) => e.id === estimateId);
+    if (cachedEstimate?.title) {
+      setJobTitles((prev) => {
+        if (prev[estimateId]) return prev;
+        return { ...prev, [estimateId]: cachedEstimate.title! };
+      });
+      return cachedEstimate.title;
+    }
+
+    // Fetch from API
+    try {
+      const response = await fetch(`/api/estimates/${estimateId}`, {
+        method: 'GET',
+        headers: getApiHeaders(),
+      });
+
+      if (response.ok) {
+        const estimate = await response.json();
+        const title = estimate.title || null;
+        if (title) {
+          setJobTitles((prev) => {
+            if (prev[estimateId]) return prev;
+            return { ...prev, [estimateId]: title };
+          });
+        }
+        return title;
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching job title:', err);
+    }
+
+    return null;
+  }, [estimates]);
 
   // Fetch notifications when menu opens
   const fetchNotifications = useCallback(async () => {
@@ -512,33 +579,47 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setNotifications(data || []);
+        const notificationsData = data || [];
+        setNotifications(notificationsData);
+
+        // Fetch job titles for all notifications
+        const titlePromises = notificationsData
+          .map((n: Notification) => {
+            const estimateId = extractEstimateId(n.link);
+            return estimateId ? fetchJobTitle(estimateId) : Promise.resolve(null);
+          });
+        await Promise.all(titlePromises);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Error fetching notifications:', error);
+      // Reset notifications on error to ensure consistent state
+      setNotifications([]);
     } finally {
       setNotificationsLoading(false);
     }
-  }, [notificationsLoading]);
+  }, [notificationsLoading, extractEstimateId, fetchJobTitle]);
 
   // Acknowledge notification
   const acknowledgeNotification = useCallback(async (notificationId: string) => {
-    try {
-      const response = await fetch(`/api/notifications/${notificationId}/acknowledge`, {
-        method: 'POST',
-        headers: getApiHeaders(),
-      });
+    // Optimistically update UI immediately
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+    setUnacknowledgedCount((prev) => Math.max(0, prev - 1));
 
-      if (response.ok) {
-        // Remove from list and update count
-        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
-        setUnacknowledgedCount((prev) => Math.max(0, prev - 1));
-      }
-    } catch (error) {
+    // Dispatch event immediately to update count in other components
+    window.dispatchEvent(new CustomEvent('notificationAcknowledged'));
+
+    // Acknowledge in the background (non-blocking)
+    fetch(`/api/notifications/${notificationId}/acknowledge`, {
+      method: 'POST',
+      headers: getApiHeaders(),
+    }).catch((error) => {
       // eslint-disable-next-line no-console
       console.error('Error acknowledging notification:', error);
-    }
+      // Revert optimistic update on error
+      setUnacknowledgedCount((prev) => prev + 1);
+      // Note: We don't restore the notification to the list since we don't have it cached
+    });
   }, []);
 
   // Don't render header if not authenticated or still loading
@@ -707,8 +788,17 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                           {notification.title}
                         </Text>
                         <Text size="xs" c="dimmed" lineClamp={2}>
-                          {notification.message}
+                          {stripHtmlTags(notification.message)}
                         </Text>
+                        {(() => {
+                          const estimateId = extractEstimateId(notification.link);
+                          const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                          return jobTitle ? (
+                            <Text size="xs" c="blue" fw={500} lineClamp={1}>
+                              {jobTitle}
+                            </Text>
+                          ) : null;
+                        })()}
                         {notification.link && (
                           <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
                             View details →
