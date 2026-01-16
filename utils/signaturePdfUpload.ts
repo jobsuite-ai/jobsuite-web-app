@@ -5,31 +5,6 @@
 
 const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
 
-async function getPresignedUrlForPart(
-    signatureHash: string,
-    resourceID: string,
-    partNumber: number
-): Promise<string> {
-    const response = await fetch(
-        `/api/signature/${signatureHash}/upload-pdf/${resourceID}/presigned-url?part_number=${partNumber}`,
-        {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        }
-    );
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error || errorData.detail || 'Failed to get presigned URL';
-        throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
-    return data.presigned_url;
-}
-
 async function uploadFilePartWithRetry(
     signatureHash: string,
     resourceID: string,
@@ -42,36 +17,33 @@ async function uploadFilePartWithRetry(
 
     for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
         try {
-            // Get presigned URL for this part
-            const presignedUrl = await getPresignedUrlForPart(
-                signatureHash,
-                resourceID,
-                partNumber
+            // Upload chunk through backend endpoint
+            const formData = new FormData();
+            formData.append('part_number', partNumber.toString());
+            formData.append('file', chunk);
+
+            const uploadResponse = await fetch(
+                `/api/signature/${signatureHash}/upload-pdf/${resourceID}/part`,
+                {
+                    method: 'POST',
+                    body: formData,
+                }
             );
 
-            // Upload chunk to presigned URL
-            const uploadResponse = await fetch(presignedUrl, {
-                method: 'PUT',
-                body: chunk,
-                headers: {
-                    'Content-Type': 'application/pdf',
-                },
-            });
-
             if (!uploadResponse.ok) {
-                throw new Error(
-                    `Upload failed with status ${uploadResponse.status}: ${uploadResponse.statusText}`
-                );
+                const errorData = await uploadResponse.json().catch(() => ({}));
+                const errorMessage = errorData.error || errorData.detail || `Upload failed with status ${uploadResponse.status}`;
+                throw new Error(errorMessage);
             }
 
-            // Extract ETag from response headers
-            const etag = uploadResponse.headers.get('ETag');
-            if (!etag) {
+            // Get ETag from response
+            const data = await uploadResponse.json();
+            if (!data.etag) {
                 throw new Error('ETag not found in upload response');
             }
 
             // Remove quotes from ETag if present
-            const cleanEtag = etag.replace(/^"|"$/g, '');
+            const cleanEtag = data.etag.replace(/^"|"$/g, '');
 
             if (onProgress) {
                 onProgress(partNumber, 100);
