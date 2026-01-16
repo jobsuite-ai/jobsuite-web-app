@@ -50,6 +50,7 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import { getCachedEstimateSummary, setCachedEstimateSummary } from '@/app/utils/dataCache';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const { estimates: cachedEstimates, clients: cachedClients } = useDataCache();
@@ -69,6 +70,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
     const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
     const [signatureRefreshKey, setSignatureRefreshKey] = useState(0);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const isMountedRef = useRef(true);
@@ -755,6 +757,378 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         transcriptionSummaryRef.current?.handleEdit();
     };
 
+    const handlePrint = async () => {
+        if (!estimate || !client || lineItems.length === 0) {
+            notifications.show({
+                title: 'Error',
+                message: 'Unable to print: Missing required data',
+                color: 'red',
+                position: 'top-center',
+            });
+            return;
+        }
+
+        try {
+            // Fetch signatures if not already loaded
+            let pdfSignatures: Array<{
+                signature_type: string;
+                signature_data: string;
+                signer_name?: string;
+                is_valid?: boolean;
+            }> = [];
+
+            try {
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    pdfSignatures = (signaturesData.signatures || [])
+                        .filter((sig: any) => sig.is_valid !== false)
+                        .map((sig: any) => ({
+                            signature_type: sig.signature_type,
+                            signature_data: sig.signature_data || '',
+                            signer_name: sig.signer_name,
+                            is_valid: sig.is_valid !== false,
+                        }));
+                }
+            } catch (sigErr) {
+                // eslint-disable-next-line no-console
+                console.warn('Error fetching signatures for print:', sigErr);
+            }
+
+            // Build the template HTML (same as preview)
+            const { buildEstimateTemplateHtml } = await import('@/utils/estimatePdfGenerator');
+            const fullHtml = await buildEstimateTemplateHtml({
+                estimate,
+                client,
+                lineItems,
+                imageResources: resources.filter(
+                    (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+                ),
+            });
+
+            // Extract styles and body content
+            const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+            const styles = styleMatch ? styleMatch[1] : '';
+            const htmlWithoutStyles = fullHtml.replace(/<style[\s\S]*?<\/style>/i, '');
+
+            // Create a new window with just the estimate content
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                notifications.show({
+                    title: 'Error',
+                    message: 'Please allow popups to print the estimate',
+                    color: 'red',
+                    position: 'top-center',
+                });
+                return;
+            }
+
+            // Write the HTML with print-specific styles
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Estimate ${estimateID}</title>
+                    <style>
+                        ${styles}
+                        /* Print-specific styles - minimize page margins to account for browser headers/footers */
+                        @page {
+                            margin: 0;
+                            size: letter;
+                        }
+                        @media print {
+                            /* Remove body margins and padding */
+                            body {
+                                margin: 0 !important;
+                                padding: 0.5in !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Ensure container uses available width and is centered */
+                            .container {
+                                margin: 0 auto !important;
+                                max-width: 100% !important;
+                                width: 100% !important;
+                                padding: 40px !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Hide any potential header/footer elements in content */
+                            header, footer, .header, .footer {
+                                display: none !important;
+                            }
+                            /* Prevent overflow and ensure proper sizing */
+                            html, body {
+                                width: 100% !important;
+                                overflow: visible !important;
+                                box-sizing: border-box !important;
+                            }
+                            * {
+                                box-sizing: border-box !important;
+                            }
+                        }
+                        /* Ensure signature fields have visible borders */
+                        signature-field,
+                        signature-field.signature-field,
+                        .signature-field {
+                            display: block !important;
+                            border-bottom: 1px solid #333 !important;
+                            width: 300px !important;
+                            height: 80px !important;
+                            min-height: 80px !important;
+                            box-sizing: border-box !important;
+                            margin-bottom: 5px !important;
+                        }
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${htmlWithoutStyles}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+
+            // Wait for content to load, then place signatures and print
+            const placeSignaturesAndPrint = () => {
+                // Place signatures in the print window
+                if (pdfSignatures.length > 0) {
+                    const signatureFields = printWindow.document.querySelectorAll('signature-field');
+                    signatureFields.forEach((field) => {
+                        const role = field.getAttribute('role');
+                        if (!role) return;
+
+                        let signatureType: string | null = null;
+                        if (role === 'Service Provider') {
+                            signatureType = 'CONTRACTOR';
+                        } else if (role === 'Property Owner') {
+                            signatureType = 'CLIENT';
+                        }
+
+                        if (!signatureType) return;
+
+                        const signature = pdfSignatures.find(
+                            (sig) => sig.signature_type === signatureType && sig.is_valid !== false
+                        );
+
+                        const signatureField = field as HTMLElement;
+                        signatureField.style.borderBottom = '1px solid #333';
+                        signatureField.style.display = 'block';
+                        signatureField.style.width = '300px';
+                        signatureField.style.height = '80px';
+                        signatureField.style.minHeight = '80px';
+                        signatureField.style.boxSizing = 'border-box';
+
+                        if (signature && signature.signature_data) {
+                            let signatureDataUrl = signature.signature_data;
+                            if (!signatureDataUrl.startsWith('data:')) {
+                                signatureDataUrl = `data:image/png;base64,${signatureDataUrl}`;
+                            }
+
+                            const img = printWindow.document.createElement('img');
+                            img.src = signatureDataUrl;
+                            img.style.width = '100%';
+                            img.style.height = 'auto';
+                            img.style.maxHeight = '80px';
+                            img.style.objectFit = 'contain';
+                            img.style.display = 'block';
+
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(img);
+                        } else {
+                            const spacer = printWindow.document.createElement('div');
+                            spacer.style.width = '100%';
+                            spacer.style.height = '79px';
+                            spacer.style.minHeight = '79px';
+                            spacer.style.display = 'block';
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(spacer);
+                        }
+                    });
+                }
+
+                // Wait for images to load, then print
+                const images = printWindow.document.querySelectorAll('img');
+                const imagePromises = Array.from(images).map((img) => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise<void>((resolve) => {
+                        img.onload = () => resolve();
+                        img.onerror = () => resolve();
+                        setTimeout(() => resolve(), 2000);
+                    });
+                });
+
+                Promise.all(imagePromises).then(() => {
+                    setTimeout(() => {
+                        // Show a brief notification about disabling headers/footers
+                        notifications.show({
+                            title: 'Print Tip',
+                            message: 'In the print dialog, uncheck "Headers and footers" for a cleaner print',
+                            color: 'blue',
+                            position: 'top-center',
+                            autoClose: 3000,
+                        });
+
+                        // Focus the print window and print
+                        printWindow.focus();
+                        printWindow.print();
+
+                        // Note: The print dialog is modal and will block the parent window
+                        // This is standard browser behavior and cannot be avoided.
+                        // Close the print window after a delay to free up resources
+                        setTimeout(() => {
+                            try {
+                                if (printWindow && !printWindow.closed) {
+                                    printWindow.close();
+                                }
+                            } catch (e) {
+                                // Window might already be closed, ignore
+                            }
+                            // Refocus the parent window
+                            window.focus();
+                        }, 3000);
+                    }, 300);
+                });
+            };
+
+            // Use both onload and a timeout as fallback
+            if (printWindow.document.readyState === 'complete') {
+                setTimeout(placeSignaturesAndPrint, 100);
+            } else {
+                printWindow.onload = () => {
+                    setTimeout(placeSignaturesAndPrint, 100);
+                };
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error preparing print:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to prepare print. Please try again.',
+                color: 'red',
+                position: 'top-center',
+            });
+        }
+    };
+
+    // Removed handleDownloadPdf - using handlePrint instead
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _handleDownloadPdf = async () => {
+        if (!estimate || !client || lineItems.length === 0) {
+            notifications.show({
+                title: 'Error',
+                message: 'Unable to generate PDF: Missing required data',
+                color: 'red',
+                position: 'top-center',
+            });
+            return;
+        }
+
+        if (downloadingPdf) {
+            return;
+        }
+
+        try {
+            setDownloadingPdf(true);
+
+            // Fetch signatures if not already loaded
+            let pdfSignatures: Array<{
+                signature_type: string;
+                signature_data: string;
+                signer_name?: string;
+                is_valid?: boolean;
+            }> = [];
+
+            try {
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    // Filter out invalid signatures and format exactly like sign page
+                    pdfSignatures = (signaturesData.signatures || [])
+                        .filter((sig: any) => sig.is_valid !== false)
+                        .map((sig: any) => ({
+                            signature_type: sig.signature_type,
+                            signature_data: sig.signature_data || '',
+                            signer_name: sig.signer_name,
+                            is_valid: sig.is_valid !== false,
+                        }));
+                }
+            } catch (sigErr) {
+                // eslint-disable-next-line no-console
+                console.warn('Error fetching signatures for PDF:', sigErr);
+                // Continue without signatures
+            }
+
+            // Format line items exactly like sign page (lines 230-237)
+            const pdfLineItems: EstimateLineItem[] = lineItems.map((item) => ({
+                id: item.id,
+                title: item.title || '',
+                description: item.description || '',
+                hours: item.hours || 0,
+                rate: item.rate || 0,
+                created_at: item.created_at || new Date().toISOString(),
+            }));
+
+            // Filter image resources exactly like sign page (lines 239-241)
+            const pdfImageResources = resources.filter(
+                (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+            );
+
+            // Generate PDF using the same function and format as sign page
+            const pdfBlob = await generateEstimatePdf({
+                estimate,
+                client,
+                lineItems: pdfLineItems,
+                imageResources: pdfImageResources,
+                signatures: pdfSignatures,
+            });
+
+            // Create download link and trigger download
+            const url = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `estimate-${estimateID}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            notifications.show({
+                title: 'Success',
+                message: 'PDF downloaded successfully',
+                color: 'green',
+                position: 'top-center',
+            });
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error generating PDF:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to generate PDF. Please try again.',
+                color: 'red',
+                position: 'top-center',
+            });
+        } finally {
+            setDownloadingPdf(false);
+        }
+    };
+
     const archiveEstimate = async () => {
         const accessToken = localStorage.getItem('access_token');
         if (!accessToken) return;
@@ -1417,9 +1791,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               && hasVideo && hasImages && lineItemsCount > 0 ? (
                                                   <ActionIcon
                                                     variant="subtle"
-                                                    onClick={() => {
-                                                        window.open(`/proposals/${estimateID}/print`, '_blank');
-                                                    }}
+                                                    onClick={handlePrint}
                                                     title="Print Estimate"
                                                   >
                                                     <IconPrinter size={18} />

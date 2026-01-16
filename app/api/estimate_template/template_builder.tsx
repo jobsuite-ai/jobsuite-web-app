@@ -119,10 +119,10 @@ export const generateTemplate = (template: TemplateInput) => `
 
             .container {
                 background: #fff;
-                border-radius: 5px;
                 padding: 40px;
                 max-width: 800px;
                 margin: auto;
+                border: none !important;
             }
 
             h1 {
@@ -138,6 +138,7 @@ export const generateTemplate = (template: TemplateInput) => `
             .full-page-wrapper {
                 display: flex;
                 flex-direction: column;
+                border: none !important;
             }
 
             .top-wrapper {
@@ -160,6 +161,27 @@ export const generateTemplate = (template: TemplateInput) => `
             .client-contact {
                 flex: 1;
                 text-align: right;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .estimate-meta {
+                margin-bottom: 0;
+            }
+
+            .client-info {
+                margin-top: 0;
+                /* Add padding to align with contractor name (logo is ~120px + margin) */
+                padding-top: 62px;
+            }
+
+            .client-name {
+                padding-top: 16px;
+            }
+
+            .client-info h3 {
+                margin-top: 0;
+                margin-bottom: 0;
             }
 
             .image-wrapper {
@@ -174,10 +196,19 @@ export const generateTemplate = (template: TemplateInput) => `
                 padding-bottom: 30px;
             }
 
+            .terms {
+                border-bottom: none !important;
+                border-top: none !important;
+            }
+
             .footer {
                 text-align: center;
                 font-size: 0.9em;
                 color: #555;
+                border-top: none !important;
+                border-bottom: none !important;
+                border-left: none !important;
+                border-right: none !important;
             }
             
             .description {
@@ -241,11 +272,20 @@ export const generateTemplate = (template: TemplateInput) => `
                 padding-bottom: 30px;
             }
 
+            .trailer-notice {
+                page-break-inside: avoid;
+                break-inside: avoid;
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+
             .signature-section {
                 display: flex;
                 flex-direction: row;
                 justify-content: space-between;
                 margin-bottom: 30px;
+                border-bottom: none !important;
+                border-top: none !important;
             }
 
             .signature-field-wrapper {
@@ -292,13 +332,17 @@ export const generateTemplate = (template: TemplateInput) => `
                     </div>
 
                     <div class="client-contact">
-                        <p><strong>Date:</strong> ${getTodaysDate()}</p>
-                        <p><strong>Estimate ID:</strong> ${template.estimateNumber}</p>
-                        <h3 style="margin-top: 60px;">Prepared For</h3>
-                        <p>${template.client.name}</p>
-                        <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
-                        <p>Phone: ${template.client.phone}</p>
-                        <p>${template.client.email}</p>
+                        <div class="estimate-meta">
+                            <p><strong>Date:</strong> ${getTodaysDate()}</p>
+                            <p><strong>Estimate ID:</strong> ${template.estimateNumber}</p>
+                        </div>
+                        <div class="client-info">
+                            <h3>Prepared For</h3>
+                            <p class="client-name">${template.client.name}</p>
+                            <p>${template.client.address}, ${template.client.city}, ${template.client.state}</p>
+                            <p>Phone: ${template.client.phone}</p>
+                            <p>${template.client.email}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -336,10 +380,12 @@ export const generateTemplate = (template: TemplateInput) => `
 
                 <div class="page-break"></div>
 
-                <p style="text-transform: uppercase;">
-                    PLEASE NOTE THAT A WORK TRAILER WILL NEED TO BE PLACED IN HOMEOWNER'S DRIVEWAY. WE
-                    ARE PROHIBITED FROM PARKING TRAILERS ON THE STREET.
-                </p>
+                <div class="trailer-notice">
+                    <p style="text-transform: uppercase;">
+                        PLEASE NOTE THAT A WORK TRAILER WILL NEED TO BE PLACED IN HOMEOWNER'S DRIVEWAY. WE
+                        ARE PROHIBITED FROM PARKING TRAILERS ON THE STREET.
+                    </p>
+                </div>
 
                 <div class="terms">
                     <h3>Terms</h3>
@@ -374,8 +420,8 @@ export const generateTemplate = (template: TemplateInput) => `
                     </div>
                 </div>
 
-                <div class="footer">
-                    <p>© 2025 R.L. Peek Painting. All rights reserved.</p>
+                <div class="footer" style="border: none !important;">
+                    <p style="border: none !important;">© 2025 R.L. Peek Painting. All rights reserved.</p>
                 </div>
             </div>
         </div>

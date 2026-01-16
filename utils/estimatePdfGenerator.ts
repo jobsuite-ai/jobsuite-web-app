@@ -188,6 +188,36 @@ function placeSignaturesInElement(
                     (sig) => sig.signature_type === signatureType && sig.is_valid !== false
                 );
 
+                const signatureField = field as HTMLElement;
+                // CRITICAL: Set border directly on the signature-field element
+                // These styles ensure the line appears above the signature/name
+                // Use setProperty with important flag to ensure it persists through PDF generation
+                signatureField.style.setProperty('display', 'block', 'important');
+                signatureField.style.setProperty('visibility', 'visible', 'important');
+                signatureField.style.setProperty('width', '300px', 'important');
+                signatureField.style.setProperty('height', '80px', 'important');
+                signatureField.style.setProperty('min-height', '80px', 'important');
+                signatureField.style.setProperty('border-bottom', '1px solid #333', 'important');
+                signatureField.style.setProperty('border-top', 'none', 'important');
+                signatureField.style.setProperty('border-left', 'none', 'important');
+                signatureField.style.setProperty('border-right', 'none', 'important');
+                signatureField.style.setProperty('box-sizing', 'border-box', 'important');
+                signatureField.style.setProperty('position', 'relative', 'important');
+                signatureField.style.setProperty('padding', '0', 'important');
+                signatureField.style.setProperty('margin', '0', 'important');
+                signatureField.style.setProperty('margin-bottom', '5px', 'important');
+                signatureField.style.setProperty('overflow', 'visible', 'important');
+                signatureField.style.setProperty('background', 'transparent', 'important');
+
+                // Also set as attribute to ensure it's in the DOM
+                signatureField.setAttribute('style', signatureField.style.cssText);
+
+                // Set data attribute to mark this as a signature field that needs borders
+                signatureField.setAttribute('data-signature-field', 'true');
+
+                // Clear existing content
+                signatureField.innerHTML = '';
+
                 if (signature && signature.signature_data) {
                     // Ensure signature_data is in the correct format (data URL)
                     let signatureDataUrl = signature.signature_data;
@@ -201,30 +231,45 @@ function placeSignaturesInElement(
                     img.src = signatureDataUrl;
                     img.style.width = '100%';
                     img.style.height = 'auto';
-                    img.style.maxHeight = '80px';
+                    img.style.maxHeight = '79px';
                     img.style.objectFit = 'contain';
                     img.style.display = 'block';
                     img.alt = signature.signer_name || 'Signature';
 
-                    // Clear the field and add the signature image + explicit line
-                    const signatureField = field as HTMLElement;
-                    signatureField.innerHTML = '';
-                    signatureField.style.display = 'block';
-                    signatureField.style.width = '300px';
-                    signatureField.style.height = '80px';
                     signatureField.appendChild(img);
-
-                    const line = document.createElement('div');
-                    line.style.borderBottom = '1px solid #333';
-                    line.style.marginTop = '-10px';
-                    line.style.width = '100%';
-                    signatureField.appendChild(line);
 
                     // eslint-disable-next-line no-console
                     console.log(`Placed ${signatureType} signature on ${role} field`);
                 } else {
+                    // No signature - ensure the line is visible
+                    // Add a spacer div that takes up the space
+                    const spacer = document.createElement('div');
+                    spacer.style.width = '100%';
+                    spacer.style.height = '79px';
+                    spacer.style.minHeight = '79px';
+                    spacer.style.display = 'block';
+                    signatureField.appendChild(spacer);
+
+                    // The border-bottom on signatureField itself will provide the line
+                    // No need for additional lineDiv that might cause rendering issues
+
                     // eslint-disable-next-line no-console
-                    console.log(`No signature found for ${signatureType} (role: ${role})`);
+                    console.log(`No signature found for ${signatureType} (role: ${role}), showing empty line`);
+                }
+            });
+
+            // Double-check that all signature fields have borders set
+            // This ensures the lines will be visible in the PDF
+            const allFields = element.querySelectorAll('signature-field');
+            allFields.forEach((field) => {
+                const fieldEl = field as HTMLElement;
+                // Force border to be set if it's not already set with important flag
+                const currentBorder = fieldEl.style.getPropertyValue('border-bottom');
+                if (!currentBorder || currentBorder === 'none' || !currentBorder.includes('solid')) {
+                    fieldEl.style.setProperty('border-bottom', '1px solid #333', 'important');
+                    fieldEl.style.setProperty('display', 'block', 'important');
+                    fieldEl.style.setProperty('height', '80px', 'important');
+                    fieldEl.style.setProperty('min-height', '80px', 'important');
                 }
             });
 
@@ -250,6 +295,32 @@ export async function generateEstimatePdf(
         lineItems,
         imageResources,
     });
+
+    // Always include signature field styling to ensure lines appear above names
+    // Signature fields are always in the template, and we need borders visible
+    // when signatures exist (matching preview behavior)
+    const signatureFieldStyles = signatures.length > 0 ? `
+        .pdf-render-root signature-field,
+        .pdf-render-root signature-field.signature-field,
+        .pdf-render-root signature-field[class="signature-field"],
+        .pdf-render-root .signature-field {
+            display: block !important;
+            visibility: visible !important;
+            border-bottom: 1px solid #333 !important;
+            border-top: none !important;
+            border-left: none !important;
+            border-right: none !important;
+            width: 300px !important;
+            height: 80px !important;
+            min-height: 80px !important;
+            box-sizing: border-box !important;
+            margin-bottom: 5px !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: transparent !important;
+        }
+    ` : '';
+
     const pdfOverrides = `
         .pdf-render-root .full-page-wrapper { display: block; }
         .pdf-render-root .container {
@@ -257,6 +328,12 @@ export async function generateEstimatePdf(
             max-width: 7.5in !important;
             margin: 0 auto;
             box-sizing: border-box;
+            border: none !important;
+            border-bottom: none !important;
+        }
+        .pdf-render-root .full-page-wrapper {
+            border: none !important;
+            border-bottom: none !important;
         }
         .pdf-render-root .container *,
         .pdf-render-root .container *::before,
@@ -267,9 +344,14 @@ export async function generateEstimatePdf(
         .pdf-render-root .signature-section,
         .pdf-render-root .estimate-details,
         .pdf-render-root .notes,
-        .pdf-render-root .terms {
+        .pdf-render-root .terms,
+        .pdf-render-root .trailer-notice {
             page-break-inside: avoid;
             break-inside: avoid;
+        }
+        .pdf-render-root .terms {
+            border-bottom: none !important;
+            border-top: none !important;
         }
         .pdf-render-root .estimate-body,
         .pdf-render-root .description,
@@ -282,24 +364,53 @@ export async function generateEstimatePdf(
             page-break-inside: avoid;
             break-inside: avoid;
         }
-        .pdf-render-root signature-field.signature-field {
-            display: block;
-            border-bottom: 1px solid #333;
-            width: 300px;
-            height: 80px;
-            background-image: linear-gradient(#333, #333);
-            background-repeat: no-repeat;
-            background-position: bottom left;
-            background-size: 100% 1px;
+        ${signatureFieldStyles}
+        /* Additional rule to ensure signature fields have borders - targets custom element directly */
+        ${signatures.length > 0 ? `
+        .pdf-render-root signature-field[role="Service Provider"],
+        .pdf-render-root signature-field[role="Property Owner"] {
+            border-bottom: 1px solid #333 !important;
+            display: block !important;
         }
+        ` : ''}
         .pdf-render-root .signature-section {
             display: flex;
             justify-content: space-between;
             flex-wrap: nowrap;
+            border-bottom: none !important;
+            border-top: none !important;
         }
         .pdf-render-root .signature-field-wrapper {
             width: 45%;
             padding: 20px 0;
+            border-bottom: none !important;
+        }
+        .pdf-render-root .signature-label {
+            margin-top: 10px !important;
+        }
+        .pdf-render-root .footer {
+            border-top: none !important;
+            border-bottom: none !important;
+            border-left: none !important;
+            border-right: none !important;
+        }
+        /* Remove any borders from footer children */
+        .pdf-render-root .footer * {
+            border-bottom: none !important;
+            border-top: none !important;
+        }
+        /* Remove border from signature-section (but keep signature-field borders) */
+        .pdf-render-root .signature-section {
+            border-bottom: none !important;
+            border-top: none !important;
+        }
+        /* Remove border from signature-field-wrapper (but keep signature-field borders) */
+        .pdf-render-root .signature-field-wrapper {
+            border-bottom: none !important;
+        }
+        /* Remove border from terms section */
+        .pdf-render-root .terms {
+            border-bottom: none !important;
         }
     `;
 
@@ -334,7 +445,9 @@ export async function generateEstimatePdf(
     tempContainer.style.minHeight = '11in';
     tempContainer.style.overflow = 'visible';
     tempContainer.style.background = '#fff';
-    tempContainer.innerHTML = `<style>${scopedTemplateStyles}${pdfOverrides}</style><div class="pdf-render-root">${htmlWithoutStyles}</div>`;
+    tempContainer.style.border = 'none';
+    tempContainer.style.borderBottom = 'none';
+    tempContainer.innerHTML = `<style>${scopedTemplateStyles}${pdfOverrides}</style><div class="pdf-render-root" style="border: none !important; border-bottom: none !important;">${htmlWithoutStyles}</div>`;
     document.body.appendChild(tempContainer);
 
     try {
@@ -348,9 +461,14 @@ export async function generateEstimatePdf(
             await document.fonts.ready;
         }
 
-        // Place signatures if provided
+        // Only place signatures if they exist
+        // If there are no signatures, don't modify the signature fields at all
         if (signatures.length > 0) {
             await placeSignaturesInElement(tempContainer, signatures);
+            // Give the DOM time to apply the styles before PDF generation
+            await new Promise<void>(resolve => {
+                setTimeout(resolve, 50);
+            });
         }
 
         // Wait for all images (including signature images) to load
@@ -366,6 +484,24 @@ export async function generateEstimatePdf(
         });
 
         await Promise.all(imagePromises);
+
+        // Final verification: Ensure all signature fields have visible borders
+        // This is critical for the contract appearance
+        if (signatures.length > 0) {
+            const allSignatureFields = tempContainer.querySelectorAll('signature-field');
+            allSignatureFields.forEach((field) => {
+                const fieldEl = field as HTMLElement;
+                // Force border to be visible - this is critical for contract appearance
+                fieldEl.style.setProperty('border-bottom', '1px solid #333', 'important');
+                fieldEl.style.setProperty('display', 'block', 'important');
+                fieldEl.style.setProperty('visibility', 'visible', 'important');
+                // Ensure the field has height so the border is visible
+                if (!fieldEl.style.height || fieldEl.style.height === '0px') {
+                    fieldEl.style.setProperty('height', '80px', 'important');
+                    fieldEl.style.setProperty('min-height', '80px', 'important');
+                }
+            });
+        }
 
         // Generate PDF from the element
         const pdfBlob = await generatePdfFromElement(tempContainer, {
