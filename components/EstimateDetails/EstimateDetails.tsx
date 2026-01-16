@@ -1170,7 +1170,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
     ), [resources]);
     const signedPdfResource = useMemo(() => (
-        fileResources.find(r => r.resource_location?.toLowerCase().startsWith('signed-estimate-'))
+        fileResources.find(r => {
+            const location = r.resource_location?.toLowerCase() || '';
+            return location.includes('-signed-estimate.pdf') || location === 'fully-signed-estimate.pdf';
+        })
     ), [fileResources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
@@ -1790,14 +1793,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                           title={
                                             isSignatureRequired
                                                 ? 'Signature Required'
-                                                : isFullySigned
-                                                ? 'Signed Estimate'
                                                 : 'Estimate Preview'
                                           }
-                                          defaultOpen={!isFullySigned}
+                                          defaultOpen={!hasSignedPdf && !isSignatureRequired}
                                           headerActions={
                                               !isSignatureRequired
-                                              && !isFullySigned
+                                              && !hasSignedPdf
                                               && hasVideo && hasImages && lineItemsCount > 0 ? (
                                                   <ActionIcon
                                                     variant="subtle"

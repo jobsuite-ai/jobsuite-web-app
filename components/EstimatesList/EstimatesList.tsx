@@ -90,6 +90,26 @@ export default function EstimatesList() {
         }
     }, [cachedEstimates, cacheLoading.estimates]);
 
+    // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+    useEffect(() => {
+        // Only auto-refresh if:
+        // 1. Not currently loading
+        // 2. Data is empty
+        // 3. We have an access token (user is logged in)
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!cacheLoading.estimates && estimates.length === 0 && accessToken) {
+            // Small delay to avoid race conditions with initial cache load
+            const timeoutId = setTimeout(() => {
+                if (estimates.length === 0 && !cacheLoading.estimates) {
+                    invalidateCache('estimates');
+                    refreshData('estimates', true);
+                }
+            }, 100);
+            return () => clearTimeout(timeoutId);
+        }
+        return undefined;
+    }, [estimates.length, cacheLoading.estimates, invalidateCache, refreshData]);
+
     useEffect(() => {
         // Sort jobs into columns based on status
         const sortedColumnOne = estimates
