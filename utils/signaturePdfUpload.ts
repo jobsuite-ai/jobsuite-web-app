@@ -50,34 +50,59 @@ async function uploadFilePartWithRetry(
             );
 
             // Upload chunk to presigned URL
-            const uploadResponse = await fetch(presignedUrl, {
-                method: 'PUT',
-                body: chunk,
-                headers: {
-                    'Content-Type': 'application/pdf',
-                },
-            });
+            // Note: Do not set Content-Type header for multipart upload parts
+            // The Content-Type is set during create_multipart_upload
+            const controller = new AbortController();
+            // 5 minute timeout per part
+            const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
-            if (!uploadResponse.ok) {
-                throw new Error(
-                    `Upload failed with status ${uploadResponse.status}: ${uploadResponse.statusText}`
-                );
+            try {
+                const uploadResponse = await fetch(presignedUrl, {
+                    method: 'PUT',
+                    body: chunk,
+                    signal: controller.signal,
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!uploadResponse.ok) {
+                    const errorText = await uploadResponse.text().catch(() => 'Unknown error');
+                    throw new Error(
+                        `Upload failed with status ${uploadResponse.status}: ${uploadResponse.statusText}. ${errorText}`
+                    );
+                }
+
+                // Extract ETag from response headers
+                const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
+                if (!etag) {
+                    const availableHeaders: string[] = [];
+                    uploadResponse.headers.forEach((value, key) => {
+                        availableHeaders.push(`${key}: ${value}`);
+                    });
+                    // eslint-disable-next-line no-console
+                    console.error(
+                        `ETag header not available for part ${partNumber}. ` +
+                        `Available headers: ${availableHeaders.join(', ')}. ` +
+                        'This is likely a CORS configuration issue - the S3 bucket must expose the ETag header.'
+                    );
+                    throw new Error(
+                        `No ETag received for part ${partNumber}. ` +
+                        'This is likely a CORS configuration issue. ' +
+                        'The S3 bucket must expose the ETag header in its CORS configuration.'
+                    );
+                }
+
+                const cleanEtag = etag;
+
+                if (onProgress) {
+                    onProgress(partNumber, 100);
+                }
+
+                return { PartNumber: partNumber, ETag: cleanEtag };
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
+                throw fetchError;
             }
-
-            // Extract ETag from response headers
-            const etag = uploadResponse.headers.get('ETag');
-            if (!etag) {
-                throw new Error('ETag not found in upload response');
-            }
-
-            // Remove quotes from ETag if present
-            const cleanEtag = etag.replace(/^"|"$/g, '');
-
-            if (onProgress) {
-                onProgress(partNumber, 100);
-            }
-
-            return { PartNumber: partNumber, ETag: cleanEtag };
         } catch (error: any) {
             lastError = error;
             // eslint-disable-next-line no-console

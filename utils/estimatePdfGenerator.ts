@@ -150,6 +150,68 @@ export async function buildEstimateTemplateHtml(
 }
 
 /**
+ * Convert an image URL to a base64 data URL
+ * This ensures images are embedded in the PDF and don't require external network requests
+ */
+async function convertImageUrlToBase64(url: string): Promise<string> {
+    try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) {
+            // eslint-disable-next-line no-console
+            console.warn(`Failed to fetch image: ${url}`);
+            return url; // Return original URL if fetch fails
+        }
+        const blob = await response.blob();
+        return await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64String = reader.result as string;
+                resolve(base64String);
+            };
+            reader.onerror = () => {
+                // eslint-disable-next-line no-console
+                console.warn(`Failed to convert image to base64: ${url}`);
+                resolve(url); // Return original URL if conversion fails
+            };
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn(`Error converting image to base64: ${url}`, error);
+        return url; // Return original URL if there's an error
+    }
+}
+
+/**
+ * Convert all external image URLs in the container to base64 data URLs
+ * This ensures images are embedded in the PDF
+ */
+async function convertImagesToBase64(container: HTMLElement): Promise<void> {
+    const images = container.querySelectorAll('img');
+    const conversionPromises = Array.from(images).map(async (img) => {
+        const src = img.getAttribute('src');
+        if (!src) return;
+
+        // Skip if already a data URL
+        if (src.startsWith('data:')) return;
+
+        // Skip if it's a signature image (those are already handled)
+        if (img.closest('signature-field')) return;
+
+        try {
+            const base64Url = await convertImageUrlToBase64(src);
+            img.src = base64Url;
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.warn(`Failed to convert image ${src} to base64:`, error);
+            // Continue with original URL
+        }
+    });
+
+    await Promise.all(conversionPromises);
+}
+
+/**
  * Place signatures in the HTML template DOM element
  */
 function placeSignaturesInElement(
@@ -460,6 +522,10 @@ export async function generateEstimatePdf(
         if (document.fonts?.ready) {
             await document.fonts.ready;
         }
+
+        // Convert all external image URLs to base64 data URLs
+        // This ensures images are embedded in the PDF and don't require external network requests
+        await convertImagesToBase64(tempContainer);
 
         // Only place signatures if they exist
         // If there are no signatures, don't modify the signature fields at all

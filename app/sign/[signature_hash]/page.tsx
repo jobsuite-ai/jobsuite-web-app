@@ -356,7 +356,7 @@ export default function SignaturePage() {
                           signed &&
                           linkInfo.signatures &&
                           linkInfo.signatures.length > 0 && (
-                          <Box mt="xl">
+                          <Box mt="xl" style={{ display: 'flex', justifyContent: 'center' }}>
                             <Button
                               leftSection={<IconDownload size={16} />}
                               onClick={async () => {
