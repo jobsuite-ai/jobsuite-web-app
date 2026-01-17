@@ -372,7 +372,7 @@ export default function SignatureForm({
                 </div>
 
                 <Checkbox
-                  label="I consent to sign this estimate and agree to the terms"
+                  label="I consent to sign this electronic document and agree to the terms of the estimate"
                   checked={consentGiven}
                   onChange={(e) => setConsentGiven(e.currentTarget.checked)}
                   required

@@ -89,7 +89,6 @@ export default function SignaturePageSections({
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
-                            minHeight: '500px',
                             width: '100%',
                         }}>
                             <iframe
@@ -97,7 +96,8 @@ export default function SignaturePageSections({
                               src={signaturePageConfig.license_pdf_url}
                               style={{
                                     width: '100%',
-                                    height: '600px',
+                                    height: 'calc(100vh - 300px)',
+                                    minHeight: '600px',
                                     border: 'none',
                                     borderRadius: '4px',
                                 }}
@@ -125,7 +125,6 @@ export default function SignaturePageSections({
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
-                            minHeight: '500px',
                             width: '100%',
                         }}>
                             <iframe
@@ -133,7 +132,8 @@ export default function SignaturePageSections({
                               src={signaturePageConfig.insurance_pdf_url}
                               style={{
                                     width: '100%',
-                                    height: '600px',
+                                    height: 'calc(100vh - 300px)',
+                                    minHeight: '600px',
                                     border: 'none',
                                     borderRadius: '4px',
                                 }}
@@ -157,7 +157,6 @@ export default function SignaturePageSections({
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
-                        minHeight: '500px',
                         width: '100%',
                     }}>
                         <iframe
@@ -165,7 +164,8 @@ export default function SignaturePageSections({
                           src={signaturePageConfig.w9_pdf_url}
                           style={{
                                 width: '100%',
-                                height: '600px',
+                                height: 'calc(100vh - 300px)',
+                                minHeight: '600px',
                                 border: 'none',
                                 borderRadius: '4px',
                             }}
