@@ -347,37 +347,99 @@ function EstimateSignaturePreviewBase({
 
     // Add click handler and hover effects to signature clickable section after template is rendered
     useEffect(() => {
+        // Declare cleanup variables at the top so they're always in scope
+        let animationFrameId: number | null = null;
+        let timeoutId: NodeJS.Timeout | null = null;
+        let clickableSection: HTMLElement | null = null;
+        let clickHandler: (() => void) | null = null;
+        let handleMouseEnter: (() => void) | null = null;
+        let handleMouseLeave: (() => void) | null = null;
+
         if (!template || !showSignatureClickable || !onSignatureClick || !templateRef.current) {
-            return;
+            // Return cleanup function even when early returning
+            return () => {
+                if (animationFrameId !== null) {
+                    cancelAnimationFrame(animationFrameId);
+                }
+                if (timeoutId !== null) {
+                    clearTimeout(timeoutId);
+                }
+                if (clickableSection && clickHandler && handleMouseEnter && handleMouseLeave) {
+                    clickableSection.removeEventListener('click', clickHandler);
+                    clickableSection.removeEventListener('mouseenter', handleMouseEnter);
+                    clickableSection.removeEventListener('mouseleave', handleMouseLeave);
+                }
+            };
         }
 
-        const clickableSection = templateRef.current.querySelector('[data-signature-clickable="true"]') as HTMLElement;
-        if (!clickableSection) {
-            return;
-        }
+        // Wait for DOM to update after React renders the template
+        // Use multiple requestAnimationFrame calls to ensure DOM is fully updated
+        let retryCount = 0;
+        const maxRetries = 10;
 
-        // Add click handler
-        const clickHandler = onSignatureClick;
-        clickableSection.addEventListener('click', clickHandler);
+        const attachClickHandler = () => {
+            if (!templateRef.current) {
+                return;
+            }
 
-        // Add hover effects
-        const handleMouseEnter = () => {
-            clickableSection.style.backgroundColor = '#e9ecef';
-            clickableSection.style.borderColor = '#1a1f2e';
+            clickableSection = templateRef.current.querySelector('[data-signature-clickable="true"]') as HTMLElement;
+
+            if (!clickableSection) {
+                // Retry if element not found yet
+                retryCount += 1;
+                if (retryCount < maxRetries) {
+                    animationFrameId = requestAnimationFrame(() => {
+                        requestAnimationFrame(attachClickHandler);
+                    });
+                }
+                return;
+            }
+
+            // Element found, attach handlers
+            clickHandler = onSignatureClick;
+            clickableSection.addEventListener('click', clickHandler);
+
+            // Add hover effects
+            handleMouseEnter = () => {
+                if (clickableSection) {
+                    clickableSection.style.backgroundColor = '#e9ecef';
+                    clickableSection.style.borderColor = '#1a1f2e';
+                }
+            };
+            handleMouseLeave = () => {
+                if (clickableSection) {
+                    clickableSection.style.backgroundColor = '#f8f9fa';
+                    clickableSection.style.borderColor = '#2c3e50';
+                }
+            };
+
+            clickableSection.addEventListener('mouseenter', handleMouseEnter);
+            clickableSection.addEventListener('mouseleave', handleMouseLeave);
         };
-        const handleMouseLeave = () => {
-            clickableSection.style.backgroundColor = '#f8f9fa';
-            clickableSection.style.borderColor = '#2c3e50';
-        };
 
-        clickableSection.addEventListener('mouseenter', handleMouseEnter);
-        clickableSection.addEventListener('mouseleave', handleMouseLeave);
+        // Start attaching after DOM update - use a small delay to ensure React has updated the DOM
+        timeoutId = setTimeout(() => {
+            animationFrameId = requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    requestAnimationFrame(attachClickHandler);
+                });
+            });
+        }, 50);
 
-        // eslint-disable-next-line consistent-return
+        // Cleanup function
         return () => {
-            clickableSection.removeEventListener('click', clickHandler);
-            clickableSection.removeEventListener('mouseenter', handleMouseEnter);
-            clickableSection.removeEventListener('mouseleave', handleMouseLeave);
+            if (animationFrameId !== null) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            if (timeoutId !== null) {
+                clearTimeout(timeoutId);
+            }
+            // Remove listeners if element exists
+            if (clickableSection && clickHandler && handleMouseEnter && handleMouseLeave) {
+                clickableSection.removeEventListener('click', clickHandler);
+                clickableSection.removeEventListener('mouseenter', handleMouseEnter);
+                clickableSection.removeEventListener('mouseleave', handleMouseLeave);
+            }
         };
     }, [template, showSignatureClickable, onSignatureClick]);
 

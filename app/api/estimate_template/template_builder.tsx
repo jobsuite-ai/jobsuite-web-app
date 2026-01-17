@@ -125,6 +125,18 @@ export const generateTemplate = (template: TemplateInput) => `
                 border: none !important;
             }
 
+            @media (min-width: 1200px) {
+                .container {
+                    max-width: 1000px;
+                }
+            }
+
+            @media (min-width: 1600px) {
+                .container {
+                    max-width: 1200px;
+                }
+            }
+
             h1 {
                 margin: 0;
                 text-align: center;
