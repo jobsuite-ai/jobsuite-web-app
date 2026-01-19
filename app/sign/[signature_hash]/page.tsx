@@ -12,7 +12,6 @@ import SignatureAuditHistory from '@/components/EstimateDetails/signature/Signat
 import SignatureForm from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
-import { uploadPdfFromSignature } from '@/utils/signaturePdfUpload';
 
 interface SignatureLinkInfo {
     signature_hash: string;
@@ -59,7 +58,6 @@ export default function SignaturePage() {
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
     const [isContractorViewer, setIsContractorViewer] = useState(false);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
-    const [pdfUploading, setPdfUploading] = useState(false);
 
     useEffect(() => {
         if (!signatureHash) return;
@@ -225,44 +223,6 @@ export default function SignaturePage() {
         setActiveTab(availableTabs[0].value);
     }
 
-    const buildPdfBlob = async (sourceInfo: SignatureLinkInfo): Promise<Blob> => {
-        if (!sourceInfo.client) {
-            throw new Error('Client information is required to generate the PDF.');
-        }
-
-        const pdfLineItems: EstimateLineItem[] = (sourceInfo.line_items || []).map((item) => ({
-            id: item.id,
-            title: item.title || '',
-            description: item.description || '',
-            hours: item.hours || 0,
-            rate: item.rate || 0,
-            created_at: item.created_at || new Date().toISOString(),
-        }));
-
-        const pdfImageResources = sourceInfo.resources.filter(
-            (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
-        );
-
-        const pdfSignatures = (sourceInfo.signatures || [])
-            .filter((sig) => sig.is_valid !== false)
-            .map((sig) => ({
-                signature_type: sig.signature_type,
-                signature_data: sig.signature_data || '',
-                signer_name: sig.signer_name,
-                is_valid: sig.is_valid !== false,
-            }));
-
-        // Import generateEstimatePdf dynamically to avoid loading it unless needed
-        const { generateEstimatePdf } = await import('@/utils/estimatePdfGenerator');
-        return generateEstimatePdf({
-            estimate: sourceInfo.estimate,
-            client: sourceInfo.client,
-            lineItems: pdfLineItems,
-            imageResources: pdfImageResources,
-            signatures: pdfSignatures,
-        });
-    };
-
     return (
         <AppShell
           padding={0}
@@ -331,17 +291,6 @@ export default function SignaturePage() {
                             This estimate has already been signed. Thank you for your confirmation.
                           </Alert>
                         )}
-                        {pdfUploading && (
-                          <Alert
-                            icon={<IconInfoCircle size={16} />}
-                            title="Uploading PDF"
-                            color="blue"
-                            variant="light"
-                            mb="xl"
-                          >
-                            Generating and uploading the signed estimate PDF...
-                          </Alert>
-                        )}
                         <Box style={{ position: 'relative' }}>
                           <EstimateSignaturePreview
                             estimate={linkInfo.estimate}
@@ -383,36 +332,8 @@ export default function SignaturePage() {
                                   const data = await response.json();
                                   setLinkInfo(data);
 
-                                  // Check if both parties have signed
-                                  const signatures = data.signatures || [];
-                                  const hasClientSignature = signatures.some(
-                                    (sig: any) => sig.signature_type === 'CLIENT' && sig.is_valid !== false
-                                  );
-                                  const hasContractorSignature = signatures.some(
-                                    (sig: any) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false
-                                  );
-
-                                  // If both parties have signed, generate and upload PDF
-                                  if (hasClientSignature && hasContractorSignature) {
-                                    // Wait a bit for DOM to update with signatures
-                                    setTimeout(async () => {
-                                      try {
-                                        setPdfUploading(true);
-                                        const pdfBlob = await buildPdfBlob(data);
-
-                                        // Upload PDF
-                                        await uploadPdfFromSignature(signatureHash, pdfBlob);
-                                        // eslint-disable-next-line no-console
-                                        console.log('PDF uploaded successfully');
-                                      } catch (err) {
-                                        // eslint-disable-next-line no-console
-                                        console.error('Error generating or uploading PDF:', err);
-                                        // Don't show error to user - PDF generation is not critical
-                                      } finally {
-                                        setPdfUploading(false);
-                                      }
-                                    }, 2000); // Wait 2 seconds for signatures to render
-                                  }
+                                  // Note: PDF is automatically generated and stored by the backend
+                                  // when signatures are recorded. No need to upload from frontend.
                                 }
                               } catch (err) {
                                 // eslint-disable-next-line no-console
