@@ -11,7 +11,9 @@ import {
     Stack,
     Text,
     TextInput,
+    useMantineTheme,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
@@ -32,6 +34,8 @@ export default function SignatureForm({
     opened,
     onClose,
 }: SignatureFormProps) {
+    const theme = useMantineTheme();
+    const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [signerName, setSignerName] = useState('');
@@ -183,6 +187,37 @@ export default function SignatureForm({
         setTypedSignature('');
     }, [signatureMethod]);
 
+    // Resize canvas to match display size on mobile
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas || !isMobile) {
+            return undefined;
+        }
+
+        const resizeCanvas = () => {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                ctx.scale(dpr, dpr);
+            }
+
+            // Re-render typed signature if applicable
+            if (signatureMethod === 'type' && typedSignature) {
+                renderTypedSignature();
+            }
+        };
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        return () => {
+            window.removeEventListener('resize', resizeCanvas);
+        };
+    }, [isMobile, signatureMethod, typedSignature, renderTypedSignature]);
+
     const handleSubmit = async () => {
         setError(null);
 
@@ -275,8 +310,9 @@ export default function SignatureForm({
           opened={opened}
           onClose={onClose}
           title="Sign Estimate"
-          size="lg"
-          centered
+          size={isMobile ? '100%' : 'lg'}
+          fullScreen={isMobile}
+          centered={!isMobile}
         >
             <Stack gap="md">
                 {error && (
@@ -334,6 +370,7 @@ export default function SignatureForm({
                             borderRadius: '4px',
                             position: 'relative',
                             backgroundColor: '#fff',
+                            width: '100%',
                         }}
                     >
                         <canvas
@@ -344,8 +381,9 @@ export default function SignatureForm({
                                 display: 'block',
                                 cursor: signatureMethod === 'draw' ? 'crosshair' : 'default',
                                 width: '100%',
-                                height: '200px',
+                                height: isMobile ? '150px' : '200px',
                                 touchAction: signatureMethod === 'draw' ? 'none' : 'auto',
+                                maxWidth: '100%',
                             }}
                           onMouseDown={signatureMethod === 'draw' ? startDrawing : undefined}
                           onMouseMove={signatureMethod === 'draw' ? draw : undefined}

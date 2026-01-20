@@ -20,6 +20,156 @@
     justify-content: center;
 }
 
+.estimatePreviewWrapper :global(.full-page-wrapper) {
+    width: 100%;
+    max-width: 100%;
+}
+
+.estimatePreviewWrapper :global(.container) {
+    width: 100%;
+    max-width: 100%;
+    padding: var(--mantine-spacing-md);
+    box-sizing: border-box;
+}
+
+/* Make estimate preview responsive on mobile */
+@media (max-width: 768px) {
+    .estimatePreviewWrapper {
+        width: 100%;
+        overflow-x: hidden;
+        padding: var(--mantine-spacing-xs);
+    }
+
+    .estimatePreviewWrapper :global(.mantine-Paper-root) {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .estimatePreviewWrapper :global(.full-page-wrapper) {
+        width: 100%;
+        max-width: 100%;
+        transform: scale(1);
+        transform-origin: top center;
+    }
+
+    .estimatePreviewWrapper :global(.container) {
+        padding: var(--mantine-spacing-sm);
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    /* Keep fonts at normal size or slightly larger for readability */
+    .estimatePreviewWrapper :global(*) {
+        font-size: 1em;
+    }
+
+    .estimatePreviewWrapper :global(h1),
+    .estimatePreviewWrapper :global(h2),
+    .estimatePreviewWrapper :global(h3) {
+        font-size: 1.3em;
+    }
+
+    .estimatePreviewWrapper :global(table) {
+        font-size: 0.9em;
+        width: 100%;
+        display: block;
+        overflow-x: auto;
+    }
+
+    /* Make signature section stack vertically on mobile */
+    .estimatePreviewWrapper :global(.signature-section) {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: var(--mantine-spacing-md) !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .estimatePreviewWrapper :global(.signature-field-wrapper) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        padding: var(--mantine-spacing-sm) 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Make signature fields fit within mobile viewport - use high specificity */
+    .estimatePreviewWrapper :global(signature-field),
+    .estimatePreviewWrapper :global(signature-field.signature-field),
+    .estimatePreviewWrapper :global(.signature-field),
+    .estimatePreviewWrapper :global(signature-field[role="Service Provider"]),
+    .estimatePreviewWrapper :global(signature-field[role="Property Owner"]) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+        display: block !important;
+    }
+
+    /* Ensure signature labels are readable */
+    .estimatePreviewWrapper :global(.signature-label) {
+        font-size: 1em !important;
+        text-align: left !important;
+        margin-top: var(--mantine-spacing-xs) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .estimatePreviewWrapper {
+        padding: var(--mantine-spacing-xs);
+    }
+
+    .estimatePreviewWrapper :global(.full-page-wrapper) {
+        transform: scale(1);
+        transform-origin: top center;
+    }
+
+    .estimatePreviewWrapper :global(.container) {
+        padding: var(--mantine-spacing-xs);
+    }
+
+    /* Keep text readable on small screens */
+    .estimatePreviewWrapper :global(*) {
+        font-size: 0.95em;
+    }
+
+    .estimatePreviewWrapper :global(h1),
+    .estimatePreviewWrapper :global(h2),
+    .estimatePreviewWrapper :global(h3) {
+        font-size: 1.2em;
+    }
+
+    .estimatePreviewWrapper :global(table) {
+        font-size: 0.85em;
+    }
+
+    /* Ensure signature fields are full width on very small screens */
+    .estimatePreviewWrapper :global(signature-field),
+    .estimatePreviewWrapper :global(signature-field.signature-field),
+    .estimatePreviewWrapper :global(.signature-field),
+    .estimatePreviewWrapper :global(signature-field[role="Service Provider"]),
+    .estimatePreviewWrapper :global(signature-field[role="Property Owner"]) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .estimatePreviewWrapper :global(.signature-field-wrapper) {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: var(--mantine-spacing-xs) 0 !important;
+        box-sizing: border-box !important;
+    }
+
+    .estimatePreviewWrapper :global(.signature-section) {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
 .twoColumnLayout {
     display: flex;
     width: 100%;
