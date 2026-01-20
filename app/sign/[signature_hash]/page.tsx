@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title } from '@mantine/core';
+import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title, Tabs, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding, IconFileInvoice } from '@tabler/icons-react';
 import { useParams } from 'next/navigation';
 
@@ -58,6 +59,8 @@ export default function SignaturePage() {
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
     const [isContractorViewer, setIsContractorViewer] = useState(false);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
+    const theme = useMantineTheme();
+    const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
     useEffect(() => {
         if (!signatureHash) return;
@@ -223,45 +226,95 @@ export default function SignaturePage() {
         setActiveTab(availableTabs[0].value);
     }
 
+    // Render navigation based on screen size
+    const renderNavigation = () => {
+        if (isMobile) {
+            // Mobile: Horizontal tabs at the top
+            return (
+                <Box
+                  style={{
+                      borderBottom: '1px solid var(--mantine-color-gray-3)',
+                      backgroundColor: 'var(--mantine-color-body)',
+                  }}
+                >
+                    <Container size="xl" py="md" style={{ maxWidth: '1400px' }}>
+                        {/* Contractor Header for Mobile */}
+                        {linkInfo.contractor && (
+                            <Box mb="md">
+                                <Title order={4}>{linkInfo.contractor.name}</Title>
+                                {linkInfo.contractor.email && (
+                                    <Text c="dimmed" size="xs" mt="xs">
+                                        {linkInfo.contractor.email}
+                                    </Text>
+                                )}
+                            </Box>
+                        )}
+                        <Tabs
+                          value={activeTab || undefined}
+                          onChange={(value) => setActiveTab(value)}
+                        >
+                            <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
+                                {availableTabs.map((tab) => (
+                                    <Tabs.Tab
+                                      key={tab.value}
+                                      value={tab.value}
+                                      leftSection={<tab.icon size={16} />}
+                                    >
+                                        {tab.label}
+                                    </Tabs.Tab>
+                                ))}
+                            </Tabs.List>
+                        </Tabs>
+                    </Container>
+                </Box>
+            );
+        }
+        // Desktop: Sidebar navigation
+        return (
+            <AppShell.Navbar p="md">
+                <Stack gap="xs">
+                    {/* Contractor Header */}
+                    {linkInfo.contractor && (
+                        <Box mb="md" pb="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
+                            <Title order={4}>{linkInfo.contractor.name}</Title>
+                            {linkInfo.contractor.email && (
+                                <Text c="dimmed" size="xs" mt="xs">
+                                    {linkInfo.contractor.email}
+                                </Text>
+                            )}
+                        </Box>
+                    )}
+
+                    {/* Navigation Tabs */}
+                    {availableTabs.map((tab) => (
+                      <NavLink
+                        key={tab.value}
+                        label={tab.label}
+                        leftSection={<tab.icon size={18} />}
+                        active={activeTab === tab.value}
+                        onClick={() => setActiveTab(tab.value)}
+                        style={{
+                            borderRadius: 'var(--mantine-radius-sm)',
+                        }}
+                      />
+                    ))}
+                </Stack>
+            </AppShell.Navbar>
+        );
+    };
+
     return (
         <AppShell
           padding={0}
-          navbar={{
+          navbar={isMobile ? undefined : {
             width: 250,
             breakpoint: 'sm',
           }}
         >
-            <AppShell.Navbar p="md">
-                <Stack gap="xs">
-                  {/* Contractor Header */}
-                  {linkInfo.contractor && (
-                    <Box mb="md" pb="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-                      <Title order={4}>{linkInfo.contractor.name}</Title>
-                      {linkInfo.contractor.email && (
-                        <Text c="dimmed" size="xs" mt="xs">
-                          {linkInfo.contractor.email}
-                        </Text>
-                      )}
-                    </Box>
-                  )}
-
-                  {/* Navigation Tabs */}
-                  {availableTabs.map((tab) => (
-                    <NavLink
-                      key={tab.value}
-                      label={tab.label}
-                      leftSection={<tab.icon size={18} />}
-                      active={activeTab === tab.value}
-                      onClick={() => setActiveTab(tab.value)}
-                      style={{
-                        borderRadius: 'var(--mantine-radius-sm)',
-                      }}
-                    />
-                  ))}
-                </Stack>
-            </AppShell.Navbar>
+            {!isMobile && renderNavigation()}
 
             <AppShell.Main>
+                {isMobile && renderNavigation()}
                 <Container size="xl" py="xl" style={{ maxWidth: '1400px' }}>
                   <Stack gap="xl">
                     {/* Preview Mode Banner for Contractors */}
