@@ -78,6 +78,21 @@
         overflow-x: auto;
     }
 
+    /* Make images smaller on mobile */
+    .estimatePreviewWrapper :global(.image-wrapper img),
+    .estimatePreviewWrapper :global(img) {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: var(--mantine-spacing-md) auto !important;
+    }
+
+    /* Make logo smaller on mobile */
+    .estimatePreviewWrapper :global(.logo) {
+        width: 60% !important;
+        max-width: 200px !important;
+    }
+
     /* Make signature section stack vertically on mobile */
     .estimatePreviewWrapper :global(.signature-section) {
         flex-direction: column !important;
@@ -143,6 +158,21 @@
 
     .estimatePreviewWrapper :global(table) {
         font-size: 0.85em;
+    }
+
+    /* Make images even smaller on very small screens */
+    .estimatePreviewWrapper :global(.image-wrapper img),
+    .estimatePreviewWrapper :global(img) {
+        max-width: 100% !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: var(--mantine-spacing-sm) auto !important;
+    }
+
+    /* Make logo even smaller on very small screens */
+    .estimatePreviewWrapper :global(.logo) {
+        width: 50% !important;
+        max-width: 150px !important;
     }
 
     /* Ensure signature fields are full width on very small screens */
