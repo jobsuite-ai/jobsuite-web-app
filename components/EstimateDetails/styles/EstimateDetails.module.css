@@ -40,7 +40,6 @@
         padding: var(--mantine-spacing-xs);
     }
 
-    .estimatePreviewWrapper :global(paper),
     .estimatePreviewWrapper :global(.mantine-Paper-root) {
         width: 100%;
         max-width: 100%;
