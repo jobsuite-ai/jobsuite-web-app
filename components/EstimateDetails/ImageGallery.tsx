@@ -39,42 +39,141 @@ export default function ImageGallery({
           (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
         );
 
-        const getImageBucket = () => {
-          // Determine env based on bucket name if available, otherwise default to dev
-          const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
-          const isProduction = branch === 'production' || branch === 'prod';
-          const env = isProduction ? 'prod' : 'dev';
-          return `jobsuite-resource-images-${env}`;
-        };
+        // Fetch presigned URLs for images to ensure correct Content-Type header
+        // This fixes issues where S3 objects have incorrect Content-Type metadata
+        // (e.g., application/octet-stream instead of image/heic or image/jpeg)
+        const accessToken = localStorage.getItem('access_token');
 
-        const paths = imageResources.map((resource) => {
-          // Determine region based on bucket name (more reliable than env vars)
-          // If bucket name contains '-prod', use us-east-1, otherwise us-west-2
-          const bucket = resource.s3_bucket || getImageBucket();
-          const isProduction = bucket.includes('-prod');
-          const region = isProduction ? 'us-east-1' : 'us-west-2';
+        if (accessToken && imageResources.length > 0) {
+          try {
+            // Fetch presigned URLs for all images in parallel
+            const urlPromises = imageResources.map(async (resource) => {
+              // Only fetch presigned URL if we have s3_bucket and s3_key
+              // Legacy resources without these will fall back to direct URL
+              if (resource.s3_bucket && resource.s3_key) {
+                try {
+                  const response = await fetch(
+                    `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
+                    {
+                      method: 'GET',
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                      },
+                    }
+                  );
 
-          // If we have s3_bucket and s3_key, construct the correct S3 URL
-          if (resource.s3_bucket && resource.s3_key) {
-            const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
-            return { url, resource };
+                  if (response.ok) {
+                    const data = await response.json();
+                    const presignedUrl = data.presigned_url || data.url;
+                    if (presignedUrl) {
+                      return { url: presignedUrl, resource };
+                    }
+                  }
+                } catch (error) {
+                  // eslint-disable-next-line no-console
+                  console.warn(`Failed to get presigned URL for resource ${resource.id}:`, error);
+                  // Fall through to direct URL construction
+                }
+              }
+
+              // Fallback to direct URL construction for legacy resources or if presigned URL fails
+              const getImageBucket = () => {
+                const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
+                const isProduction = branch === 'production' || branch === 'prod';
+                const env = isProduction ? 'prod' : 'dev';
+                return `jobsuite-resource-images-${env}`;
+              };
+
+              const bucket = resource.s3_bucket || getImageBucket();
+              const isProduction = bucket.includes('-prod');
+              const region = isProduction ? 'us-east-1' : 'us-west-2';
+
+              if (resource.s3_bucket && resource.s3_key) {
+                const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
+                return { url, resource };
+              }
+
+              // Legacy fallback
+              const imageName = resource.resource_location;
+              const url = imageName
+                ? `https://${getImageBucket()}.s3.${region}.amazonaws.com/${estimateID}/${imageName}`
+                : null;
+              return { url, resource };
+            });
+
+            const paths = await Promise.all(urlPromises);
+            const validPaths = paths.filter((item) => item.url !== null) as Array<{
+              url: string;
+              resource: EstimateResource;
+            }>;
+            setImagePaths(validPaths);
+          } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error loading image URLs:', error);
+            // Fallback to direct URL construction
+            const getImageBucket = () => {
+              const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
+              const isProduction = branch === 'production' || branch === 'prod';
+              const env = isProduction ? 'prod' : 'dev';
+              return `jobsuite-resource-images-${env}`;
+            };
+
+            const paths = imageResources.map((resource) => {
+              const bucket = resource.s3_bucket || getImageBucket();
+              const isProduction = bucket.includes('-prod');
+              const region = isProduction ? 'us-east-1' : 'us-west-2';
+
+              if (resource.s3_bucket && resource.s3_key) {
+                const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
+                return { url, resource };
+              }
+
+              const imageName = resource.resource_location;
+              const url = imageName
+                ? `https://${getImageBucket()}.s3.${region}.amazonaws.com/${estimateID}/${imageName}`
+                : null;
+              return { url, resource };
+            });
+
+            const validPaths = paths.filter((item) => item.url !== null) as Array<{
+              url: string;
+              resource: EstimateResource;
+            }>;
+            setImagePaths(validPaths);
           }
+        } else {
+          // No access token or no images - use direct URL construction
+          const getImageBucket = () => {
+            const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
+            const isProduction = branch === 'production' || branch === 'prod';
+            const env = isProduction ? 'prod' : 'dev';
+            return `jobsuite-resource-images-${env}`;
+          };
 
-          // Legacy fallback: use old format (for resources without s3_bucket/s3_key)
-          // This should only happen for very old resources that were uploaded
-          // before S3 metadata was stored
-          const imageName = resource.resource_location;
-          const url = imageName
-            ? `https://${getImageBucket()}.s3.${region}.amazonaws.com/${estimateID}/${imageName}`
-            : null;
-          return { url, resource };
-        });
+          const paths = imageResources.map((resource) => {
+            const bucket = resource.s3_bucket || getImageBucket();
+            const isProduction = bucket.includes('-prod');
+            const region = isProduction ? 'us-east-1' : 'us-west-2';
 
-        const validPaths = paths.filter((item) => item.url !== null) as Array<{
-          url: string;
-          resource: EstimateResource;
-        }>;
-        setImagePaths(validPaths);
+            if (resource.s3_bucket && resource.s3_key) {
+              const url = `https://${bucket}.s3.${region}.amazonaws.com/${resource.s3_key}`;
+              return { url, resource };
+            }
+
+            const imageName = resource.resource_location;
+            const url = imageName
+              ? `https://${getImageBucket()}.s3.${region}.amazonaws.com/${estimateID}/${imageName}`
+              : null;
+            return { url, resource };
+          });
+
+          const validPaths = paths.filter((item) => item.url !== null) as Array<{
+            url: string;
+            resource: EstimateResource;
+          }>;
+          setImagePaths(validPaths);
+        }
       } else {
         setImagePaths([]);
       }

@@ -34,10 +34,10 @@ interface BuildEstimateTemplateParams {
 /**
  * Get image path from resources - prioritize cover photo
  */
-function getImagePath(
+async function getImagePath(
     estimate: Estimate,
     imageResources: EstimateResource[]
-): string {
+): Promise<string> {
     if (!imageResources || imageResources.length === 0) {
         return '';
     }
@@ -53,13 +53,40 @@ function getImagePath(
         }
     }
 
-    // Determine region based on bucket name (more reliable than env vars)
-    // If bucket name contains '-prod', use us-east-1, otherwise us-west-2
+    // Try to get presigned URL if we have authentication and s3_bucket/s3_key
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken && selectedImage.s3_bucket && selectedImage.s3_key && selectedImage.id) {
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimate.id}/resources/${selectedImage.id}/presigned-url`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                const presignedUrl = data.presigned_url || data.url;
+                if (presignedUrl) {
+                    return presignedUrl;
+                }
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.warn('Failed to get presigned URL for image:', error);
+            // Fall through to direct URL construction
+        }
+    }
+
+    // Fallback to direct URL construction
     const bucketName = selectedImage.s3_bucket || 'jobsuite-resource-images-dev';
     const isProduction = bucketName.includes('-prod');
     const region = isProduction ? 'us-east-1' : 'us-west-2';
 
-    // If we have s3_bucket and s3_key, construct the correct S3 URL
     if (selectedImage.s3_bucket && selectedImage.s3_key) {
         const bucket = selectedImage.s3_bucket;
         return `https://${bucket}.s3.${region}.amazonaws.com/${selectedImage.s3_key}`;
@@ -83,6 +110,9 @@ export async function buildEstimateTemplateHtml(
 ): Promise<string> {
     const { estimate, client, lineItems, imageResources } = params;
 
+    // Get image path with presigned URL
+    const imagePath = await getImagePath(estimate, imageResources);
+
     // Process transcription summary to HTML
     const result = await remark().use(html).process(estimate.transcription_summary || '');
     const htmlString = result.toString();
@@ -94,8 +124,6 @@ export async function buildEstimateTemplateHtml(
         price: item.hours * item.rate,
         hours: item.hours,
     }));
-
-    const imagePath = getImagePath(estimate, imageResources);
 
     // Generate template
     const estimateNumber = uuidv4().split('-')[0];
