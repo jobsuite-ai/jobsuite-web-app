@@ -35,6 +35,18 @@ interface SignatureInfo {
     }>;
 }
 
+interface ContractorConfiguration {
+    id: string;
+    user_id: string;
+    contractor_id: string;
+    settings: Record<string, any>;
+    configuration_type: string;
+    configuration: Record<string, any>;
+    edited: any[];
+    services: string[];
+    updated_at: string;
+}
+
 interface ContractorSignatureRequiredProps {
     estimateId: string;
     onSignatureComplete: () => void;
@@ -51,9 +63,65 @@ export default function ContractorSignatureRequired({
     const [signed, setSigned] = useState(false);
     const [contractorSignatureHash, setContractorSignatureHash] = useState<string | null>(null);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
+    const [contractorEmail, setContractorEmail] = useState<string | null>(null);
+    const [contractorName, setContractorName] = useState<string | null>(null);
 
     const userEmail = user?.email || null;
-    const contractorName = user?.full_name || user?.email || null;
+
+    // Fetch contractor configuration to get contractor email and name
+    useEffect(() => {
+        const fetchContractorConfig = async () => {
+            try {
+                const response = await fetch(
+                    '/api/configurations?config_type=contractor_config',
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (response.ok) {
+                    const configs: ContractorConfiguration[] = await response.json();
+                    const config = configs.find(
+                        (c) => c.configuration_type === 'contractor_config'
+                    );
+
+                    if (config) {
+                        // Use contractor settings if available, otherwise fall back to user details
+                        const email =
+                            config.configuration?.client_communication_email ||
+                            user?.email ||
+                            null;
+                        const name =
+                            config.configuration?.client_communication_name ||
+                            user?.full_name ||
+                            user?.email ||
+                            null;
+                        setContractorEmail(email);
+                        setContractorName(name);
+                    } else {
+                        // No config found, use user details as fallback
+                        setContractorEmail(user?.email || null);
+                        setContractorName(user?.full_name || user?.email || null);
+                    }
+                } else {
+                    // API error, use user details as fallback
+                    setContractorEmail(user?.email || null);
+                    setContractorName(user?.full_name || user?.email || null);
+                }
+            } catch (err) {
+                // Error fetching config, use user details as fallback
+                // eslint-disable-next-line no-console
+                console.error('Error fetching contractor configuration:', err);
+                setContractorEmail(user?.email || null);
+                setContractorName(user?.full_name || user?.email || null);
+            }
+        };
+
+        if (user) {
+            fetchContractorConfig();
+        }
+    }, [user]);
 
     useEffect(() => {
         fetchSignatures();
@@ -329,7 +397,7 @@ export default function ContractorSignatureRequired({
 
             <SignatureForm
               signatureHash={signatureHash}
-              clientEmail={userEmail || ''}
+              clientEmail={contractorEmail || userEmail || ''}
               onSignatureSuccess={handleSignatureSuccess}
               signatureType="CONTRACTOR"
               opened={signatureModalOpened}
