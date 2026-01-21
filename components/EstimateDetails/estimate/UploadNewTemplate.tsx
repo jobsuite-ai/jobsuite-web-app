@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 
 import { Button, Checkbox, Group, Select, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconCopy, IconLink } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconLink, IconFilePdf } from '@tabler/icons-react';
 
 import { EstimateLineItem } from './LineItem';
 import { ResendConfirmModal } from './ResendConfirmModal';
@@ -22,6 +22,7 @@ export function UploadNewTemplate({
     lineItems = [],
     signatureUrl,
     loadingSignatureUrl = false,
+    onSignatureUrlGenerated,
 }: {
     estimate: Estimate,
     client?: ContractorClient,
@@ -32,11 +33,13 @@ export function UploadNewTemplate({
     lineItems?: EstimateLineItem[],
     signatureUrl?: string | null,
     loadingSignatureUrl?: boolean,
+    onSignatureUrlGenerated?: (url: string) => void,
 }) {
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
     const [hasBeenSent, setHasBeenSent] = useState(false);
     const [showResendModal, setShowResendModal] = useState(false);
+    const [generatingPdf, setGeneratingPdf] = useState(false);
 
     // Collect all available emails (deduplicated by email value)
     const availableEmails = useMemo(() => {
@@ -262,6 +265,60 @@ export function UploadNewTemplate({
         }
     };
 
+    const handleCreatePdf = async () => {
+        if (!client?.email) {
+            notifications.show({
+                title: 'Error',
+                message: 'Client email is required to generate PDF',
+                color: 'red',
+            });
+            return;
+        }
+
+        setGeneratingPdf(true);
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimate.id}/signature-links`,
+                {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                    body: JSON.stringify({
+                        client_email: client.email,
+                        expires_in_days: 30,
+                    }),
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+                const newSignatureUrl = data.signature_url;
+
+                // Notify parent component to update signatureUrl
+                if (onSignatureUrlGenerated) {
+                    onSignatureUrlGenerated(newSignatureUrl);
+                }
+
+                notifications.show({
+                    title: 'Success!',
+                    message: 'PDF generated and signature link created',
+                    color: 'green',
+                    icon: <IconCheck size={16} />,
+                });
+            } else {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.detail || 'Failed to generate PDF');
+            }
+        } catch (error: any) {
+            notifications.show({
+                title: 'Error',
+                message: error.message || 'Failed to generate PDF. Please try again.',
+                color: 'red',
+            });
+        } finally {
+            setGeneratingPdf(false);
+        }
+    };
+
     return (
         <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <ResendConfirmModal
@@ -324,6 +381,18 @@ export function UploadNewTemplate({
                 </div>
             )}
             <Group gap="sm" mt="lg">
+                {!signatureUrl && !loadingSignatureUrl && (
+                    <Tooltip label="Generate PDF and create signature link">
+                        <Button
+                          variant="outline"
+                          onClick={handleCreatePdf}
+                          loading={generatingPdf}
+                          leftSection={<IconFilePdf size={16} />}
+                        >
+                            Create PDF
+                        </Button>
+                    </Tooltip>
+                )}
                 <Tooltip
                   label={isDisabled ? 'Please finish the todo list above to send the estimate' : ''}
                   disabled={!isDisabled}
