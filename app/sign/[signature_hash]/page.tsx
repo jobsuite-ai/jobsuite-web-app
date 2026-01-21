@@ -362,6 +362,7 @@ export default function SignaturePage() {
                           <SignatureForm
                             signatureHash={signatureHash}
                             clientEmail={linkInfo.client?.email || ''}
+                            clientName={linkInfo.client?.name || undefined}
                             onSignatureSuccess={async () => {
                               setSigned(true);
                               setSignatureModalOpened(false);
