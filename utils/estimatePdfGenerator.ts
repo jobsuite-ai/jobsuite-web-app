@@ -42,11 +42,6 @@ function getImagePath(
         return '';
     }
 
-    // Determine region based on branch
-    const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
-    const isProduction = branch === 'production' || branch === 'prod';
-    const region = isProduction ? 'us-east-1' : 'us-west-2';
-
     // Find cover photo if specified, otherwise use first image
     let selectedImage = imageResources[0];
     if (estimate.cover_photo_resource_id) {
@@ -57,6 +52,12 @@ function getImagePath(
             selectedImage = coverPhoto;
         }
     }
+
+    // Determine region based on bucket name (more reliable than env vars)
+    // If bucket name contains '-prod', use us-east-1, otherwise us-west-2
+    const bucketName = selectedImage.s3_bucket || 'jobsuite-resource-images-dev';
+    const isProduction = bucketName.includes('-prod');
+    const region = isProduction ? 'us-east-1' : 'us-west-2';
 
     // If we have s3_bucket and s3_key, construct the correct S3 URL
     if (selectedImage.s3_bucket && selectedImage.s3_key) {
