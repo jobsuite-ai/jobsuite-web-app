@@ -24,6 +24,7 @@ interface SignatureFormProps {
     signatureType?: 'CLIENT' | 'CONTRACTOR';
     opened: boolean;
     onClose: () => void;
+    contractorName?: string; // Display name for contractor (full_name or email)
 }
 
 export default function SignatureForm({
@@ -33,19 +34,46 @@ export default function SignatureForm({
     signatureType = 'CLIENT',
     opened,
     onClose,
+    contractorName,
 }: SignatureFormProps) {
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [signerName, setSignerName] = useState('');
-    const [signerEmail, setSignerEmail] = useState(clientEmail);
+
+    // For contractor: pre-populate with contractorName (or email if no name) and email
+    // For client: start empty
+    const getInitialName = () => {
+        if (signatureType === 'CONTRACTOR' && contractorName) {
+            return contractorName;
+        }
+        return '';
+    };
+
+    const getInitialEmail = () => {
+        if (signatureType === 'CONTRACTOR') {
+            return clientEmail;
+        }
+        return clientEmail;
+    };
+
+    const getInitialSignatureMethod = () => (signatureType === 'CONTRACTOR' ? 'type' : 'draw');
+
+    const getInitialTypedSignature = () => {
+        if (signatureType === 'CONTRACTOR' && contractorName) {
+            return contractorName;
+        }
+        return '';
+    };
+
+    const [signerName, setSignerName] = useState(getInitialName());
+    const [signerEmail, setSignerEmail] = useState(getInitialEmail());
     const [consentGiven, setConsentGiven] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [hasSignature, setHasSignature] = useState(false);
-    const [signatureMethod, setSignatureMethod] = useState<'draw' | 'type'>('draw');
-    const [typedSignature, setTypedSignature] = useState('');
+    const [signatureMethod, setSignatureMethod] = useState<'draw' | 'type'>(getInitialSignatureMethod());
+    const [typedSignature, setTypedSignature] = useState(getInitialTypedSignature());
 
     const getCoordinates = (
         e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
@@ -173,6 +201,39 @@ export default function SignatureForm({
             renderTypedSignature();
         }
     }, [typedSignature, signatureMethod, renderTypedSignature]);
+
+    // Initialize contractor fields when modal opens and signatureType is CONTRACTOR
+    useEffect(() => {
+        if (opened && signatureType === 'CONTRACTOR') {
+            const name = contractorName || clientEmail;
+            setSignerName(name);
+            setSignerEmail(clientEmail);
+            setSignatureMethod('type');
+            setTypedSignature(name);
+            // Clear any existing signature
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                }
+            }
+            setHasSignature(false);
+            // Render typed signature after a brief delay to ensure canvas is ready
+            setTimeout(() => {
+                if (canvasRef.current) {
+                    renderTypedSignature();
+                }
+            }, 0);
+        } else if (opened && signatureType === 'CLIENT') {
+            // Reset to defaults for client
+            setSignerName('');
+            setSignerEmail(clientEmail);
+            setSignatureMethod('draw');
+            setTypedSignature('');
+            setHasSignature(false);
+        }
+    }, [opened, signatureType, contractorName, clientEmail, renderTypedSignature]);
 
     // Clear canvas when switching methods
     useEffect(() => {

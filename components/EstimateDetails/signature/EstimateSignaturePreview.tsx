@@ -345,24 +345,36 @@ function EstimateSignaturePreviewBase({
         };
     }, [template, signatures]);
 
+    // Store the latest callback in a ref to avoid re-attaching listeners when it changes
+    const onSignatureClickRef = useRef(onSignatureClick);
+    useEffect(() => {
+        onSignatureClickRef.current = onSignatureClick;
+    }, [onSignatureClick]);
+
     // Add click handler and hover effects to signature clickable section after template is rendered
     useEffect(() => {
         // Declare cleanup variables at the top so they're always in scope
-        let animationFrameId: number | null = null;
         let timeoutId: NodeJS.Timeout | null = null;
+        let observer: MutationObserver | null = null;
         let clickableSection: HTMLElement | null = null;
-        let clickHandler: (() => void) | null = null;
+        let clickHandler: ((e: Event) => void) | null = null;
         let handleMouseEnter: (() => void) | null = null;
         let handleMouseLeave: (() => void) | null = null;
+        let isAttached = false;
 
-        if (!template || !showSignatureClickable || !onSignatureClick || !templateRef.current) {
+        if (
+            !template ||
+            !showSignatureClickable ||
+            !onSignatureClickRef.current ||
+            !templateRef.current
+        ) {
             // Return cleanup function even when early returning
             return () => {
-                if (animationFrameId !== null) {
-                    cancelAnimationFrame(animationFrameId);
-                }
                 if (timeoutId !== null) {
                     clearTimeout(timeoutId);
+                }
+                if (observer) {
+                    observer.disconnect();
                 }
                 if (clickableSection && clickHandler && handleMouseEnter && handleMouseLeave) {
                     clickableSection.removeEventListener('click', clickHandler);
@@ -372,32 +384,32 @@ function EstimateSignaturePreviewBase({
             };
         }
 
-        // Wait for DOM to update after React renders the template
-        // Use multiple requestAnimationFrame calls to ensure DOM is fully updated
-        let retryCount = 0;
-        const maxRetries = 10;
-
         const attachClickHandler = () => {
-            if (!templateRef.current) {
+            if (!templateRef.current || isAttached) {
                 return;
             }
 
             clickableSection = templateRef.current.querySelector('[data-signature-clickable="true"]') as HTMLElement;
 
             if (!clickableSection) {
-                // Retry if element not found yet
-                retryCount += 1;
-                if (retryCount < maxRetries) {
-                    animationFrameId = requestAnimationFrame(() => {
-                        requestAnimationFrame(attachClickHandler);
-                    });
-                }
                 return;
             }
 
-            // Element found, attach handlers
-            clickHandler = onSignatureClick;
-            clickableSection.addEventListener('click', clickHandler);
+            // Prevent double attachment
+            if (isAttached) {
+                return;
+            }
+            isAttached = true;
+
+            // Use a wrapper function that calls the latest callback from the ref
+            clickHandler = (e: Event) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (onSignatureClickRef.current) {
+                    onSignatureClickRef.current();
+                }
+            };
+            clickableSection.addEventListener('click', clickHandler, { passive: false });
 
             // Add hover effects
             handleMouseEnter = () => {
@@ -415,24 +427,45 @@ function EstimateSignaturePreviewBase({
 
             clickableSection.addEventListener('mouseenter', handleMouseEnter);
             clickableSection.addEventListener('mouseleave', handleMouseLeave);
+
+            // Disconnect observer once attached
+            if (observer) {
+                observer.disconnect();
+                observer = null;
+            }
         };
 
-        // Start attaching after DOM update - use a small delay to ensure React has updated the DOM
-        timeoutId = setTimeout(() => {
-            animationFrameId = requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    requestAnimationFrame(attachClickHandler);
-                });
+        // Try to attach immediately
+        const tryAttach = () => {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(attachClickHandler);
             });
-        }, 50);
+        };
+
+        // Start trying to attach after a short delay
+        timeoutId = setTimeout(tryAttach, 50);
+
+        // Also use MutationObserver to watch for the element being added to DOM
+        if (templateRef.current) {
+            observer = new MutationObserver(() => {
+                if (!isAttached) {
+                    tryAttach();
+                }
+            });
+            observer.observe(templateRef.current, {
+                childList: true,
+                subtree: true,
+            });
+        }
 
         // Cleanup function
         return () => {
-            if (animationFrameId !== null) {
-                cancelAnimationFrame(animationFrameId);
-            }
+            isAttached = false;
             if (timeoutId !== null) {
                 clearTimeout(timeoutId);
+            }
+            if (observer) {
+                observer.disconnect();
             }
             // Remove listeners if element exists
             if (clickableSection && clickHandler && handleMouseEnter && handleMouseLeave) {
@@ -441,7 +474,7 @@ function EstimateSignaturePreviewBase({
                 clickableSection.removeEventListener('mouseleave', handleMouseLeave);
             }
         };
-    }, [template, showSignatureClickable, onSignatureClick]);
+    }, [template, showSignatureClickable]);
 
     if (loading || !client) {
         return <LoadingState />;
