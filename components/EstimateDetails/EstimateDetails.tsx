@@ -53,7 +53,12 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
-    const { estimates: cachedEstimates, clients: cachedClients } = useDataCache();
+    const {
+        estimates: cachedEstimates,
+        clients: cachedClients,
+        updateEstimate,
+        refreshData,
+    } = useDataCache();
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -437,12 +442,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             if (response.ok) {
                 const estimateData = await response.json();
                 setEstimate(estimateData);
+                // Update cache immediately so SidebarDetails and other components see the changes
+                updateEstimate(estimateData);
             }
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching estimate:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, updateEstimate]);
 
     const getResources = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
@@ -1634,6 +1641,25 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         />
                                     </CollapsibleSection>
 
+                                    {/* Change Orders Section - Only show if not archived and
+                                    there are change orders */}
+                                    {estimate &&
+                                    !estimate.original_estimate_id &&
+                                    estimate.status !== EstimateStatus.ARCHIVED &&
+                                    changeOrders.length > 0 && (
+                                        <CollapsibleSection title="Change Orders" defaultOpen>
+                                            <ChangeOrders
+                                              estimate={estimate}
+                                              initialChangeOrders={changeOrders}
+                                              skipInitialFetch={changeOrders.length > 0}
+                                              onUpdate={() => {
+                                                getEstimate();
+                                                fetchChangeOrders();
+                                            }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
                                     {/* Image Gallery - Show if images exist */}
                                     {hasImages && (
                                         <CollapsibleSection title="Image Gallery" defaultOpen>
@@ -1745,9 +1771,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={() => {
-                                                getEstimate();
-                                                getLineItems();
+                                              onEstimateUpdate={async () => {
+                                                // Update estimate, line items, and cache
+                                                await Promise.all([
+                                                    getEstimate(),
+                                                    getLineItems(),
+                                                ]);
+                                                // Refresh cache in background
+                                                refreshData('estimates').catch(() => {});
                                               }}
                                             />
                                         </CollapsibleSection>
@@ -1759,31 +1790,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={() => {
-                                                getEstimate();
-                                                getLineItems();
+                                              onEstimateUpdate={async () => {
+                                                // Update estimate, line items, and cache
+                                                await Promise.all([
+                                                    getEstimate(),
+                                                    getLineItems(),
+                                                ]);
+                                                // Refresh cache in background
+                                                refreshData('estimates').catch(() => {});
                                               }}
                                             />
                                         </div>
-                                    )}
-
-                                    {/* Change Orders Section - Only show if not archived and
-                                    there are change orders */}
-                                    {estimate &&
-                                    !estimate.original_estimate_id &&
-                                    estimate.status !== EstimateStatus.ARCHIVED &&
-                                    changeOrders.length > 0 && (
-                                        <CollapsibleSection title="Change Orders" defaultOpen>
-                                            <ChangeOrders
-                                              estimate={estimate}
-                                              initialChangeOrders={changeOrders}
-                                              skipInitialFetch={changeOrders.length > 0}
-                                              onUpdate={() => {
-                                                getEstimate();
-                                                fetchChangeOrders();
-                                              }}
-                                            />
-                                        </CollapsibleSection>
                                     )}
 
                                     {/* Estimate Preview or Signature Requirement Section */}
@@ -1906,6 +1923,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               onClose={() => setIsModalOpen(false)}
               size="lg"
               className={classes.archiveModal}
+              centered
               title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">
