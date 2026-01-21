@@ -301,7 +301,7 @@ export function UploadNewTemplate({
                 newSignatureUrl = linkData.signature_url;
 
                 // Notify parent component to update signatureUrl
-                if (onSignatureUrlGenerated) {
+                if (onSignatureUrlGenerated && newSignatureUrl) {
                     onSignatureUrlGenerated(newSignatureUrl);
                 }
             }
