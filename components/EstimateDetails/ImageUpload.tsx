@@ -230,6 +230,198 @@ export default function ImageUpload({ estimateID, setImage, setShowModal }: Imag
         }, 2000);
     };
 
+    // Multipart upload helper functions
+    async function initiateMultipartUpload(file: File): Promise<any> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const parsedFileName = file.name.replaceAll(' ', '_');
+        const formData = new FormData();
+        formData.append('filename', parsedFileName);
+        formData.append('content_type', file.type);
+        formData.append('resource_type', 'IMAGE');
+
+        const response = await fetch(
+            `/api/estimates/${estimateID}/resources/multipart/initiate`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: formData,
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to initiate multipart upload';
+            throw new Error(errorMessage);
+        }
+
+        return response.json();
+    }
+
+    async function getPresignedUrlForPart(
+        resourceID: string,
+        partNumber: number
+    ): Promise<string> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const response = await fetch(
+            `/api/estimates/${estimateID}/resources/${resourceID}/multipart/presigned-url?part_number=${partNumber}`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to get presigned URL';
+            throw new Error(errorMessage);
+        }
+
+        const data = await response.json();
+        return data.presigned_url;
+    }
+
+    async function uploadFilePartWithRetry(
+        resourceID: string,
+        partNumber: number,
+        chunk: Blob,
+        maxRetries: number = 3
+    ): Promise<{ PartNumber: number; ETag: string }> {
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+            try {
+                // Get presigned URL for this part
+                const presignedUrl = await getPresignedUrlForPart(
+                    resourceID,
+                    partNumber
+                );
+
+                // Upload part directly to S3 with timeout
+                const controller = new AbortController();
+                // 5 minute timeout per part
+                const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+
+                try {
+                    const uploadResponse = await fetch(presignedUrl, {
+                        method: 'PUT',
+                        body: chunk,
+                        signal: controller.signal,
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!uploadResponse.ok) {
+                        const errorText = await uploadResponse.text().catch(() => 'Unknown error');
+                        throw new Error(
+                            `Failed to upload part ${partNumber}: ${uploadResponse.status} ${uploadResponse.statusText}. ${errorText}`
+                        );
+                    }
+
+                    const etag = uploadResponse.headers.get('ETag')?.replace(/"/g, '');
+                    if (!etag) {
+                        throw new Error(
+                            `No ETag received for part ${partNumber}. ` +
+                            'This is likely a CORS configuration issue. ' +
+                            'The S3 bucket must expose the ETag header in its CORS configuration.'
+                        );
+                    }
+
+                    return {
+                        PartNumber: partNumber,
+                        ETag: etag,
+                    };
+                } catch (fetchError) {
+                    clearTimeout(timeoutId);
+                    if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                        throw new Error(`Upload timeout for part ${partNumber} (attempt ${attempt}/${maxRetries})`);
+                    }
+                    throw fetchError;
+                }
+            } catch (error) {
+                lastError = error instanceof Error ? error : new Error(String(error));
+                if (attempt < maxRetries) {
+                    // Exponential backoff: wait 1s, 2s, 4s before retrying
+                    const delay = Math.min(1000 * (2 ** (attempt - 1)), 10000);
+                    await new Promise((resolve) => {
+                        setTimeout(resolve, delay);
+                    });
+                }
+            }
+        }
+
+        // All retries failed
+        throw new Error(
+            `Failed to upload part ${partNumber} after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`
+        );
+    }
+
+    async function uploadFileParts(
+        file: File,
+        resourceID: string
+    ): Promise<Array<{ PartNumber: number; ETag: string }>> {
+        const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+        const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+        const parts: Array<{ PartNumber: number; ETag: string }> = [];
+
+        for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+            const start = (partNumber - 1) * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const chunk = file.slice(start, end);
+
+            const partResult = await uploadFilePartWithRetry(
+                resourceID,
+                partNumber,
+                chunk,
+                3 // maxRetries
+            );
+
+            parts.push(partResult);
+        }
+
+        return parts;
+    }
+
+    async function completeMultipartUpload(
+        resourceID: string,
+        parts: Array<{ PartNumber: number; ETag: string }>
+    ): Promise<void> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            throw new Error('No access token found');
+        }
+
+        const response = await fetch(
+            `/api/estimates/${estimateID}/resources/${resourceID}/multipart/complete`,
+            {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ parts }),
+            }
+        );
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMessage = errorData.message || errorData.error || 'Failed to complete multipart upload';
+            throw new Error(errorMessage);
+        }
+    }
+
     async function uploadResource(file: FileWithPath) {
         if (!file) return;
 
@@ -238,30 +430,51 @@ export default function ImageUpload({ estimateID, setImage, setShowModal }: Imag
             throw new Error('No access token found');
         }
 
+        // Use multipart upload for files larger than 4MB to avoid
+        // Next.js API route body size limits
+        const MULTIPART_THRESHOLD = 4 * 1024 * 1024; // 4MB
+
         try {
-            // Create form data for resource upload
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('resource_type', 'IMAGE');
+            if (file.size > MULTIPART_THRESHOLD) {
+                // Use multipart upload for large files
+                // Step 1: Initiate multipart upload
+                const resource = await initiateMultipartUpload(file);
+                const resourceID = resource.id;
 
-            const response = await fetch(
-                `/api/estimates/${estimateID}/resources`,
-                {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                    },
-                    body: formData,
+                if (!resourceID) {
+                    throw new Error('Resource ID not found after initiating upload');
                 }
-            );
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                const errorMsg = errorData.message || errorData.error || 'Failed to upload resource';
-                throw new Error(errorMsg);
+                // Step 2: Upload file parts
+                const parts = await uploadFileParts(file, resourceID);
+
+                // Step 3: Complete multipart upload
+                await completeMultipartUpload(resourceID, parts);
+            } else {
+                // Use simple POST for small files (faster for small uploads)
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('resource_type', 'IMAGE');
+
+                const response = await fetch(
+                    `/api/estimates/${estimateID}/resources`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                        },
+                        body: formData,
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    const errorMsg = errorData.message || errorData.error || 'Failed to upload resource';
+                    throw new Error(errorMsg);
+                }
+
+                await response.json();
             }
-
-            await response.json();
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : 'Failed to upload resource';
             throw new Error(`Failed to upload resource: ${errorMsg}`);
