@@ -16,6 +16,7 @@ import { IconExternalLink, IconCheck, IconSignature } from '@tabler/icons-react'
 import SignatureForm from './signature/SignatureForm';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SignatureInfo {
     estimate_id: string;
@@ -43,35 +44,20 @@ export default function ContractorSignatureRequired({
     estimateId,
     onSignatureComplete,
 }: ContractorSignatureRequiredProps) {
+    const { user } = useAuth({ fetchUser: true });
     const [loading, setLoading] = useState(true);
     const [signatureInfo, setSignatureInfo] = useState<SignatureInfo | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [signed, setSigned] = useState(false);
     const [contractorSignatureHash, setContractorSignatureHash] = useState<string | null>(null);
-    const [userEmail, setUserEmail] = useState<string | null>(null);
     const [signatureModalOpened, setSignatureModalOpened] = useState(false);
 
+    const userEmail = user?.email || null;
+    const contractorName = user?.full_name || user?.email || null;
+
     useEffect(() => {
-        fetchUserEmail();
         fetchSignatures();
-    }, [estimateId]);
-
-    const fetchUserEmail = async () => {
-        try {
-            const response = await fetch('/api/auth/me', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-
-            if (response.ok) {
-                const user = await response.json();
-                setUserEmail(user.email || null);
-            }
-        } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching user email:', err);
-        }
-    };
+    }, [estimateId, userEmail]);
 
     const fetchSignatures = async () => {
         try {
@@ -348,6 +334,7 @@ export default function ContractorSignatureRequired({
               signatureType="CONTRACTOR"
               opened={signatureModalOpened}
               onClose={() => setSignatureModalOpened(false)}
+              contractorName={contractorName || undefined}
             />
         </>
     );
