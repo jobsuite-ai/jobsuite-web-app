@@ -277,30 +277,48 @@ export function UploadNewTemplate({
 
         setGeneratingPdf(true);
         try {
-            const response = await fetch(
-                `/api/estimates/${estimate.id}/signature-links`,
-                {
-                    method: 'POST',
-                    headers: getApiHeaders(),
-                    body: JSON.stringify({
-                        client_email: client.email,
-                        expires_in_days: 30,
-                    }),
-                }
-            );
+            // First, ensure a signature link exists (create one if needed)
+            let newSignatureUrl = signatureUrl;
+            if (!newSignatureUrl) {
+                const linkResponse = await fetch(
+                    `/api/estimates/${estimate.id}/signature-links`,
+                    {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            client_email: client.email,
+                            expires_in_days: 30,
+                        }),
+                    }
+                );
 
-            if (response.ok) {
-                const data = await response.json();
-                const newSignatureUrl = data.signature_url;
+                if (!linkResponse.ok) {
+                    const errorData = await linkResponse.json().catch(() => ({}));
+                    throw new Error(errorData.detail || 'Failed to create signature link');
+                }
+
+                const linkData = await linkResponse.json();
+                newSignatureUrl = linkData.signature_url;
 
                 // Notify parent component to update signatureUrl
                 if (onSignatureUrlGenerated) {
                     onSignatureUrlGenerated(newSignatureUrl);
                 }
+            }
 
+            // Now generate the PDF
+            const response = await fetch(
+                `/api/estimates/${estimate.id}/generate-pdf`,
+                {
+                    method: 'POST',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (response.ok) {
                 notifications.show({
                     title: 'Success!',
-                    message: 'PDF generated and signature link created',
+                    message: 'PDF generated successfully',
                     color: 'green',
                     icon: <IconCheck size={16} />,
                 });
