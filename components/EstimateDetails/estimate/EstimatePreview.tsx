@@ -29,6 +29,7 @@ interface EstimatePreviewProps {
         signer_name?: string;
         is_valid?: boolean;
     }>; // Signatures passed from parent (already loaded)
+    onSignatureUrlGenerated?: (url: string) => void;
 }
 
 export default function EstimatePreview({
@@ -41,6 +42,7 @@ export default function EstimatePreview({
     signatureUrl,
     loadingSignatureUrl = false,
     signatures: propSignatures = [],
+    onSignatureUrlGenerated,
 }: EstimatePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -217,6 +219,7 @@ export default function EstimatePreview({
                               lineItems={lineItems}
                               signatureUrl={signatureUrl}
                               loadingSignatureUrl={loadingSignatureUrl}
+                              onSignatureUrlGenerated={onSignatureUrlGenerated}
                             />
                         )}
                     </Flex>

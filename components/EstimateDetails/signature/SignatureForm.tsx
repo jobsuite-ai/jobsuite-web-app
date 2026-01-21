@@ -204,7 +204,9 @@ export default function SignatureForm({
 
     // Initialize contractor fields when modal opens and signatureType is CONTRACTOR
     useEffect(() => {
-        if (opened && signatureType === 'CONTRACTOR') {
+        if (!opened) return;
+
+        if (signatureType === 'CONTRACTOR') {
             const name = contractorName || clientEmail;
             setSignerName(name);
             setSignerEmail(clientEmail);
@@ -219,13 +221,7 @@ export default function SignatureForm({
                 }
             }
             setHasSignature(false);
-            // Render typed signature after a brief delay to ensure canvas is ready
-            setTimeout(() => {
-                if (canvasRef.current) {
-                    renderTypedSignature();
-                }
-            }, 0);
-        } else if (opened && signatureType === 'CLIENT') {
+        } else if (signatureType === 'CLIENT') {
             // Reset to defaults for client
             setSignerName('');
             setSignerEmail(clientEmail);
@@ -233,9 +229,9 @@ export default function SignatureForm({
             setTypedSignature('');
             setHasSignature(false);
         }
-    }, [opened, signatureType, contractorName, clientEmail, renderTypedSignature]);
+    }, [opened, signatureType, contractorName, clientEmail]);
 
-    // Clear canvas when switching methods
+    // Clear canvas when switching methods (but preserve typedSignature if switching to type)
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -245,7 +241,11 @@ export default function SignatureForm({
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         setHasSignature(false);
-        setTypedSignature('');
+        // Only clear typedSignature if switching away from 'type' method
+        // If switching to 'type', keep any existing typedSignature
+        if (signatureMethod !== 'type') {
+            setTypedSignature('');
+        }
     }, [signatureMethod]);
 
     // Resize canvas to match display size on mobile
