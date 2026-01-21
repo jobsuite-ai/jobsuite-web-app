@@ -20,6 +20,7 @@ import { useRouter } from 'next/navigation';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import LoadingState from '@/components/Global/LoadingState';
 import UniversalError from '@/components/Global/UniversalError';
+import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Notification {
@@ -38,15 +39,38 @@ interface Notification {
   updated_at: string;
 }
 
+// Utility function to extract estimate_id from notification link
+function extractEstimateId(link: string | null): string | null {
+  if (!link) return null;
+
+  // Match patterns like /proposals/{id} or https://jobsuite.app/proposals/{id}
+  const match = link.match(/\/proposals\/([^/?]+)/);
+  return match ? match[1] : null;
+}
+
+// Utility function to strip HTML tags from notification messages
+function stripHtmlTags(html: string): string {
+  // Create a temporary div element to parse HTML
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  // Replace <br> tags with newlines, then get text content
+  const text = tmp.innerText || tmp.textContent || '';
+
+  // Clean up multiple consecutive newlines/spaces
+  return text.replace(/\n\s*\n/g, '\n').trim();
+}
+
 export default function NotificationsPage() {
   const router = useRouter();
   const { isLoading: authLoading } = useAuth({ requireAuth: true });
+  const { estimates } = useSearchData();
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [showOlderNotifications, setShowOlderNotifications] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [acknowledging, setAcknowledging] = useState<string | null>(null);
+  const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
 
   const fetchNotifications = useCallback(
     async (includeOlder: boolean = false) => {
@@ -100,30 +124,89 @@ export default function NotificationsPage() {
     }
   }, [authLoading, fetchNotifications]);
 
-  const acknowledgeNotification = useCallback(async (notificationId: string) => {
+  // Fetch job title for a notification
+  const fetchJobTitle = useCallback(async (estimateId: string) => {
+    // Check cache first
+    const cachedEstimate = estimates.find((e) => e.id === estimateId);
+    if (cachedEstimate?.title) {
+      setJobTitles((prev) => {
+        if (prev[estimateId]) return prev; // Already set
+        return { ...prev, [estimateId]: cachedEstimate.title! };
+      });
+      return cachedEstimate.title;
+    }
+
+    // Fetch from API
     try {
-      setAcknowledging(notificationId);
-      const response = await fetch(`/api/notifications/${notificationId}/acknowledge`, {
-        method: 'POST',
+      const response = await fetch(`/api/estimates/${estimateId}`, {
+        method: 'GET',
         headers: getApiHeaders(),
       });
 
       if (response.ok) {
-        // Update the notification in the list
-        setAllNotifications((prev) =>
-          prev.map((n) =>
-            n.id === notificationId
-              ? { ...n, is_acknowledged: true, acknowledged_at: new Date().toISOString() }
-              : n
-          )
-        );
+        const estimate = await response.json();
+        const title = estimate.title || null;
+        if (title) {
+          setJobTitles((prev) => {
+            if (prev[estimateId]) return prev; // Already set
+            return { ...prev, [estimateId]: title };
+          });
+        }
+        return title;
       }
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Error acknowledging notification:', err);
-    } finally {
-      setAcknowledging(null);
+      console.error('Error fetching job title:', err);
     }
+
+    return null;
+  }, [estimates]);
+
+  // Fetch job titles for all notifications with links
+  useEffect(() => {
+    const fetchTitles = async () => {
+      const titlePromises = allNotifications
+        .map((n) => {
+          const estimateId = extractEstimateId(n.link);
+          return estimateId ? fetchJobTitle(estimateId) : Promise.resolve(null);
+        });
+      await Promise.all(titlePromises);
+    };
+
+    if (allNotifications.length > 0) {
+      fetchTitles();
+    }
+  }, [allNotifications]);
+
+  const acknowledgeNotification = useCallback(async (notificationId: string) => {
+    // Optimistically update UI immediately
+    setAllNotifications((prev) =>
+      prev.map((n) =>
+        n.id === notificationId
+          ? { ...n, is_acknowledged: true, acknowledged_at: new Date().toISOString() }
+          : n
+      )
+    );
+
+    // Dispatch event immediately to update header count
+    window.dispatchEvent(new CustomEvent('notificationAcknowledged'));
+
+    // Acknowledge in the background (non-blocking)
+    fetch(`/api/notifications/${notificationId}/acknowledge`, {
+      method: 'POST',
+      headers: getApiHeaders(),
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Error acknowledging notification:', err);
+      // Revert optimistic update on error
+      setAllNotifications((prev) =>
+        prev.map((n) =>
+          n.id === notificationId
+            ? { ...n, is_acknowledged: false, acknowledged_at: null }
+            : n
+        )
+      );
+    });
   }, []);
 
   const formatDate = (dateString: string) => {
@@ -219,7 +302,7 @@ export default function NotificationsPage() {
           <Stack gap="md">
             <Group gap="sm">
               <IconClock size={20} color="var(--mantine-color-red-6)" />
-              <Title order={2} size="h3">
+              <Title order={2} size="h3" c="gray.0">
                 Unacknowledged ({recentUnacknowledged.length + olderUnacknowledged.length})
               </Title>
             </Group>
@@ -235,6 +318,11 @@ export default function NotificationsPage() {
                 }}
                 onClick={() => {
                   if (notification.link) {
+                    // Acknowledge notification in background (non-blocking)
+                    if (!notification.is_acknowledged) {
+                      acknowledgeNotification(notification.id);
+                    }
+                    // Navigate immediately
                     const link = notification.link.replace('/estimates/', '/proposals/');
                     router.push(link);
                   }
@@ -252,8 +340,17 @@ export default function NotificationsPage() {
                         </Badge>
                       </Group>
                       <Text size="sm" c="dimmed">
-                        {notification.message}
+                        {stripHtmlTags(notification.message)}
                       </Text>
+                      {(() => {
+                        const estimateId = extractEstimateId(notification.link);
+                        const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                        return jobTitle ? (
+                          <Text size="sm" c="blue" fw={500}>
+                            {jobTitle}
+                          </Text>
+                        ) : null;
+                      })()}
                       <Group gap="xs" mt={4}>
                         <Text size="xs" c="dimmed">
                           {formatDate(notification.created_at)}
@@ -274,7 +371,6 @@ export default function NotificationsPage() {
                       variant="subtle"
                       size="sm"
                       leftSection={<IconCheck size={16} />}
-                      loading={acknowledging === notification.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         acknowledgeNotification(notification.id);
@@ -284,7 +380,21 @@ export default function NotificationsPage() {
                     </Button>
                   </Group>
                   {notification.link && (
-                    <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                    <Text
+                      size="xs"
+                      c="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Acknowledge notification in background (non-blocking)
+                        if (!notification.is_acknowledged) {
+                          acknowledgeNotification(notification.id);
+                        }
+                        // Navigate immediately
+                        const link = notification.link!.replace('/estimates/', '/proposals/');
+                        router.push(link);
+                      }}
+                    >
                       View details →
                     </Text>
                   )}
@@ -298,7 +408,7 @@ export default function NotificationsPage() {
         {showOlderNotifications && olderUnacknowledged.length > 0 && (
           <Stack gap="md">
             <Divider
-              label={`Older than 30 days - Unacknowledged (${olderUnacknowledged.length})`}
+              label={<Text c="dimmed" size="sm">{`Older than 30 days - Unacknowledged (${olderUnacknowledged.length})`}</Text>}
               labelPosition="center"
               my="md"
             />
@@ -315,6 +425,11 @@ export default function NotificationsPage() {
                 }}
                 onClick={() => {
                   if (notification.link) {
+                    // Acknowledge notification in background (non-blocking)
+                    if (!notification.is_acknowledged) {
+                      acknowledgeNotification(notification.id);
+                    }
+                    // Navigate immediately
                     const link = notification.link.replace('/estimates/', '/proposals/');
                     router.push(link);
                   }
@@ -332,8 +447,17 @@ export default function NotificationsPage() {
                         </Badge>
                       </Group>
                       <Text size="sm" c="dimmed">
-                        {notification.message}
+                        {stripHtmlTags(notification.message)}
                       </Text>
+                      {(() => {
+                        const estimateId = extractEstimateId(notification.link);
+                        const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                        return jobTitle ? (
+                          <Text size="sm" c="blue" fw={500}>
+                            {jobTitle}
+                          </Text>
+                        ) : null;
+                      })()}
                       <Group gap="xs" mt={4}>
                         <Text size="xs" c="dimmed">
                           {formatDate(notification.created_at)}
@@ -354,7 +478,6 @@ export default function NotificationsPage() {
                       variant="subtle"
                       size="sm"
                       leftSection={<IconCheck size={16} />}
-                      loading={acknowledging === notification.id}
                       onClick={(e) => {
                         e.stopPropagation();
                         acknowledgeNotification(notification.id);
@@ -364,7 +487,21 @@ export default function NotificationsPage() {
                     </Button>
                   </Group>
                   {notification.link && (
-                    <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                    <Text
+                      size="xs"
+                      c="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Acknowledge notification in background (non-blocking)
+                        if (!notification.is_acknowledged) {
+                          acknowledgeNotification(notification.id);
+                        }
+                        // Navigate immediately
+                        const link = notification.link!.replace('/estimates/', '/proposals/');
+                        router.push(link);
+                      }}
+                    >
                       View details →
                     </Text>
                   )}
@@ -394,7 +531,7 @@ export default function NotificationsPage() {
         {/* Divider between sections */}
         {(recentUnacknowledged.length > 0 || olderUnacknowledged.length > 0) &&
           (recentAcknowledged.length > 0 || olderAcknowledged.length > 0) && (
-            <Divider label="Acknowledged Notifications" labelPosition="center" my="md" />
+            <Divider label={<Text c="dimmed" size="sm">Acknowledged Notifications</Text>} labelPosition="center" my="md" />
           )}
 
         {/* Recent Acknowledged Notifications */}
@@ -403,7 +540,7 @@ export default function NotificationsPage() {
             {(recentUnacknowledged.length === 0 && olderUnacknowledged.length === 0) && (
               <Group gap="sm">
                 <IconCheck size={20} color="var(--mantine-color-gray-6)" />
-                <Title order={2} size="h3">
+                <Title order={2} size="h3" c="dimmed">
                   Acknowledged ({recentAcknowledged.length + olderAcknowledged.length})
                 </Title>
               </Group>
@@ -421,6 +558,11 @@ export default function NotificationsPage() {
                 }}
                 onClick={() => {
                   if (notification.link) {
+                    // Acknowledge notification in background (non-blocking)
+                    if (!notification.is_acknowledged) {
+                      acknowledgeNotification(notification.id);
+                    }
+                    // Navigate immediately
                     const link = notification.link.replace('/estimates/', '/proposals/');
                     router.push(link);
                   }
@@ -438,8 +580,17 @@ export default function NotificationsPage() {
                         </Badge>
                       </Group>
                       <Text size="sm" c="dimmed">
-                        {notification.message}
+                        {stripHtmlTags(notification.message)}
                       </Text>
+                      {(() => {
+                        const estimateId = extractEstimateId(notification.link);
+                        const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                        return jobTitle ? (
+                          <Text size="sm" c="blue" fw={500}>
+                            {jobTitle}
+                          </Text>
+                        ) : null;
+                      })()}
                       <Group gap="xs" mt={4}>
                         <Text size="xs" c="dimmed">
                           {formatDate(notification.created_at)}
@@ -468,7 +619,21 @@ export default function NotificationsPage() {
                     </Stack>
                   </Group>
                   {notification.link && (
-                    <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                    <Text
+                      size="xs"
+                      c="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Acknowledge notification in background (non-blocking)
+                        if (!notification.is_acknowledged) {
+                          acknowledgeNotification(notification.id);
+                        }
+                        // Navigate immediately
+                        const link = notification.link!.replace('/estimates/', '/proposals/');
+                        router.push(link);
+                      }}
+                    >
                       View details →
                     </Text>
                   )}
@@ -484,14 +649,14 @@ export default function NotificationsPage() {
             {recentAcknowledged.length === 0 && (
               <Group gap="sm">
                 <IconCheck size={20} color="var(--mantine-color-gray-6)" />
-                <Title order={2} size="h3">
+                <Title order={2} size="h3" c="dimmed">
                   Acknowledged ({olderAcknowledged.length})
                 </Title>
               </Group>
             )}
             {recentAcknowledged.length > 0 && olderAcknowledged.length > 0 && (
               <Divider
-                label={`Older than 30 days - Acknowledged (${olderAcknowledged.length})`}
+                label={<Text c="dimmed" size="sm">{`Older than 30 days - Acknowledged (${olderAcknowledged.length})`}</Text>}
                 labelPosition="center"
                 my="md"
               />
@@ -509,6 +674,11 @@ export default function NotificationsPage() {
                 }}
                 onClick={() => {
                   if (notification.link) {
+                    // Acknowledge notification in background (non-blocking)
+                    if (!notification.is_acknowledged) {
+                      acknowledgeNotification(notification.id);
+                    }
+                    // Navigate immediately
                     const link = notification.link.replace('/estimates/', '/proposals/');
                     router.push(link);
                   }
@@ -526,8 +696,17 @@ export default function NotificationsPage() {
                         </Badge>
                       </Group>
                       <Text size="sm" c="dimmed">
-                        {notification.message}
+                        {stripHtmlTags(notification.message)}
                       </Text>
+                      {(() => {
+                        const estimateId = extractEstimateId(notification.link);
+                        const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                        return jobTitle ? (
+                          <Text size="sm" c="blue" fw={500}>
+                            {jobTitle}
+                          </Text>
+                        ) : null;
+                      })()}
                       <Group gap="xs" mt={4}>
                         <Text size="xs" c="dimmed">
                           {formatDate(notification.created_at)}
@@ -556,7 +735,21 @@ export default function NotificationsPage() {
                     </Stack>
                   </Group>
                   {notification.link && (
-                    <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                    <Text
+                      size="xs"
+                      c="blue"
+                      style={{ cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Acknowledge notification in background (non-blocking)
+                        if (!notification.is_acknowledged) {
+                          acknowledgeNotification(notification.id);
+                        }
+                        // Navigate immediately
+                        const link = notification.link!.replace('/estimates/', '/proposals/');
+                        router.push(link);
+                      }}
+                    >
                       View details →
                     </Text>
                   )}

@@ -377,6 +377,26 @@ export default function JobsList() {
         }
     }, [projects, cacheLoading.projects]);
 
+    // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+    useEffect(() => {
+        // Only auto-refresh if:
+        // 1. Not currently loading
+        // 2. Data is empty
+        // 3. We have an access token (user is logged in)
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!cacheLoading.projects && jobs.length === 0 && accessToken) {
+            // Small delay to avoid race conditions with initial cache load
+            const timeoutId = setTimeout(() => {
+                if (jobs.length === 0 && !cacheLoading.projects) {
+                    invalidateCache('projects');
+                    refreshData('projects', true);
+                }
+            }, 100);
+            return () => clearTimeout(timeoutId);
+        }
+        return undefined;
+    }, [jobs.length, cacheLoading.projects, invalidateCache, refreshData]);
+
     // Listen for storage changes to reload column settings
     useEffect(() => {
         const handleStorageChange = () => {

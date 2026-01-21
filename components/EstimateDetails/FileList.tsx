@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-import { Button, Card, Flex, Group, Modal, Stack, Text } from '@mantine/core';
-import { IconDownload, IconFile, IconPlus, IconX } from '@tabler/icons-react';
+import { Button, Card, Flex, Group, Modal, Skeleton, Stack, Text } from '@mantine/core';
+import { IconDownload, IconFile, IconEye, IconPlus, IconX } from '@tabler/icons-react';
 
 import FileUpload from './FileUpload';
 import classes from './styles/EstimateDetails.module.css';
@@ -23,6 +23,11 @@ function getFileIcon() {
 export default function FileList({ estimateID, resources, onUpdate }: FileListProps) {
   const [showFileUploadModal, setShowFileUploadModal] = useState(false);
   const [fileResources, setFileResources] = useState<EstimateResource[]>([]);
+  const [previewStates, setPreviewStates] = useState<Record<string, {
+    url: string | null;
+    loading: boolean;
+    isOpen: boolean;
+  }>>({});
 
   useEffect(() => {
     if (resources && resources.length > 0) {
@@ -105,47 +110,205 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
     }
   };
 
+  const isPdfFile = (resource: EstimateResource) => resource.resource_location?.toLowerCase().endsWith('.pdf') ?? false;
+
+  const getPdfPresignedUrl = useCallback(async (resource: EstimateResource) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
+
+    // Set loading state
+    setPreviewStates(prev => ({
+      ...prev,
+      [resource.id]: { ...prev[resource.id], loading: true, isOpen: true },
+    }));
+
+    try {
+      const response = await fetch(
+        `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        // eslint-disable-next-line no-console
+        console.error('Error fetching PDF presigned URL:', errorData);
+        setPreviewStates(prev => ({
+          ...prev,
+          [resource.id]: { url: null, loading: false, isOpen: true },
+        }));
+        return;
+      }
+
+      const data = await response.json();
+      const presignedUrl = data.presigned_url || data.url;
+
+      if (!presignedUrl) {
+        // eslint-disable-next-line no-console
+        console.error('No presigned URL in response:', data);
+        setPreviewStates(prev => ({
+          ...prev,
+          [resource.id]: { url: null, loading: false, isOpen: true },
+        }));
+        return;
+      }
+
+      setPreviewStates(prev => ({
+        ...prev,
+        [resource.id]: { url: presignedUrl, loading: false, isOpen: true },
+      }));
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error fetching PDF presigned URL:', error);
+      setPreviewStates(prev => ({
+        ...prev,
+        [resource.id]: { url: null, loading: false, isOpen: true },
+      }));
+    }
+  }, [estimateID]);
+
+  const togglePreview = (resource: EstimateResource) => {
+    const currentState = previewStates[resource.id];
+
+    if (currentState?.isOpen) {
+      // Close preview
+      setPreviewStates(prev => ({
+        ...prev,
+        [resource.id]: { ...prev[resource.id], isOpen: false },
+      }));
+    } else if (!currentState?.url && !currentState?.loading) {
+        getPdfPresignedUrl(resource);
+    } else {
+        setPreviewStates(prev => ({
+            ...prev,
+            [resource.id]: { ...prev[resource.id], isOpen: true },
+        }));
+    }
+  };
+
   return (
     <>
       <div className={classes.sectionContent}>
         <Flex direction="column" gap="md">
           {fileResources.length > 0 ? (
             <Stack gap="sm">
-              {fileResources.map((resource) => (
-                <Card key={resource.id} shadow="xs" radius="md" withBorder p="md">
-                  <Group justify="space-between" align="center">
-                    <Group gap="sm">
-                      {getFileIcon()}
-                      <div>
-                        <Text fw={500} size="sm">
-                          {resource.resource_location}
-                        </Text>
-                        <Text size="xs" c="dimmed">
-                          Uploaded {new Date(resource.created_at).toLocaleDateString()}
-                        </Text>
-                      </div>
-                    </Group>
-                    <Group gap="xs">
-                      <Button
-                        variant="subtle"
-                        size="xs"
-                        leftSection={<IconDownload size={16} />}
-                        onClick={() => downloadFile(resource)}
-                      >
-                        Download
-                      </Button>
-                      <IconX
-                        onClick={() => deleteFile(resource)}
-                        style={{
-                          cursor: 'pointer',
-                          width: '20px',
-                          height: '20px',
-                        }}
-                      />
-                    </Group>
-                  </Group>
-                </Card>
-              ))}
+              {fileResources.map((resource) => {
+                const previewState = previewStates[resource.id];
+                const isPdf = isPdfFile(resource);
+
+                return (
+                  <div key={resource.id}>
+                    <Card shadow="xs" radius="md" withBorder p="md">
+                      <Group justify="space-between" align="center">
+                        <Group gap="sm">
+                          {getFileIcon()}
+                          <div>
+                            <Text fw={500} size="sm">
+                              {resource.resource_location}
+                            </Text>
+                            <Text size="xs" c="dimmed">
+                              Uploaded {new Date(resource.created_at).toLocaleDateString()}
+                            </Text>
+                          </div>
+                        </Group>
+                        <Group gap="xs">
+                          {isPdf && (
+                            <Button
+                              variant="subtle"
+                              size="xs"
+                              leftSection={<IconEye size={16} />}
+                              onClick={() => togglePreview(resource)}
+                            >
+                              {previewState?.isOpen ? 'Hide Preview' : 'Preview'}
+                            </Button>
+                          )}
+                          <Button
+                            variant="subtle"
+                            size="xs"
+                            leftSection={<IconDownload size={16} />}
+                            onClick={() => downloadFile(resource)}
+                          >
+                            Download
+                          </Button>
+                          <IconX
+                            onClick={() => deleteFile(resource)}
+                            style={{
+                              cursor: 'pointer',
+                              width: '20px',
+                              height: '20px',
+                            }}
+                          />
+                        </Group>
+                      </Group>
+                    </Card>
+                    {isPdf && previewState?.isOpen && (
+                      <Card shadow="xs" radius="md" withBorder p="md" mt="sm">
+                        {previewState.loading ? (
+                          <Skeleton height={600} radius="md" />
+                        ) : previewState.url ? (
+                          <div style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                            minHeight: '500px',
+                            width: '100%',
+                            position: 'relative',
+                            backgroundColor: '#f5f5f5',
+                          }}>
+                            <iframe
+                              title={`PDF preview for ${resource.resource_location}`}
+                              src={previewState.url || ''}
+                              style={{
+                                width: '100%',
+                                height: '600px',
+                                border: 'none',
+                                borderRadius: '8px',
+                                maxHeight: '70vh',
+                                minHeight: '500px',
+                                backgroundColor: '#fff',
+                              }}
+                              onLoad={() => {
+                                // eslint-disable-next-line no-console
+                                console.log('PDF iframe loaded successfully');
+                              }}
+                              onError={() => {
+                                // eslint-disable-next-line no-console
+                                console.error('PDF iframe failed to load');
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <Text c="dimmed" ta="center" p="md">
+                            Unable to load PDF preview
+                          </Text>
+                        )}
+
+                        <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                          <Button
+                            variant="light"
+                            size="sm"
+                            w="50%"
+                            mt="md"
+                            onClick={() => {
+                              if (previewState.url) {
+                                  window.open(previewState.url, '_blank');
+                              }
+                            }}
+                          >
+                              Open PDF in New Tab
+                          </Button>
+                        </div>
+                      </Card>
+                    )}
+                  </div>
+                );
+              })}
             </Stack>
           ) : (
             <div className={classes.emptyState}>

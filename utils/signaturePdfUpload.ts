@@ -1,0 +1,201 @@
+/**
+ * Utility functions for uploading PDF via multipart upload using signature_hash
+ * This allows clients (who aren't authenticated) to upload PDFs
+ */
+
+const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+
+async function uploadFilePartWithRetry(
+    signatureHash: string,
+    resourceID: string,
+    partNumber: number,
+    chunk: Blob,
+    maxRetries: number = 3,
+    onProgress?: (partNumber: number, progress: number) => void
+): Promise<{ PartNumber: number; ETag: string }> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
+        try {
+            // Upload chunk through backend endpoint
+            const formData = new FormData();
+            formData.append('part_number', partNumber.toString());
+            formData.append('file', chunk);
+
+            const uploadResponse = await fetch(
+                `/api/signature/${signatureHash}/upload-pdf/${resourceID}/part`,
+                {
+                    method: 'POST',
+                    body: formData,
+                }
+            );
+
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json().catch(() => ({}));
+                const errorMessage = errorData.error || errorData.detail || `Upload failed with status ${uploadResponse.status}`;
+                throw new Error(errorMessage);
+            }
+
+            // Get ETag from response
+            const data = await uploadResponse.json();
+            if (!data.etag) {
+                throw new Error('ETag not found in upload response');
+            }
+
+            // Remove quotes from ETag if present
+            const cleanEtag = data.etag.replace(/^"|"$/g, '');
+
+            if (onProgress) {
+                onProgress(partNumber, 100);
+            }
+
+            return { PartNumber: partNumber, ETag: cleanEtag };
+        } catch (error: any) {
+            lastError = error;
+            // eslint-disable-next-line no-console
+            console.warn(
+                `Upload attempt ${attempt}/${maxRetries} failed for part ${partNumber}:`,
+                error
+            );
+
+            if (attempt < maxRetries) {
+                // Exponential backoff: wait 1s, 2s, 4s
+                await new Promise((resolve) => { setTimeout(resolve, 1000 * 2 ** (attempt - 1)); });
+            }
+        }
+    }
+
+    throw new Error(
+        `Failed to upload part ${partNumber} after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`
+    );
+}
+
+async function uploadFileParts(
+    file: Blob,
+    signatureHash: string,
+    resourceID: string,
+    onProgress?: (uploaded: number, total: number) => void
+): Promise<Array<{ PartNumber: number; ETag: string }>> {
+    const totalParts = Math.ceil(file.size / CHUNK_SIZE);
+    const parts: Array<{ PartNumber: number; ETag: string }> = [];
+    const partProgress: Map<number, number> = new Map();
+
+    for (let partNumber = 1; partNumber <= totalParts; partNumber += 1) {
+        const start = (partNumber - 1) * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+
+        const partResult = await uploadFilePartWithRetry(
+            signatureHash,
+            resourceID,
+            partNumber,
+            chunk,
+            3, // maxRetries
+            (partNum, progress) => {
+                partProgress.set(partNum, progress);
+                if (onProgress) {
+                    const totalProgress = Array.from(
+                        partProgress.values()
+                    ).reduce((sum, p) => sum + p, 0);
+                    onProgress(totalProgress, totalParts * 100);
+                }
+            }
+        );
+
+        parts.push(partResult);
+    }
+
+    return parts;
+}
+
+async function completeMultipartUpload(
+    signatureHash: string,
+    resourceID: string,
+    parts: Array<{ PartNumber: number; ETag: string }>
+): Promise<void> {
+    const response = await fetch(
+        `/api/signature/${signatureHash}/upload-pdf/${resourceID}/complete`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ parts }),
+        }
+    );
+
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error || errorData.detail || 'Failed to complete multipart upload';
+
+        // Check if the error is because the upload was already completed
+        // This can happen if the completion succeeded on the backend but the response
+        // didn't reach the frontend (network timeout, etc.)
+        if (errorMessage.includes('upload does not exist') ||
+            errorMessage.includes('upload ID may be invalid') ||
+            errorMessage.includes('upload may have been aborted or completed')) {
+            // Upload actually completed successfully, just the response didn't come back
+            // eslint-disable-next-line no-console
+            console.log('Upload was already completed, treating as success');
+            return;
+        }
+
+        throw new Error(errorMessage);
+    }
+}
+
+/**
+ * Upload a PDF blob via multipart upload using signature_hash
+ *
+ * @param signatureHash - The signature hash from the signature link
+ * @param pdfBlob - The PDF blob to upload
+ * @param onProgress - Optional progress callback (uploaded, total)
+ * @returns Promise that resolves when upload is complete
+ */
+export async function uploadPdfFromSignature(
+    signatureHash: string,
+    pdfBlob: Blob,
+    onProgress?: (uploaded: number, total: number) => void
+): Promise<void> {
+    try {
+        // Step 1: Initiate multipart upload
+        const formData = new FormData();
+        formData.append('filename', `signed-estimate-${Date.now()}.pdf`);
+        formData.append('content_type', 'application/pdf');
+
+        const initiateResponse = await fetch(
+            `/api/signature/${signatureHash}/upload-pdf/initiate`,
+            {
+                method: 'POST',
+                body: formData,
+            }
+        );
+
+        if (!initiateResponse.ok) {
+            const errorData = await initiateResponse.json().catch(() => ({}));
+            const errorMessage = errorData.error || errorData.detail || 'Failed to initiate PDF upload';
+            throw new Error(errorMessage);
+        }
+
+        const resource = await initiateResponse.json();
+        const resourceID = resource.id;
+
+        // Step 2: Upload file parts
+        const parts = await uploadFileParts(
+            pdfBlob,
+            signatureHash,
+            resourceID,
+            onProgress
+        );
+
+        // Step 3: Complete multipart upload
+        await completeMultipartUpload(signatureHash, resourceID, parts);
+
+        // eslint-disable-next-line no-console
+        console.log('PDF upload completed successfully');
+    } catch (error: any) {
+        // eslint-disable-next-line no-console
+        console.error('Error uploading PDF:', error);
+        throw error;
+    }
+}

@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 
 import {
-    Button,
     Card,
     Group,
     Stack,
@@ -15,10 +14,9 @@ import {
     Loader,
     Alert,
     Accordion,
-    Badge,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconMail } from '@tabler/icons-react';
+import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useUsers } from '@/hooks/useUsers';
@@ -71,10 +69,6 @@ export default function TemplatesTab() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [sesEmail, setSesEmail] = useState('');
-    const [sesDisplayName, setSesDisplayName] = useState('');
-    const [sesVerifying, setSesVerifying] = useState(false);
-    const [sesUpdatingDisplayName, setSesUpdatingDisplayName] = useState(false);
     const { users, loading: usersLoading } = useUsers();
 
     useEffect(() => {
@@ -97,8 +91,6 @@ export default function TemplatesTab() {
 
             const data: TemplatesData = await response.json();
             setTemplates(data);
-            setSesEmail(data._ses_identity?.email || '');
-            setSesDisplayName(data._ses_identity?.display_name || '');
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error loading templates:', err);
@@ -201,95 +193,6 @@ export default function TemplatesTab() {
         }
     };
 
-    const verifySesIdentity = async () => {
-        if (!sesEmail) {
-            notifications.show({
-                title: 'Error',
-                message: 'Please enter an email address',
-                color: 'red',
-                icon: <IconX size={16} />,
-            });
-            return;
-        }
-
-        try {
-            setSesVerifying(true);
-            const response = await fetch('/api/outreach-templates/ses-identity', {
-                method: 'POST',
-                headers: getApiHeaders(),
-                body: JSON.stringify({ email: sesEmail }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to verify email');
-            }
-
-            const data = await response.json();
-            setTemplates((prev) => ({
-                ...prev,
-                _ses_identity: data,
-            }));
-
-            notifications.show({
-                title: 'Success',
-                message: `Verification email sent to ${sesEmail}. Please check your inbox for an email from Amazon Web Services - there will be a link to verify the email address.`,
-                color: 'green',
-                icon: <IconCheck size={16} />,
-            });
-        } catch (err) {
-            notifications.show({
-                title: 'Error',
-                message: err instanceof Error ? err.message : 'Failed to verify email',
-                color: 'red',
-                icon: <IconX size={16} />,
-            });
-        } finally {
-            setSesVerifying(false);
-        }
-    };
-
-    const updateSesDisplayName = async () => {
-        try {
-            setSesUpdatingDisplayName(true);
-            const response = await fetch('/api/outreach-templates/ses-identity/display-name', {
-                method: 'PUT',
-                headers: getApiHeaders(),
-                body: JSON.stringify({ display_name: sesDisplayName || null }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to update display name');
-            }
-
-            const data = await response.json();
-            setTemplates((prev) => ({
-                ...prev,
-                _ses_identity: {
-                    ...prev._ses_identity,
-                    display_name: data.display_name,
-                },
-            }));
-
-            notifications.show({
-                title: 'Success',
-                message: 'Display name updated successfully',
-                color: 'green',
-                icon: <IconCheck size={16} />,
-            });
-        } catch (err) {
-            notifications.show({
-                title: 'Error',
-                message: err instanceof Error ? err.message : 'Failed to update display name',
-                color: 'red',
-                icon: <IconX size={16} />,
-            });
-        } finally {
-            setSesUpdatingDisplayName(false);
-        }
-    };
-
     if (loading) {
         return (
             <Stack align="center" gap="md">
@@ -306,73 +209,6 @@ export default function TemplatesTab() {
                     {error}
                 </Alert>
             )}
-
-            {/* SES Email Identity */}
-            <Card shadow="sm" padding="lg" withBorder>
-                <Stack gap="md">
-                    <Text fw={600} size="lg">
-                        SES Email Identity
-                    </Text>
-                    <Text c="dimmed" size="sm">
-                        Configure the email address that will be used to send client outreach
-                        messages. This email must be verified in AWS SES.
-                    </Text>
-                    <Group>
-                        <TextInput
-                          placeholder="email@example.com"
-                          value={sesEmail}
-                          onChange={(e) => setSesEmail(e.target.value)}
-                          style={{ flex: 1 }}
-                        />
-                        <Button
-                          onClick={verifySesIdentity}
-                          loading={sesVerifying}
-                          leftSection={<IconMail size={16} />}
-                        >
-                            Verify Email
-                        </Button>
-                    </Group>
-                    {templates._ses_identity?.status && (
-                        <Badge
-                          color={
-                                templates._ses_identity.status === 'Success'
-                                    ? 'green'
-                                    : templates._ses_identity.status === 'Pending'
-                                      ? 'yellow'
-                                      : 'red'
-                            }
-                        >
-                            Status: {templates._ses_identity.status}
-                        </Badge>
-                    )}
-                    {templates._ses_identity?.status === 'Success' && (
-                        <Stack gap="xs">
-                            <Text fw={500} size="sm">
-                                Display Name
-                            </Text>
-                            <Text c="dimmed" size="xs">
-                                The name that will appear as the sender in client emails (e.g.,
-                                &quot;Your Company Name&quot;). If left empty, defaults to
-                                &quot;Jobsuite&quot;.
-                            </Text>
-                            <Group>
-                                <TextInput
-                                  placeholder="Your Company Name"
-                                  value={sesDisplayName}
-                                  onChange={(e) => setSesDisplayName(e.target.value)}
-                                  style={{ flex: 1 }}
-                                />
-                                <Button
-                                  onClick={updateSesDisplayName}
-                                  loading={sesUpdatingDisplayName}
-                                >
-                                    Save
-                                </Button>
-                            </Group>
-                        </Stack>
-                    )}
-                </Stack>
-            </Card>
 
             {/* Message Templates */}
             <Card shadow="sm" padding="lg" withBorder>

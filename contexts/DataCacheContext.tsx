@@ -353,9 +353,14 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Check if this is a page reload (not just a navigation)
+    // Force refresh on page reload to ensure fresh data after inactivity
+    const isPageReload = typeof window !== 'undefined' &&
+      (window.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'reload';
+
     // Use stale-while-revalidate: show cached data immediately, refresh in background
-    // Only fetch if cache is expired or missing (refreshData handles this)
-    refreshData();
+    // Force refresh on page reload, otherwise only fetch if cache is expired or missing
+    refreshData(undefined, isPageReload);
   }, [refreshData]);
 
   // Listen for storage changes (e.g., after login)
@@ -371,6 +376,16 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         if (cachedClients) setClients(cachedClients);
         if (cachedEstimates) setEstimates(cachedEstimates);
         if (cachedProjects) setProjects(cachedProjects);
+
+        // If cache is empty or expired after login, force refresh
+        const hasNoData = (!cachedClients || cachedClients.length === 0) &&
+          (!cachedEstimates || cachedEstimates.length === 0) &&
+          (!cachedProjects || cachedProjects.length === 0);
+
+        if (hasNoData) {
+          // Force refresh all data after login
+          refreshData(undefined, true);
+        }
       } else {
         // Clear data if logged out
         setClients([]);
@@ -386,7 +401,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageChange', handleStorageChange as EventListener);
     };
-  }, []);
+  }, [refreshData]);
 
   return (
     <DataCacheContext.Provider

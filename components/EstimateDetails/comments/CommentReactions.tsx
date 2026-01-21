@@ -19,8 +19,6 @@ import { SingleComment, User } from '@/components/Global/model';
 import { useAuth } from '@/hooks/useAuth';
 import { useUsers } from '@/hooks/useUsers';
 
-const QUICK_REACTIONS = ['👍', '❤️', '👎', '😮', '😢', '👏'];
-
 const COMMON_EMOJIS = [
     '👍', '👎', '❤️', '😊', '😄', '😍', '🤔', '😅',
     '🙌', '👏', '🎉', '✅', '❌', '⚠️', '💡', '🔥',
@@ -180,26 +178,6 @@ export function CommentReactions({
                 );
             })}
 
-            {/* Quick reaction buttons */}
-            {QUICK_REACTIONS.map((emoji) => {
-                // Only show if not already displayed as a reaction
-                if (reactedEmojis.includes(emoji)) return null;
-
-                return (
-                    <ActionIcon
-                      key={emoji}
-                      variant="subtle"
-                      size="sm"
-                      onClick={() => handleReaction(emoji)}
-                      loading={loading === emoji}
-                      disabled={loading !== null}
-                      style={{ fontSize: '1.2rem' }}
-                    >
-                        {emoji}
-                    </ActionIcon>
-                );
-            })}
-
             {/* More emoji picker */}
             <Popover
               opened={emojiPickerOpened}
@@ -226,27 +204,21 @@ export function CommentReactions({
                             width: 240,
                         }}
                     >
-                        {COMMON_EMOJIS.map((emoji) => {
-                            // Skip quick reactions that are already shown
-                            if (QUICK_REACTIONS.includes(emoji) && !reactedEmojis.includes(emoji)) {
-                                return null;
-                            }
-                            return (
-                                <ActionIcon
-                                  key={emoji}
-                                  variant="subtle"
-                                  size="lg"
-                                  onClick={() => {
-                                        handleReaction(emoji);
-                                        setEmojiPickerOpened(false);
-                                    }}
-                                  disabled={loading !== null}
-                                  style={{ fontSize: '1.5rem', cursor: 'pointer' }}
-                                >
-                                    {emoji}
-                                </ActionIcon>
-                            );
-                        })}
+                        {COMMON_EMOJIS.map((emoji) => (
+                            <ActionIcon
+                              key={emoji}
+                              variant="subtle"
+                              size="lg"
+                              onClick={() => {
+                                    handleReaction(emoji);
+                                    setEmojiPickerOpened(false);
+                                }}
+                              disabled={loading !== null}
+                              style={{ fontSize: '1.5rem', cursor: 'pointer' }}
+                            >
+                                {emoji}
+                            </ActionIcon>
+                        ))}
                     </div>
                 </Popover.Dropdown>
             </Popover>

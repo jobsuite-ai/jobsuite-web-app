@@ -30,6 +30,7 @@ import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Notification {
@@ -130,14 +131,36 @@ function AnimatedSection({
   );
 }
 
+// Utility function to extract estimate_id from notification link
+function extractEstimateId(link: string | null): string | null {
+  if (!link) return null;
+  const match = link.match(/\/proposals\/([^/?]+)/);
+  return match ? match[1] : null;
+}
+
+// Utility function to strip HTML tags from notification messages
+function stripHtmlTags(html: string): string {
+  // Create a temporary div element to parse HTML
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+
+  // Replace <br> tags with newlines, then get text content
+  const text = tmp.innerText || tmp.textContent || '';
+
+  // Clean up multiple consecutive newlines/spaces
+  return text.replace(/\n\s*\n/g, '\n').trim();
+}
+
 export default function Homepage() {
   const router = useRouter();
   const { user } = useAuth({ fetchUser: true });
+  const { estimates } = useSearchData();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HomepageData | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
 
   // Extract first name from full_name
   const getFirstName = () => {
@@ -221,22 +244,78 @@ export default function Homepage() {
     }
   }, [loading, error]);
 
-  // Acknowledge notification
-  const acknowledgeNotification = async (notificationId: string) => {
+  // Fetch job title for a notification
+  const fetchJobTitle = async (estimateId: string) => {
+    // Check cache first
+    const cachedEstimate = estimates.find((e) => e.id === estimateId);
+    if (cachedEstimate?.title) {
+      setJobTitles((prev) => {
+        if (prev[estimateId]) return prev;
+        return { ...prev, [estimateId]: cachedEstimate.title! };
+      });
+      return cachedEstimate.title;
+    }
+
+    // Fetch from API
     try {
-      const response = await fetch(`/api/notifications/${notificationId}/acknowledge`, {
-        method: 'POST',
+      const response = await fetch(`/api/estimates/${estimateId}`, {
+        method: 'GET',
         headers: getApiHeaders(),
       });
 
       if (response.ok) {
-        // Remove from list
-        setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+        const estimate = await response.json();
+        const title = estimate.title || null;
+        if (title) {
+          setJobTitles((prev) => {
+            if (prev[estimateId]) return prev;
+            return { ...prev, [estimateId]: title };
+          });
+        }
+        return title;
       }
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Error acknowledging notification:', err);
+      console.error('Error fetching job title:', err);
     }
+
+    return null;
+  };
+
+  // Fetch job titles when notifications change
+  useEffect(() => {
+    const fetchTitles = async () => {
+      const titlePromises = notifications
+        .map((n) => {
+          const estimateId = extractEstimateId(n.link);
+          return estimateId ? fetchJobTitle(estimateId) : Promise.resolve(null);
+        });
+      await Promise.all(titlePromises);
+    };
+
+    if (notifications.length > 0) {
+      fetchTitles();
+    }
+  }, [notifications]);
+
+  // Acknowledge notification
+  const acknowledgeNotification = async (notificationId: string) => {
+    // Optimistically update UI immediately
+    setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+
+    // Dispatch event immediately to update header count
+    window.dispatchEvent(new CustomEvent('notificationAcknowledged'));
+
+    // Acknowledge in the background (non-blocking)
+    fetch(`/api/notifications/${notificationId}/acknowledge`, {
+      method: 'POST',
+      headers: getApiHeaders(),
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Error acknowledging notification:', err);
+      // Revert optimistic update on error by refetching
+      // (We don't have the original notification to restore, so we'll let it stay removed)
+    });
   };
 
   if (loading) {
@@ -356,9 +435,14 @@ export default function Homepage() {
                     withBorder
                     style={{ cursor: notification.link ? 'pointer' : 'default' }}
                     onClick={() => {
-                      acknowledgeNotification(notification.id);
+                      // Acknowledge notification in background (non-blocking)
+                      if (!notification.is_acknowledged) {
+                        acknowledgeNotification(notification.id);
+                      }
+                      // Navigate immediately
                       if (notification.link) {
-                        router.push(notification.link);
+                        const link = notification.link.replace('/estimates/', '/proposals/');
+                        router.push(link);
                       }
                     }}
                   >
@@ -379,10 +463,33 @@ export default function Homepage() {
                         </Button>
                       </Group>
                       <Text size="xs" c="dimmed" lineClamp={2}>
-                        {notification.message}
+                        {stripHtmlTags(notification.message)}
                       </Text>
+                      {(() => {
+                        const estimateId = extractEstimateId(notification.link);
+                        const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                        return jobTitle ? (
+                          <Text size="xs" c="blue" fw={500} lineClamp={1}>
+                            {jobTitle}
+                          </Text>
+                        ) : null;
+                      })()}
                       {notification.link && (
-                        <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                        <Text
+                          size="xs"
+                          c="blue"
+                          style={{ cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // Acknowledge notification in background (non-blocking)
+                            if (!notification.is_acknowledged) {
+                              acknowledgeNotification(notification.id);
+                            }
+                            // Navigate immediately
+                            const link = notification.link!.replace('/estimates/', '/proposals/');
+                            router.push(link);
+                          }}
+                        >
                           View details →
                         </Text>
                       )}

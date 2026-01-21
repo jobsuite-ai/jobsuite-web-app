@@ -41,6 +41,28 @@ export default function ClientsList() {
     }
   }, [cachedClients, cachedProjects, cacheLoading.clients, cacheLoading.projects]);
 
+  // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+  useEffect(() => {
+    // Only auto-refresh if:
+    // 1. Not currently loading
+    // 2. Data is empty
+    // 3. We have an access token (user is logged in)
+    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+    if (!cacheLoading.clients && !cacheLoading.projects && clients.length === 0 && accessToken) {
+      // Small delay to avoid race conditions with initial cache load
+      const timeoutId = setTimeout(() => {
+        if (clients.length === 0 && !cacheLoading.clients && !cacheLoading.projects) {
+          invalidateCache('clients');
+          invalidateCache('projects');
+          refreshData('clients', true);
+          refreshData('projects', true);
+        }
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+    return undefined;
+  }, [clients.length, cacheLoading.clients, cacheLoading.projects, invalidateCache, refreshData]);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     try {

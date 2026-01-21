@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from 'react';
 
+import { usePathname } from 'next/navigation';
+
 import { Header } from './Header/Header';
 import classes from './Shell.module.css';
 
 export function Shell({ children }: { children: any }) {
   const [sidebarOpened, setSidebarOpened] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const pathname = usePathname();
+
+  // Don't show header/navigation for signature pages
+  const isSignaturePage = pathname?.startsWith('/sign/');
 
   useEffect(() => {
     // Check if user is authenticated
@@ -41,6 +47,11 @@ export function Shell({ children }: { children: any }) {
       window.removeEventListener('localStorageChange', handleCustomStorageChange as EventListener);
     };
   }, []);
+
+  // For signature pages, don't wrap with Shell/Header
+  if (isSignaturePage) {
+    return <>{children}</>;
+  }
 
   return (
     <div className={`${classes.verticalWrapper} ${!isAuthenticated ? classes.verticalWrapperNoHeader : ''}`}>

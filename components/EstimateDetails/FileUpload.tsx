@@ -52,6 +52,24 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
             return `File size (${formatFileSize(file.size)}) exceeds the 150MB limit`;
         }
 
+        // Explicitly reject image files
+        const imageTypes: string[] = [
+            'image/jpeg',
+            'image/jpg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'image/bmp',
+            'image/svg+xml',
+            'image/heic',
+            'image/heif',
+            'image/tiff',
+            'image/x-icon',
+        ];
+        if (file.type && imageTypes.includes(file.type.toLowerCase())) {
+            return 'Images are not allowed. Please use the image upload feature for images. Only PDF, Word, Excel, PowerPoint, or text files are allowed here.';
+        }
+
         // Validate file type - accept PDFs and common document types
         const validTypes: string[] = [
             MIME_TYPES.pdf,
@@ -65,8 +83,16 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
             'text/csv', // .csv
             'application/rtf', // .rtf
         ];
-        if (!validTypes.includes(file.type)) {
-            return 'Invalid file type. Please upload PDF, Word, Excel, PowerPoint, or text files.';
+
+        // Check file extension as fallback if MIME type is missing or incorrect
+        const fileName = file.name.toLowerCase();
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic', '.heif', '.tiff', '.ico'];
+        if (imageExtensions.some(ext => fileName.endsWith(ext))) {
+            return 'Images are not allowed. Please use the image upload feature for images. Only PDF, Word, Excel, PowerPoint, or text files are allowed here.';
+        }
+
+        if (!file.type || !validTypes.includes(file.type)) {
+            return 'Invalid file type. Please upload PDF, Word, Excel, PowerPoint, or text files only. Images are not allowed.';
         }
 
         return null;

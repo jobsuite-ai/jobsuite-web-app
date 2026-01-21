@@ -16,12 +16,14 @@ import {
     FileButton,
     Image,
     Box,
+    Badge,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
+import SignaturePageTab from '@/components/Settings/SignaturePageTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
 
@@ -44,6 +46,10 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reviewLink, setReviewLink] = useState('');
+    const [clientCommunicationEmail, setClientCommunicationEmail] = useState('');
+    const [clientCommunicationName, setClientCommunicationName] = useState('');
+    const [sesVerificationStatus, setSesVerificationStatus] = useState<string | null>(null);
+    const [sesVerifying, setSesVerifying] = useState(false);
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [configId, setConfigId] = useState<string | null>(null);
@@ -89,6 +95,15 @@ export default function SettingsPage() {
                 setReviewLink(
                     config.configuration?.review_link || ''
                 );
+                setClientCommunicationEmail(
+                    config.configuration?.client_communication_email || ''
+                );
+                setClientCommunicationName(
+                    config.configuration?.client_communication_name || ''
+                );
+                setSesVerificationStatus(
+                    config.configuration?.ses_verification_status || null
+                );
 
                 // Check if logo fields exist in the configuration
                 const hasLogoFields =
@@ -127,6 +142,9 @@ export default function SettingsPage() {
             } else {
                 setConfigId(null);
                 setReviewLink('');
+                setClientCommunicationEmail('');
+                setClientCommunicationName('');
+                setSesVerificationStatus(null);
                 setLogoUrl(null);
             }
         } catch (err) {
@@ -172,12 +190,23 @@ export default function SettingsPage() {
                 configuration_type: 'contractor_config',
                 configuration: {
                     review_link: reviewLink,
+                    client_communication_email: clientCommunicationEmail,
+                    client_communication_name: clientCommunicationName,
+                    // Preserve SES verification status if it exists
+                    ...(existingConfig?.configuration?.ses_verification_status && {
+                        ses_verification_status:
+                            existingConfig.configuration.ses_verification_status,
+                    }),
                     // Preserve logo fields if they exist
                     ...(existingConfig?.configuration?.logo_s3_key && {
                         logo_s3_key: existingConfig.configuration.logo_s3_key,
                     }),
                     ...(existingConfig?.configuration?.logo_s3_bucket && {
                         logo_s3_bucket: existingConfig.configuration.logo_s3_bucket,
+                    }),
+                    // Preserve signature page config if it exists
+                    ...(existingConfig?.configuration?.signature_page_config && {
+                        signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
                 },
             };
@@ -237,6 +266,65 @@ export default function SettingsPage() {
     const handleReviewLinkChange = (value: string) => {
         setReviewLink(value);
         setHasChanges(true);
+    };
+
+    const handleClientCommunicationEmailChange = (value: string) => {
+        setClientCommunicationEmail(value);
+        setHasChanges(true);
+    };
+
+    const handleClientCommunicationNameChange = (value: string) => {
+        setClientCommunicationName(value);
+        setHasChanges(true);
+    };
+
+    const verifySesIdentity = async () => {
+        if (!clientCommunicationEmail) {
+            notifications.show({
+                title: 'Error',
+                message: 'Please enter an email address',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            return;
+        }
+
+        try {
+            setSesVerifying(true);
+            const response = await fetch('/api/configurations/ses-identity', {
+                method: 'POST',
+                headers: getApiHeaders(),
+                body: JSON.stringify({ email: clientCommunicationEmail }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to verify email');
+            }
+
+            const data = await response.json();
+            setSesVerificationStatus(data.status);
+            setClientCommunicationEmail(data.email);
+
+            notifications.show({
+                title: 'Success',
+                message: `Verification email sent to ${clientCommunicationEmail}. Please check your inbox for an email from Amazon Web Services - there will be a link to verify the email address.`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Reload configuration to get updated status
+            await loadConfiguration();
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to verify email',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSesVerifying(false);
+        }
     };
 
     const handleLogoUpload = async (file: File | null) => {
@@ -346,6 +434,7 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
+                    <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
@@ -372,6 +461,51 @@ export default function SettingsPage() {
                                   description="Review link to include in post-completion thank you messages"
                                   value={reviewLink}
                                   onChange={(e) => handleReviewLinkChange(e.target.value)}
+                                />
+
+                                <Stack gap="xs">
+                                    <TextInput
+                                      label="Display Email"
+                                      placeholder="email@example.com"
+                                      description="This email will be used for sending estimate signature emails and outreach messages to clients. This email must be verified in AWS SES."
+                                      value={clientCommunicationEmail}
+                                      onChange={(e) =>
+                                        handleClientCommunicationEmailChange(e.target.value)
+                                      }
+                                    />
+                                    <Group>
+                                        <Button
+                                          onClick={verifySesIdentity}
+                                          loading={sesVerifying}
+                                          leftSection={<IconMail size={16} />}
+                                          disabled={!clientCommunicationEmail}
+                                        >
+                                            Verify Email
+                                        </Button>
+                                        {sesVerificationStatus && (
+                                            <Badge
+                                              color={
+                                                    sesVerificationStatus === 'Success'
+                                                        ? 'green'
+                                                        : sesVerificationStatus === 'Pending'
+                                                          ? 'yellow'
+                                                          : 'red'
+                                                }
+                                            >
+                                                Status: {sesVerificationStatus}
+                                            </Badge>
+                                        )}
+                                    </Group>
+                                </Stack>
+
+                                <TextInput
+                                  label="Display Name"
+                                  placeholder="Your Company Name"
+                                  description="This name will appear as the sender in client emails (e.g., 'Your Company Name Team')"
+                                  value={clientCommunicationName}
+                                  onChange={(e) =>
+                                    handleClientCommunicationNameChange(e.target.value)
+                                  }
                                 />
 
                                 {/* Logo Upload */}
@@ -425,6 +559,10 @@ export default function SettingsPage() {
                             </Stack>
                         )}
                     </Card>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="signature-page" pt="md">
+                    <SignaturePageTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="templates" pt="md">

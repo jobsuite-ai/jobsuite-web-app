@@ -4,29 +4,39 @@ import { useState, useMemo, useEffect } from 'react';
 
 import { Button, Checkbox, Group, Select, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { IconCheck, IconCopy, IconLink } from '@tabler/icons-react';
 
 import { EstimateLineItem } from './LineItem';
+import { ResendConfirmModal } from './ResendConfirmModal';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../../Global/model';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
+
 export function UploadNewTemplate({
-    template,
     estimate,
     client,
     setLoading,
+    loading = false,
     imageResources = [],
     videoResources = [],
     lineItems = [],
+    signatureUrl,
+    loadingSignatureUrl = false,
 }: {
-    template: string,
     estimate: Estimate,
     client?: ContractorClient,
     setLoading: Function,
+    loading?: boolean,
     imageResources?: EstimateResource[],
     videoResources?: EstimateResource[],
-    lineItems?: EstimateLineItem[]
+    lineItems?: EstimateLineItem[],
+    signatureUrl?: string | null,
+    loadingSignatureUrl?: boolean,
 }) {
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
+    const [hasBeenSent, setHasBeenSent] = useState(false);
+    const [showResendModal, setShowResendModal] = useState(false);
 
     // Collect all available emails (deduplicated by email value)
     const availableEmails = useMemo(() => {
@@ -68,6 +78,50 @@ export function UploadNewTemplate({
             }
         }
     }, [availableEmails, client]);
+
+    // Check if estimate has been sent before
+    useEffect(() => {
+        const checkIfSent = async () => {
+            // Check estimate status first
+            const statusHasBeenSent = estimate.status === EstimateStatus.ESTIMATE_SENT ||
+                estimate.status === EstimateStatus.ESTIMATE_OPENED ||
+                estimate.status === EstimateStatus.ESTIMATE_ACCEPTED ||
+                estimate.status === EstimateStatus.ACCOUNTING_NEEDED ||
+                estimate.status === EstimateStatus.CONTRACTOR_SIGNED ||
+                estimate.status?.toString().startsWith('PROJECT_');
+
+            if (statusHasBeenSent) {
+                setHasBeenSent(true);
+                return;
+            }
+
+            // Also check for existing signature links (non-PENDING status)
+            try {
+                const response = await fetch(
+                    `/api/estimates/${estimate.id}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const links = data.signature_links || [];
+                    // Only treat links as sent when they were opened or signed
+                    const hasSentLinks = links.some((link: any) =>
+                        link.status === 'OPENED' || link.status === 'SIGNED'
+                    );
+                    setHasBeenSent(hasSentLinks);
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error checking if estimate has been sent:', error);
+            }
+        };
+
+        checkIfSent();
+    }, [estimate.id, estimate.status]);
     async function createAndSendTemplate() {
         if (!client) {
             notifications.show({
@@ -76,6 +130,21 @@ export function UploadNewTemplate({
                 color: 'red',
                 message: 'Client information is required to send estimate.',
             });
+            return;
+        }
+
+        // If estimate has been sent before, show confirmation modal
+        if (hasBeenSent) {
+            setShowResendModal(true);
+            return;
+        }
+
+        // Proceed with sending
+        await sendEstimate();
+    }
+
+    async function sendEstimate() {
+        if (!client) {
             return;
         }
 
@@ -98,37 +167,19 @@ export function UploadNewTemplate({
         }
 
         setLoading(true);
+        setShowResendModal(false);
         try {
-            // Step 1: Create template
-            const templateResponse = await fetch(
-                '/api/estimate_template',
-                {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        template,
-                        jobID: estimate.id,
-                    }),
-                }
-            );
-
-            if (!templateResponse.ok) {
-                const errorData = await templateResponse.json();
-                throw new Error(errorData.error || 'Failed to create estimate template');
-            }
-
-            const templateData = await templateResponse.json();
-
-            if (!templateData.out?.id) {
-                throw new Error('Template created but no template ID returned');
-            }
-
-            // Step 2: Send estimate
+            // Send estimate with signature links
+            // Note: Backend automatically revokes old signature links when generating new ones
             const sendResponse = await fetch(
                 '/api/send_estimate',
                 {
                     method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('access_token')}`,
+                    },
                     body: JSON.stringify({
-                        template_id: templateData.out.id,
                         jobID: estimate.id,
                         client_emails: emailsToSend,
                     }),
@@ -191,8 +242,38 @@ export function UploadNewTemplate({
 
     const hasMultipleEmails = availableEmails.length > 1;
 
+    const handleCopySignatureLink = async () => {
+        if (!signatureUrl) return;
+
+        try {
+            await navigator.clipboard.writeText(signatureUrl);
+            notifications.show({
+                title: 'Success!',
+                message: 'Signature link copied to clipboard',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to copy signature link',
+                color: 'red',
+            });
+        }
+    };
+
     return (
         <div style={{ marginBottom: 20, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <ResendConfirmModal
+              opened={showResendModal}
+              onClose={() => {
+                    if (!loading) {
+                        setShowResendModal(false);
+                    }
+                }}
+              onConfirm={sendEstimate}
+              loading={loading}
+            />
             {hasMultipleEmails && (
                 <div style={{
                     marginBottom: 16,
@@ -242,16 +323,46 @@ export function UploadNewTemplate({
                     )}
                 </div>
             )}
-            <Tooltip
-              label={isDisabled ? 'Please finish the todo list above to send the estimate' : ''}
-              disabled={!isDisabled}
-              position="top"
-              withArrow
-            >
-                <Button onClick={createAndSendTemplate} mt="lg" disabled={isDisabled}>
-                    Send Estimate
-                </Button>
-            </Tooltip>
+            <Group gap="sm" mt="lg">
+                <Tooltip
+                  label={isDisabled ? 'Please finish the todo list above to send the estimate' : ''}
+                  disabled={!isDisabled}
+                  position="top"
+                  withArrow
+                >
+                    <Button onClick={createAndSendTemplate} disabled={isDisabled}>
+                        {hasBeenSent ? 'Re-send Estimate' : 'Send Estimate'}
+                    </Button>
+                </Tooltip>
+                {signatureUrl && (
+                    <>
+                        <Tooltip label="Copy signature link">
+                            <Button
+                              variant="outline"
+                              onClick={handleCopySignatureLink}
+                              leftSection={<IconCopy size={16} />}
+                            >
+                                Copy Link
+                            </Button>
+                        </Tooltip>
+                        <Button
+                          variant="outline"
+                          component="a"
+                          href={signatureUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          leftSection={<IconLink size={16} />}
+                        >
+                            Open Link
+                        </Button>
+                    </>
+                )}
+                {loadingSignatureUrl && (
+                    <Button variant="outline" disabled>
+                        Generating...
+                    </Button>
+                )}
+            </Group>
         </div>
     );
 }

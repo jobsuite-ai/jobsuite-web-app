@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Skeleton, Stepper, Table, Text } from '@mantine/core';
+import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Stepper, Table, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
+import ContractorSignatureRequired from './ContractorSignatureRequired';
 import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
@@ -45,9 +46,11 @@ import SidebarDetails from './SidebarDetails';
 import classes from './styles/EstimateDetails.module.css';
 import VideoUploader from './VideoUploader';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { getCachedEstimateSummary, setCachedEstimateSummary } from '@/app/utils/dataCache';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const { estimates: cachedEstimates, clients: cachedClients } = useDataCache();
@@ -64,8 +67,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
     const [lineItemsCount, setLineItemsCount] = useState(0);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
-    const [firstPdfUrl, setFirstPdfUrl] = useState<string | null>(null);
-    const [loadingPdfUrl, setLoadingPdfUrl] = useState(false);
+    const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+    const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
+    const [downloadingPdf, setDownloadingPdf] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
     const isMountedRef = useRef(true);
@@ -81,6 +85,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [timeEntries, setTimeEntries] = useState<any[]>([]);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
+    const [signatures, setSignatures] = useState<Array<{
+        signature_type: string;
+        signature_data?: string;
+        signer_name?: string;
+        signer_email?: string;
+        signed_at?: string;
+        is_valid?: boolean;
+    }>>([]);
+    const [signaturesLoaded, setSignaturesLoaded] = useState(false);
 
     // Load cached estimate data immediately for instant display
     useEffect(() => {
@@ -231,6 +244,42 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         };
     }, [estimateID]);
 
+    const fetchSignatures = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) {
+            // Mark as loaded even if no token (to avoid infinite waiting)
+            setSignaturesLoaded(true);
+            return;
+        }
+
+        try {
+            setSignaturesLoaded(false);
+            const response = await fetch(
+                `/api/estimates/${estimateID}/signatures`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (response.ok && isMountedRef.current) {
+                const signaturesData = await response.json();
+                // Filter out invalid signatures
+                const validSignatures = (signaturesData.signatures || []).filter(
+                    (sig: any) => sig.is_valid !== false
+                );
+                setSignatures(validSignatures);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching signatures:', error);
+        } finally {
+            if (isMountedRef.current) {
+                setSignaturesLoaded(true);
+            }
+        }
+    }, [estimateID]);
+
     // Load full details in background after initial render
     useEffect(() => {
         if (initialLoading || detailsLoaded) {
@@ -348,6 +397,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 if (isMountedRef.current) {
                     setDetailsLoaded(true);
+                    // Fetch signatures after details are loaded
+                    fetchSignatures();
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
@@ -364,7 +415,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         return function cleanup() {
             clearTimeout(timeoutId);
         };
-    }, [estimateID, initialLoading, detailsLoaded]);
+    }, [estimateID, initialLoading, detailsLoaded, fetchSignatures]);
 
     // Separate functions for refreshing data after initial load
     const getEstimate = useCallback(async () => {
@@ -423,6 +474,34 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching resources:', error);
+        }
+    }, [estimateID]);
+
+    const getLineItems = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/line-items`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (response.ok) {
+                const itemsData = await response.json();
+                const itemsArray = Array.isArray(itemsData) ? itemsData : [];
+                setLineItems(itemsArray);
+                setLineItemsCount(itemsArray.length);
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching line items:', error);
         }
     }, [estimateID]);
 
@@ -643,6 +722,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         window.open(link, '_blank');
     };
 
+    const handleVideoUploadComplete = useCallback(async () => {
+        await getResources();
+        // Refresh estimate to ensure all data is up to date
+        await getEstimate();
+        setShowVideoUploaderModal(false);
+    }, [getResources, getEstimate]);
+
+    const handleImageUploadComplete = useCallback(async () => {
+        await getResources();
+        // Refresh estimate to ensure all data is up to date
+        await getEstimate();
+        setShowImageUploadModal(false);
+    }, [getResources, getEstimate]);
+
     const handleCopySpanishTranscription = async () => {
         if (!estimate?.spanish_transcription) {
             return;
@@ -672,6 +765,378 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const handleEditTranscriptionSummary = () => {
         transcriptionSummaryRef.current?.handleEdit();
+    };
+
+    const handlePrint = async () => {
+        if (!estimate || !client || lineItems.length === 0) {
+            notifications.show({
+                title: 'Error',
+                message: 'Unable to print: Missing required data',
+                color: 'red',
+                position: 'top-center',
+            });
+            return;
+        }
+
+        try {
+            // Fetch signatures if not already loaded
+            let pdfSignatures: Array<{
+                signature_type: string;
+                signature_data: string;
+                signer_name?: string;
+                is_valid?: boolean;
+            }> = [];
+
+            try {
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    pdfSignatures = (signaturesData.signatures || [])
+                        .filter((sig: any) => sig.is_valid !== false)
+                        .map((sig: any) => ({
+                            signature_type: sig.signature_type,
+                            signature_data: sig.signature_data || '',
+                            signer_name: sig.signer_name,
+                            is_valid: sig.is_valid !== false,
+                        }));
+                }
+            } catch (sigErr) {
+                // eslint-disable-next-line no-console
+                console.warn('Error fetching signatures for print:', sigErr);
+            }
+
+            // Build the template HTML (same as preview)
+            const { buildEstimateTemplateHtml } = await import('@/utils/estimatePdfGenerator');
+            const fullHtml = await buildEstimateTemplateHtml({
+                estimate,
+                client,
+                lineItems,
+                imageResources: resources.filter(
+                    (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+                ),
+            });
+
+            // Extract styles and body content
+            const styleMatch = fullHtml.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+            const styles = styleMatch ? styleMatch[1] : '';
+            const htmlWithoutStyles = fullHtml.replace(/<style[\s\S]*?<\/style>/i, '');
+
+            // Create a new window with just the estimate content
+            const printWindow = window.open('', '_blank', 'width=800,height=600');
+            if (!printWindow) {
+                notifications.show({
+                    title: 'Error',
+                    message: 'Please allow popups to print the estimate',
+                    color: 'red',
+                    position: 'top-center',
+                });
+                return;
+            }
+
+            // Write the HTML with print-specific styles
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Estimate ${estimateID}</title>
+                    <style>
+                        ${styles}
+                        /* Print-specific styles - minimize page margins to account for browser headers/footers */
+                        @page {
+                            margin: 0;
+                            size: letter;
+                        }
+                        @media print {
+                            /* Remove body margins and padding */
+                            body {
+                                margin: 0 !important;
+                                padding: 0.5in !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Ensure container uses available width and is centered */
+                            .container {
+                                margin: 0 auto !important;
+                                max-width: 100% !important;
+                                width: 100% !important;
+                                padding: 40px !important;
+                                box-sizing: border-box !important;
+                            }
+                            /* Hide any potential header/footer elements in content */
+                            header, footer, .header, .footer {
+                                display: none !important;
+                            }
+                            /* Prevent overflow and ensure proper sizing */
+                            html, body {
+                                width: 100% !important;
+                                overflow: visible !important;
+                                box-sizing: border-box !important;
+                            }
+                            * {
+                                box-sizing: border-box !important;
+                            }
+                        }
+                        /* Ensure signature fields have visible borders */
+                        signature-field,
+                        signature-field.signature-field,
+                        .signature-field {
+                            display: block !important;
+                            border-bottom: 1px solid #333 !important;
+                            width: 300px !important;
+                            height: 80px !important;
+                            min-height: 80px !important;
+                            box-sizing: border-box !important;
+                            margin-bottom: 5px !important;
+                        }
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+                        }
+                    </style>
+                </head>
+                <body>
+                    ${htmlWithoutStyles}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+
+            // Wait for content to load, then place signatures and print
+            const placeSignaturesAndPrint = () => {
+                // Place signatures in the print window
+                if (pdfSignatures.length > 0) {
+                    const signatureFields = printWindow.document.querySelectorAll('signature-field');
+                    signatureFields.forEach((field) => {
+                        const role = field.getAttribute('role');
+                        if (!role) return;
+
+                        let signatureType: string | null = null;
+                        if (role === 'Service Provider') {
+                            signatureType = 'CONTRACTOR';
+                        } else if (role === 'Property Owner') {
+                            signatureType = 'CLIENT';
+                        }
+
+                        if (!signatureType) return;
+
+                        const signature = pdfSignatures.find(
+                            (sig) => sig.signature_type === signatureType && sig.is_valid !== false
+                        );
+
+                        const signatureField = field as HTMLElement;
+                        signatureField.style.borderBottom = '1px solid #333';
+                        signatureField.style.display = 'block';
+                        signatureField.style.width = '300px';
+                        signatureField.style.height = '80px';
+                        signatureField.style.minHeight = '80px';
+                        signatureField.style.boxSizing = 'border-box';
+
+                        if (signature && signature.signature_data) {
+                            let signatureDataUrl = signature.signature_data;
+                            if (!signatureDataUrl.startsWith('data:')) {
+                                signatureDataUrl = `data:image/png;base64,${signatureDataUrl}`;
+                            }
+
+                            const img = printWindow.document.createElement('img');
+                            img.src = signatureDataUrl;
+                            img.style.width = '100%';
+                            img.style.height = 'auto';
+                            img.style.maxHeight = '80px';
+                            img.style.objectFit = 'contain';
+                            img.style.display = 'block';
+
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(img);
+                        } else {
+                            const spacer = printWindow.document.createElement('div');
+                            spacer.style.width = '100%';
+                            spacer.style.height = '79px';
+                            spacer.style.minHeight = '79px';
+                            spacer.style.display = 'block';
+                            signatureField.innerHTML = '';
+                            signatureField.appendChild(spacer);
+                        }
+                    });
+                }
+
+                // Wait for images to load, then print
+                const images = printWindow.document.querySelectorAll('img');
+                const imagePromises = Array.from(images).map((img) => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise<void>((resolve) => {
+                        img.onload = () => resolve();
+                        img.onerror = () => resolve();
+                        setTimeout(() => resolve(), 2000);
+                    });
+                });
+
+                Promise.all(imagePromises).then(() => {
+                    setTimeout(() => {
+                        // Show a brief notification about disabling headers/footers
+                        notifications.show({
+                            title: 'Print Tip',
+                            message: 'In the print dialog, uncheck "Headers and footers" for a cleaner print',
+                            color: 'blue',
+                            position: 'top-center',
+                            autoClose: 3000,
+                        });
+
+                        // Focus the print window and print
+                        printWindow.focus();
+                        printWindow.print();
+
+                        // Note: The print dialog is modal and will block the parent window
+                        // This is standard browser behavior and cannot be avoided.
+                        // Close the print window after a delay to free up resources
+                        setTimeout(() => {
+                            try {
+                                if (printWindow && !printWindow.closed) {
+                                    printWindow.close();
+                                }
+                            } catch (e) {
+                                // Window might already be closed, ignore
+                            }
+                            // Refocus the parent window
+                            window.focus();
+                        }, 3000);
+                    }, 300);
+                });
+            };
+
+            // Use both onload and a timeout as fallback
+            if (printWindow.document.readyState === 'complete') {
+                setTimeout(placeSignaturesAndPrint, 100);
+            } else {
+                printWindow.onload = () => {
+                    setTimeout(placeSignaturesAndPrint, 100);
+                };
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error preparing print:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to prepare print. Please try again.',
+                color: 'red',
+                position: 'top-center',
+            });
+        }
+    };
+
+    // Removed handleDownloadPdf - using handlePrint instead
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _handleDownloadPdf = async () => {
+        if (!estimate || !client || lineItems.length === 0) {
+            notifications.show({
+                title: 'Error',
+                message: 'Unable to generate PDF: Missing required data',
+                color: 'red',
+                position: 'top-center',
+            });
+            return;
+        }
+
+        if (downloadingPdf) {
+            return;
+        }
+
+        try {
+            setDownloadingPdf(true);
+
+            // Fetch signatures if not already loaded
+            let pdfSignatures: Array<{
+                signature_type: string;
+                signature_data: string;
+                signer_name?: string;
+                is_valid?: boolean;
+            }> = [];
+
+            try {
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    // Filter out invalid signatures and format exactly like sign page
+                    pdfSignatures = (signaturesData.signatures || [])
+                        .filter((sig: any) => sig.is_valid !== false)
+                        .map((sig: any) => ({
+                            signature_type: sig.signature_type,
+                            signature_data: sig.signature_data || '',
+                            signer_name: sig.signer_name,
+                            is_valid: sig.is_valid !== false,
+                        }));
+                }
+            } catch (sigErr) {
+                // eslint-disable-next-line no-console
+                console.warn('Error fetching signatures for PDF:', sigErr);
+                // Continue without signatures
+            }
+
+            // Format line items exactly like sign page (lines 230-237)
+            const pdfLineItems: EstimateLineItem[] = lineItems.map((item) => ({
+                id: item.id,
+                title: item.title || '',
+                description: item.description || '',
+                hours: item.hours || 0,
+                rate: item.rate || 0,
+                created_at: item.created_at || new Date().toISOString(),
+            }));
+
+            // Filter image resources exactly like sign page (lines 239-241)
+            const pdfImageResources = resources.filter(
+                (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+            );
+
+            // Generate PDF using the same function and format as sign page
+            const pdfBlob = await generateEstimatePdf({
+                estimate,
+                client,
+                lineItems: pdfLineItems,
+                imageResources: pdfImageResources,
+                signatures: pdfSignatures,
+            });
+
+            // Create download link and trigger download
+            const url = URL.createObjectURL(pdfBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `estimate-${estimateID}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            notifications.show({
+                title: 'Success',
+                message: 'PDF downloaded successfully',
+                color: 'green',
+                position: 'top-center',
+            });
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error generating PDF:', err);
+            notifications.show({
+                title: 'Error',
+                message: 'Failed to generate PDF. Please try again.',
+                color: 'red',
+                position: 'top-center',
+            });
+        } finally {
+            setDownloadingPdf(false);
+        }
     };
 
     const archiveEstimate = async () => {
@@ -704,67 +1169,194 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const fileResources = useMemo(() => (
         resources.filter(r => r.resource_type === 'DOCUMENT' && r.upload_status === 'COMPLETED')
     ), [resources]);
-    const firstPdfResource = useMemo(() => (
-        fileResources.find(r => r.resource_location?.toLowerCase().endsWith('.pdf'))
+    const signedPdfResource = useMemo(() => (
+        fileResources.find(r => {
+            const location = r.resource_location?.toLowerCase() || '';
+            return location.includes('-signed-estimate.pdf') || location === 'fully-signed-estimate.pdf';
+        })
     ), [fileResources]);
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
-    const hasPdfPreview = firstPdfResource !== undefined;
-
-    const getPdfPresignedUrl = useCallback(async (resource: EstimateResource) => {
-        const accessToken = localStorage.getItem('access_token');
-        if (!accessToken) return;
-
-        setLoadingPdfUrl(true);
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
-                // eslint-disable-next-line no-console
-                console.error('Error fetching PDF presigned URL:', errorData);
-                setFirstPdfUrl(null);
-                return;
-            }
-
-            const data = await response.json();
-            const presignedUrl = data.presigned_url || data.url;
-            setFirstPdfUrl(presignedUrl || null);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching PDF presigned URL:', error);
-            setFirstPdfUrl(null);
-        } finally {
-            setLoadingPdfUrl(false);
-        }
-    }, [estimateID]);
-
-    // Fetch PDF URL only after initial load is complete
-    useEffect(() => {
-        if (initialLoading) {
-            return;
-        }
-
-        if (firstPdfResource) {
-            getPdfPresignedUrl(firstPdfResource);
-        } else {
-            setFirstPdfUrl(null);
-        }
-    }, [firstPdfResource, getPdfPresignedUrl, initialLoading]);
+    const hasSignedPdf = signedPdfResource !== undefined;
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
     const hasSpanishTranscription = estimate?.spanish_transcription
         && estimate.spanish_transcription.trim().length > 0;
+
+    // Check if both parties have signed
+    const isFullySigned = useMemo(() => {
+        if (signatures.length === 0) return false;
+        const hasClient = signatures.some(
+            (sig) => sig.signature_type === 'CLIENT' && sig.is_valid !== false
+        );
+        const hasContractor = signatures.some(
+            (sig) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false
+        );
+        return hasClient && hasContractor;
+    }, [signatures]);
+
+    const hasClientSignature = useMemo(() => (
+        signatures.some((sig) => sig.signature_type === 'CLIENT' && sig.is_valid !== false)
+    ), [signatures]);
+
+    const hasContractorSignature = useMemo(() => (
+        signatures.some((sig) => sig.signature_type === 'CONTRACTOR' && sig.is_valid !== false)
+    ), [signatures]);
+
+    const isSignatureRequired = hasClientSignature && !hasContractorSignature;
+
+    // Check if all resources are ready for signature link generation
+    const allResourcesReady = useMemo(() => (
+        hasVideo && hasImages && lineItemsCount > 0 && !initialLoading && detailsLoaded
+    ), [hasVideo, hasImages, lineItemsCount, initialLoading, detailsLoaded]);
+
+    // Track previous state to detect when all resources become ready
+    const prevAllResourcesReadyRef = useRef(false);
+
+    // Generate or fetch signature link when all resources are ready OR when we have a signed PDF
+    useEffect(() => {
+        // Proceed if all resources are ready, OR if we have a signed PDF (need URL for link)
+        const shouldFetch = (
+            allResourcesReady || (hasSignedPdf && isFullySigned)
+        ) && client?.email && estimate;
+
+        if (!shouldFetch) {
+            prevAllResourcesReadyRef.current = allResourcesReady;
+            return;
+        }
+
+        // Skip if we already processed this state (avoid duplicate calls)
+        // Note: This will still refresh when estimate changes since estimate is in dependency array
+        if (prevAllResourcesReadyRef.current === allResourcesReady && signatureUrl) {
+            return;
+        }
+
+        // Mark that we're processing this state
+        prevAllResourcesReadyRef.current = allResourcesReady;
+
+        const fetchOrGenerateSignatureLink = async () => {
+            try {
+                setLoadingSignatureUrl(true);
+
+                // First, try to fetch existing signature links
+                const signaturesResponse = await fetch(
+                    `/api/estimates/${estimateID}/signatures`,
+                    {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }
+                );
+
+                if (signaturesResponse.ok) {
+                    const signaturesData = await signaturesResponse.json();
+                    // Filter out REVOKED and EXPIRED links, only use active ones
+                    let activeLinks = signaturesData.signature_links?.filter(
+                        (link: any) =>
+                            link.client_email === client.email &&
+                            link.status !== 'REVOKED' &&
+                            link.status !== 'EXPIRED'
+                    ) || [];
+
+                    // If we have a signed PDF, prefer SIGNED links
+                    if (hasSignedPdf && isFullySigned) {
+                        const signedLinks = activeLinks.filter((link: any) => link.status === 'SIGNED');
+                        if (signedLinks.length > 0) {
+                            activeLinks = signedLinks;
+                        }
+                    }
+
+                    // Sort by created_at descending to get the most recent active link
+                    activeLinks.sort((a: any, b: any) => {
+                        const dateA = new Date(a.created_at || 0).getTime();
+                        const dateB = new Date(b.created_at || 0).getTime();
+                        return dateB - dateA;
+                    });
+
+                    const existingLink = activeLinks[0];
+
+                    if (existingLink) {
+                        // Use existing signature link
+                        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
+                        setSignatureUrl(`${baseUrl}/sign/${existingLink.signature_hash}`);
+                        setLoadingSignatureUrl(false);
+                        return;
+                    }
+                }
+
+                // No existing link found, generate a new one
+                const generateResponse = await fetch(
+                    `/api/estimates/${estimateID}/signature-links`,
+                    {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            client_email: client.email,
+                            expires_in_days: 30,
+                        }),
+                    }
+                );
+
+                if (generateResponse.ok) {
+                    const generateData = await generateResponse.json();
+                    setSignatureUrl(generateData.signature_url);
+                } else {
+                    // eslint-disable-next-line no-console
+                    console.error('Failed to generate signature link');
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Error fetching/generating signature link:', error);
+            } finally {
+                setLoadingSignatureUrl(false);
+            }
+        };
+
+        // Small delay to ensure resources are fully processed
+        const timeoutId = setTimeout(() => {
+            fetchOrGenerateSignatureLink();
+        }, 500);
+
+        // eslint-disable-next-line consistent-return
+        return function cleanup() {
+            clearTimeout(timeoutId);
+        };
+    }, [
+        allResourcesReady,
+        hasSignedPdf,
+        isFullySigned,
+        client?.email,
+        estimateID,
+        estimate,
+        signatureUrl,
+        fetchSignatures,
+    ]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') {
+            return undefined;
+        }
+
+        const handleFocus = () => {
+            getEstimate();
+            getResources();
+            fetchSignatures();
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                handleFocus();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [fetchSignatures, getEstimate, getResources]);
 
     const OverviewDetails = useMemo(() => (
         <>
@@ -1059,40 +1651,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* PDF Preview - Show if first file is a PDF */}
-                                    {hasPdfPreview && firstPdfResource && (
-                                        <CollapsibleSection title="PDF Preview" defaultOpen>
-                                            {loadingPdfUrl ? (
-                                                <Skeleton height={800} radius="md" />
-                                            ) : firstPdfUrl ? (
-                                                <div style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'center',
-                                                    alignItems: 'center',
-                                                    minHeight: '500px',
-                                                    width: '100%',
-                                                }}>
-                                                    <iframe
-                                                      title={`PDF preview for ${firstPdfResource.resource_location}`}
-                                                      src={firstPdfUrl}
-                                                      className={classes.pdfIframe}
-                                                      style={{
-                                                          width: '100%',
-                                                          height: '800px',
-                                                          border: 'none',
-                                                          borderRadius: '8px',
-                                                          maxHeight: '70vh',
-                                                      }}
-                                                    />
-                                                </div>
-                                            ) : (
-                                                <Text c="dimmed" ta="center" p="md">
-                                                    Unable to load PDF preview
-                                                </Text>
-                                            )}
-                                        </CollapsibleSection>
-                                    )}
-
                                     {/* File List - Show if files exist */}
                                     {hasFiles && (
                                         <CollapsibleSection title="Files" defaultOpen>
@@ -1187,7 +1745,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={getEstimate}
+                                              onEstimateUpdate={() => {
+                                                getEstimate();
+                                                getLineItems();
+                                              }}
                                             />
                                         </CollapsibleSection>
                                     ) : (
@@ -1198,7 +1759,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={getEstimate}
+                                              onEstimateUpdate={() => {
+                                                getEstimate();
+                                                getLineItems();
+                                              }}
                                             />
                                         </div>
                                     )}
@@ -1222,31 +1786,51 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Estimate Preview Section - Only show when
-                                     all three steps are completed */}
-                                    {estimate && hasVideo && hasImages && lineItemsCount > 0 && (
+                                    {/* Estimate Preview or Signature Requirement Section */}
+                                    {/* Only show when details and signatures are loaded */}
+                                    {estimate && detailsLoaded && signaturesLoaded && (
                                         <CollapsibleSection
-                                          title="Estimate Preview"
-                                          defaultOpen
+                                          title={
+                                            isSignatureRequired
+                                                ? 'Signature Required'
+                                                : 'Estimate Preview'
+                                          }
+                                          defaultOpen={!hasSignedPdf && !isSignatureRequired}
                                           headerActions={
-                                              <ActionIcon
-                                                variant="subtle"
-                                                onClick={() => {
-                                                    window.open(`/proposals/${estimateID}/print`, '_blank');
-                                                }}
-                                                title="Print Estimate"
-                                              >
-                                                <IconPrinter size={18} />
-                                              </ActionIcon>
+                                              !isSignatureRequired
+                                              && !hasSignedPdf
+                                              && hasVideo && hasImages && lineItemsCount > 0 ? (
+                                                  <ActionIcon
+                                                    variant="subtle"
+                                                    onClick={handlePrint}
+                                                    title="Print Estimate"
+                                                  >
+                                                    <IconPrinter size={18} />
+                                                  </ActionIcon>
+                                              ) : undefined
                                           }
                                         >
-                                            <EstimatePreview
-                                              estimate={estimate}
-                                              imageResources={imageResources}
-                                              videoResources={videoResources}
-                                              lineItems={lineItems}
-                                              client={client}
-                                            />
+                                            {isSignatureRequired ? (
+                                                <ContractorSignatureRequired
+                                                  estimateId={estimateID}
+                                                  onSignatureComplete={() => {
+                                                      getEstimate();
+                                                      getResources();
+                                                      fetchSignatures();
+                                                  }}
+                                                />
+                                            ) : (
+                                                <EstimatePreview
+                                                  estimate={estimate}
+                                                  imageResources={imageResources}
+                                                  videoResources={videoResources}
+                                                  lineItems={lineItems}
+                                                  client={client}
+                                                  signatureUrl={signatureUrl}
+                                                  loadingSignatureUrl={loadingSignatureUrl}
+                                                  signatures={signatures}
+                                                />
+                                            )}
                                         </CollapsibleSection>
                                     )}
                                 </div>
@@ -1346,10 +1930,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             >
                 <VideoUploader
                   estimateID={estimateID}
-                  refresh={() => {
-                    getResources();
-                    setShowVideoUploaderModal(false);
-                  }}
+                  refresh={handleVideoUploadComplete}
                 />
             </Modal>
 
@@ -1365,8 +1946,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 <ImageUpload
                   estimateID={estimateID}
                   setImage={() => {
-                    getResources();
-                    setShowImageUploadModal(false);
+                    handleImageUploadComplete();
                   }}
                   setShowModal={setShowImageUploadModal}
                 />
@@ -1413,15 +1993,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         hasVideo,
         hasImages,
         hasFiles,
-        hasPdfPreview,
         hasDescription,
         hasSpanishTranscription,
         videoResources,
         imageResources,
         fileResources,
-        firstPdfResource,
-        firstPdfUrl,
-        loadingPdfUrl,
         showVideoUploaderModal,
         showImageUploadModal,
         showFileUploadModal,

@@ -39,13 +39,17 @@ export default function ImageGallery({
           (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
         );
 
+        // Determine region based on branch (not NODE_ENV, which is always 'production' in builds)
+        const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
+        const isProduction = branch === 'production' || branch === 'prod';
+        const region = isProduction ? 'us-east-1' : 'us-west-2';
+
         const getImageBucket = () => {
-          const env = process.env.NODE_ENV === 'production' ? 'prod' : 'dev';
+          const env = isProduction ? 'prod' : 'dev';
           return `jobsuite-resource-images-${env}`;
         };
 
         const paths = imageResources.map((resource) => {
-          const region = process.env.NODE_ENV === 'production' ? 'us-east-1' : 'us-west-2';
           // If we have s3_bucket and s3_key, construct the correct S3 URL
           if (resource.s3_bucket && resource.s3_key) {
             // Use the bucket from the resource, or fallback to default

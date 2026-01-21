@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import html2pdf from 'html2pdf.js';
 import { useParams, useRouter } from 'next/navigation';
 
-import EstimatePreview from '@/components/EstimateDetails/estimate/EstimatePreview';
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 import { useAuth } from '@/hooks/useAuth';
+import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 export default function PrintEstimate() {
     const params = useParams();
@@ -23,8 +23,7 @@ export default function PrintEstimate() {
     const [client, setClient] = useState<ContractorClient | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
-    const [pdfGenerated, setPdfGenerated] = useState(false);
-    const printRef = useRef<HTMLDivElement>(null);
+    const [generatingPdf, setGeneratingPdf] = useState(false);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -40,23 +39,13 @@ export default function PrintEstimate() {
             try {
                 setLoading(true);
                 setError(false);
-                const accessToken = localStorage.getItem('access_token');
-
-                if (!accessToken) {
-                    setError(true);
-                    setLoading(false);
-                    return;
-                }
 
                 // Fetch estimate details
                 const detailsRes = await fetch(
                     `/api/estimates/${estimateID}/details`,
                     {
                         method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
+                        headers: getApiHeaders(),
                     }
                 );
 
@@ -99,118 +88,118 @@ export default function PrintEstimate() {
         fetchData();
     }, [estimateID, isAuthenticated, isLoading, router]);
 
-    // Generate PDF when content is ready
+    // Generate and download PDF when content is ready
     useEffect(() => {
         const shouldGeneratePdf = !loading
             && estimate
             && client
             && lineItems.length > 0
-            && !pdfGenerated
-            && printRef.current;
+            && !generatingPdf;
 
         if (shouldGeneratePdf) {
-            // Wait for images and content to fully load
-            const timer = setTimeout(async () => {
-                const element = printRef.current;
-                if (!element) return;
-
-                // Wait for all images to load
-                const images = element.querySelectorAll('img');
-                const imagePromises = Array.from(images).map((img) => {
-                    if (img.complete) return Promise.resolve();
-                    return new Promise<void>((resolve) => {
-                        img.onload = () => resolve();
-                        img.onerror = () => resolve(); // Continue even if image fails
-                        // Timeout after 5 seconds
-                        setTimeout(() => resolve(), 5000);
-                    });
-                });
-
-                await Promise.all(imagePromises);
-
-                // Configure PDF options
-                const opt = {
-                    margin: [0.5, 0.5, 0.5, 0.5] as [number, number, number, number],
-                    filename: `estimate-${estimateID}.pdf`,
-                    image: { type: 'jpeg' as const, quality: 0.98 },
-                    html2canvas: {
-                        scale: 2,
-                        useCORS: true,
-                        logging: false,
-                        letterRendering: true,
-                    },
-                    jsPDF: {
-                        unit: 'in',
-                        format: 'letter',
-                        orientation: 'portrait' as const,
-                    },
-                };
-
+            const generateAndDownloadPdf = async () => {
                 try {
-                    await html2pdf().set(opt).from(element).save();
-                    setPdfGenerated(true);
+                    setGeneratingPdf(true);
+
+                    // Fetch signatures
+                    let signatures: Array<{
+                        signature_type: string;
+                        signature_data: string;
+                        signer_name?: string;
+                        is_valid?: boolean;
+                    }> = [];
+
+                    try {
+                        const signaturesResponse = await fetch(
+                            `/api/estimates/${estimateID}/signatures`,
+                            {
+                                method: 'GET',
+                                headers: getApiHeaders(),
+                            }
+                        );
+
+                        if (signaturesResponse.ok) {
+                            const signaturesData = await signaturesResponse.json();
+                            // Filter out invalid signatures
+                            signatures = (signaturesData.signatures || []).filter(
+                                (sig: any) => sig.is_valid !== false
+                            ).map((sig: any) => ({
+                                signature_type: sig.signature_type,
+                                signature_data: sig.signature_data || '',
+                                signer_name: sig.signer_name,
+                                is_valid: sig.is_valid !== false,
+                            }));
+                        }
+                    } catch (sigErr) {
+                        // eslint-disable-next-line no-console
+                        console.warn('Error fetching signatures for PDF:', sigErr);
+                        // Continue without signatures
+                    }
+
+                    // Filter resources
+                    const imageResources = resources.filter(
+                        (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
+                    );
+
+                    // Generate PDF using the utility
+                    const pdfBlob = await generateEstimatePdf({
+                        estimate,
+                        client,
+                        lineItems,
+                        imageResources,
+                        signatures,
+                    });
+
+                    // Create download link and trigger download
+                    const url = URL.createObjectURL(pdfBlob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `estimate-${estimateID}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
                 } catch (err) {
                     // eslint-disable-next-line no-console
                     console.error('Error generating PDF:', err);
-                    // Fallback to browser print if PDF generation fails
-                    window.print();
+                    setError(true);
+                } finally {
+                    setGeneratingPdf(false);
                 }
-            }, 1000);
+            };
+
+            // Small delay to ensure everything is ready
+            const timer = setTimeout(() => {
+                generateAndDownloadPdf();
+            }, 500);
             return () => clearTimeout(timer);
         }
         return () => {};
-    }, [loading, estimate, client, lineItems, pdfGenerated, estimateID]);
+    }, [loading, estimate, client, lineItems, resources, estimateID, generatingPdf]);
 
-    if (isLoading || loading) {
-        return <LoadingState />;
+    if (isLoading || loading || generatingPdf) {
+        return (
+            <>
+                <LoadingState />
+                {generatingPdf && (
+                    <div style={{ textAlign: 'center', marginTop: '20px' }}>
+                        <p>Generating PDF...</p>
+                    </div>
+                )}
+            </>
+        );
     }
 
     if (error || !estimate || !client) {
         return <UniversalError message="Unable to load estimate for printing" />;
     }
 
-    const imageResources = resources.filter(
-        (r) => r.resource_type === 'IMAGE' && r.upload_status === 'COMPLETED'
-    );
-    const videoResources = resources.filter(
-        (r) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED'
-    );
-
+    // This page should automatically download the PDF, so we don't need to render anything
+    // If we reach here, the PDF should have been generated and downloaded
     return (
-        <>
-            <style>{`
-                body {
-                    margin: 0;
-                    padding: 0;
-                    background: white;
-                }
-                /* Hide navigation and other non-print elements */
-                nav, header, footer, button, .no-print {
-                    display: none !important;
-                }
-                /* Ensure content fits on page */
-                * {
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-                /* PDF generation container */
-                .pdf-container {
-                    background: white;
-                    padding: 0;
-                    margin: 0;
-                }
-            `}
-            </style>
-            <div ref={printRef} className="pdf-container">
-                <EstimatePreview
-                  estimate={estimate}
-                  imageResources={imageResources}
-                  videoResources={videoResources}
-                  lineItems={lineItems}
-                  client={client}
-                  hideTodo
-                />
-            </div>
-        </>
+        <div style={{ padding: '20px', textAlign: 'center' }}>
+            <p>PDF download should have started automatically.</p>
+            <p>If it didn&apos;t, please check your browser&apos;s download settings.</p>
+        </div>
     );
 }
