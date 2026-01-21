@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 
 import { Button, Checkbox, Group, Select, Tooltip } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconCopy, IconLink, IconFilePdf } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconLink, IconFile } from '@tabler/icons-react';
 
 import { EstimateLineItem } from './LineItem';
 import { ResendConfirmModal } from './ResendConfirmModal';
@@ -387,7 +387,7 @@ export function UploadNewTemplate({
                           variant="outline"
                           onClick={handleCreatePdf}
                           loading={generatingPdf}
-                          leftSection={<IconFilePdf size={16} />}
+                          leftSection={<IconFile size={16} />}
                         >
                             Create PDF
                         </Button>
