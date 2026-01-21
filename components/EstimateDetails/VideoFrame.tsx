@@ -61,10 +61,14 @@ export function VideoFrame({ resource, estimateID, refresh }: {
         return `jobsuite-resource-videos-${env}`;
     };
 
-    const getVideoBucketRegion = () => isProduction() ? 'us-east-1' : 'us-west-2';
+    // Determine region based on bucket name (more reliable than env vars)
+    // If bucket name contains '-prod', use us-east-1, otherwise us-west-2
+    const bucketName = resource.s3_bucket || getVideoBucket();
+    const isProdBucket = bucketName.includes('-prod');
+    const region = isProdBucket ? 'us-east-1' : 'us-west-2';
 
     const videoUrl = resource.s3_key
-        ? `https://${getVideoBucket()}.s3.${getVideoBucketRegion()}.amazonaws.com/${resource.s3_key}`
+        ? `https://${bucketName}.s3.${region}.amazonaws.com/${resource.s3_key}`
         : null;
     const objectExists = resource.upload_status === 'COMPLETED' && videoUrl !== null;
 
