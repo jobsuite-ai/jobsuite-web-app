@@ -194,6 +194,15 @@ export function UploadNewTemplate({
                 throw new Error(errorData.error || 'Failed to send estimate');
             }
 
+            // Get signature links from the response
+            const sendData = await sendResponse.json();
+            const signatureLinks = sendData.signature_links || [];
+
+            // Use the first signature link if available
+            if (signatureLinks.length > 0 && onSignatureUrlGenerated) {
+                onSignatureUrlGenerated(signatureLinks[0]);
+            }
+
             // Step 3: Update estimate status
             const accessToken = localStorage.getItem('access_token');
             if (!accessToken) {
@@ -266,47 +275,9 @@ export function UploadNewTemplate({
     };
 
     const handleCreatePdf = async () => {
-        if (!client?.email) {
-            notifications.show({
-                title: 'Error',
-                message: 'Client email is required to generate PDF',
-                color: 'red',
-            });
-            return;
-        }
-
         setGeneratingPdf(true);
         try {
-            // First, ensure a signature link exists (create one if needed)
-            let newSignatureUrl = signatureUrl;
-            if (!newSignatureUrl) {
-                const linkResponse = await fetch(
-                    `/api/estimates/${estimate.id}/signature-links`,
-                    {
-                        method: 'POST',
-                        headers: getApiHeaders(),
-                        body: JSON.stringify({
-                            client_email: client.email,
-                            expires_in_days: 30,
-                        }),
-                    }
-                );
-
-                if (!linkResponse.ok) {
-                    const errorData = await linkResponse.json().catch(() => ({}));
-                    throw new Error(errorData.detail || 'Failed to create signature link');
-                }
-
-                const linkData = await linkResponse.json();
-                newSignatureUrl = linkData.signature_url;
-
-                // Notify parent component to update signatureUrl
-                if (onSignatureUrlGenerated && newSignatureUrl) {
-                    onSignatureUrlGenerated(newSignatureUrl);
-                }
-            }
-
-            // Now generate the PDF
+            // Generate the PDF (signature links are not required)
             const response = await fetch(
                 `/api/estimates/${estimate.id}/generate-pdf`,
                 {
