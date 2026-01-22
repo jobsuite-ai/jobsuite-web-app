@@ -17,6 +17,7 @@ import {
     Image,
     Box,
     Badge,
+    NumberInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
@@ -54,6 +55,7 @@ export default function SettingsPage() {
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [configId, setConfigId] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
+    const [baseHourlyRate, setBaseHourlyRate] = useState<string>('');
 
     // Load existing configuration on mount
     useEffect(() => {
@@ -104,6 +106,9 @@ export default function SettingsPage() {
                 setSesVerificationStatus(
                     config.configuration?.ses_verification_status || null
                 );
+                setBaseHourlyRate(
+                    config.configuration?.base_hourly_rate?.toString() || ''
+                );
 
                 // Check if logo fields exist in the configuration
                 const hasLogoFields =
@@ -146,6 +151,7 @@ export default function SettingsPage() {
                 setClientCommunicationName('');
                 setSesVerificationStatus(null);
                 setLogoUrl(null);
+                setBaseHourlyRate('');
             }
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -192,6 +198,7 @@ export default function SettingsPage() {
                     review_link: reviewLink,
                     client_communication_email: clientCommunicationEmail,
                     client_communication_name: clientCommunicationName,
+                    base_hourly_rate: baseHourlyRate ? parseFloat(baseHourlyRate) : null,
                     // Preserve SES verification status if it exists
                     ...(existingConfig?.configuration?.ses_verification_status && {
                         ses_verification_status:
@@ -275,6 +282,11 @@ export default function SettingsPage() {
 
     const handleClientCommunicationNameChange = (value: string) => {
         setClientCommunicationName(value);
+        setHasChanges(true);
+    };
+
+    const handleBaseHourlyRateChange = (value: string) => {
+        setBaseHourlyRate(value);
         setHasChanges(true);
     };
 
@@ -505,6 +517,20 @@ export default function SettingsPage() {
                                   value={clientCommunicationName}
                                   onChange={(e) =>
                                     handleClientCommunicationNameChange(e.target.value)
+                                  }
+                                />
+
+                                <NumberInput
+                                  label="Base Hourly Rate"
+                                  placeholder="0.00"
+                                  description="Default hourly rate that will be used to auto-populate line item rates"
+                                  prefix="$"
+                                  min={0}
+                                  decimalScale={2}
+                                  allowNegative={false}
+                                  value={baseHourlyRate ? parseFloat(baseHourlyRate) : undefined}
+                                  onChange={(value) =>
+                                    handleBaseHourlyRateChange(value?.toString() || '')
                                   }
                                 />
 
