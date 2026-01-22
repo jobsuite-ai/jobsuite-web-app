@@ -25,6 +25,7 @@ interface SignatureFormProps {
     opened: boolean;
     onClose: () => void;
     contractorName?: string; // Display name for contractor (full_name or email)
+    clientName?: string; // Display name for client
 }
 
 export default function SignatureForm({
@@ -35,6 +36,7 @@ export default function SignatureForm({
     opened,
     onClose,
     contractorName,
+    clientName,
 }: SignatureFormProps) {
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
@@ -42,10 +44,13 @@ export default function SignatureForm({
     const [isDrawing, setIsDrawing] = useState(false);
 
     // For contractor: pre-populate with contractorName (or email if no name) and email
-    // For client: start empty
+    // For client: pre-populate with clientName (or email if no name) and email
     const getInitialName = () => {
         if (signatureType === 'CONTRACTOR' && contractorName) {
             return contractorName;
+        }
+        if (signatureType === 'CLIENT' && clientName) {
+            return clientName;
         }
         return '';
     };
@@ -62,6 +67,9 @@ export default function SignatureForm({
     const getInitialTypedSignature = () => {
         if (signatureType === 'CONTRACTOR' && contractorName) {
             return contractorName;
+        }
+        if (signatureType === 'CLIENT' && clientName) {
+            return clientName;
         }
         return '';
     };
@@ -202,7 +210,7 @@ export default function SignatureForm({
         }
     }, [typedSignature, signatureMethod, renderTypedSignature]);
 
-    // Initialize contractor fields when modal opens and signatureType is CONTRACTOR
+    // Initialize fields when modal opens based on signature type
     useEffect(() => {
         if (!opened) return;
 
@@ -222,14 +230,15 @@ export default function SignatureForm({
             }
             setHasSignature(false);
         } else if (signatureType === 'CLIENT') {
-            // Reset to defaults for client
-            setSignerName('');
-            setSignerEmail(clientEmail);
+            // Pre-populate with client name and email if available
+            const name = clientName || clientEmail || '';
+            setSignerName(name);
+            setSignerEmail(clientEmail || '');
             setSignatureMethod('draw');
-            setTypedSignature('');
+            setTypedSignature(name);
             setHasSignature(false);
         }
-    }, [opened, signatureType, contractorName, clientEmail]);
+    }, [opened, signatureType, contractorName, clientName, clientEmail]);
 
     // Clear canvas when switching methods (but preserve typedSignature if switching to type)
     useEffect(() => {

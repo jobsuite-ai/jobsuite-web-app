@@ -25,6 +25,7 @@ import '@mantine/dropzone/styles.css';
 import { EstimateLineItem, LineItem } from './LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import LoadingState from '@/components/Global/LoadingState';
 
 export type LineItemsRef = {
@@ -339,10 +340,52 @@ const LineItems = forwardRef<LineItemsRef, {
         form.reset();
     };
 
-    const openAddModal = () => {
+    const fetchBaseHourlyRate = async (): Promise<number | null> => {
+        try {
+            const response = await fetch(
+                '/api/configurations?config_type=contractor_config',
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (!response.ok) {
+                return null;
+            }
+
+            const configs = await response.json();
+            const config = configs.find(
+                (c: { configuration_type: string }) => c.configuration_type === 'contractor_config'
+            );
+
+            if (config?.configuration?.base_hourly_rate) {
+                return parseFloat(config.configuration.base_hourly_rate);
+            }
+
+            return null;
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Error fetching base hourly rate:', error);
+            return null;
+        }
+    };
+
+    const openAddModal = async () => {
         form.reset();
         setEditingItem(null);
         setOpened(true);
+
+        // Fetch base hourly rate and auto-populate if available
+        const baseRate = await fetchBaseHourlyRate();
+        if (baseRate && baseRate > 0) {
+            form.setValues({
+                title: '',
+                description: '',
+                hours: 0,
+                rate: baseRate,
+            });
+        }
     };
 
     async function reorderLineItems(lineItemIds: string[]) {
@@ -457,11 +500,7 @@ const LineItems = forwardRef<LineItemsRef, {
 
             {lineItems.length > 0 && (
                 <Group justify="center" mt="lg">
-                    <Button onClick={() => {
-                        form.reset();
-                        setEditingItem(null);
-                        setOpened(true);
-                    }}>
+                    <Button onClick={openAddModal}>
                         Add Line Item
                     </Button>
                 </Group>

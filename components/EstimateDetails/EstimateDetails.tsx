@@ -53,7 +53,12 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
-    const { estimates: cachedEstimates, clients: cachedClients } = useDataCache();
+    const {
+        estimates: cachedEstimates,
+        clients: cachedClients,
+        updateEstimate,
+        refreshData,
+    } = useDataCache();
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -437,12 +442,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             if (response.ok) {
                 const estimateData = await response.json();
                 setEstimate(estimateData);
+                // Update cache immediately so SidebarDetails and other components see the changes
+                updateEstimate(estimateData);
             }
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching estimate:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, updateEstimate]);
 
     const getResources = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
@@ -1206,40 +1213,30 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const isSignatureRequired = hasClientSignature && !hasContractorSignature;
 
-    // Check if all resources are ready for signature link generation
-    const allResourcesReady = useMemo(() => (
-        hasVideo && hasImages && lineItemsCount > 0 && !initialLoading && detailsLoaded
-    ), [hasVideo, hasImages, lineItemsCount, initialLoading, detailsLoaded]);
-
-    // Track previous state to detect when all resources become ready
-    const prevAllResourcesReadyRef = useRef(false);
-
-    // Generate or fetch signature link when all resources are ready OR when we have a signed PDF
+    // Fetch existing signature link (only if estimate has been sent)
+    // We no longer generate signature links automatically - they're only created when sending
     useEffect(() => {
-        // Proceed if all resources are ready, OR if we have a signed PDF (need URL for link)
-        const shouldFetch = (
-            allResourcesReady || (hasSignedPdf && isFullySigned)
-        ) && client?.email && estimate;
+        // Check if estimate has been sent (by status or by having signature links)
+        const estimateHasBeenSent = estimate?.status === EstimateStatus.ESTIMATE_SENT ||
+            estimate?.status === EstimateStatus.ESTIMATE_OPENED ||
+            estimate?.status === EstimateStatus.ESTIMATE_ACCEPTED ||
+            estimate?.status === EstimateStatus.ACCOUNTING_NEEDED ||
+            estimate?.status === EstimateStatus.CONTRACTOR_SIGNED ||
+            estimate?.status?.toString().startsWith('PROJECT_') ||
+            (hasSignedPdf && isFullySigned);
+
+        // Only fetch if estimate has been sent and we have client email
+        const shouldFetch = estimateHasBeenSent && client?.email && estimate;
 
         if (!shouldFetch) {
-            prevAllResourcesReadyRef.current = allResourcesReady;
             return;
         }
 
-        // Skip if we already processed this state (avoid duplicate calls)
-        // Note: This will still refresh when estimate changes since estimate is in dependency array
-        if (prevAllResourcesReadyRef.current === allResourcesReady && signatureUrl) {
-            return;
-        }
-
-        // Mark that we're processing this state
-        prevAllResourcesReadyRef.current = allResourcesReady;
-
-        const fetchOrGenerateSignatureLink = async () => {
+        const fetchExistingSignatureLink = async () => {
             try {
                 setLoadingSignatureUrl(true);
 
-                // First, try to fetch existing signature links
+                // Fetch existing signature links (only, don't generate new ones)
                 const signaturesResponse = await fetch(
                     `/api/estimates/${estimateID}/signatures`,
                     {
@@ -1279,34 +1276,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         // Use existing signature link
                         const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
                         setSignatureUrl(`${baseUrl}/sign/${existingLink.signature_hash}`);
-                        setLoadingSignatureUrl(false);
-                        return;
                     }
-                }
-
-                // No existing link found, generate a new one
-                const generateResponse = await fetch(
-                    `/api/estimates/${estimateID}/signature-links`,
-                    {
-                        method: 'POST',
-                        headers: getApiHeaders(),
-                        body: JSON.stringify({
-                            client_email: client.email,
-                            expires_in_days: 30,
-                        }),
-                    }
-                );
-
-                if (generateResponse.ok) {
-                    const generateData = await generateResponse.json();
-                    setSignatureUrl(generateData.signature_url);
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.error('Failed to generate signature link');
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
-                console.error('Error fetching/generating signature link:', error);
+                console.error('Error fetching signature link:', error);
             } finally {
                 setLoadingSignatureUrl(false);
             }
@@ -1314,7 +1288,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
         // Small delay to ensure resources are fully processed
         const timeoutId = setTimeout(() => {
-            fetchOrGenerateSignatureLink();
+            fetchExistingSignatureLink();
         }, 500);
 
         // eslint-disable-next-line consistent-return
@@ -1322,13 +1296,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             clearTimeout(timeoutId);
         };
     }, [
-        allResourcesReady,
         hasSignedPdf,
         isFullySigned,
         client?.email,
         estimateID,
+        estimate?.status,
         estimate,
-        signatureUrl,
         fetchSignatures,
     ]);
 
@@ -1634,6 +1607,25 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         />
                                     </CollapsibleSection>
 
+                                    {/* Change Orders Section - Only show if not archived and
+                                    there are change orders */}
+                                    {estimate &&
+                                    !estimate.original_estimate_id &&
+                                    estimate.status !== EstimateStatus.ARCHIVED &&
+                                    changeOrders.length > 0 && (
+                                        <CollapsibleSection title="Change Orders" defaultOpen>
+                                            <ChangeOrders
+                                              estimate={estimate}
+                                              initialChangeOrders={changeOrders}
+                                              skipInitialFetch={changeOrders.length > 0}
+                                              onUpdate={() => {
+                                                getEstimate();
+                                                fetchChangeOrders();
+                                            }}
+                                            />
+                                        </CollapsibleSection>
+                                    )}
+
                                     {/* Image Gallery - Show if images exist */}
                                     {hasImages && (
                                         <CollapsibleSection title="Image Gallery" defaultOpen>
@@ -1745,9 +1737,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={() => {
-                                                getEstimate();
-                                                getLineItems();
+                                              onEstimateUpdate={async () => {
+                                                // Update estimate, line items, and cache
+                                                await Promise.all([
+                                                    getEstimate(),
+                                                    getLineItems(),
+                                                ]);
+                                                // Refresh cache in background
+                                                refreshData('estimates').catch(() => {});
                                               }}
                                             />
                                         </CollapsibleSection>
@@ -1759,31 +1756,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
-                                              onEstimateUpdate={() => {
-                                                getEstimate();
-                                                getLineItems();
+                                              onEstimateUpdate={async () => {
+                                                // Update estimate, line items, and cache
+                                                await Promise.all([
+                                                    getEstimate(),
+                                                    getLineItems(),
+                                                ]);
+                                                // Refresh cache in background
+                                                refreshData('estimates').catch(() => {});
                                               }}
                                             />
                                         </div>
-                                    )}
-
-                                    {/* Change Orders Section - Only show if not archived and
-                                    there are change orders */}
-                                    {estimate &&
-                                    !estimate.original_estimate_id &&
-                                    estimate.status !== EstimateStatus.ARCHIVED &&
-                                    changeOrders.length > 0 && (
-                                        <CollapsibleSection title="Change Orders" defaultOpen>
-                                            <ChangeOrders
-                                              estimate={estimate}
-                                              initialChangeOrders={changeOrders}
-                                              skipInitialFetch={changeOrders.length > 0}
-                                              onUpdate={() => {
-                                                getEstimate();
-                                                fetchChangeOrders();
-                                              }}
-                                            />
-                                        </CollapsibleSection>
                                     )}
 
                                     {/* Estimate Preview or Signature Requirement Section */}
@@ -1832,6 +1815,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   onSignatureUrlGenerated={(url) => {
                                                       setSignatureUrl(url);
                                                   }}
+                                                  onResourcesRefresh={getResources}
                                                 />
                                             )}
                                         </CollapsibleSection>
@@ -1906,6 +1890,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
               onClose={() => setIsModalOpen(false)}
               size="lg"
               className={classes.archiveModal}
+              centered
               title={<Text fz={30} fw={700}>Are you sure?</Text>}
             >
                 <Center mt="md">

@@ -23,6 +23,7 @@ export function UploadNewTemplate({
     signatureUrl,
     loadingSignatureUrl = false,
     onSignatureUrlGenerated,
+    onResourcesRefresh,
 }: {
     estimate: Estimate,
     client?: ContractorClient,
@@ -34,6 +35,7 @@ export function UploadNewTemplate({
     signatureUrl?: string | null,
     loadingSignatureUrl?: boolean,
     onSignatureUrlGenerated?: (url: string) => void,
+    onResourcesRefresh?: () => void,
 }) {
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
@@ -194,6 +196,15 @@ export function UploadNewTemplate({
                 throw new Error(errorData.error || 'Failed to send estimate');
             }
 
+            // Get signature links from the response
+            const sendData = await sendResponse.json();
+            const signatureLinks = sendData.signature_links || [];
+
+            // Use the first signature link if available
+            if (signatureLinks.length > 0 && onSignatureUrlGenerated) {
+                onSignatureUrlGenerated(signatureLinks[0]);
+            }
+
             // Step 3: Update estimate status
             const accessToken = localStorage.getItem('access_token');
             if (!accessToken) {
@@ -266,44 +277,28 @@ export function UploadNewTemplate({
     };
 
     const handleCreatePdf = async () => {
-        if (!client?.email) {
-            notifications.show({
-                title: 'Error',
-                message: 'Client email is required to generate PDF',
-                color: 'red',
-            });
-            return;
-        }
-
         setGeneratingPdf(true);
         try {
+            // Generate the PDF (signature links are not required)
             const response = await fetch(
-                `/api/estimates/${estimate.id}/signature-links`,
+                `/api/estimates/${estimate.id}/generate-pdf`,
                 {
                     method: 'POST',
                     headers: getApiHeaders(),
-                    body: JSON.stringify({
-                        client_email: client.email,
-                        expires_in_days: 30,
-                    }),
                 }
             );
 
             if (response.ok) {
-                const data = await response.json();
-                const newSignatureUrl = data.signature_url;
-
-                // Notify parent component to update signatureUrl
-                if (onSignatureUrlGenerated) {
-                    onSignatureUrlGenerated(newSignatureUrl);
-                }
-
                 notifications.show({
                     title: 'Success!',
-                    message: 'PDF generated and signature link created',
+                    message: 'PDF generated successfully',
                     color: 'green',
                     icon: <IconCheck size={16} />,
                 });
+                // Reload resources to get the updated PDF file
+                if (onResourcesRefresh) {
+                    onResourcesRefresh();
+                }
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.detail || 'Failed to generate PDF');
