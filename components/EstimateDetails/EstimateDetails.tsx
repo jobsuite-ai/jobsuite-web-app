@@ -1815,6 +1815,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   onSignatureUrlGenerated={(url) => {
                                                       setSignatureUrl(url);
                                                   }}
+                                                  onResourcesRefresh={getResources}
                                                 />
                                             )}
                                         </CollapsibleSection>
