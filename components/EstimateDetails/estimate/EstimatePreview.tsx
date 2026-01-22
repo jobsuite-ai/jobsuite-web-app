@@ -30,6 +30,7 @@ interface EstimatePreviewProps {
         is_valid?: boolean;
     }>; // Signatures passed from parent (already loaded)
     onSignatureUrlGenerated?: (url: string) => void;
+    onResourcesRefresh?: () => void;
 }
 
 export default function EstimatePreview({
@@ -43,6 +44,7 @@ export default function EstimatePreview({
     loadingSignatureUrl = false,
     signatures: propSignatures = [],
     onSignatureUrlGenerated,
+    onResourcesRefresh,
 }: EstimatePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -220,6 +222,7 @@ export default function EstimatePreview({
                               signatureUrl={signatureUrl}
                               loadingSignatureUrl={loadingSignatureUrl}
                               onSignatureUrlGenerated={onSignatureUrlGenerated}
+                              onResourcesRefresh={onResourcesRefresh}
                             />
                         )}
                     </Flex>

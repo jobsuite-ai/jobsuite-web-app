@@ -23,6 +23,7 @@ export function UploadNewTemplate({
     signatureUrl,
     loadingSignatureUrl = false,
     onSignatureUrlGenerated,
+    onResourcesRefresh,
 }: {
     estimate: Estimate,
     client?: ContractorClient,
@@ -34,6 +35,7 @@ export function UploadNewTemplate({
     signatureUrl?: string | null,
     loadingSignatureUrl?: boolean,
     onSignatureUrlGenerated?: (url: string) => void,
+    onResourcesRefresh?: () => void,
 }) {
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
@@ -293,6 +295,10 @@ export function UploadNewTemplate({
                     color: 'green',
                     icon: <IconCheck size={16} />,
                 });
+                // Reload resources to get the updated PDF file
+                if (onResourcesRefresh) {
+                    onResourcesRefresh();
+                }
             } else {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(errorData.detail || 'Failed to generate PDF');
