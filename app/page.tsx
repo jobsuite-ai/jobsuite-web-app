@@ -49,7 +49,7 @@ function HomePageContent() {
         Welcome to JobSuite
       </Title>
       {showRegister ? (
-        <RegisterForm onShowRegister={() => setShowRegister(false)} />
+        <RegisterForm onShowLogin={() => setShowRegister(false)} />
       ) : (
         <LoginForm onShowRegister={() => setShowRegister(true)} />
       )}
