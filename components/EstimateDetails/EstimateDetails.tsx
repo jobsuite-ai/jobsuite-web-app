@@ -51,7 +51,20 @@ import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectClientById } from '@/store/slices/clientsSlice';
-import { selectEstimateById, enrichEstimate } from '@/store/slices/estimatesSlice';
+import {
+    selectEstimateDetails,
+    selectLineItems,
+    selectComments,
+    selectChangeOrders,
+    selectTimeEntries,
+    selectResources,
+    selectSignatures,
+    setEstimateDetails,
+} from '@/store/slices/estimateDetailsSlice';
+import {
+    selectEstimateById,
+    enrichEstimate,
+} from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
@@ -66,6 +79,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const cachedClient = useAppSelector((state) =>
         cachedEstimate?.client_id ? selectClientById(state, cachedEstimate.client_id) : undefined
     );
+
+    // Get cached estimate details from Redux
+    const cachedDetails = useAppSelector((state) => selectEstimateDetails(state, estimateID));
+    const cachedLineItems = useAppSelector((state) => selectLineItems(state, estimateID));
+    const cachedComments = useAppSelector((state) => selectComments(state, estimateID));
+    const cachedChangeOrders = useAppSelector((state) => selectChangeOrders(state, estimateID));
+    const cachedTimeEntries = useAppSelector((state) => selectTimeEntries(state, estimateID));
+    const cachedResources = useAppSelector((state) => selectResources(state, estimateID));
+    const cachedSignatures = useAppSelector((state) => selectSignatures(state, estimateID));
+
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -108,6 +131,52 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [signaturesLoaded, setSignaturesLoaded] = useState(false);
     const hasFetchedInitialDataRef = useRef<string | null>(null);
 
+    // Load cached details data immediately for instant display
+    useEffect(() => {
+        if (isMountedRef.current) {
+            // Load cached line items
+            if (cachedLineItems.length > 0) {
+                setLineItems(cachedLineItems);
+                setLineItemsCount(cachedLineItems.length);
+            }
+            // Load cached comments
+            if (cachedComments.length > 0) {
+                setComments(cachedComments);
+            }
+            // Load cached change orders
+            if (cachedChangeOrders.length > 0) {
+                setChangeOrders(cachedChangeOrders);
+            }
+            // Load cached time entries
+            if (cachedTimeEntries.length > 0) {
+                setTimeEntries(cachedTimeEntries);
+            }
+            // Load cached resources
+            if (cachedResources.length > 0) {
+                setResources(cachedResources);
+                // Check if any video resource exists
+                const videoResource = cachedResources.find(
+                    (r) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED'
+                );
+                if (videoResource) {
+                    setObjectExists(true);
+                }
+            }
+            // Load cached signatures
+            if (cachedSignatures.length > 0) {
+                setSignatures(cachedSignatures);
+                setSignaturesLoaded(true);
+            }
+        }
+    }, [
+        cachedLineItems,
+        cachedComments,
+        cachedChangeOrders,
+        cachedTimeEntries,
+        cachedResources,
+        cachedSignatures,
+    ]);
+
     // Load cached estimate data immediately for instant display
     useEffect(() => {
         if (cachedEstimate && isMountedRef.current) {
@@ -146,12 +215,32 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         // Mark as fetched to prevent re-fetching BEFORE starting the async operation
         hasFetchedInitialDataRef.current = estimateID;
 
+        // Check if we have cached data - if so, we can show it immediately and fetch in background
+        // We consider it cached if we have any of the detail data types
+        const hasCachedData =
+            cachedDetails?.lastFetched !== null ||
+            cachedLineItems.length > 0 ||
+            cachedResources.length > 0 ||
+            cachedComments.length > 0;
+        if (hasCachedData) {
+            // We have cached data, so we can show it immediately
+            // Still fetch fresh data in background, but don't block UI
+            setInitialLoading(false);
+        } else {
+            // No cached data, show loading state
+            setInitialLoading(true);
+        }
+
         // Fetch all three endpoints in parallel
         const fetchAllData = async () => {
             try {
-                setInitialLoading(true);
+                if (!hasCachedData) {
+                    setInitialLoading(true);
+                }
                 setHasError(false);
-                setSignaturesLoaded(false);
+                if (!hasCachedData) {
+                    setSignaturesLoaded(false);
+                }
 
                 // Start all three requests in parallel
                 const [summaryResult, detailsResult, signaturesResult] = await Promise.allSettled([
@@ -252,6 +341,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             const resourcesArray = detailsData.resources;
                             setResources(resourcesArray);
 
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    resources: resourcesArray,
+                                })
+                            );
+
                             // Check if any video resource exists
                             const videoResource = resourcesArray.find(
                                 (r: EstimateResource) =>
@@ -272,6 +369,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             const itemsArray = detailsData.line_items;
                             setLineItems(itemsArray);
                             setLineItemsCount(itemsArray.length);
+
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    lineItems: itemsArray,
+                                })
+                            );
                         }
 
                         // Process comments
@@ -282,6 +387,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         ) {
                             const commentsArray = detailsData.comments;
                             setComments(commentsArray);
+
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    comments: commentsArray,
+                                })
+                            );
                         }
                         // Note: Comments should be in details response
 
@@ -293,6 +406,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         ) {
                             const changeOrdersArray = detailsData.change_orders;
                             setChangeOrders(changeOrdersArray);
+
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    changeOrders: changeOrdersArray,
+                                })
+                            );
                         }
                         // Note: Change orders should be in details response
 
@@ -304,6 +425,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         ) {
                             const timeEntriesArray = detailsData.time_entries;
                             setTimeEntries(timeEntriesArray);
+
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    timeEntries: timeEntriesArray,
+                                })
+                            );
                         }
 
                         // Update estimate with data from details (overwrites summary)
@@ -351,6 +480,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 (sig: any) => sig.is_valid !== false
                             );
                             setSignatures(validSignatures);
+
+                            // Update Redux cache
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    signatures: validSignatures,
+                                })
+                            );
                         }
                     } catch (error) {
                         // eslint-disable-next-line no-console
@@ -396,6 +533,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         };
 
+        // Fetch in background (don't await - let it run async)
         fetchAllData();
 
         // eslint-disable-next-line consistent-return
@@ -430,6 +568,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     (sig: any) => sig.is_valid !== false
                 );
                 setSignatures(validSignatures);
+
+                // Update Redux cache
+                dispatch(
+                    setEstimateDetails({
+                        estimateId: estimateID,
+                        signatures: validSignatures,
+                    })
+                );
             }
         } catch (error) {
             // eslint-disable-next-line no-console
@@ -439,7 +585,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 setSignaturesLoaded(true);
             }
         }
-    }, [estimateID]);
+    }, [estimateID, dispatch]);
 
     // Separate functions for refreshing data after initial load
     const getEstimate = useCallback(async () => {
@@ -491,6 +637,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 const resourcesArray = Array.isArray(resourcesData) ? resourcesData : [];
                 setResources(resourcesArray);
 
+                // Update Redux cache
+                dispatch(
+                    setEstimateDetails({
+                        estimateId: estimateID,
+                        resources: resourcesArray,
+                    })
+                );
+
                 // Check if any video resource exists
                 const videoResource = resourcesArray.find((r: EstimateResource) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED');
                 if (videoResource) {
@@ -501,7 +655,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             // eslint-disable-next-line no-console
             console.error('Error fetching resources:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, dispatch]);
 
     const getLineItems = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
@@ -524,12 +678,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 const itemsArray = Array.isArray(itemsData) ? itemsData : [];
                 setLineItems(itemsArray);
                 setLineItemsCount(itemsArray.length);
+
+                // Update Redux cache
+                dispatch(
+                    setEstimateDetails({
+                        estimateId: estimateID,
+                        lineItems: itemsArray,
+                    })
+                );
             }
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching line items:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, dispatch]);
 
     const fetchChangeOrders = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
@@ -551,12 +713,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 const changeOrdersData = await response.json();
                 const changeOrdersArray = Array.isArray(changeOrdersData) ? changeOrdersData : [];
                 setChangeOrders(changeOrdersArray);
+
+                // Update Redux cache
+                dispatch(
+                    setEstimateDetails({
+                        estimateId: estimateID,
+                        changeOrders: changeOrdersArray,
+                    })
+                );
             }
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching change orders:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, dispatch]);
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const fetchComments = useCallback(async () => {
@@ -584,12 +754,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     ? commentsData
                     : [];
                 setComments(commentsArray);
+
+                // Update Redux cache
+                dispatch(
+                    setEstimateDetails({
+                        estimateId: estimateID,
+                        comments: commentsArray,
+                    })
+                );
             }
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching comments:', error);
         }
-    }, [estimateID]);
+    }, [estimateID, dispatch]);
 
     // Fallback: If loading takes too long, force completion after 10 seconds
     // But only show error if we truly don't have any data
