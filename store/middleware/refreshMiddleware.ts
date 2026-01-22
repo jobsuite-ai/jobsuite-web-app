@@ -16,7 +16,7 @@ let lastActivityTime = Date.now();
 let isPageVisible = true;
 
 // Track user activity
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   // Track page visibility
   document.addEventListener('visibilitychange', () => {
     isPageVisible = !document.hidden;

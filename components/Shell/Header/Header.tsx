@@ -78,6 +78,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   // Utility function to strip HTML tags from notification messages
   const stripHtmlTags = useCallback((html: string): string => {
     // Create a temporary div element to parse HTML
+    if (typeof document === 'undefined') {
+      // Fallback for SSR: simple regex-based HTML tag removal
+      return html.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
+    }
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
 
@@ -438,7 +442,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
   // Track user activity for smarter polling
   const lastActivityRef = useRef(Date.now());
-  const isPageVisibleRef = useRef(!document.hidden);
+  const isPageVisibleRef = useRef(typeof document !== 'undefined' ? !document.hidden : true);
 
   // Update activity tracking
   useEffect(() => {
