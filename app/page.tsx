@@ -23,19 +23,23 @@ function HomePageContent() {
   }
 
   // Check if user is authenticated and show homepage if so
+  // Don't block rendering - show content immediately, let auth load in background
   const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
-  if (isAuthLoading) {
-    return (
-      <Center style={{ minHeight: '100vh' }}>
-        <Loader size="xl" />
-      </Center>
-    );
-  }
-
-  // Show homepage for authenticated users
+  // Show homepage for authenticated users (even if still loading, show structure)
   if (isAuthenticated) {
     return <Homepage />;
+  }
+
+  // If still loading auth, show a minimal loading state (not full screen)
+  if (isAuthLoading) {
+    return (
+      <Container size={420} my={40}>
+        <Center>
+          <Loader size="md" />
+        </Center>
+      </Container>
+    );
   }
 
   // Show login/register for unauthenticated users
@@ -45,7 +49,7 @@ function HomePageContent() {
         Welcome to JobSuite
       </Title>
       {showRegister ? (
-        <RegisterForm onShowLogin={() => setShowRegister(false)} />
+        <RegisterForm onShowRegister={() => setShowRegister(false)} />
       ) : (
         <LoginForm onShowRegister={() => setShowRegister(true)} />
       )}
@@ -56,9 +60,11 @@ function HomePageContent() {
 export default function HomePage() {
   return (
     <Suspense fallback={
-      <Center style={{ minHeight: '100vh' }}>
-        <Loader size="xl" />
-      </Center>
+      <Container size={420} my={40}>
+        <Center>
+          <Loader size="md" />
+        </Center>
+      </Container>
     }>
       <HomePageContent />
     </Suspense>

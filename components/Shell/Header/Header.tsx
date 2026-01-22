@@ -482,6 +482,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
   // Fetch unacknowledged notification count with smart polling
   useEffect(() => {
+    // Only fetch if we have confirmed authentication (not just checking)
     if (!isAuthenticated || isLoading) {
       return undefined;
     }
@@ -695,11 +696,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     });
   }, []);
 
-  // Don't render header if not authenticated or still loading
-  if (isLoading || !isAuthenticated) {
-    return null;
-  }
-
+  // Always render header structure - auth-dependent features will handle their own loading states
   return (
     <>
       <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
@@ -730,94 +727,98 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           </Group>
 
           <Group className={classes.centerSection}>
-            <Autocomplete
-              className={classes.search}
-              placeholder="Search by client name, email, or estimate address"
-              value={autocompleteValue}
-              leftSection={
-                <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
-              }
-              renderOption={renderAutocompleteOption}
-              data={autocompleteData}
-              visibleFrom="xs"
-              onChange={(value) => {
-                setAutocompleteValue(value);
-              }}
-              onOptionSubmit={(value) => {
-                // Handle navigation and prevent setting value in input
-                const shouldPrevent = handleSearchSelect(value);
-                if (shouldPrevent === false) {
-                  // Clear the value to prevent it from being set
-                  setTimeout(() => setAutocompleteValue(''), 0);
+            {isAuthenticated && !isLoading && (
+              <Autocomplete
+                className={classes.search}
+                placeholder="Search by client name, email, or estimate address"
+                value={autocompleteValue}
+                leftSection={
+                  <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
                 }
-              }}
-              limit={10}
-              styles={{
-                dropdown: {
-                  borderRadius: rem(8),
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                },
-                option: {
-                  padding: rem(8),
-                  borderRadius: rem(6),
-                  cursor: 'pointer',
-                  '&[data-hovered]': {
-                    backgroundColor: 'var(--mantine-color-gray-1)',
+                renderOption={renderAutocompleteOption}
+                data={autocompleteData}
+                visibleFrom="xs"
+                onChange={(value) => {
+                  setAutocompleteValue(value);
+                }}
+                onOptionSubmit={(value) => {
+                  // Handle navigation and prevent setting value in input
+                  const shouldPrevent = handleSearchSelect(value);
+                  if (shouldPrevent === false) {
+                    // Clear the value to prevent it from being set
+                    setTimeout(() => setAutocompleteValue(''), 0);
+                  }
+                }}
+                limit={10}
+                styles={{
+                  dropdown: {
+                    borderRadius: rem(8),
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                   },
-                },
-              }}
-            />
+                  option: {
+                    padding: rem(8),
+                    borderRadius: rem(6),
+                    cursor: 'pointer',
+                    '&[data-hovered]': {
+                      backgroundColor: 'var(--mantine-color-gray-1)',
+                    },
+                  },
+                }}
+              />
+            )}
           </Group>
 
           <Group gap="sm">
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Settings"
-              href="/settings"
-              onClick={(event) => handleNavLinkClick(event, '/settings')}
-            >
-              <IconSettings color="black" size={22} radius="xl" />
-            </Link>
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Profile"
-              href="/profile"
-              onClick={(event) => handleNavLinkClick(event, '/profile')}
-            >
-              <IconUser color="black" size={22} radius="xl" />
-            </Link>
-            <Menu
-              shadow="md"
-              width={400}
-              position="bottom-end"
-              onOpen={fetchNotifications}
-            >
-              <Menu.Target>
-                <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
-                  <IconNotification color="black" size={22} radius="xl" />
-                  {unacknowledgedCount > 0 && (
-                    <Badge
-                      size="xs"
-                      color="red"
-                      variant="filled"
-                      style={{
-                        position: 'absolute',
-                        top: rem(-4),
-                        right: rem(-4),
-                        minWidth: rem(18),
-                        height: rem(18),
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: rem(10),
-                      }}
-                    >
-                      {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
-                    </Badge>
-                  )}
-                </div>
-              </Menu.Target>
+            {isAuthenticated && !isLoading && (
+              <>
+                <Link
+                  style={{ marginTop: rem(5) }}
+                  key="Settings"
+                  href="/settings"
+                  onClick={(event) => handleNavLinkClick(event, '/settings')}
+                >
+                  <IconSettings color="black" size={22} radius="xl" />
+                </Link>
+                <Link
+                  style={{ marginTop: rem(5) }}
+                  key="Profile"
+                  href="/profile"
+                  onClick={(event) => handleNavLinkClick(event, '/profile')}
+                >
+                  <IconUser color="black" size={22} radius="xl" />
+                </Link>
+                <Menu
+                  shadow="md"
+                  width={400}
+                  position="bottom-end"
+                  onOpen={fetchNotifications}
+                >
+                  <Menu.Target>
+                    <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
+                      <IconNotification color="black" size={22} radius="xl" />
+                      {unacknowledgedCount > 0 && (
+                        <Badge
+                          size="xs"
+                          color="red"
+                          variant="filled"
+                          style={{
+                            position: 'absolute',
+                            top: rem(-4),
+                            right: rem(-4),
+                            minWidth: rem(18),
+                            height: rem(18),
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: rem(10),
+                          }}
+                        >
+                          {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>
                   <Group justify="space-between">
@@ -891,7 +892,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                   <Text size="sm">View All Notifications</Text>
                 </Menu.Item>
               </Menu.Dropdown>
-            </Menu>
+                </Menu>
+              </>
+            )}
           </Group>
         </div>
       </header>
