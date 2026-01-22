@@ -88,6 +88,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   const estimatesRef = useRef(estimates);
   const clientsRef = useRef(clients);
   const projectsRef = useRef(projects);
+  const hasInitialLoadRef = useRef(false);
 
   // Update refs when values change
   useEffect(() => {
@@ -312,13 +313,21 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     [dispatch]
   );
 
-  // Initial load: fetch fresh data from API
+  // Initial load: fetch fresh data from API (only once)
   useEffect(() => {
+    // Prevent multiple initial loads
+    if (hasInitialLoadRef.current) {
+      return;
+    }
+
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
     if (!accessToken) {
       return;
     }
+
+    // Mark as loaded to prevent duplicate fetches
+    hasInitialLoadRef.current = true;
 
     // Cleanup archived estimates/projects from Redux state
     dispatch(cleanupArchivedEstimates());
