@@ -355,7 +355,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     [dispatch]
   );
 
-  // Initial load: fetch fresh data from API (only once)
+  // Initial load: check if we have persisted data, then optionally refresh
   useEffect(() => {
     // Prevent multiple initial loads
     if (hasInitialLoadRef.current) {
@@ -375,8 +375,25 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     dispatch(cleanupArchivedEstimates());
     dispatch(cleanupArchivedProjects());
 
-    // Fetch fresh data from API
-    refreshData(undefined);
+    // Check if we have persisted data in Redux (from redux-persist)
+    // If we have data, we can show it immediately and refresh in background
+    // If no data, fetch immediately
+    const hasPersistedData =
+      estimatesRef.current.length > 0 ||
+      clientsRef.current.length > 0 ||
+      projectsRef.current.length > 0;
+
+    if (hasPersistedData) {
+      // We have persisted data, so refresh in background (non-blocking)
+      // This allows the UI to show immediately with cached data
+      refreshData(undefined).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Background refresh failed:', err);
+      });
+    } else {
+      // No persisted data, fetch immediately
+      refreshData(undefined);
+    }
   }, [dispatch, refreshData]);
 
   // Listen for storage changes (e.g., after login)

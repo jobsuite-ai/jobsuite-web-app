@@ -11,11 +11,12 @@ import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 
 import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
 
 import { Shell } from '@/components/Shell/Shell';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
 import { SearchDataProvider } from '@/contexts/SearchDataContext';
-import { store } from '@/store';
+import { persistor, store } from '@/store';
 
 // Custom fetcher that includes authentication token
 const authenticatedUserFetcher = async (url: string): Promise<UserProfile | undefined> => {
@@ -87,16 +88,18 @@ export default function RootLayout({ children }: { children: any }) {
       </head>
       <body>
         <Provider store={store}>
-          <MantineProvider>
-            <UserProvider fetcher={authenticatedUserFetcher}>
-              <DataCacheProvider>
-                <SearchDataProvider>
-                  <Notifications />
-                  <Shell>{children}</Shell>
-                </SearchDataProvider>
-              </DataCacheProvider>
-            </UserProvider>
-          </MantineProvider>
+          <PersistGate loading={null} persistor={persistor}>
+            <MantineProvider>
+              <UserProvider fetcher={authenticatedUserFetcher}>
+                <DataCacheProvider>
+                  <SearchDataProvider>
+                    <Notifications />
+                    <Shell>{children}</Shell>
+                  </SearchDataProvider>
+                </DataCacheProvider>
+              </UserProvider>
+            </MantineProvider>
+          </PersistGate>
         </Provider>
       </body>
     </html>
