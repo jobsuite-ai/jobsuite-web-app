@@ -171,20 +171,29 @@ export default function JobComments({
         }
     }, [initialComments]);
 
+    const hasFetchedRef = useRef<string | null>(null);
+
     useEffect(() => {
+        // Skip if we've already fetched for this estimateID
+        if (hasFetchedRef.current === estimateID) {
+            return;
+        }
+
         // Skip initial fetch if initialComments are provided and not empty
         if (skipInitialFetch && initialComments && initialComments.length > 0) {
             setLoading(false);
+            hasFetchedRef.current = estimateID;
             return;
         }
 
         setLoading(true);
         onLoadingChangeRef.current?.(true);
+        hasFetchedRef.current = estimateID;
         getJobComments().finally(() => {
             setLoading(false);
             onLoadingChangeRef.current?.(false);
         });
-    }, [estimateID, skipInitialFetch, initialComments, getJobComments]);
+    }, [estimateID, getJobComments]);
 
     // Extract mentioned user IDs from comment contents (keep original text with usernames)
     function processMentions(text: string): { processedText: string; mentionedUserIds: string[] } {

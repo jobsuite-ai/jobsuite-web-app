@@ -47,18 +47,25 @@ import classes from './styles/EstimateDetails.module.css';
 import VideoUploader from './VideoUploader';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { getCachedEstimateSummary, setCachedEstimateSummary } from '@/app/utils/dataCache';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { selectClientById } from '@/store/slices/clientsSlice';
+import { selectEstimateById, enrichEstimate } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
+    const dispatch = useAppDispatch();
     const {
-        estimates: cachedEstimates,
-        clients: cachedClients,
         updateEstimate,
         refreshData,
     } = useDataCache();
+
+    // Get estimate and client from Redux cache
+    const cachedEstimate = useAppSelector((state) => selectEstimateById(state, estimateID));
+    const cachedClient = useAppSelector((state) =>
+        cachedEstimate?.client_id ? selectClientById(state, cachedEstimate.client_id) : undefined
+    );
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [estimate, setEstimate] = useState<Estimate>();
@@ -99,30 +106,34 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         is_valid?: boolean;
     }>>([]);
     const [signaturesLoaded, setSignaturesLoaded] = useState(false);
+    const hasFetchedInitialDataRef = useRef<string | null>(null);
 
     // Load cached estimate data immediately for instant display
     useEffect(() => {
-        if (cachedEstimates.length > 0) {
-            const cachedEstimate = cachedEstimates.find((e) => e.id === estimateID);
-            if (cachedEstimate && isMountedRef.current) {
-                // Use cached estimate data immediately - this provides instant UI
-                setEstimate(cachedEstimate);
-
-                // Also try to find cached client
-                if (cachedEstimate.client_id && cachedClients.length > 0) {
-                    const cachedClient = cachedClients.find(
-                        (c) => c.id === cachedEstimate.client_id
-                    );
-                    if (cachedClient && isMountedRef.current) {
-                        setClient(cachedClient);
-                    }
-                }
-            }
+        if (cachedEstimate && isMountedRef.current) {
+            // Use cached estimate data immediately - this provides instant UI
+            setEstimate(cachedEstimate);
         }
-    }, [cachedEstimates, cachedClients, estimateID]);
+        if (cachedClient && isMountedRef.current) {
+            setClient(cachedClient);
+        }
+    }, [cachedEstimate, cachedClient]);
 
-    // Fetch initial summary data for fast page load
+    // Fetch all initial data in parallel for fast page load
     useEffect(() => {
+        // Reset ref if estimateID changed (component remounted or navigated to different estimate)
+        if (
+            hasFetchedInitialDataRef.current !== null &&
+            hasFetchedInitialDataRef.current !== estimateID
+        ) {
+            hasFetchedInitialDataRef.current = null;
+        }
+
+        // Prevent infinite loop - only fetch once per estimateID
+        if (hasFetchedInitialDataRef.current === estimateID) {
+            return;
+        }
+
         isMountedRef.current = true;
         const accessToken = localStorage.getItem('access_token');
 
@@ -132,121 +143,266 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             return;
         }
 
-        // Check cache first to avoid unnecessary fetch
-        const cachedSummary = getCachedEstimateSummary<any>(estimateID);
-        if (cachedSummary) {
-            // Use cached summary data
-            if (cachedSummary.estimate && isMountedRef.current) {
-                const estimateData = { ...cachedSummary.estimate };
-                if (
-                    cachedSummary.hours_worked !== undefined &&
-                    cachedSummary.hours_worked !== null
-                ) {
-                    estimateData.hours_worked = cachedSummary.hours_worked;
-                }
-                setEstimate(estimateData);
-            }
-            if (cachedSummary.client && isMountedRef.current) {
-                setClient(cachedSummary.client);
-            }
-            if (cachedSummary.has_video && isMountedRef.current) {
-                setObjectExists(true);
-            }
-            if (isMountedRef.current) {
-                setLineItemsCount(cachedSummary.line_items_count || 0);
-            }
-            setInitialLoading(false);
-        }
+        // Mark as fetched to prevent re-fetching BEFORE starting the async operation
+        hasFetchedInitialDataRef.current = estimateID;
 
-        const fetchSummary = async () => {
+        // Fetch all three endpoints in parallel
+        const fetchAllData = async () => {
             try {
-                // Only show loading if we don't have cached data
-                if (!cachedSummary) {
-                    setInitialLoading(true);
-                }
+                setInitialLoading(true);
                 setHasError(false);
+                setSignaturesLoaded(false);
 
-                // Fetch lightweight summary for initial render
-                const summaryRes = await fetch(`/api/estimates/${estimateID}/summary`, {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
+                // Start all three requests in parallel
+                const [summaryResult, detailsResult, signaturesResult] = await Promise.allSettled([
+                    fetch(`/api/estimates/${estimateID}/summary`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                    fetch(`/api/estimates/${estimateID}/details`, {
+                        method: 'GET',
+                        headers: {
+                            Authorization: `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    }),
+                    fetch(`/api/estimates/${estimateID}/signatures`, {
+                        method: 'GET',
+                        headers: getApiHeaders(),
+                    }),
+                ]);
 
                 if (!isMountedRef.current) return;
 
-                if (!summaryRes.ok) {
-                    const errorData = await summaryRes.json().catch(() => ({}));
+                // Process summary response (for quick UI updates)
+                if (summaryResult.status === 'fulfilled' && summaryResult.value.ok) {
+                    try {
+                        const summaryData = await summaryResult.value.json();
+
+                        // Enrich estimate in Redux cache with summary data
+                        if (summaryData.estimate) {
+                            dispatch(enrichEstimate({
+                                estimateId: estimateID,
+                                data: {
+                                    ...summaryData.estimate,
+                                    hours_worked: summaryData.hours_worked,
+                                },
+                            }));
+
+                            // Update local state (details will overwrite if it arrives later)
+                            const detailsOk = detailsResult.status === 'fulfilled' && detailsResult.value.ok;
+                            if (isMountedRef.current && !detailsOk) {
+                                const estimateData = { ...summaryData.estimate };
+                                if (
+                                    summaryData.hours_worked !== undefined &&
+                                    summaryData.hours_worked !== null
+                                ) {
+                                    estimateData.hours_worked = summaryData.hours_worked;
+                                }
+                                setEstimate(estimateData);
+                            }
+                        }
+
+                        // Process client from summary (details will overwrite if it arrives later)
+                        const detailsOk =
+                            detailsResult.status === 'fulfilled' && detailsResult.value.ok;
+                        if (summaryData.client && isMountedRef.current && !detailsOk) {
+                            setClient(summaryData.client);
+                        }
+
+                        // Set flags from summary
+                        if (summaryData.has_video && isMountedRef.current) {
+                            setObjectExists(true);
+                        }
+
+                        // Set counts from summary (details will overwrite if it arrives later)
+                        const detailsOkForCount = detailsResult.status === 'fulfilled' && detailsResult.value.ok;
+                        if (isMountedRef.current && !detailsOkForCount) {
+                            setLineItemsCount(summaryData.line_items_count || 0);
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error parsing summary response:', error);
+                    }
+                } else if (
+                    summaryResult.status === 'rejected' ||
+                    (summaryResult.status === 'fulfilled' && !summaryResult.value.ok)
+                ) {
+                    const errorData = summaryResult.status === 'fulfilled'
+                        ? await summaryResult.value.json().catch(() => ({}))
+                        : {};
                     // eslint-disable-next-line no-console
                     console.error('Error fetching estimate summary:', errorData);
+                }
 
-                    // Only set error if we don't have cached data to show
-                    if (!cachedSummary && !estimate) {
+                // Process details response (more complete data, overwrites summary)
+                if (detailsResult.status === 'fulfilled' && detailsResult.value.ok) {
+                    try {
+                        const detailsData = await detailsResult.value.json();
+
+                        // Process resources
+                        if (
+                            detailsData.resources &&
+                            Array.isArray(detailsData.resources) &&
+                            isMountedRef.current
+                        ) {
+                            const resourcesArray = detailsData.resources;
+                            setResources(resourcesArray);
+
+                            // Check if any video resource exists
+                            const videoResource = resourcesArray.find(
+                                (r: EstimateResource) =>
+                                    r.resource_type === 'VIDEO' &&
+                                    r.upload_status === 'COMPLETED'
+                            );
+                            if (videoResource) {
+                                setObjectExists(true);
+                            }
+                        }
+
+                        // Process line items
+                        if (
+                            detailsData.line_items &&
+                            Array.isArray(detailsData.line_items) &&
+                            isMountedRef.current
+                        ) {
+                            const itemsArray = detailsData.line_items;
+                            setLineItems(itemsArray);
+                            setLineItemsCount(itemsArray.length);
+                        }
+
+                        // Process comments
+                        if (
+                            detailsData.comments &&
+                            Array.isArray(detailsData.comments) &&
+                            isMountedRef.current
+                        ) {
+                            const commentsArray = detailsData.comments;
+                            setComments(commentsArray);
+                        }
+                        // Note: Comments should be in details response
+
+                        // Process change orders
+                        if (
+                            detailsData.change_orders &&
+                            Array.isArray(detailsData.change_orders) &&
+                            isMountedRef.current
+                        ) {
+                            const changeOrdersArray = detailsData.change_orders;
+                            setChangeOrders(changeOrdersArray);
+                        }
+                        // Note: Change orders should be in details response
+
+                        // Process time entries
+                        if (
+                            detailsData.time_entries &&
+                            Array.isArray(detailsData.time_entries) &&
+                            isMountedRef.current
+                        ) {
+                            const timeEntriesArray = detailsData.time_entries;
+                            setTimeEntries(timeEntriesArray);
+                        }
+
+                        // Update estimate with data from details (overwrites summary)
+                        if (detailsData.estimate && isMountedRef.current) {
+                            const estimateData = { ...detailsData.estimate };
+                            if (
+                                detailsData.hours_worked !== undefined &&
+                                detailsData.hours_worked !== null
+                            ) {
+                                estimateData.hours_worked = detailsData.hours_worked;
+                            }
+                            setEstimate(estimateData);
+                        }
+
+                        // Process client from details (overwrites summary)
+                        if (detailsData.client && isMountedRef.current) {
+                            setClient(detailsData.client);
+                        }
+
+                        if (isMountedRef.current) {
+                            setDetailsLoaded(true);
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error parsing details response:', error);
+                    }
+                } else if (
+                    detailsResult.status === 'rejected' ||
+                    (detailsResult.status === 'fulfilled' && !detailsResult.value.ok)
+                ) {
+                    const errorData = detailsResult.status === 'fulfilled'
+                        ? await detailsResult.value.json().catch(() => ({}))
+                        : {};
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching estimate details:', errorData);
+                }
+
+                // Process signatures response (independent data)
+                if (signaturesResult.status === 'fulfilled' && signaturesResult.value.ok) {
+                    try {
+                        const signaturesData = await signaturesResult.value.json();
+                        if (isMountedRef.current) {
+                            // Filter out invalid signatures
+                            const validSignatures = (signaturesData.signatures || []).filter(
+                                (sig: any) => sig.is_valid !== false
+                            );
+                            setSignatures(validSignatures);
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error parsing signatures response:', error);
+                    }
+                } else if (
+                    signaturesResult.status === 'rejected' ||
+                    (signaturesResult.status === 'fulfilled' && !signaturesResult.value.ok)
+                ) {
+                    // eslint-disable-next-line no-console
+                    const errorMsg = signaturesResult.status === 'rejected'
+                        ? signaturesResult.reason
+                        : 'Request failed';
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching signatures:', errorMsg);
+                }
+
+                // Check if we have any data to show
+                if (!estimate) {
+                    // If both summary and details failed, set error
+                    const summaryFailed =
+                        summaryResult.status === 'rejected' ||
+                        (summaryResult.status === 'fulfilled' && !summaryResult.value.ok);
+                    const detailsFailed =
+                        detailsResult.status === 'rejected' ||
+                        (detailsResult.status === 'fulfilled' && !detailsResult.value.ok);
+                    if (summaryFailed && detailsFailed) {
                         setHasError(true);
                     }
-                    if (!cachedSummary) {
-                        setInitialLoading(false);
-                    }
-                    return;
-                }
-
-                const summaryData = await summaryRes.json();
-
-                // Cache the summary data
-                setCachedEstimateSummary(estimateID, summaryData);
-
-                // Process estimate from summary
-                if (summaryData.estimate && isMountedRef.current) {
-                    const estimateData = { ...summaryData.estimate };
-                    // Add hours_worked to estimate if present
-                    if (
-                        summaryData.hours_worked !== undefined &&
-                        summaryData.hours_worked !== null
-                    ) {
-                        estimateData.hours_worked = summaryData.hours_worked;
-                    }
-                    setEstimate(estimateData);
-                }
-
-                // Process client from summary
-                if (summaryData.client && isMountedRef.current) {
-                    setClient(summaryData.client);
-                }
-
-                // Set flags from summary
-                if (summaryData.has_video && isMountedRef.current) {
-                    setObjectExists(true);
-                }
-
-                // Set counts from summary
-                if (isMountedRef.current) {
-                    setLineItemsCount(summaryData.line_items_count || 0);
                 }
             } catch (error) {
                 // eslint-disable-next-line no-console
-                console.error('Error fetching summary:', error);
-                // Only set error if we don't have cached data to show
-                if (!cachedSummary && !estimate) {
+                console.error('Error fetching estimate data:', error);
+                // Only set error if we don't have data to show
+                if (!estimate) {
                     setHasError(true);
                 }
             } finally {
                 if (isMountedRef.current) {
                     setInitialLoading(false);
+                    setSignaturesLoaded(true);
                 }
             }
         };
 
-        // Only fetch if cache is expired or missing
-        if (!cachedSummary) {
-            fetchSummary();
-        }
+        fetchAllData();
 
         // eslint-disable-next-line consistent-return
         return function cleanup() {
             isMountedRef.current = false;
         };
+        // dispatch is stable from Redux, but we capture it in the async function
     }, [estimateID]);
 
     const fetchSignatures = useCallback(async () => {
@@ -284,143 +440,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         }
     }, [estimateID]);
-
-    // Load full details in background after initial render
-    useEffect(() => {
-        if (initialLoading || detailsLoaded) {
-            return;
-        }
-
-        const accessToken = localStorage.getItem('access_token');
-        if (!accessToken) {
-            return;
-        }
-
-        const fetchFullDetails = async () => {
-            try {
-                // Fetch all data from consolidated endpoint in background
-                const detailsRes = await fetch(
-                    `/api/estimates/${estimateID}/details`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }
-                );
-
-                if (!isMountedRef.current) return;
-
-                if (!detailsRes.ok) {
-                    const errorData = await detailsRes.json().catch(() => ({}));
-                    // eslint-disable-next-line no-console
-                    console.error('Error fetching estimate details:', errorData);
-                    return;
-                }
-
-                const detailsData = await detailsRes.json();
-
-                // Process resources
-                if (
-                    detailsData.resources &&
-                    Array.isArray(detailsData.resources) &&
-                    isMountedRef.current
-                ) {
-                    const resourcesArray = detailsData.resources;
-                    setResources(resourcesArray);
-
-                    // Check if any video resource exists
-                    const videoResource = resourcesArray.find(
-                        (r: EstimateResource) =>
-                            r.resource_type === 'VIDEO' &&
-                            r.upload_status === 'COMPLETED'
-                    );
-                    if (videoResource) {
-                        setObjectExists(true);
-                    }
-                }
-
-                // Process line items
-                if (
-                    detailsData.line_items &&
-                    Array.isArray(detailsData.line_items) &&
-                    isMountedRef.current
-                ) {
-                    const itemsArray = detailsData.line_items;
-                    setLineItems(itemsArray);
-                    setLineItemsCount(itemsArray.length);
-                }
-
-                // Process comments
-                if (
-                    detailsData.comments &&
-                    Array.isArray(detailsData.comments) &&
-                    isMountedRef.current
-                ) {
-                    const commentsArray = detailsData.comments;
-                    setComments(commentsArray);
-                } else if (isMountedRef.current) {
-                    // Fallback: fetch comments separately if not in details response
-                    fetchComments();
-                }
-
-                // Process change orders
-                if (
-                    detailsData.change_orders &&
-                    Array.isArray(detailsData.change_orders) &&
-                    isMountedRef.current
-                ) {
-                    const changeOrdersArray = detailsData.change_orders;
-                    setChangeOrders(changeOrdersArray);
-                } else if (isMountedRef.current) {
-                    // Fallback: fetch change orders separately if not in details response
-                    fetchChangeOrders();
-                }
-
-                // Process time entries
-                if (
-                    detailsData.time_entries &&
-                    Array.isArray(detailsData.time_entries) &&
-                    isMountedRef.current
-                ) {
-                    const timeEntriesArray = detailsData.time_entries;
-                    setTimeEntries(timeEntriesArray);
-                }
-
-                // Update estimate with any additional data from details
-                if (detailsData.estimate && isMountedRef.current) {
-                    const estimateData = { ...detailsData.estimate };
-                    if (
-                        detailsData.hours_worked !== undefined &&
-                        detailsData.hours_worked !== null
-                    ) {
-                        estimateData.hours_worked = detailsData.hours_worked;
-                    }
-                    setEstimate(estimateData);
-                }
-
-                if (isMountedRef.current) {
-                    setDetailsLoaded(true);
-                    // Fetch signatures after details are loaded
-                    fetchSignatures();
-                }
-            } catch (error) {
-                // eslint-disable-next-line no-console
-                console.error('Error fetching full details:', error);
-            }
-        };
-
-        // Small delay to ensure initial render completes first
-        const timeoutId = setTimeout(() => {
-            fetchFullDetails();
-        }, 100);
-
-        // eslint-disable-next-line consistent-return
-        return function cleanup() {
-            clearTimeout(timeoutId);
-        };
-    }, [estimateID, initialLoading, detailsLoaded, fetchSignatures]);
 
     // Separate functions for refreshing data after initial load
     const getEstimate = useCallback(async () => {
@@ -539,6 +558,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         }
     }, [estimateID]);
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const fetchComments = useCallback(async () => {
         const accessToken = localStorage.getItem('access_token');
         if (!accessToken) return;
@@ -1305,32 +1325,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         fetchSignatures,
     ]);
 
-    useEffect(() => {
-        if (typeof window === 'undefined') {
-            return undefined;
-        }
-
-        const handleFocus = () => {
-            getEstimate();
-            getResources();
-            fetchSignatures();
-        };
-
-        const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible') {
-                handleFocus();
-            }
-        };
-
-        window.addEventListener('focus', handleFocus);
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            window.removeEventListener('focus', handleFocus);
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [fetchSignatures, getEstimate, getResources]);
-
     const OverviewDetails = useMemo(() => (
         <>
             {initialLoading && !estimate ? (
@@ -1769,9 +1763,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </div>
                                     )}
 
-                                    {/* Estimate Preview or Signature Requirement Section */}
-                                    {/* Only show when details and signatures are loaded */}
-                                    {estimate && detailsLoaded && signaturesLoaded && (
+                                    {/* Estimate Preview - show only when all resources present */}
+                                    {estimate &&
+                                    detailsLoaded &&
+                                    signaturesLoaded &&
+                                    hasVideo &&
+                                    hasImages &&
+                                    lineItemsCount > 0 &&
+                                    hasDescription && (
                                         <CollapsibleSection
                                           title={
                                             isSignatureRequired
@@ -1781,8 +1780,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                           defaultOpen={!hasSignedPdf && !isSignatureRequired}
                                           headerActions={
                                               !isSignatureRequired
-                                              && !hasSignedPdf
-                                              && hasVideo && hasImages && lineItemsCount > 0 ? (
+                                              && !hasSignedPdf ? (
                                                   <ActionIcon
                                                     variant="subtle"
                                                     onClick={handlePrint}

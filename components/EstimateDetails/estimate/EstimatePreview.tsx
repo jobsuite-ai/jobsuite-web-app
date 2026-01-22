@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Flex, Paper } from '@mantine/core';
 
-import EstimateTodo from './EstimateTodo';
 import { EstimateLineItem } from './LineItem';
 import classes from '../styles/EstimateDetails.module.css';
 
@@ -193,14 +192,6 @@ export default function EstimatePreview({
             <div className={classes.estimatePreviewWrapper}>
                 {estimate ?
                     <Flex direction="column" gap="md" justify="center" align="center">
-                        {!hideTodo && !isFullySigned && (
-                            <EstimateTodo
-                              hasImages={imageResources.length > 0}
-                              hasVideo={videoResources.length > 0}
-                              hasTranscriptionSummary={!!estimate.transcription_summary}
-                              hasLineItems={lineItems.length > 0}
-                            />
-                        )}
                         {shouldShowPreview && template && (
                             <Paper shadow="sm" radius="md" withBorder>
                                 <div

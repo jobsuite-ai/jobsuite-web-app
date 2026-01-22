@@ -436,13 +436,58 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     );
   };
 
-  // Fetch unacknowledged notification count with adaptive polling
+  // Track user activity for smarter polling
+  const lastActivityRef = useRef(Date.now());
+  const isPageVisibleRef = useRef(!document.hidden);
+
+  // Update activity tracking
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const handleVisibilityChange = () => {
+      isPageVisibleRef.current = !document.hidden;
+      if (!document.hidden) {
+        lastActivityRef.current = Date.now();
+      }
+    };
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((event) => {
+      window.addEventListener(event, updateActivity, { passive: true });
+    });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, updateActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Check if user is active (similar to refreshMiddleware pattern)
+  const isUserActive = useCallback(() => {
+    const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+    return (
+      isPageVisibleRef.current &&
+      timeSinceLastActivity < 5 * 60 * 1000 // Active if interacted within 5 minutes
+    );
+  }, []);
+
+  // Fetch unacknowledged notification count with smart polling
   useEffect(() => {
     if (!isAuthenticated || isLoading) {
       return undefined;
     }
 
     const fetchMessageCount = async () => {
+      // Only fetch if user is active and page is visible
+      if (!isUserActive()) {
+        return;
+      }
+
       try {
         const response = await fetch('/api/outreach-messages/count', {
           method: 'GET',
@@ -458,12 +503,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       }
     };
 
-    fetchMessageCount();
-    const messageInterval = setInterval(fetchMessageCount, 60000); // Refresh every minute
-
     const fetchUnacknowledgedCount = async () => {
-      // Don't poll if page is not visible
-      if (document.hidden) {
+      // Only fetch if user is active and page is visible
+      if (!isUserActive()) {
         return;
       }
 
@@ -486,29 +528,54 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     };
 
     // Initial fetch
+    fetchMessageCount();
     fetchUnacknowledgedCount();
 
-    // Adaptive polling:
-    // - 120 seconds (2 minutes) when no notifications
-    // - 60 seconds (1 minute) when there are notifications
-    // This reduces server load while still keeping the count reasonably up-to-date
-    const getPollInterval = () => unacknowledgedCountRef.current > 0 ? 60000 : 120000;
-
-    let timeoutId: NodeJS.Timeout;
-
-    const scheduleNextPoll = () => {
-      timeoutId = setTimeout(() => {
-        fetchUnacknowledgedCount().then(() => {
-          scheduleNextPoll();
-        });
-      }, getPollInterval());
+    // Smart polling intervals:
+    // - When user is active: 60s for messages, adaptive for notifications (60s/120s)
+    // - When user is inactive: 5 minutes for both
+    const getPollInterval = (isActive: boolean, hasNotifications: boolean) => {
+      if (!isActive) {
+        return 5 * 60 * 1000; // 5 minutes when inactive
+      }
+      // Active polling
+      if (hasNotifications) {
+        return 45 * 1000; // 45 seconds when there are notifications
+      }
+      return 2 * 60 * 1000; // 2 minutes when no notifications
     };
 
-    scheduleNextPoll();
+    let messageTimeoutId: NodeJS.Timeout;
+    let notificationTimeoutId: NodeJS.Timeout;
 
-    // Also poll when page becomes visible again
+    const scheduleMessagePoll = () => {
+      messageTimeoutId = setTimeout(() => {
+        if (isUserActive()) {
+          fetchMessageCount();
+        }
+        scheduleMessagePoll();
+      }, getPollInterval(isUserActive(), false));
+    };
+
+    const scheduleNotificationPoll = () => {
+      notificationTimeoutId = setTimeout(() => {
+        if (isUserActive()) {
+          fetchUnacknowledgedCount().then(() => {
+            scheduleNotificationPoll();
+          });
+        } else {
+          scheduleNotificationPoll();
+        }
+      }, getPollInterval(isUserActive(), unacknowledgedCountRef.current > 0));
+    };
+
+    scheduleMessagePoll();
+    scheduleNotificationPoll();
+
+    // Poll when page becomes visible again
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && isUserActive()) {
+        fetchMessageCount();
         fetchUnacknowledgedCount();
       }
     };
@@ -516,17 +583,19 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
     // Listen for notification acknowledgment events to update count immediately
     const handleNotificationAcknowledged = () => {
-      fetchUnacknowledgedCount();
+      if (isUserActive()) {
+        fetchUnacknowledgedCount();
+      }
     };
     window.addEventListener('notificationAcknowledged', handleNotificationAcknowledged);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(messageTimeoutId);
+      clearTimeout(notificationTimeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('notificationAcknowledged', handleNotificationAcknowledged);
-      clearInterval(messageInterval);
     };
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, isUserActive]);
 
   // Fetch job title for a notification
   const fetchJobTitle = useCallback(async (estimateId: string) => {
