@@ -16,13 +16,13 @@ export function Shell({ children }: { children: any }) {
   const isSignaturePage = pathname?.startsWith('/sign/');
 
   useEffect(() => {
-    // Check if user is authenticated
+    // Check if user is authenticated - do this immediately without blocking render
     const checkAuth = () => {
       const accessToken = localStorage.getItem('access_token');
       setIsAuthenticated(!!accessToken);
     };
 
-    // Initial check
+    // Initial check - synchronous, doesn't block render
     checkAuth();
 
     // Listen for storage changes (e.g., when login saves token)
