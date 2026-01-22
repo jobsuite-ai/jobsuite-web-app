@@ -36,7 +36,6 @@ import { IconArrowsMoveHorizontal, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
-import LoadingState from '../Global/LoadingState';
 import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
@@ -341,10 +340,10 @@ export default function JobsList() {
         loading: cacheLoading,
         refreshData,
         updateEstimate,
-        invalidateCache,
     } = useDataCache();
-    const [jobs, setJobs] = useState<Job[]>([]);
-    const [loading, setLoading] = useState(true);
+
+    // Initialize jobs from Redux state (via context)
+    const [jobs, setJobs] = useState<Job[]>(projects.length > 0 ? projects : []);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [overId, setOverId] = useState<string | null>(null);
     const [columns, setColumns] = useState<ColumnConfig[]>(loadColumnSettings());
@@ -356,6 +355,8 @@ export default function JobsList() {
     });
     const [refreshing, setRefreshing] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const hasAttemptedAutoRefreshRef = useRef(false);
+    const hasEverHadDataRef = useRef(projects.length > 0);
     const router = useRouter();
 
     // Configure sensors for drag and drop
@@ -368,34 +369,50 @@ export default function JobsList() {
     );
 
     // Update jobs when cache data changes
+    // Always keep lanes visible - loading happens in background
     useEffect(() => {
-        if (projects.length > 0 || !cacheLoading.projects) {
+        // Update jobs when we get fresh data from Redux
+        if (projects.length > 0) {
             setJobs(projects);
-            setLoading(false);
-        } else if (cacheLoading.projects) {
-            setLoading(true);
+            hasEverHadDataRef.current = true;
+        } else if (hasEverHadDataRef.current) {
+            // If we've had data before but now it's empty, keep the empty state
+            // Don't clear jobs to prevent flash
         }
-    }, [projects, cacheLoading.projects]);
+    }, [projects]);
 
     // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+    // Only runs once per mount to prevent infinite loops
     useEffect(() => {
         // Only auto-refresh if:
         // 1. Not currently loading
         // 2. Data is empty
         // 3. We have an access token (user is logged in)
+        // 4. We haven't already attempted an auto-refresh
         const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        if (!cacheLoading.projects && jobs.length === 0 && accessToken) {
+        if (
+            !cacheLoading.projects &&
+            jobs.length === 0 &&
+            accessToken &&
+            !hasAttemptedAutoRefreshRef.current
+        ) {
             // Small delay to avoid race conditions with initial cache load
             const timeoutId = setTimeout(() => {
-                if (jobs.length === 0 && !cacheLoading.projects) {
-                    invalidateCache('projects');
-                    refreshData('projects', true);
+                if (
+                    jobs.length === 0 &&
+                    !cacheLoading.projects &&
+                    !hasAttemptedAutoRefreshRef.current
+                ) {
+                    hasAttemptedAutoRefreshRef.current = true;
+                    // Don't call invalidateCache - it clears state and causes loops
+                    // Just refresh the data
+                    refreshData('projects');
                 }
-            }, 100);
+            }, 1000); // Increased delay to let DataCacheContext finish initial load
             return () => clearTimeout(timeoutId);
         }
         return undefined;
-    }, [jobs.length, cacheLoading.projects, invalidateCache, refreshData]);
+    }, [jobs.length, cacheLoading.projects, refreshData]);
 
     // Listen for storage changes to reload column settings
     useEffect(() => {
@@ -483,7 +500,8 @@ export default function JobsList() {
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
-            invalidateCache('projects');
+            // Refresh data in background without clearing cache
+            // This keeps the lanes visible during refresh
             await refreshData('projects', true);
         } finally {
             setRefreshing(false);
@@ -818,10 +836,6 @@ export default function JobsList() {
     // Get active job for drag overlay
     const activeJob = activeId ? jobs.find((job) => job.id === activeId) : null;
 
-    if (loading) {
-        return <LoadingState />;
-    }
-
     return (
         <DndContext
           sensors={sensors}
@@ -835,8 +849,17 @@ export default function JobsList() {
                       variant="light"
                       onClick={handleRefresh}
                       loading={refreshing || cacheLoading.projects}
-                      title="Refresh projects"
+                      title={
+                          refreshing || cacheLoading.projects
+                              ? 'Refreshing...'
+                              : 'Refresh projects'
+                      }
                       size={40}
+                      className={
+                          refreshing || cacheLoading.projects
+                              ? classes.refreshButtonLoading
+                              : undefined
+                      }
                     >
                         <IconRefresh size={24} />
                     </ActionIcon>

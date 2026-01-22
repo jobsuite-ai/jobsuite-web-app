@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 
 import { ActionIcon, Badge, Card, Divider, Flex, Group, Paper, Text, Title } from '@mantine/core';
 import { IconRefresh } from '@tabler/icons-react';
@@ -25,6 +25,7 @@ export default function ClientsList() {
   const [jobs, setJobs] = useState(new Array<Job>());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const hasAttemptedAutoRefreshRef = useRef(false);
   const router = useRouter();
 
   // Update clients and jobs when cache data changes
@@ -42,26 +43,40 @@ export default function ClientsList() {
   }, [cachedClients, cachedProjects, cacheLoading.clients, cacheLoading.projects]);
 
   // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+  // Only runs once per mount to prevent infinite loops
   useEffect(() => {
     // Only auto-refresh if:
     // 1. Not currently loading
     // 2. Data is empty
     // 3. We have an access token (user is logged in)
+    // 4. We haven't already attempted an auto-refresh
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-    if (!cacheLoading.clients && !cacheLoading.projects && clients.length === 0 && accessToken) {
+    if (
+        !cacheLoading.clients &&
+        !cacheLoading.projects &&
+        clients.length === 0 &&
+        accessToken &&
+        !hasAttemptedAutoRefreshRef.current
+    ) {
       // Small delay to avoid race conditions with initial cache load
       const timeoutId = setTimeout(() => {
-        if (clients.length === 0 && !cacheLoading.clients && !cacheLoading.projects) {
-          invalidateCache('clients');
-          invalidateCache('projects');
+        if (
+            clients.length === 0 &&
+            !cacheLoading.clients &&
+            !cacheLoading.projects &&
+            !hasAttemptedAutoRefreshRef.current
+        ) {
+          hasAttemptedAutoRefreshRef.current = true;
+          // Don't call invalidateCache - it clears state and causes loops
+          // Just refresh the data
           refreshData('clients', true);
           refreshData('projects', true);
         }
-      }, 100);
+      }, 1000); // Increased delay to let DataCacheContext finish initial load
       return () => clearTimeout(timeoutId);
     }
     return undefined;
-  }, [clients.length, cacheLoading.clients, cacheLoading.projects, invalidateCache, refreshData]);
+  }, [clients.length, cacheLoading.clients, cacheLoading.projects, refreshData]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

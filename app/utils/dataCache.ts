@@ -15,7 +15,6 @@ interface CachedSingleData<T> {
 }
 
 const CACHE_PREFIX = 'jobsuite_cache_';
-const ESTIMATE_SUMMARY_PREFIX = 'jobsuite_estimate_summary_';
 
 // Cache expiration times in milliseconds
 const CACHE_EXPIRATION: Record<CacheKey, number> = {
@@ -23,8 +22,6 @@ const CACHE_EXPIRATION: Record<CacheKey, number> = {
   estimates: 10 * 60 * 1000, // 10 minutes
   projects: 10 * 60 * 1000, // 10 minutes
 };
-
-const ESTIMATE_SUMMARY_EXPIRATION = 2 * 60 * 1000; // 2 minutes
 
 /**
  * Get the full cache key for a given cache type
@@ -187,74 +184,76 @@ export function getCacheTimestamp(key: CacheKey): number | null {
 }
 
 /**
- * Get cached estimate summary for a given estimate ID
+ * Clean up old estimate summary cache entries (no longer used)
+ * This removes all entries with the old ESTIMATE_SUMMARY_PREFIX
  */
-export function getCachedEstimateSummary<T>(estimateId: string): T | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  try {
-    const cacheKey = `${ESTIMATE_SUMMARY_PREFIX}${estimateId}`;
-    const cached = localStorage.getItem(cacheKey);
-
-    if (!cached) {
-      return null;
-    }
-
-    const parsed: CachedSingleData<T> = JSON.parse(cached);
-
-    // Check if cache has expired
-    const now = Date.now();
-    if (now - parsed.timestamp > ESTIMATE_SUMMARY_EXPIRATION) {
-      // Clear expired cache
-      clearCachedEstimateSummary(estimateId);
-      return null;
-    }
-
-    return parsed.data;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`Error reading estimate summary cache for ${estimateId}:`, error);
-    return null;
-  }
-}
-
-/**
- * Set cached estimate summary for a given estimate ID
- */
-export function setCachedEstimateSummary<T>(estimateId: string, data: T): void {
+export function cleanupOldEstimateSummaryCache(): void {
   if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    const cacheKey = `${ESTIMATE_SUMMARY_PREFIX}${estimateId}`;
-    const cached: CachedSingleData<T> = {
-      data,
-      timestamp: Date.now(),
-    };
-    localStorage.setItem(cacheKey, JSON.stringify(cached));
+    const prefix = 'jobsuite_estimate_summary_';
+    const keysToRemove: string[] = [];
+
+    // Iterate through all localStorage keys
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        keysToRemove.push(key);
+      }
+    }
+
+    // Remove all old summary cache entries
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+    });
+
+    if (keysToRemove.length > 0) {
+      // eslint-disable-next-line no-console
+      console.log(`Cleaned up ${keysToRemove.length} old estimate summary cache entries`);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`Error writing estimate summary cache for ${estimateId}:`, error);
+    console.error('Error cleaning up old estimate summary cache:', error);
   }
 }
 
 /**
- * Clear cached estimate summary for a specific estimate ID
+ * Clean up archived estimates from cache
+ * This is a utility function that can be called on app start
  */
-export function clearCachedEstimateSummary(estimateId: string): void {
+export function cleanupArchivedFromCache(): void {
   if (typeof window === 'undefined') {
     return;
   }
 
   try {
-    const cacheKey = `${ESTIMATE_SUMMARY_PREFIX}${estimateId}`;
-    localStorage.removeItem(cacheKey);
+    const keys: CacheKey[] = ['estimates', 'projects'];
+    keys.forEach((key) => {
+      const cached = getCachedData<any>(key);
+      if (cached && Array.isArray(cached)) {
+        // Filter out archived, completed, and cancelled items
+        const filtered = cached.filter(
+          (item: any) =>
+            item.status !== 'ARCHIVED' &&
+            item.status !== 'PROJECT_COMPLETED' &&
+            item.status !== 'PROJECT_CANCELLED'
+        );
+
+        // Only update if we actually removed items
+        if (filtered.length !== cached.length) {
+          setCachedData(key, filtered);
+          // eslint-disable-next-line no-console
+          console.log(
+            `Cleaned up ${cached.length - filtered.length} archived items from ${key} cache`
+          );
+        }
+      }
+    });
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.error(`Error clearing estimate summary cache for ${estimateId}:`, error);
+    console.error('Error cleaning up archived items from cache:', error);
   }
 }
 

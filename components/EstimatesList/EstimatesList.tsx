@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useRef } from 'react';
 
 import {
     ActionIcon,
@@ -71,6 +71,7 @@ export default function EstimatesList() {
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'main' | 'list'>('main');
     const [refreshing, setRefreshing] = useState(false);
+    const hasAttemptedAutoRefreshRef = useRef(false);
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -91,24 +92,39 @@ export default function EstimatesList() {
     }, [cachedEstimates, cacheLoading.estimates]);
 
     // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+    // Only runs once per mount to prevent infinite loops
     useEffect(() => {
         // Only auto-refresh if:
         // 1. Not currently loading
         // 2. Data is empty
         // 3. We have an access token (user is logged in)
-        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        if (!cacheLoading.estimates && estimates.length === 0 && accessToken) {
+        // 4. We haven't already attempted an auto-refresh
+        const accessToken = typeof window !== 'undefined'
+            ? localStorage.getItem('access_token')
+            : null;
+        const shouldRefresh =
+            !cacheLoading.estimates &&
+            estimates.length === 0 &&
+            accessToken &&
+            !hasAttemptedAutoRefreshRef.current;
+        if (shouldRefresh) {
             // Small delay to avoid race conditions with initial cache load
             const timeoutId = setTimeout(() => {
-                if (estimates.length === 0 && !cacheLoading.estimates) {
-                    invalidateCache('estimates');
+                const stillEmpty =
+                    estimates.length === 0 &&
+                    !cacheLoading.estimates &&
+                    !hasAttemptedAutoRefreshRef.current;
+                if (stillEmpty) {
+                    hasAttemptedAutoRefreshRef.current = true;
+                    // Don't call invalidateCache - it clears state and causes loops
+                    // Just refresh the data
                     refreshData('estimates', true);
                 }
-            }, 100);
+            }, 1000); // Increased delay to let DataCacheContext finish initial load
             return () => clearTimeout(timeoutId);
         }
         return undefined;
-    }, [estimates.length, cacheLoading.estimates, invalidateCache, refreshData]);
+    }, [estimates.length, cacheLoading.estimates, refreshData]);
 
     useEffect(() => {
         // Sort jobs into columns based on status
