@@ -103,7 +103,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [lineItemsCount, setLineItemsCount] = useState(0);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
-    const [loadingSignatureUrl, setLoadingSignatureUrl] = useState(false);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
     const transcriptionSummaryRef = useRef<TranscriptionSummaryRef>(null);
     const lineItemsRef = useRef<LineItemsRef>(null);
@@ -112,8 +111,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
 
-    // Single initial loading state - true until all initial data is loaded
-    const [initialLoading, setInitialLoading] = useState(true);
+    // Check if we have cached data to determine initial loading state
+    const hasCachedDataInitial = useMemo(
+        () => !!(
+            cachedEstimate ||
+            cachedDetails?.lastFetched !== null ||
+            cachedLineItems.length > 0 ||
+            cachedResources.length > 0 ||
+            cachedComments.length > 0
+        ),
+        [cachedEstimate, cachedDetails, cachedLineItems, cachedResources, cachedComments]
+    );
+
+    // Single initial loading state - false if we have cached data, true otherwise
+    const [initialLoading, setInitialLoading] = useState(!hasCachedDataInitial);
     const [hasError, setHasError] = useState(false);
     const [comments, setComments] = useState<any[]>([]);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
@@ -130,30 +141,39 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     }>>([]);
     const [signaturesLoaded, setSignaturesLoaded] = useState(false);
     const hasFetchedInitialDataRef = useRef<string | null>(null);
+    const signatureLinksRef = useRef<any[] | null>(null);
+    const hasProcessedSignatureLinksRef = useRef<string | null>(null);
 
     // Load cached details data immediately for instant display
     useEffect(() => {
         if (isMountedRef.current) {
+            let hasAnyCachedData = false;
+
             // Load cached line items
             if (cachedLineItems.length > 0) {
                 setLineItems(cachedLineItems);
                 setLineItemsCount(cachedLineItems.length);
+                hasAnyCachedData = true;
             }
             // Load cached comments
             if (cachedComments.length > 0) {
                 setComments(cachedComments);
+                hasAnyCachedData = true;
             }
             // Load cached change orders
             if (cachedChangeOrders.length > 0) {
                 setChangeOrders(cachedChangeOrders);
+                hasAnyCachedData = true;
             }
             // Load cached time entries
             if (cachedTimeEntries.length > 0) {
                 setTimeEntries(cachedTimeEntries);
+                hasAnyCachedData = true;
             }
             // Load cached resources
             if (cachedResources.length > 0) {
                 setResources(cachedResources);
+                hasAnyCachedData = true;
                 // Check if any video resource exists
                 const videoResource = cachedResources.find(
                     (r) => r.resource_type === 'VIDEO' && r.upload_status === 'COMPLETED'
@@ -166,6 +186,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             if (cachedSignatures.length > 0) {
                 setSignatures(cachedSignatures);
                 setSignaturesLoaded(true);
+                hasAnyCachedData = true;
+            }
+
+            // If we have cached data and cached estimate, show UI immediately
+            if (hasAnyCachedData && cachedEstimate) {
+                setInitialLoading(false);
+                setDetailsLoaded(true);
             }
         }
     }, [
@@ -175,6 +202,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         cachedTimeEntries,
         cachedResources,
         cachedSignatures,
+        cachedEstimate,
     ]);
 
     // Load cached estimate data immediately for instant display
@@ -182,11 +210,18 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         if (cachedEstimate && isMountedRef.current) {
             // Use cached estimate data immediately - this provides instant UI
             setEstimate(cachedEstimate);
+            // If we have cached estimate, we can show the UI immediately
+            // (details will be loaded in the other useEffect)
+            if (cachedDetails?.lastFetched !== null ||
+                cachedLineItems.length > 0 ||
+                cachedResources.length > 0) {
+                setInitialLoading(false);
+            }
         }
         if (cachedClient && isMountedRef.current) {
             setClient(cachedClient);
         }
-    }, [cachedEstimate, cachedClient]);
+    }, [cachedEstimate, cachedClient, cachedDetails, cachedLineItems, cachedResources]);
 
     // Fetch all initial data in parallel for fast page load
     useEffect(() => {
@@ -480,6 +515,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 (sig: any) => sig.is_valid !== false
                             );
                             setSignatures(validSignatures);
+
+                            // Store signature links for later use (avoid duplicate fetch)
+                            signatureLinksRef.current = signaturesData.signature_links || [];
 
                             // Update Redux cache
                             dispatch(
@@ -1411,9 +1449,22 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const isSignatureRequired = hasClientSignature && !hasContractorSignature;
 
-    // Fetch existing signature link (only if estimate has been sent)
+    // Process signature links from initial fetch (only if estimate has been sent)
     // We no longer generate signature links automatically - they're only created when sending
     useEffect(() => {
+        // Reset ref if estimateID changed
+        if (
+            hasProcessedSignatureLinksRef.current !== null &&
+            hasProcessedSignatureLinksRef.current !== estimateID
+        ) {
+            hasProcessedSignatureLinksRef.current = null;
+        }
+
+        // Prevent processing multiple times for the same estimate
+        if (hasProcessedSignatureLinksRef.current === estimateID) {
+            return;
+        }
+
         // Check if estimate has been sent (by status or by having signature links)
         const estimateHasBeenSent = estimate?.status === EstimateStatus.ESTIMATE_SENT ||
             estimate?.status === EstimateStatus.ESTIMATE_OPENED ||
@@ -1423,70 +1474,61 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             estimate?.status?.toString().startsWith('PROJECT_') ||
             (hasSignedPdf && isFullySigned);
 
-        // Only fetch if estimate has been sent and we have client email
-        const shouldFetch = estimateHasBeenSent && client?.email && estimate;
+        // Only process if estimate has been sent and we have client email
+        const shouldProcess = estimateHasBeenSent && client?.email && estimate;
 
-        if (!shouldFetch) {
+        if (!shouldProcess) {
             return;
         }
 
-        const fetchExistingSignatureLink = async () => {
-            try {
-                setLoadingSignatureUrl(true);
+        // Use signature links from initial fetch (stored in ref) instead of fetching again
+        const processSignatureLinks = () => {
+            const signatureLinks = signatureLinksRef.current || [];
 
-                // Fetch existing signature links (only, don't generate new ones)
-                const signaturesResponse = await fetch(
-                    `/api/estimates/${estimateID}/signatures`,
-                    {
-                        method: 'GET',
-                        headers: getApiHeaders(),
-                    }
-                );
+            // If signature links aren't available yet, don't process
+            // They'll be processed when the useEffect runs again after they're loaded
+            if (signatureLinks.length === 0 && !signaturesLoaded) {
+                return;
+            }
 
-                if (signaturesResponse.ok) {
-                    const signaturesData = await signaturesResponse.json();
-                    // Filter out REVOKED and EXPIRED links, only use active ones
-                    let activeLinks = signaturesData.signature_links?.filter(
-                        (link: any) =>
-                            link.client_email === client.email &&
-                            link.status !== 'REVOKED' &&
-                            link.status !== 'EXPIRED'
-                    ) || [];
+            // Mark as processed to prevent re-processing
+            hasProcessedSignatureLinksRef.current = estimateID;
 
-                    // If we have a signed PDF, prefer SIGNED links
-                    if (hasSignedPdf && isFullySigned) {
-                        const signedLinks = activeLinks.filter((link: any) => link.status === 'SIGNED');
-                        if (signedLinks.length > 0) {
-                            activeLinks = signedLinks;
-                        }
-                    }
+            // Filter out REVOKED and EXPIRED links, only use active ones
+            let activeLinks = signatureLinks.filter(
+                (link: any) =>
+                    link.client_email === client.email &&
+                    link.status !== 'REVOKED' &&
+                    link.status !== 'EXPIRED'
+            );
 
-                    // Sort by created_at descending to get the most recent active link
-                    activeLinks.sort((a: any, b: any) => {
-                        const dateA = new Date(a.created_at || 0).getTime();
-                        const dateB = new Date(b.created_at || 0).getTime();
-                        return dateB - dateA;
-                    });
-
-                    const existingLink = activeLinks[0];
-
-                    if (existingLink) {
-                        // Use existing signature link
-                        const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
-                        setSignatureUrl(`${baseUrl}/sign/${existingLink.signature_hash}`);
-                    }
+            // If we have a signed PDF, prefer SIGNED links
+            if (hasSignedPdf && isFullySigned) {
+                const signedLinks = activeLinks.filter((link: any) => link.status === 'SIGNED');
+                if (signedLinks.length > 0) {
+                    activeLinks = signedLinks;
                 }
-            } catch (error) {
-                // eslint-disable-next-line no-console
-                console.error('Error fetching signature link:', error);
-            } finally {
-                setLoadingSignatureUrl(false);
+            }
+
+            // Sort by created_at descending to get the most recent active link
+            activeLinks.sort((a: any, b: any) => {
+                const dateA = new Date(a.created_at || 0).getTime();
+                const dateB = new Date(b.created_at || 0).getTime();
+                return dateB - dateA;
+            });
+
+            const existingLink = activeLinks[0];
+
+            if (existingLink) {
+                // Use existing signature link
+                const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://jobsuite.app';
+                setSignatureUrl(`${baseUrl}/sign/${existingLink.signature_hash}`);
             }
         };
 
-        // Small delay to ensure resources are fully processed
+        // Small delay to ensure signature links are available from initial fetch
         const timeoutId = setTimeout(() => {
-            fetchExistingSignatureLink();
+            processSignatureLinks();
         }, 500);
 
         // eslint-disable-next-line consistent-return
@@ -1500,7 +1542,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         estimateID,
         estimate?.status,
         estimate,
-        fetchSignatures,
+        signaturesLoaded,
     ]);
 
     const OverviewDetails = useMemo(() => (
@@ -1986,7 +2028,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                   lineItems={lineItems}
                                                   client={client}
                                                   signatureUrl={signatureUrl}
-                                                  loadingSignatureUrl={loadingSignatureUrl}
+                                                  loadingSignatureUrl={false}
                                                   signatures={signatures}
                                                   onSignatureUrlGenerated={(url) => {
                                                       setSignatureUrl(url);
