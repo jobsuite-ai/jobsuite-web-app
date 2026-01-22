@@ -89,6 +89,8 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   const clientsRef = useRef(clients);
   const projectsRef = useRef(projects);
   const hasInitialLoadRef = useRef(false);
+  // Track in-flight requests to prevent duplicate fetches
+  const inFlightRequestsRef = useRef<Map<'clients' | 'estimates' | 'projects', Promise<void>>>(new Map());
 
   // Update refs when values change
   useEffect(() => {
@@ -165,81 +167,121 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         ? [key]
         : ['clients', 'estimates', 'projects'];
 
+      // Check for in-flight requests and reuse them to prevent duplicates
+      const existingPromises: Promise<void>[] = [];
+      const newPromises: Promise<void>[] = [];
+
       // Set loading states only for keys that need fetching AND don't have data yet
       // This prevents flashing loading state when refreshing with existing data
       // Use refs to check current values without adding to dependencies
       if (keysToFetch.includes('clients')) {
-        // Only show loading if we don't have clients data yet
-        if (clientsRef.current.length === 0) {
-          dispatch(setClientsLoading(true));
+        const existingRequest = inFlightRequestsRef.current.get('clients');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have clients data yet
+          if (clientsRef.current.length === 0) {
+            dispatch(setClientsLoading(true));
+          }
+          dispatch(setClientsError(null));
         }
-        dispatch(setClientsError(null));
       }
       if (keysToFetch.includes('estimates')) {
-        // Only show loading if we don't have estimates data yet
-        if (estimatesRef.current.length === 0) {
-          dispatch(setEstimatesLoading(true));
+        const existingRequest = inFlightRequestsRef.current.get('estimates');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have estimates data yet
+          if (estimatesRef.current.length === 0) {
+            dispatch(setEstimatesLoading(true));
+          }
+          dispatch(setEstimatesError(null));
         }
-        dispatch(setEstimatesError(null));
       }
       if (keysToFetch.includes('projects')) {
-        // Only show loading if we don't have projects data yet
-        if (projectsRef.current.length === 0) {
-          dispatch(setProjectsLoading(true));
+        const existingRequest = inFlightRequestsRef.current.get('projects');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have projects data yet
+          if (projectsRef.current.length === 0) {
+            dispatch(setProjectsLoading(true));
+          }
+          dispatch(setProjectsError(null));
         }
-        dispatch(setProjectsError(null));
+      }
+
+      // If all requests are already in flight, just wait for them
+      if (existingPromises.length === keysToFetch.length) {
+        await Promise.all(existingPromises);
+        return;
       }
 
       try {
-        const promises: Promise<void>[] = [];
-
-        if (keysToFetch.includes('clients')) {
-          promises.push(
-            fetchClients()
-              .then((data) => {
-                dispatch(setClients(data));
-              })
-              .catch((err) => {
-                dispatch(
-                  setClientsError(err instanceof Error ? err.message : 'Failed to fetch clients')
-                );
-              })
-          );
+        // Create new fetch promises only for keys that don't have in-flight requests
+        if (keysToFetch.includes('clients') && !inFlightRequestsRef.current.has('clients')) {
+          const clientsPromise = fetchClients()
+            .then((data) => {
+              dispatch(setClients(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setClientsError(err instanceof Error ? err.message : 'Failed to fetch clients')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('clients');
+              dispatch(setClientsLoading(false));
+            });
+          inFlightRequestsRef.current.set('clients', clientsPromise);
+          newPromises.push(clientsPromise);
         }
 
-        if (keysToFetch.includes('estimates')) {
-          promises.push(
-            fetchEstimates()
-              .then((data) => {
-                dispatch(setEstimates(data));
-              })
-              .catch((err) => {
-                dispatch(
-                  setEstimatesError(err instanceof Error ? err.message : 'Failed to fetch estimates')
-                );
-              })
-          );
+        if (keysToFetch.includes('estimates') && !inFlightRequestsRef.current.has('estimates')) {
+          const estimatesPromise = fetchEstimates()
+            .then((data) => {
+              dispatch(setEstimates(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setEstimatesError(err instanceof Error ? err.message : 'Failed to fetch estimates')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('estimates');
+              dispatch(setEstimatesLoading(false));
+            });
+          inFlightRequestsRef.current.set('estimates', estimatesPromise);
+          newPromises.push(estimatesPromise);
         }
 
-        if (keysToFetch.includes('projects')) {
-          promises.push(
-            fetchProjects()
-              .then((data) => {
-                dispatch(setProjects(data));
-              })
-              .catch((err) => {
-                dispatch(
-                  setProjectsError(err instanceof Error ? err.message : 'Failed to fetch projects')
-                );
-              })
-          );
+        if (keysToFetch.includes('projects') && !inFlightRequestsRef.current.has('projects')) {
+          const projectsPromise = fetchProjects()
+            .then((data) => {
+              dispatch(setProjects(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setProjectsError(err instanceof Error ? err.message : 'Failed to fetch projects')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('projects');
+              dispatch(setProjectsLoading(false));
+            });
+          inFlightRequestsRef.current.set('projects', projectsPromise);
+          newPromises.push(projectsPromise);
         }
 
-        await Promise.all(promises);
+        // Wait for both existing and new promises
+        await Promise.all([...existingPromises, ...newPromises]);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Error refreshing data:', err);
-      } finally {
+        // Clean up in-flight requests on error
+        keysToFetch.forEach((k) => {
+          inFlightRequestsRef.current.delete(k);
+        });
         // Clear loading states
         if (keysToFetch.includes('clients')) {
           dispatch(setClientsLoading(false));

@@ -91,16 +91,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const [objectExists, setObjectExists] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [estimate, setEstimate] = useState<Estimate>();
-    const [resources, setResources] = useState<EstimateResource[]>([]);
-    const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
-    const [client, setClient] = useState<ContractorClient>();
+    // Initialize estimate from cached data immediately (synchronously) to avoid loading flash
+    const [estimate, setEstimate] = useState<Estimate | undefined>(cachedEstimate);
+    // Initialize resources from cached data immediately
+    const [resources, setResources] = useState<EstimateResource[]>(cachedResources);
+    // Initialize line items from cached data immediately
+    const [lineItems, setLineItems] = useState<EstimateLineItem[]>(cachedLineItems);
+    // Initialize line items count from cached data
+    const [lineItemsCount, setLineItemsCount] = useState(cachedLineItems.length);
+    // Initialize client from cached data immediately
+    const [client, setClient] = useState<ContractorClient | undefined>(cachedClient);
     const [showVideoUploaderModal, setShowVideoUploaderModal] = useState(false);
     const [showImageUploadModal, setShowImageUploadModal] = useState(false);
     const [showFileUploadModal, setShowFileUploadModal] = useState(false);
     const [showDescriptionEditor, setShowDescriptionEditor] = useState(false);
     const [showSpanishTranscriptionEditor, setShowSpanishTranscriptionEditor] = useState(false);
-    const [lineItemsCount, setLineItemsCount] = useState(0);
     const [showCreateChangeOrderModal, setShowCreateChangeOrderModal] = useState(false);
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
     const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -111,26 +116,18 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
 
-    // Check if we have cached data to determine initial loading state
-    const hasCachedDataInitial = useMemo(
-        () => !!(
-            cachedEstimate ||
-            cachedDetails?.lastFetched !== null ||
-            cachedLineItems.length > 0 ||
-            cachedResources.length > 0 ||
-            cachedComments.length > 0
-        ),
-        [cachedEstimate, cachedDetails, cachedLineItems, cachedResources, cachedComments]
-    );
-
-    // Single initial loading state - false if we have cached data, true otherwise
-    const [initialLoading, setInitialLoading] = useState(!hasCachedDataInitial);
+    // Single initial loading state - false if we have cached estimate, true otherwise
+    // Since we initialize estimate from cachedEstimate synchronously, if cachedEstimate exists,
+    // estimate will be set immediately and we can show the UI right away
+    const [initialLoading, setInitialLoading] = useState(!cachedEstimate);
     const [hasError, setHasError] = useState(false);
-    const [comments, setComments] = useState<any[]>([]);
-    const [changeOrders, setChangeOrders] = useState<Estimate[]>([]);
-    const [timeEntries, setTimeEntries] = useState<any[]>([]);
+    // Initialize from cached data immediately
+    const [comments, setComments] = useState<any[]>(cachedComments);
+    const [changeOrders, setChangeOrders] = useState<Estimate[]>(cachedChangeOrders);
+    const [timeEntries, setTimeEntries] = useState<any[]>(cachedTimeEntries);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
+    // Initialize signatures from cached data immediately
     const [signatures, setSignatures] = useState<Array<{
         signature_type: string;
         signature_data?: string;
@@ -138,8 +135,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         signer_email?: string;
         signed_at?: string;
         is_valid?: boolean;
-    }>>([]);
-    const [signaturesLoaded, setSignaturesLoaded] = useState(false);
+    }>>(cachedSignatures);
+    // Set signaturesLoaded to true if we have cached signatures
+    const [signaturesLoaded, setSignaturesLoaded] = useState(cachedSignatures.length > 0);
     const hasFetchedInitialDataRef = useRef<string | null>(null);
     const signatureLinksRef = useRef<any[] | null>(null);
     const hasProcessedSignatureLinksRef = useRef<string | null>(null);
@@ -205,17 +203,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         cachedEstimate,
     ]);
 
-    // Load cached estimate data immediately for instant display
+    // Update estimate and client when cached data changes (for when navigating between estimates)
     useEffect(() => {
         if (cachedEstimate && isMountedRef.current) {
             // Use cached estimate data immediately - this provides instant UI
             setEstimate(cachedEstimate);
-            // If we have cached estimate, we can show the UI immediately
-            // (details will be loaded in the other useEffect)
+            // If we have cached estimate and details, show UI immediately
             if (cachedDetails?.lastFetched !== null ||
                 cachedLineItems.length > 0 ||
                 cachedResources.length > 0) {
                 setInitialLoading(false);
+                setDetailsLoaded(true);
             }
         }
         if (cachedClient && isMountedRef.current) {

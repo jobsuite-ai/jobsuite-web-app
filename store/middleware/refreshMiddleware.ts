@@ -1,4 +1,4 @@
-import { Middleware, type AnyAction } from '@reduxjs/toolkit';
+import { Middleware } from '@reduxjs/toolkit';
 
 import { setClients as setClientsAction } from '../slices/clientsSlice';
 import { setEstimates as setEstimatesAction } from '../slices/estimatesSlice';
@@ -12,6 +12,7 @@ const CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 const REFRESH_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
 
 const refreshTimers: Map<CacheKey, NodeJS.Timeout> = new Map();
+const inFlightRequests: Map<CacheKey, Promise<any[]>> = new Map();
 let lastActivityTime = Date.now();
 let isPageVisible = true;
 
@@ -45,42 +46,60 @@ function isUserActive(): boolean {
 }
 
 /**
- * Fetch data from API
+ * Fetch data from API with deduplication
  */
 async function fetchData(key: CacheKey): Promise<any[]> {
+  // Check if there's already an in-flight request for this key
+  const existingRequest = inFlightRequests.get(key);
+  if (existingRequest) {
+    // Return the existing promise to avoid duplicate requests
+    return existingRequest;
+  }
+
   const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
   if (!accessToken) {
     return [];
   }
 
-  try {
-    let url = '';
-    if (key === 'estimates') {
-      url = '/api/estimates';
-    } else if (key === 'clients') {
-      url = '/api/clients';
-    } else if (key === 'projects') {
-      url = '/api/projects';
-    } else {
+  // Create the fetch promise
+  const fetchPromise = (async () => {
+    try {
+      let url = '';
+      if (key === 'estimates') {
+        url = '/api/estimates';
+      } else if (key === 'clients') {
+        url = '/api/clients';
+      } else if (key === 'projects') {
+        url = '/api/projects';
+      } else {
+        return [];
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: getApiHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${key}`);
+      }
+
+      const data = await response.json();
+      return data.Items || data || [];
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error(`Error fetching ${key}:`, error);
       return [];
+    } finally {
+      // Remove from in-flight requests when done
+      inFlightRequests.delete(key);
     }
+  })();
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: getApiHeaders(),
-    });
+  // Store the promise to deduplicate concurrent requests
+  inFlightRequests.set(key, fetchPromise);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch ${key}`);
-    }
-
-    const data = await response.json();
-    return data.Items || data || [];
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`Error fetching ${key}:`, error);
-    return [];
-  }
+  return fetchPromise;
 }
 
 /**
@@ -119,7 +138,8 @@ function setupRefreshTimer(
     const isExpired = !isValid || cacheAge > CACHE_EXPIRATION_MS;
 
     // Only refresh if expired and user is active
-    if (isExpired && isUserActive()) {
+    // Also check if there's already a request in flight
+    if (isExpired && isUserActive() && !inFlightRequests.has(key)) {
       // Refresh in background (stale-while-revalidate)
       fetchData(key).then((data) => {
         if (key === 'estimates') {
@@ -145,25 +165,7 @@ export const refreshMiddleware: Middleware<{}, RootState> = (store) => {
   setupRefreshTimer('clients', store.dispatch, store.getState);
   setupRefreshTimer('projects', store.dispatch, store.getState);
 
-  return (next) => (action) => {
-    const result = next(action);
-
-    // Type guard to check if action has a type property
-    if (typeof action !== 'object' || action === null || !('type' in action)) {
-      return result;
-    }
-
-    const typedAction = action as AnyAction;
-
-    // Restart timers if data was just fetched
-    if (typedAction.type === 'estimates/setEstimates') {
-      setupRefreshTimer('estimates', store.dispatch, store.getState);
-    } else if (typedAction.type === 'clients/setClients') {
-      setupRefreshTimer('clients', store.dispatch, store.getState);
-    } else if (typedAction.type === 'projects/setProjects') {
-      setupRefreshTimer('projects', store.dispatch, store.getState);
-    }
-
-    return result;
-  };
+  // Don't restart timers on every set action - timers are already running
+  // The timers are set up once on middleware initialization and run continuously
+  return (next) => (action) => next(action);
 };
