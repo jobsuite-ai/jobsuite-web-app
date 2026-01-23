@@ -11,9 +11,11 @@ import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useContractorLogo } from '@/hooks/useContractorLogo';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllClients } from '@/store/slices/clientsSlice';
+import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 
 const links = [
   { link: '/', label: 'Home' },
@@ -56,6 +58,7 @@ interface Notification {
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [unacknowledgedCount, setUnacknowledgedCount] = useState<number>(0);
   const [messageCount, setMessageCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -64,7 +67,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const unacknowledgedCountRef = useRef<number>(0);
   const router = useRouter();
   const pathname = usePathname();
-  const { clients, estimates } = useSearchData();
+  const clients = useAppSelector(selectAllClients);
+  const estimates = useAppSelector(selectAllEstimates);
   const { isAuthenticated, isLoading } = useAuth();
   const { logoUrl } = useContractorLogo();
 
@@ -440,6 +444,45 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     );
   };
 
+  const handleSearchSubmit = useCallback(() => {
+    const query = autocompleteValue.trim();
+    if (!query) {
+      return;
+    }
+    setSearchResults([]);
+    setAutocompleteValue('');
+    setSearchLoading(true);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('search-submit', { detail: { query } })
+      );
+    }
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  }, [autocompleteValue, router]);
+
+  useEffect(() => {
+    const handleSearchLoading = (event: Event) => {
+      const customEvent = event as CustomEvent<{ loading?: boolean }>;
+      if (typeof customEvent.detail?.loading === 'boolean') {
+        setSearchLoading(customEvent.detail.loading);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('search-loading', handleSearchLoading);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('search-loading', handleSearchLoading);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== '/search') {
+      setSearchLoading(false);
+    }
+  }, [pathname]);
+
   // Track user activity for smarter polling
   const lastActivityRef = useRef(Date.now());
   const isPageVisibleRef = useRef(typeof document !== 'undefined' ? !document.hidden : true);
@@ -728,43 +771,56 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
           <Group className={classes.centerSection}>
             {isAuthenticated && !isLoading && (
-              <Autocomplete
-                className={classes.search}
-                placeholder="Search by client name, email, or estimate address"
-                value={autocompleteValue}
-                leftSection={
-                  <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
-                }
-                renderOption={renderAutocompleteOption}
-                data={autocompleteData}
-                visibleFrom="xs"
-                onChange={(value) => {
-                  setAutocompleteValue(value);
-                }}
-                onOptionSubmit={(value) => {
-                  // Handle navigation and prevent setting value in input
-                  const shouldPrevent = handleSearchSelect(value);
-                  if (shouldPrevent === false) {
-                    // Clear the value to prevent it from being set
-                    setTimeout(() => setAutocompleteValue(''), 0);
+              <div className={classes.searchWrapper}>
+                <Autocomplete
+                  className={classes.search}
+                  placeholder="Search by client name, email, or estimate address"
+                  value={autocompleteValue}
+                  leftSection={
+                    <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
                   }
-                }}
-                limit={10}
-                styles={{
-                  dropdown: {
-                    borderRadius: rem(8),
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                  },
-                  option: {
-                    padding: rem(8),
-                    borderRadius: rem(6),
-                    cursor: 'pointer',
-                    '&[data-hovered]': {
-                      backgroundColor: 'var(--mantine-color-gray-1)',
+                  renderOption={renderAutocompleteOption}
+                  data={autocompleteData}
+                  visibleFrom="xs"
+                  onChange={(value) => {
+                    setAutocompleteValue(value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSearchSubmit();
+                    }
+                  }}
+                  onOptionSubmit={(value) => {
+                    // Handle navigation and prevent setting value in input
+                    const shouldPrevent = handleSearchSelect(value);
+                    if (shouldPrevent === false) {
+                      // Clear the value to prevent it from being set
+                      setTimeout(() => setAutocompleteValue(''), 0);
+                    }
+                  }}
+                  limit={10}
+                  styles={{
+                    dropdown: {
+                      borderRadius: rem(8),
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                     },
-                  },
-                }}
-              />
+                    option: {
+                      padding: rem(8),
+                      borderRadius: rem(6),
+                      cursor: 'pointer',
+                      '&[data-hovered]': {
+                        backgroundColor: 'var(--mantine-color-gray-1)',
+                      },
+                    },
+                  }}
+                />
+                {searchLoading && (
+                  <div className={classes.searchLoadingBar} aria-hidden>
+                    <div className={classes.searchLoadingIndicator} />
+                  </div>
+                )}
+              </div>
             )}
           </Group>
 

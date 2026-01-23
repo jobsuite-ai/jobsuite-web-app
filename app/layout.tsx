@@ -15,7 +15,6 @@ import { PersistGate } from 'redux-persist/integration/react';
 
 import { Shell } from '@/components/Shell/Shell';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
-import { SearchDataProvider } from '@/contexts/SearchDataContext';
 import { persistor, store } from '@/store';
 
 // Custom fetcher that includes authentication token
@@ -92,10 +91,8 @@ export default function RootLayout({ children }: { children: any }) {
             <MantineProvider>
               <UserProvider fetcher={authenticatedUserFetcher}>
                 <DataCacheProvider>
-                  <SearchDataProvider>
-                    <Notifications />
-                    <Shell>{children}</Shell>
-                  </SearchDataProvider>
+                  <Notifications />
+                  <Shell>{children}</Shell>
                 </DataCacheProvider>
               </UserProvider>
             </MantineProvider>
