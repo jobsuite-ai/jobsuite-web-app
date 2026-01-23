@@ -23,6 +23,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import ActionsTab from '@/components/Settings/ActionsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
@@ -449,6 +450,7 @@ export default function SettingsPage() {
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
+                    <Tabs.Tab value="actions">Actions</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                 </Tabs.List>
 
@@ -597,6 +599,10 @@ export default function SettingsPage() {
 
                 <Tabs.Panel value="integrations" pt="md">
                     <IntegrationsTab />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="actions" pt="md">
+                    <ActionsTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="notifications" pt="md">

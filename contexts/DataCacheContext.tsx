@@ -1,10 +1,39 @@
 'use client';
 
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { clearCachedData, getCachedData, isCacheValid, setCachedData, type CacheKey } from '@/app/utils/dataCache';
 import { ContractorClient, Estimate, Job } from '@/components/Global/model';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  setClients,
+  setLoading as setClientsLoading,
+  setError as setClientsError,
+  selectAllClients,
+  selectClientsLoading,
+  selectClientsError,
+  updateClient as updateClientAction,
+} from '@/store/slices/clientsSlice';
+import {
+  setEstimates,
+  setLoading as setEstimatesLoading,
+  setError as setEstimatesError,
+  cleanupArchived as cleanupArchivedEstimates,
+  selectAllEstimates,
+  selectEstimatesLoading,
+  selectEstimatesError,
+  updateEstimate as updateEstimateAction,
+} from '@/store/slices/estimatesSlice';
+import {
+  setProjects,
+  setLoading as setProjectsLoading,
+  setError as setProjectsError,
+  cleanupArchived as cleanupArchivedProjects,
+  selectAllProjects,
+  selectProjectsLoading,
+  selectProjectsError,
+  updateProject as updateProjectAction,
+} from '@/store/slices/projectsSlice';
 
 interface DataCacheContextType {
   // Data
@@ -27,9 +56,9 @@ interface DataCacheContextType {
   };
 
   // Functions
-  refreshData: (key?: CacheKey, force?: boolean) => Promise<void>;
-  invalidateCache: (key?: CacheKey) => void;
-  getData: <T extends CacheKey>(
+  refreshData: (key?: 'clients' | 'estimates' | 'projects', force?: boolean) => Promise<void>;
+  invalidateCache: (key?: 'clients' | 'estimates' | 'projects') => void;
+  getData: <T extends 'clients' | 'estimates' | 'projects'>(
     key: T
   ) => T extends 'clients'
     ? ContractorClient[]
@@ -44,41 +73,39 @@ interface DataCacheContextType {
   updateClient: (updatedClient: ContractorClient) => void;
 }
 
-const DataCacheContext = createContext<DataCacheContextType | undefined>(undefined);
+// This will be provided by the provider component
+export const DataCacheContext = createContext<DataCacheContextType | undefined>(undefined);
 
 export function DataCacheProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState<ContractorClient[]>([]);
-  const [estimates, setEstimates] = useState<Estimate[]>([]);
-  const [projects, setProjects] = useState<Job[]>([]);
+  const dispatch = useAppDispatch();
 
-  const [loading, setLoading] = useState({
-    clients: false,
-    estimates: false,
-    projects: false,
-  });
+  // Get data from Redux store
+  const estimates = useAppSelector(selectAllEstimates);
+  const clients = useAppSelector(selectAllClients);
+  const projects = useAppSelector(selectAllProjects);
 
-  const [errors, setErrors] = useState({
-    clients: null as string | null,
-    estimates: null as string | null,
-    projects: null as string | null,
-  });
+  // Use refs to track current values without causing dependency issues
+  const estimatesRef = useRef(estimates);
+  const clientsRef = useRef(clients);
+  const projectsRef = useRef(projects);
+  const hasInitialLoadRef = useRef(false);
+  // Track in-flight requests to prevent duplicate fetches
+  const inFlightRequestsRef = useRef<Map<'clients' | 'estimates' | 'projects', Promise<void>>>(new Map());
 
-  // Load from cache on mount
+  // Update refs when values change
   useEffect(() => {
-    const cachedClients = getCachedData<ContractorClient>('clients');
-    const cachedEstimates = getCachedData<Estimate>('estimates');
-    const cachedProjects = getCachedData<Job>('projects');
+    estimatesRef.current = estimates;
+    clientsRef.current = clients;
+    projectsRef.current = projects;
+  }, [estimates, clients, projects]);
 
-    if (cachedClients) {
-      setClients(cachedClients);
-    }
-    if (cachedEstimates) {
-      setEstimates(cachedEstimates);
-    }
-    if (cachedProjects) {
-      setProjects(cachedProjects);
-    }
-  }, []);
+  const estimatesLoading = useAppSelector(selectEstimatesLoading);
+  const clientsLoading = useAppSelector(selectClientsLoading);
+  const projectsLoading = useAppSelector(selectProjectsLoading);
+
+  const estimatesError = useAppSelector(selectEstimatesError);
+  const clientsError = useAppSelector(selectClientsError);
+  const projectsError = useAppSelector(selectProjectsError);
 
   // Fetch data from API
   const fetchClients = useCallback(async (): Promise<ContractorClient[]> => {
@@ -126,271 +153,265 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     return Array.isArray(projectsList) ? projectsList : [];
   }, []);
 
-  // Refresh data for a specific key or all keys using stale-while-revalidate pattern
-  const refreshData = useCallback(async (key?: CacheKey, force: boolean = false) => {
-    const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+  // Refresh data for a specific key or all keys
+  const refreshData = useCallback(
+    async (key?: 'clients' | 'estimates' | 'projects') => {
+      const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
-    if (!accessToken) {
-      // Clear data if no token
-      setClients([]);
-      setEstimates([]);
-      setProjects([]);
-      return;
-    }
-
-    const keysToRefresh: CacheKey[] = key ? [key] : ['clients', 'estimates', 'projects'];
-
-    // If force is true, fetch all keys regardless of cache validity
-    let keysToFetch: CacheKey[];
-    if (force) {
-      keysToFetch = keysToRefresh;
-    } else {
-      // Check cache validity - only fetch if cache is missing or expired
-      const cacheValid: Record<CacheKey, boolean> = {
-        clients: isCacheValid('clients'),
-        estimates: isCacheValid('estimates'),
-        projects: isCacheValid('projects'),
-      };
-
-      // Filter out keys that have valid cache - don't fetch those
-      keysToFetch = keysToRefresh.filter((k) => !cacheValid[k]);
-
-      // If all keys have valid cache, skip fetching
-      if (keysToFetch.length === 0) {
+      if (!accessToken) {
+        // Clear data if no token
         return;
       }
-    }
 
-    // Set loading states only for keys that need fetching
-    keysToFetch.forEach((k) => {
-      setLoading((prev) => ({ ...prev, [k]: true }));
-      setErrors((prev) => ({ ...prev, [k]: null }));
-    });
+      const keysToFetch: Array<'clients' | 'estimates' | 'projects'> = key
+        ? [key]
+        : ['clients', 'estimates', 'projects'];
 
-    try {
-      const promises: Promise<void>[] = [];
+      // Check for in-flight requests and reuse them to prevent duplicates
+      const existingPromises: Promise<void>[] = [];
+      const newPromises: Promise<void>[] = [];
 
+      // Set loading states only for keys that need fetching AND don't have data yet
+      // This prevents flashing loading state when refreshing with existing data
+      // Use refs to check current values without adding to dependencies
       if (keysToFetch.includes('clients')) {
-        promises.push(
-          fetchClients()
-            .then((data) => {
-              setClients(data);
-              setCachedData('clients', data);
-            })
-            .catch((err) => {
-              setErrors((prev) => ({
-                ...prev,
-                clients: err instanceof Error ? err.message : 'Failed to fetch clients',
-              }));
-            })
-        );
+        const existingRequest = inFlightRequestsRef.current.get('clients');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have clients data yet
+          if (clientsRef.current.length === 0) {
+            dispatch(setClientsLoading(true));
+          }
+          dispatch(setClientsError(null));
+        }
       }
-
       if (keysToFetch.includes('estimates')) {
-        promises.push(
-          fetchEstimates()
-            .then((data) => {
-              setEstimates(data);
-              setCachedData('estimates', data);
-            })
-            .catch((err) => {
-              setErrors((prev) => ({
-                ...prev,
-                estimates: err instanceof Error ? err.message : 'Failed to fetch estimates',
-              }));
-            })
-        );
+        const existingRequest = inFlightRequestsRef.current.get('estimates');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have estimates data yet
+          if (estimatesRef.current.length === 0) {
+            dispatch(setEstimatesLoading(true));
+          }
+          dispatch(setEstimatesError(null));
+        }
       }
-
       if (keysToFetch.includes('projects')) {
-        promises.push(
-          fetchProjects()
-            .then((data) => {
-              setProjects(data);
-              setCachedData('projects', data);
-            })
-            .catch((err) => {
-              setErrors((prev) => ({
-                ...prev,
-                projects: err instanceof Error ? err.message : 'Failed to fetch projects',
-              }));
-            })
-        );
+        const existingRequest = inFlightRequestsRef.current.get('projects');
+        if (existingRequest) {
+          existingPromises.push(existingRequest);
+        } else {
+          // Only show loading if we don't have projects data yet
+          if (projectsRef.current.length === 0) {
+            dispatch(setProjectsLoading(true));
+          }
+          dispatch(setProjectsError(null));
+        }
       }
 
-      await Promise.all(promises);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error('Error refreshing data:', err);
-    } finally {
-      // Clear loading states
-      keysToFetch.forEach((k) => {
-        setLoading((prev) => ({ ...prev, [k]: false }));
-      });
-    }
-  }, [fetchClients, fetchEstimates, fetchProjects]);
+      // If all requests are already in flight, just wait for them
+      if (existingPromises.length === keysToFetch.length) {
+        await Promise.all(existingPromises);
+        return;
+      }
+
+      try {
+        // Create new fetch promises only for keys that don't have in-flight requests
+        if (keysToFetch.includes('clients') && !inFlightRequestsRef.current.has('clients')) {
+          const clientsPromise = fetchClients()
+            .then((data) => {
+              dispatch(setClients(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setClientsError(err instanceof Error ? err.message : 'Failed to fetch clients')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('clients');
+              dispatch(setClientsLoading(false));
+            });
+          inFlightRequestsRef.current.set('clients', clientsPromise);
+          newPromises.push(clientsPromise);
+        }
+
+        if (keysToFetch.includes('estimates') && !inFlightRequestsRef.current.has('estimates')) {
+          const estimatesPromise = fetchEstimates()
+            .then((data) => {
+              dispatch(setEstimates(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setEstimatesError(err instanceof Error ? err.message : 'Failed to fetch estimates')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('estimates');
+              dispatch(setEstimatesLoading(false));
+            });
+          inFlightRequestsRef.current.set('estimates', estimatesPromise);
+          newPromises.push(estimatesPromise);
+        }
+
+        if (keysToFetch.includes('projects') && !inFlightRequestsRef.current.has('projects')) {
+          const projectsPromise = fetchProjects()
+            .then((data) => {
+              dispatch(setProjects(data));
+            })
+            .catch((err) => {
+              dispatch(
+                setProjectsError(err instanceof Error ? err.message : 'Failed to fetch projects')
+              );
+            })
+            .finally(() => {
+              inFlightRequestsRef.current.delete('projects');
+              dispatch(setProjectsLoading(false));
+            });
+          inFlightRequestsRef.current.set('projects', projectsPromise);
+          newPromises.push(projectsPromise);
+        }
+
+        // Wait for both existing and new promises
+        await Promise.all([...existingPromises, ...newPromises]);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error refreshing data:', err);
+        // Clean up in-flight requests on error
+        keysToFetch.forEach((k) => {
+          inFlightRequestsRef.current.delete(k);
+        });
+        // Clear loading states
+        if (keysToFetch.includes('clients')) {
+          dispatch(setClientsLoading(false));
+        }
+        if (keysToFetch.includes('estimates')) {
+          dispatch(setEstimatesLoading(false));
+        }
+        if (keysToFetch.includes('projects')) {
+          dispatch(setProjectsLoading(false));
+        }
+      }
+    },
+    [dispatch, fetchClients, fetchEstimates, fetchProjects]
+  );
 
   // Invalidate cache (clear from localStorage and state)
-  const invalidateCache = useCallback((key?: CacheKey) => {
-    if (key) {
-      clearCachedData(key);
+  const invalidateCache = useCallback(
+    (key?: 'clients' | 'estimates' | 'projects') => {
+      // Clear from Redux state
       if (key === 'clients') {
-        setClients([]);
+        dispatch(setClients([]));
       } else if (key === 'estimates') {
-        setEstimates([]);
+        dispatch(setEstimates([]));
       } else if (key === 'projects') {
-        setProjects([]);
+        dispatch(setProjects([]));
+      } else {
+        dispatch(setClients([]));
+        dispatch(setEstimates([]));
+        dispatch(setProjects([]));
       }
-    } else {
-      clearCachedData('clients');
-      clearCachedData('estimates');
-      clearCachedData('projects');
-      setClients([]);
-      setEstimates([]);
-      setProjects([]);
-    }
-  }, []);
+    },
+    [dispatch]
+  );
 
   // Get data helper
-  const getData = useCallback(<T extends CacheKey>(key: T) => {
-    if (key === 'clients') {
-      return clients as any;
-    } if (key === 'estimates') {
-      return estimates as any;
-    } if (key === 'projects') {
-      return projects as any;
-    }
-    throw new Error(`Unknown cache key: ${key}`);
-  }, [clients, estimates, projects]);
+  const getData = useCallback(
+    <T extends 'clients' | 'estimates' | 'projects'>(key: T) => {
+      if (key === 'clients') {
+        return clients as any;
+      }
+      if (key === 'estimates') {
+        return estimates as any;
+      }
+      if (key === 'projects') {
+        return projects as any;
+      }
+      throw new Error(`Unknown cache key: ${key}`);
+    },
+    [clients, estimates, projects]
+  );
 
   // Optimistic update methods - update single items in cache immediately
-  const updateEstimate = useCallback((updatedEstimate: Estimate) => {
-    // Update estimates array
-    setEstimates((prev) => {
-      const index = prev.findIndex((e) => e.id === updatedEstimate.id);
-      const newEstimates = index >= 0
-        ? [...prev.slice(0, index), updatedEstimate, ...prev.slice(index + 1)]
-        : [...prev, updatedEstimate];
+  const updateEstimate = useCallback(
+    (updatedEstimate: Estimate) => {
+      dispatch(updateEstimateAction(updatedEstimate));
+    },
+    [dispatch]
+  );
 
-      // Update localStorage cache
-      setCachedData('estimates', newEstimates);
-      return newEstimates;
-    });
+  const updateProject = useCallback(
+    (updatedProject: Job) => {
+      dispatch(updateProjectAction(updatedProject));
+    },
+    [dispatch]
+  );
 
-    // Also update projects array if this estimate is a project
-    // (estimates and projects share the same data structure, just different views)
-    setProjects((prev) => {
-      const index = prev.findIndex((p) => p.id === updatedEstimate.id);
-      if (index >= 0) {
-        const newProjects = [
-          ...prev.slice(0, index),
-          updatedEstimate as Job,
-          ...prev.slice(index + 1),
-        ];
-        setCachedData('projects', newProjects);
-        return newProjects;
-      }
-      // If not found in projects but is a project, add it
-      if (updatedEstimate.is_project) {
-        const newProjects = [...prev, updatedEstimate as Job];
-        setCachedData('projects', newProjects);
-        return newProjects;
-      }
-      return prev;
-    });
-  }, []);
+  const updateClient = useCallback(
+    (updatedClient: ContractorClient) => {
+      dispatch(updateClientAction(updatedClient));
+    },
+    [dispatch]
+  );
 
-  const updateProject = useCallback((updatedProject: Job) => {
-    setProjects((prev) => {
-      const index = prev.findIndex((p) => p.id === updatedProject.id);
-      const newProjects = index >= 0
-        ? [...prev.slice(0, index), updatedProject, ...prev.slice(index + 1)]
-        : [...prev, updatedProject];
-
-      // Update localStorage cache
-      setCachedData('projects', newProjects);
-      return newProjects;
-    });
-
-    // Also update estimates array since projects are estimates
-    setEstimates((prev) => {
-      const index = prev.findIndex((e) => e.id === updatedProject.id);
-      if (index >= 0) {
-        const newEstimates = [
-          ...prev.slice(0, index),
-          updatedProject as Estimate,
-          ...prev.slice(index + 1),
-        ];
-        setCachedData('estimates', newEstimates);
-        return newEstimates;
-      }
-      // If not found in estimates, add it
-      const newEstimates = [...prev, updatedProject as Estimate];
-      setCachedData('estimates', newEstimates);
-      return newEstimates;
-    });
-  }, []);
-
-  const updateClient = useCallback((updatedClient: ContractorClient) => {
-    setClients((prev) => {
-      const index = prev.findIndex((c) => c.id === updatedClient.id);
-      const newClients = index >= 0
-        ? [...prev.slice(0, index), updatedClient, ...prev.slice(index + 1)]
-        : [...prev, updatedClient];
-
-      // Update localStorage cache
-      setCachedData('clients', newClients);
-      return newClients;
-    });
-  }, []);
-
-  // Initial load: show cached data immediately,
-  // then fetch fresh data in background if cache expired
+  // Initial load: check if we have persisted data, then optionally refresh
   useEffect(() => {
+    // Prevent multiple initial loads
+    if (hasInitialLoadRef.current) {
+      return;
+    }
+
     const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
     if (!accessToken) {
       return;
     }
 
-    // Check if this is a page reload (not just a navigation)
-    // Force refresh on page reload to ensure fresh data after inactivity
-    const isPageReload = typeof window !== 'undefined' &&
-      (window.performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming)?.type === 'reload';
+    // Mark as loaded to prevent duplicate fetches
+    hasInitialLoadRef.current = true;
 
-    // Use stale-while-revalidate: show cached data immediately, refresh in background
-    // Force refresh on page reload, otherwise only fetch if cache is expired or missing
-    refreshData(undefined, isPageReload);
-  }, [refreshData]);
+    // Cleanup archived estimates/projects from Redux state
+    dispatch(cleanupArchivedEstimates());
+    dispatch(cleanupArchivedProjects());
+
+    // Check if we have persisted data in Redux (from redux-persist)
+    // If we have data, we can show it immediately and refresh in background
+    // If no data, fetch immediately
+    const hasPersistedData =
+      estimatesRef.current.length > 0 ||
+      clientsRef.current.length > 0 ||
+      projectsRef.current.length > 0;
+
+    if (hasPersistedData) {
+      // We have persisted data, so refresh in background (non-blocking)
+      // This allows the UI to show immediately with cached data
+      refreshData(undefined).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Background refresh failed:', err);
+      });
+    } else {
+      // No persisted data, fetch immediately
+      refreshData(undefined);
+    }
+  }, [dispatch, refreshData]);
 
   // Listen for storage changes (e.g., after login)
   useEffect(() => {
     const handleStorageChange = () => {
       const accessToken = localStorage.getItem('access_token');
       if (accessToken) {
-        // Reload from cache first
-        const cachedClients = getCachedData<ContractorClient>('clients');
-        const cachedEstimates = getCachedData<Estimate>('estimates');
-        const cachedProjects = getCachedData<Job>('projects');
+        // Cleanup archived estimates/projects
+        dispatch(cleanupArchivedEstimates());
+        dispatch(cleanupArchivedProjects());
 
-        if (cachedClients) setClients(cachedClients);
-        if (cachedEstimates) setEstimates(cachedEstimates);
-        if (cachedProjects) setProjects(cachedProjects);
-
-        // If cache is empty or expired after login, force refresh
-        const hasNoData = (!cachedClients || cachedClients.length === 0) &&
-          (!cachedEstimates || cachedEstimates.length === 0) &&
-          (!cachedProjects || cachedProjects.length === 0);
-
-        if (hasNoData) {
-          // Force refresh all data after login
-          refreshData(undefined, true);
-        }
+        // Fetch fresh data after login
+        refreshData(undefined);
       } else {
         // Clear data if logged out
-        setClients([]);
-        setEstimates([]);
-        setProjects([]);
+        dispatch(setClients([]));
+        dispatch(setEstimates([]));
+        dispatch(setProjects([]));
       }
     };
 
@@ -401,26 +422,32 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('localStorageChange', handleStorageChange as EventListener);
     };
-  }, [refreshData]);
+  }, [dispatch, refreshData]);
+
+  const contextValue: DataCacheContextType = {
+    clients,
+    estimates,
+    projects,
+    loading: {
+      clients: clientsLoading,
+      estimates: estimatesLoading,
+      projects: projectsLoading,
+    },
+    errors: {
+      clients: clientsError,
+      estimates: estimatesError,
+      projects: projectsError,
+    },
+    refreshData,
+    invalidateCache,
+    getData,
+    updateEstimate,
+    updateProject,
+    updateClient,
+  };
 
   return (
-    <DataCacheContext.Provider
-      value={{
-        clients,
-        estimates,
-        projects,
-        loading,
-        errors,
-        refreshData,
-        invalidateCache,
-        getData,
-        updateEstimate,
-        updateProject,
-        updateClient,
-      }}
-    >
-      {children}
-    </DataCacheContext.Provider>
+    <DataCacheContext.Provider value={contextValue}>{children}</DataCacheContext.Provider>
   );
 }
 

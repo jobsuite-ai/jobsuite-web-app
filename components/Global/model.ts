@@ -223,6 +223,37 @@ export type Estimate = {
     hours_worked?: number; // Calculated from time entries
 };
 
+// Status Actions Configuration Types
+export type StatusActionType = 'SET_OWNER' | 'SEND_NOTIFICATION';
+
+export interface SetOwnerAction {
+    type: 'SET_OWNER';
+    user_id: string;
+}
+
+export interface SendNotificationAction {
+    type: 'SEND_NOTIFICATION';
+    user_ids: string[];
+}
+
+export type StatusAction = SetOwnerAction | SendNotificationAction;
+
+export interface StatusActionsConfig {
+    actions: {
+        [status: string]: StatusAction[];
+    };
+}
+
+export interface StatusActionsConfiguration {
+    id: string;
+    user_id: string;
+    contractor_id: string;
+    configuration_type: 'status_actions';
+    configuration: StatusActionsConfig;
+    created_at: string;
+    updated_at: string;
+}
+
 export type EstimateResource = {
     id: string;
     contractor_id: string;

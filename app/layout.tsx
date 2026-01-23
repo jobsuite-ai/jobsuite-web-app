@@ -3,15 +3,19 @@
 import { useEffect } from 'react';
 
 import { UserProfile, UserProvider } from '@auth0/nextjs-auth0/client';
-import '@mantine/carousel/styles.css';
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import '@mantine/core/styles.css';
+// eslint-disable-next-line import/order
 import { Notifications } from '@mantine/notifications';
+import '@mantine/carousel/styles.css';
+import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
 
 import { Shell } from '@/components/Shell/Shell';
 import { DataCacheProvider } from '@/contexts/DataCacheContext';
-import { SearchDataProvider } from '@/contexts/SearchDataContext';
+import { persistor, store } from '@/store';
 
 // Custom fetcher that includes authentication token
 const authenticatedUserFetcher = async (url: string): Promise<UserProfile | undefined> => {
@@ -82,16 +86,18 @@ export default function RootLayout({ children }: { children: any }) {
         />
       </head>
       <body>
-        <MantineProvider>
-          <UserProvider fetcher={authenticatedUserFetcher}>
-            <DataCacheProvider>
-              <SearchDataProvider>
-                <Notifications />
-                <Shell>{children}</Shell>
-              </SearchDataProvider>
-            </DataCacheProvider>
-          </UserProvider>
-        </MantineProvider>
+        <Provider store={store}>
+          <PersistGate loading={null} persistor={persistor}>
+            <MantineProvider>
+              <UserProvider fetcher={authenticatedUserFetcher}>
+                <DataCacheProvider>
+                  <Notifications />
+                  <Shell>{children}</Shell>
+                </DataCacheProvider>
+              </UserProvider>
+            </MantineProvider>
+          </PersistGate>
+        </Provider>
       </body>
     </html>
   );

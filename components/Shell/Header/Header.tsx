@@ -11,9 +11,11 @@ import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useContractorLogo } from '@/hooks/useContractorLogo';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllClients } from '@/store/slices/clientsSlice';
+import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 
 const links = [
   { link: '/', label: 'Home' },
@@ -56,6 +58,7 @@ interface Notification {
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [unacknowledgedCount, setUnacknowledgedCount] = useState<number>(0);
   const [messageCount, setMessageCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -64,7 +67,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const unacknowledgedCountRef = useRef<number>(0);
   const router = useRouter();
   const pathname = usePathname();
-  const { clients, estimates } = useSearchData();
+  const clients = useAppSelector(selectAllClients);
+  const estimates = useAppSelector(selectAllEstimates);
   const { isAuthenticated, isLoading } = useAuth();
   const { logoUrl } = useContractorLogo();
 
@@ -78,6 +82,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   // Utility function to strip HTML tags from notification messages
   const stripHtmlTags = useCallback((html: string): string => {
     // Create a temporary div element to parse HTML
+    if (typeof document === 'undefined') {
+      // Fallback for SSR: simple regex-based HTML tag removal
+      return html.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
+    }
     const tmp = document.createElement('div');
     tmp.innerHTML = html;
 
@@ -436,13 +444,98 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     );
   };
 
-  // Fetch unacknowledged notification count with adaptive polling
+  const handleSearchSubmit = useCallback(() => {
+    const query = autocompleteValue.trim();
+    if (!query) {
+      return;
+    }
+    setSearchResults([]);
+    setAutocompleteValue('');
+    setSearchLoading(true);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('search-submit', { detail: { query } })
+      );
+    }
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  }, [autocompleteValue, router]);
+
   useEffect(() => {
+    const handleSearchLoading = (event: Event) => {
+      const customEvent = event as CustomEvent<{ loading?: boolean }>;
+      if (typeof customEvent.detail?.loading === 'boolean') {
+        setSearchLoading(customEvent.detail.loading);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('search-loading', handleSearchLoading);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('search-loading', handleSearchLoading);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== '/search') {
+      setSearchLoading(false);
+    }
+  }, [pathname]);
+
+  // Track user activity for smarter polling
+  const lastActivityRef = useRef(Date.now());
+  const isPageVisibleRef = useRef(typeof document !== 'undefined' ? !document.hidden : true);
+
+  // Update activity tracking
+  useEffect(() => {
+    const updateActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    const handleVisibilityChange = () => {
+      isPageVisibleRef.current = !document.hidden;
+      if (!document.hidden) {
+        lastActivityRef.current = Date.now();
+      }
+    };
+
+    const events = ['mousedown', 'keydown', 'scroll', 'touchstart'];
+    events.forEach((event) => {
+      window.addEventListener(event, updateActivity, { passive: true });
+    });
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      events.forEach((event) => {
+        window.removeEventListener(event, updateActivity);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Check if user is active (similar to refreshMiddleware pattern)
+  const isUserActive = useCallback(() => {
+    const timeSinceLastActivity = Date.now() - lastActivityRef.current;
+    return (
+      isPageVisibleRef.current &&
+      timeSinceLastActivity < 5 * 60 * 1000 // Active if interacted within 5 minutes
+    );
+  }, []);
+
+  // Fetch unacknowledged notification count with smart polling
+  useEffect(() => {
+    // Only fetch if we have confirmed authentication (not just checking)
     if (!isAuthenticated || isLoading) {
       return undefined;
     }
 
     const fetchMessageCount = async () => {
+      // Only fetch if user is active and page is visible
+      if (!isUserActive()) {
+        return;
+      }
+
       try {
         const response = await fetch('/api/outreach-messages/count', {
           method: 'GET',
@@ -458,12 +551,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       }
     };
 
-    fetchMessageCount();
-    const messageInterval = setInterval(fetchMessageCount, 60000); // Refresh every minute
-
     const fetchUnacknowledgedCount = async () => {
-      // Don't poll if page is not visible
-      if (document.hidden) {
+      // Only fetch if user is active and page is visible
+      if (!isUserActive()) {
         return;
       }
 
@@ -486,29 +576,54 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     };
 
     // Initial fetch
+    fetchMessageCount();
     fetchUnacknowledgedCount();
 
-    // Adaptive polling:
-    // - 120 seconds (2 minutes) when no notifications
-    // - 60 seconds (1 minute) when there are notifications
-    // This reduces server load while still keeping the count reasonably up-to-date
-    const getPollInterval = () => unacknowledgedCountRef.current > 0 ? 60000 : 120000;
-
-    let timeoutId: NodeJS.Timeout;
-
-    const scheduleNextPoll = () => {
-      timeoutId = setTimeout(() => {
-        fetchUnacknowledgedCount().then(() => {
-          scheduleNextPoll();
-        });
-      }, getPollInterval());
+    // Smart polling intervals:
+    // - When user is active: 60s for messages, adaptive for notifications (60s/120s)
+    // - When user is inactive: 5 minutes for both
+    const getPollInterval = (isActive: boolean, hasNotifications: boolean) => {
+      if (!isActive) {
+        return 5 * 60 * 1000; // 5 minutes when inactive
+      }
+      // Active polling
+      if (hasNotifications) {
+        return 45 * 1000; // 45 seconds when there are notifications
+      }
+      return 2 * 60 * 1000; // 2 minutes when no notifications
     };
 
-    scheduleNextPoll();
+    let messageTimeoutId: NodeJS.Timeout;
+    let notificationTimeoutId: NodeJS.Timeout;
 
-    // Also poll when page becomes visible again
+    const scheduleMessagePoll = () => {
+      messageTimeoutId = setTimeout(() => {
+        if (isUserActive()) {
+          fetchMessageCount();
+        }
+        scheduleMessagePoll();
+      }, getPollInterval(isUserActive(), false));
+    };
+
+    const scheduleNotificationPoll = () => {
+      notificationTimeoutId = setTimeout(() => {
+        if (isUserActive()) {
+          fetchUnacknowledgedCount().then(() => {
+            scheduleNotificationPoll();
+          });
+        } else {
+          scheduleNotificationPoll();
+        }
+      }, getPollInterval(isUserActive(), unacknowledgedCountRef.current > 0));
+    };
+
+    scheduleMessagePoll();
+    scheduleNotificationPoll();
+
+    // Poll when page becomes visible again
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && isUserActive()) {
+        fetchMessageCount();
         fetchUnacknowledgedCount();
       }
     };
@@ -516,17 +631,19 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
     // Listen for notification acknowledgment events to update count immediately
     const handleNotificationAcknowledged = () => {
-      fetchUnacknowledgedCount();
+      if (isUserActive()) {
+        fetchUnacknowledgedCount();
+      }
     };
     window.addEventListener('notificationAcknowledged', handleNotificationAcknowledged);
 
     return () => {
-      clearTimeout(timeoutId);
+      clearTimeout(messageTimeoutId);
+      clearTimeout(notificationTimeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('notificationAcknowledged', handleNotificationAcknowledged);
-      clearInterval(messageInterval);
     };
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, isUserActive]);
 
   // Fetch job title for a notification
   const fetchJobTitle = useCallback(async (estimateId: string) => {
@@ -622,11 +739,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     });
   }, []);
 
-  // Don't render header if not authenticated or still loading
-  if (isLoading || !isAuthenticated) {
-    return null;
-  }
-
+  // Always render header structure - auth-dependent features will handle their own loading states
   return (
     <>
       <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
@@ -657,94 +770,111 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           </Group>
 
           <Group className={classes.centerSection}>
-            <Autocomplete
-              className={classes.search}
-              placeholder="Search by client name, email, or estimate address"
-              value={autocompleteValue}
-              leftSection={
-                <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
-              }
-              renderOption={renderAutocompleteOption}
-              data={autocompleteData}
-              visibleFrom="xs"
-              onChange={(value) => {
-                setAutocompleteValue(value);
-              }}
-              onOptionSubmit={(value) => {
-                // Handle navigation and prevent setting value in input
-                const shouldPrevent = handleSearchSelect(value);
-                if (shouldPrevent === false) {
-                  // Clear the value to prevent it from being set
-                  setTimeout(() => setAutocompleteValue(''), 0);
-                }
-              }}
-              limit={10}
-              styles={{
-                dropdown: {
-                  borderRadius: rem(8),
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                },
-                option: {
-                  padding: rem(8),
-                  borderRadius: rem(6),
-                  cursor: 'pointer',
-                  '&[data-hovered]': {
-                    backgroundColor: 'var(--mantine-color-gray-1)',
-                  },
-                },
-              }}
-            />
+            {isAuthenticated && !isLoading && (
+              <div className={classes.searchWrapper}>
+                <Autocomplete
+                  className={classes.search}
+                  placeholder="Search by client name, email, or estimate address"
+                  value={autocompleteValue}
+                  leftSection={
+                    <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
+                  }
+                  renderOption={renderAutocompleteOption}
+                  data={autocompleteData}
+                  visibleFrom="xs"
+                  onChange={(value) => {
+                    setAutocompleteValue(value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      handleSearchSubmit();
+                    }
+                  }}
+                  onOptionSubmit={(value) => {
+                    // Handle navigation and prevent setting value in input
+                    const shouldPrevent = handleSearchSelect(value);
+                    if (shouldPrevent === false) {
+                      // Clear the value to prevent it from being set
+                      setTimeout(() => setAutocompleteValue(''), 0);
+                    }
+                  }}
+                  limit={10}
+                  styles={{
+                    dropdown: {
+                      borderRadius: rem(8),
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                    },
+                    option: {
+                      padding: rem(8),
+                      borderRadius: rem(6),
+                      cursor: 'pointer',
+                      '&[data-hovered]': {
+                        backgroundColor: 'var(--mantine-color-gray-1)',
+                      },
+                    },
+                  }}
+                />
+                {searchLoading && (
+                  <div className={classes.searchLoadingBar} aria-hidden>
+                    <div className={classes.searchLoadingIndicator} />
+                  </div>
+                )}
+              </div>
+            )}
           </Group>
 
           <Group gap="sm">
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Settings"
-              href="/settings"
-              onClick={(event) => handleNavLinkClick(event, '/settings')}
-            >
-              <IconSettings color="black" size={22} radius="xl" />
-            </Link>
-            <Link
-              style={{ marginTop: rem(5) }}
-              key="Profile"
-              href="/profile"
-              onClick={(event) => handleNavLinkClick(event, '/profile')}
-            >
-              <IconUser color="black" size={22} radius="xl" />
-            </Link>
-            <Menu
-              shadow="md"
-              width={400}
-              position="bottom-end"
-              onOpen={fetchNotifications}
-            >
-              <Menu.Target>
-                <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
-                  <IconNotification color="black" size={22} radius="xl" />
-                  {unacknowledgedCount > 0 && (
-                    <Badge
-                      size="xs"
-                      color="red"
-                      variant="filled"
-                      style={{
-                        position: 'absolute',
-                        top: rem(-4),
-                        right: rem(-4),
-                        minWidth: rem(18),
-                        height: rem(18),
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: rem(10),
-                      }}
-                    >
-                      {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
-                    </Badge>
-                  )}
-                </div>
-              </Menu.Target>
+            {isAuthenticated && !isLoading && (
+              <>
+                <Link
+                  style={{ marginTop: rem(5) }}
+                  key="Settings"
+                  href="/settings"
+                  onClick={(event) => handleNavLinkClick(event, '/settings')}
+                >
+                  <IconSettings color="black" size={22} radius="xl" />
+                </Link>
+                <Link
+                  style={{ marginTop: rem(5) }}
+                  key="Profile"
+                  href="/profile"
+                  onClick={(event) => handleNavLinkClick(event, '/profile')}
+                >
+                  <IconUser color="black" size={22} radius="xl" />
+                </Link>
+                <Menu
+                  shadow="md"
+                  width={400}
+                  position="bottom-end"
+                  onOpen={fetchNotifications}
+                >
+                  <Menu.Target>
+                    <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
+                      <IconNotification color="black" size={22} radius="xl" />
+                      {unacknowledgedCount > 0 && (
+                        <Badge
+                          size="xs"
+                          color="red"
+                          variant="filled"
+                          style={{
+                            position: 'absolute',
+                            top: rem(-4),
+                            right: rem(-4),
+                            minWidth: rem(18),
+                            height: rem(18),
+                            padding: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: rem(10),
+                          }}
+                        >
+                          {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
+                        </Badge>
+                      )}
+                    </div>
+                  </Menu.Target>
               <Menu.Dropdown>
                 <Menu.Label>
                   <Group justify="space-between">
@@ -818,7 +948,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                   <Text size="sm">View All Notifications</Text>
                 </Menu.Item>
               </Menu.Dropdown>
-            </Menu>
+                </Menu>
+              </>
+            )}
           </Group>
         </div>
       </header>

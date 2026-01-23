@@ -30,8 +30,9 @@ import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 
 interface Notification {
   id: string;
@@ -154,7 +155,7 @@ function stripHtmlTags(html: string): string {
 export default function Homepage() {
   const router = useRouter();
   const { user } = useAuth({ fetchUser: true });
-  const { estimates } = useSearchData();
+  const estimates = useAppSelector(selectAllEstimates);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<HomepageData | null>(null);

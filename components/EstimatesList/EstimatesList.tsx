@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useState, useRef } from 'react';
 
 import {
     ActionIcon,
@@ -35,6 +35,8 @@ import UniversalError from '../Global/UniversalError';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useAppSelector } from '@/store/hooks';
+import { selectEstimatesLastFetched } from '@/store/slices/estimatesSlice';
 
 // Define column status groups and their order
 const PROPOSAL_PIPELINE_STATUSES = [
@@ -60,6 +62,7 @@ const ALL_STATUSES = Object.values(EstimateStatus);
 export default function EstimatesList() {
     const {
         estimates: cachedEstimates,
+        clients,
         loading: cacheLoading,
         refreshData,
         invalidateCache,
@@ -71,14 +74,20 @@ export default function EstimatesList() {
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'main' | 'list'>('main');
     const [refreshing, setRefreshing] = useState(false);
+    const hasAttemptedAutoRefreshRef = useRef(false);
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [clientNameFilter, setClientNameFilter] = useState('');
+    const lastFetched = useAppSelector(selectEstimatesLastFetched);
 
     const router = useRouter();
+    const clientNameById = useMemo(
+        () => new Map(clients.map((client) => [client.id, client.name])),
+        [clients]
+    );
 
     // Update estimates when cache data changes
     useEffect(() => {
@@ -91,24 +100,40 @@ export default function EstimatesList() {
     }, [cachedEstimates, cacheLoading.estimates]);
 
     // Auto-refresh if data is empty after initial load (e.g., after login or cache expired)
+    // Only runs once per mount to prevent infinite loops
     useEffect(() => {
         // Only auto-refresh if:
         // 1. Not currently loading
         // 2. Data is empty
         // 3. We have an access token (user is logged in)
-        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-        if (!cacheLoading.estimates && estimates.length === 0 && accessToken) {
+        // 4. We haven't already attempted an auto-refresh
+        const accessToken = typeof window !== 'undefined'
+            ? localStorage.getItem('access_token')
+            : null;
+        const shouldRefresh =
+            !cacheLoading.estimates &&
+            estimates.length === 0 &&
+            accessToken &&
+            !hasAttemptedAutoRefreshRef.current &&
+            !lastFetched;
+        if (shouldRefresh) {
             // Small delay to avoid race conditions with initial cache load
             const timeoutId = setTimeout(() => {
-                if (estimates.length === 0 && !cacheLoading.estimates) {
-                    invalidateCache('estimates');
+                const stillEmpty =
+                    estimates.length === 0 &&
+                    !cacheLoading.estimates &&
+                    !hasAttemptedAutoRefreshRef.current;
+                if (stillEmpty) {
+                    hasAttemptedAutoRefreshRef.current = true;
+                    // Don't call invalidateCache - it clears state and causes loops
+                    // Just refresh the data
                     refreshData('estimates', true);
                 }
-            }, 100);
+            }, 1000); // Increased delay to let DataCacheContext finish initial load
             return () => clearTimeout(timeoutId);
         }
         return undefined;
-    }, [estimates.length, cacheLoading.estimates, invalidateCache, refreshData]);
+    }, [estimates.length, cacheLoading.estimates, refreshData]);
 
     useEffect(() => {
         // Sort jobs into columns based on status
@@ -159,7 +184,9 @@ export default function EstimatesList() {
             const query = searchQuery.toLowerCase().trim();
             filtered = filtered.filter(estimate => {
                 const titleMatch = estimate.title?.toLowerCase().includes(query);
-                const clientMatch = estimate.client_name?.toLowerCase().includes(query);
+                const resolvedClientName =
+                    estimate.client_name || clientNameById.get(estimate.client_id) || '';
+                const clientMatch = resolvedClientName.toLowerCase().includes(query);
                 const addressMatch =
                     estimate.address_street?.toLowerCase().includes(query) ||
                     estimate.address_city?.toLowerCase().includes(query) ||
@@ -196,16 +223,18 @@ export default function EstimatesList() {
         // Client name filter
         if (clientNameFilter.trim()) {
             const clientQuery = clientNameFilter.toLowerCase().trim();
-            filtered = filtered.filter(estimate =>
-                estimate.client_name?.toLowerCase().includes(clientQuery)
-            );
+            filtered = filtered.filter(estimate => {
+                const resolvedClientName =
+                    estimate.client_name || clientNameById.get(estimate.client_id) || '';
+                return resolvedClientName.toLowerCase().includes(clientQuery);
+            });
         }
 
         // Sort by updated_at (newest first)
         return filtered.sort((a, b) =>
             new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         );
-    }, [estimates, searchQuery, selectedStatuses, dateRange, clientNameFilter]);
+    }, [estimates, searchQuery, selectedStatuses, dateRange, clientNameFilter, clientNameById]);
 
     const clearFilters = () => {
         setSearchQuery('');
@@ -254,7 +283,10 @@ export default function EstimatesList() {
     };
 
     // Helper function to render a job card
-    const renderEstimateCard = (estimate: Estimate) => (
+    const renderEstimateCard = (estimate: Estimate) => {
+        const resolvedClientName =
+            estimate.client_name || clientNameById.get(estimate.client_id);
+        return (
         <Card
           key={estimate.id}
           shadow="sm"
@@ -283,7 +315,7 @@ export default function EstimatesList() {
                 <Text fw={600} size="md" mt="xs" mb="xs">{estimate.title}</Text>
             )}
             <Group justify="space-between" mt="md" mb="xs">
-                <Text fw={500}>{estimate.client_name || 'Unknown Client'}</Text>
+                <Text fw={500}>{resolvedClientName || 'Unknown Client'}</Text>
                 <Badge style={{ color: '#ffffff' }} color={getEstimateBadgeColor(estimate.status)}>
                     {getFormattedEstimateStatus(estimate.status)}
                 </Badge>
@@ -305,7 +337,8 @@ export default function EstimatesList() {
                 )}
             </Flex>
         </Card>
-    );
+        );
+    };
 
     // Helper function to render a column
     const renderColumn = (columnEstimates: Estimate[], title: string) => (
@@ -531,7 +564,9 @@ export default function EstimatesList() {
                                             </Table.Td>
                                             <Table.Td>
                                                 <Text lineClamp={1}>
-                                                    {estimate.client_name || 'Unknown Client'}
+                                                    {estimate.client_name ||
+                                                        clientNameById.get(estimate.client_id) ||
+                                                        'Unknown Client'}
                                                 </Text>
                                             </Table.Td>
                                             <Table.Td>
