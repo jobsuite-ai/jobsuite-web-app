@@ -11,7 +11,6 @@ import {
     Select,
     Loader,
     Alert,
-    Accordion,
     Badge,
     ActionIcon,
     MultiSelect,
@@ -25,8 +24,6 @@ import {
     StatusAction,
     StatusActionsConfig,
     StatusActionsConfiguration,
-    SetOwnerAction,
-    SendNotificationAction,
 } from '@/components/Global/model';
 import { useUsers } from '@/hooks/useUsers';
 
@@ -48,7 +45,12 @@ export default function ActionsTab() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { users, loading: usersLoading } = useUsers();
-    const [hasChanges, setHasChanges] = useState(false);
+    const [newActionStatus, setNewActionStatus] = useState<string>('');
+    const [newActionType, setNewActionType] = useState<'SET_OWNER' | 'SEND_NOTIFICATION'>(
+        'SET_OWNER'
+    );
+    const [newActionUserId, setNewActionUserId] = useState<string>('');
+    const [newActionUserIds, setNewActionUserIds] = useState<string[]>([]);
 
     useEffect(() => {
         loadConfiguration();
@@ -105,14 +107,15 @@ export default function ActionsTab() {
         }
     };
 
-    const handleSave = async () => {
+    const handleSave = async (overrideConfig?: StatusActionsConfig) => {
         try {
             setSaving(true);
             setError(null);
 
+            const configToSave = overrideConfig ?? config;
             const configData = {
                 configuration_type: 'status_actions',
-                configuration: config,
+                configuration: configToSave,
             };
 
             let response;
@@ -139,7 +142,6 @@ export default function ActionsTab() {
 
             const savedConfig: StatusActionsConfiguration = await response.json();
             setConfigId(savedConfig.id);
-            setHasChanges(false);
 
             notifications.show({
                 title: 'Success',
@@ -169,93 +171,49 @@ export default function ActionsTab() {
         }
     };
 
-    const addAction = (status: string) => {
-        setConfig((prev) => {
-            const newActions = { ...prev.actions };
-            if (!newActions[status]) {
-                newActions[status] = [];
-            }
-            // Add a default SET_OWNER action
-            newActions[status] = [
-                ...newActions[status],
-                { type: 'SET_OWNER', user_id: '' },
-            ];
-            setHasChanges(true);
-            return { actions: newActions };
-        });
+    const applyConfigAndSave = (nextConfig: StatusActionsConfig) => {
+        setConfig(nextConfig);
+        handleSave(nextConfig);
     };
 
-    const removeAction = (status: string, index: number) => {
-        setConfig((prev) => {
-            const newActions = { ...prev.actions };
-            if (newActions[status]) {
-                newActions[status] = newActions[status].filter(
-                    (_, i) => i !== index
-                );
-                if (newActions[status].length === 0) {
-                    delete newActions[status];
-                }
-            }
-            setHasChanges(true);
-            return { actions: newActions };
-        });
-    };
-
-    const updateAction = (
+    const buildConfigWithAddedAction = (
         status: string,
-        index: number,
-        updates: Partial<StatusAction>
-    ) => {
-        setConfig((prev) => {
-            const newActions = { ...prev.actions };
-            if (newActions[status] && newActions[status][index]) {
-                newActions[status] = newActions[status].map((action, i) => {
-                    if (i !== index) return action;
-
-                    // Reconstruct action based on type to maintain discriminated union
-                    if (updates.type === 'SET_OWNER') {
-                        const user_id =
-                            (updates as SetOwnerAction).user_id ??
-                            (action.type === 'SET_OWNER' ? action.user_id : '');
-                        return {
-                            type: 'SET_OWNER',
-                            user_id,
-                        } as SetOwnerAction;
-                    }
-                    if (updates.type === 'SEND_NOTIFICATION') {
-                        const user_ids =
-                            (updates as SendNotificationAction).user_ids ??
-                            (action.type === 'SEND_NOTIFICATION'
-                                ? action.user_ids
-                                : []);
-                        return {
-                            type: 'SEND_NOTIFICATION',
-                            user_ids,
-                        } as SendNotificationAction;
-                    }
-                    // Update properties without changing type
-                    if (action.type === 'SET_OWNER') {
-                        return {
-                            ...action,
-                            user_id:
-                                (updates as Partial<SetOwnerAction>).user_id ??
-                                action.user_id,
-                        };
-                    }
-                    return {
-                        ...action,
-                        user_ids:
-                            (updates as Partial<SendNotificationAction>)
-                                .user_ids ?? action.user_ids,
-                    };
-                });
-            }
-            setHasChanges(true);
-            return { actions: newActions };
-        });
+        action: StatusAction
+    ): StatusActionsConfig => {
+        const newActions = { ...config.actions };
+        if (!newActions[status]) {
+            newActions[status] = [];
+        }
+        newActions[status] = [...newActions[status], action];
+        return { actions: newActions };
     };
 
-    const getStatusActions = (status: string): StatusAction[] => config.actions[status] || [];
+    const buildConfigWithRemovedAction = (
+        status: string,
+        index: number
+    ): StatusActionsConfig => {
+        const newActions = { ...config.actions };
+        if (newActions[status]) {
+            newActions[status] = newActions[status].filter((_, i) => i !== index);
+            if (newActions[status].length === 0) {
+                delete newActions[status];
+            }
+        }
+        return { actions: newActions };
+    };
+
+    const userLabelById = (userId: string) => {
+        const user = users.find((u) => u.id === userId);
+        return user ? user.full_name || user.email : 'Unknown user';
+    };
+
+    const statusLabelByValue = (value: string) =>
+        ESTIMATE_STATUSES.find((status) => status.value === value)?.label || value;
+
+    const allActions = Object.entries(config.actions).flatMap(
+        ([status, actions]) =>
+            actions.map((action, index) => ({ status, action, index }))
+    );
 
     if (loading) {
         return (
@@ -286,126 +244,170 @@ export default function ActionsTab() {
                     </Alert>
                 )}
 
-                <Accordion>
-                    {ESTIMATE_STATUSES.map((statusOption) => {
-                        const status = statusOption.value;
-                        const actions = getStatusActions(status);
-
-                        return (
-                            <Accordion.Item key={status} value={status}>
-                                <Accordion.Control>
-                                    <Group justify="space-between" style={{ width: '100%' }}>
-                                        <Text fw={500}>{statusOption.label}</Text>
-                                        {actions.length > 0 && (
+                <Stack gap="sm">
+                    {allActions.length === 0 ? (
+                        <Text c="dimmed">No actions configured yet.</Text>
+                    ) : (
+                        allActions.map(({ status, action, index }) => (
+                            <Card
+                              key={`${status}-${index}`}
+                              padding="md"
+                              withBorder
+                              style={{ backgroundColor: '#2a3a54' }}
+                              radius="md"
+                            >
+                                <Group justify="space-between" align="flex-start">
+                                    <Stack gap={4} style={{ flex: 1 }}>
+                                        <Group gap="xs">
+                                            <Text fw={600} c="gray.0">
+                                                {ACTION_TYPES.find(
+                                                    (type) => type.value === action.type
+                                                )?.label || action.type.replace(/_/g, ' ')}
+                                            </Text>
                                             <Badge color="blue" size="sm">
-                                                {actions.length} action{actions.length !== 1 ? 's' : ''}
+                                                {statusLabelByValue(status)}
                                             </Badge>
+                                        </Group>
+                                        {action.type === 'SET_OWNER' ? (
+                                            <Text c="dimmed" size="sm">
+                                                Set owner to {userLabelById(action.user_id)}
+                                            </Text>
+                                        ) : (
+                                            <Text c="dimmed" size="sm">
+                                                Notify {action.user_ids.map(userLabelById).join(', ')}
+                                            </Text>
                                         )}
-                                    </Group>
-                                </Accordion.Control>
-                                <Accordion.Panel>
-                                    <Stack gap="md" mt="md">
-                                        {actions.map((action, index) => (
-                                            <Card
-                                              key={index}
-                                              padding="md"
-                                              withBorder
-                                              style={{ backgroundColor: '#2a3a54' }}
-                                            >
-                                                <Group justify="space-between" align="flex-start">
-                                                    <Stack gap="sm" style={{ flex: 1 }}>
-                                                        <Select
-                                                          label="Action Type"
-                                                          c="gray.0"
-                                                          data={ACTION_TYPES}
-                                                          value={action.type}
-                                                          onChange={(value) => {
-                                                                if (value === 'SET_OWNER') {
-                                                                    updateAction(status, index, {
-                                                                        type: 'SET_OWNER',
-                                                                        user_id: '',
-                                                                    });
-                                                                } else if (value === 'SEND_NOTIFICATION') {
-                                                                    updateAction(status, index, {
-                                                                        type: 'SEND_NOTIFICATION',
-                                                                        user_ids: [],
-                                                                    });
-                                                                }
-                                                            }}
-                                                        />
-
-                                                        {action.type === 'SET_OWNER' && (
-                                                            <Select
-                                                              label="Set Owner To"
-                                                              c="gray.0"
-                                                              placeholder="Select user"
-                                                              data={users.map((u) => ({
-                                                                    value: u.id,
-                                                                    label: u.full_name || u.email,
-                                                                }))}
-                                                              value={action.user_id || ''}
-                                                              onChange={(value) =>
-                                                                    updateAction(status, index, {
-                                                                        user_id: value || '',
-                                                                    })
-                                                                }
-                                                              disabled={usersLoading}
-                                                            />
-                                                        )}
-
-                                                        {action.type === 'SEND_NOTIFICATION' && (
-                                                            <MultiSelect
-                                                              label="Notify Users"
-                                                              placeholder="Select users"
-                                                              data={users.map((u) => ({
-                                                                    value: u.id,
-                                                                    label: u.full_name || u.email,
-                                                                }))}
-                                                              value={action.user_ids || []}
-                                                              onChange={(value) =>
-                                                                    updateAction(status, index, {
-                                                                        user_ids: value,
-                                                                    })
-                                                                }
-                                                              disabled={usersLoading}
-                                                            />
-                                                        )}
-                                                    </Stack>
-                                                    <ActionIcon
-                                                      color="red"
-                                                      variant="subtle"
-                                                      onClick={() => removeAction(status, index)}
-                                                      mt="md"
-                                                    >
-                                                        <IconTrash size={16} />
-                                                    </ActionIcon>
-                                                </Group>
-                                            </Card>
-                                        ))}
-
-                                        <Button
-                                          leftSection={<IconPlus size={16} />}
-                                          variant="light"
-                                          onClick={() => addAction(status)}
-                                        >
-                                            Add Action
-                                        </Button>
                                     </Stack>
-                                </Accordion.Panel>
-                            </Accordion.Item>
-                        );
-                    })}
-                </Accordion>
+                                    <ActionIcon
+                                      color="red"
+                                      variant="subtle"
+                                      onClick={() => {
+                                          const nextConfig = buildConfigWithRemovedAction(
+                                              status,
+                                              index
+                                          );
+                                          applyConfigAndSave(nextConfig);
+                                      }}
+                                      mt="xs"
+                                    >
+                                        <IconTrash size={16} />
+                                    </ActionIcon>
+                                </Group>
+                            </Card>
+                        ))
+                    )}
+                </Stack>
 
-                <Group justify="flex-end" mt="md">
-                    <Button
-                      onClick={handleSave}
-                      disabled={!hasChanges || saving}
-                      loading={saving}
-                    >
-                        Save Changes
-                    </Button>
-                </Group>
+                <Card padding="md" withBorder style={{ backgroundColor: '#2a3a54' }} radius="md">
+                    <Stack gap="sm">
+                        <Text fw={600} c="gray.0">Create New Action</Text>
+                        <Group grow align="flex-start">
+                            <Select
+                              label="Status"
+                              c="gray.0"
+                              placeholder="Select status"
+                              data={ESTIMATE_STATUSES}
+                              value={newActionStatus}
+                              onChange={(value) => setNewActionStatus(value || '')}
+                            />
+                            <Select
+                              label="Action Type"
+                              c="gray.0"
+                              data={ACTION_TYPES}
+                              value={newActionType}
+                              onChange={(value) => {
+                                    if (value === 'SET_OWNER') {
+                                        setNewActionType('SET_OWNER');
+                                        setNewActionUserIds([]);
+                                    } else if (value === 'SEND_NOTIFICATION') {
+                                        setNewActionType('SEND_NOTIFICATION');
+                                        setNewActionUserId('');
+                                    }
+                                }}
+                            />
+                            {newActionType === 'SET_OWNER' ? (
+                                <Select
+                                  label="User"
+                                  c="gray.0"
+                                  placeholder="Select user"
+                                  data={users.map((u) => ({
+                                        value: u.id,
+                                        label: u.full_name || u.email,
+                                    }))}
+                                  value={newActionUserId}
+                                  onChange={(value) => setNewActionUserId(value || '')}
+                                  disabled={usersLoading}
+                                />
+                            ) : (
+                                <MultiSelect
+                                  label="Users"
+                                  placeholder="Select users"
+                                  data={users.map((u) => ({
+                                        value: u.id,
+                                        label: u.full_name || u.email,
+                                    }))}
+                                  value={newActionUserIds}
+                                  onChange={setNewActionUserIds}
+                                  disabled={usersLoading}
+                                />
+                            )}
+                        </Group>
+                        <Group justify="flex-end">
+                            <Button
+                              leftSection={<IconPlus size={16} />}
+                              onClick={() => {
+                                    if (!newActionStatus) {
+                                        setError('Please select a status.');
+                                        return;
+                                    }
+                                    if (newActionType === 'SET_OWNER') {
+                                        if (!newActionUserId) {
+                                            setError('Please select a user.');
+                                            return;
+                                        }
+                                        const nextConfig = buildConfigWithAddedAction(
+                                            newActionStatus,
+                                            {
+                                                type: 'SET_OWNER',
+                                                user_id: newActionUserId,
+                                            }
+                                        );
+                                        applyConfigAndSave(nextConfig);
+                                    } else {
+                                        if (newActionUserIds.length === 0) {
+                                            setError('Please select at least one user.');
+                                            return;
+                                        }
+                                        const nextConfig = buildConfigWithAddedAction(
+                                            newActionStatus,
+                                            {
+                                                type: 'SEND_NOTIFICATION',
+                                                user_ids: newActionUserIds,
+                                            }
+                                        );
+                                        applyConfigAndSave(nextConfig);
+                                    }
+                                    setError(null);
+                                    setNewActionStatus('');
+                                    setNewActionType('SET_OWNER');
+                                    setNewActionUserId('');
+                                    setNewActionUserIds([]);
+                                }}
+                            >
+                                Create Action
+                            </Button>
+                        </Group>
+                    </Stack>
+                </Card>
+
+                {saving && (
+                    <Group justify="flex-end" mt="md">
+                        <Loader size="sm" />
+                        <Text size="sm" c="dimmed">
+                            Saving changes...
+                        </Text>
+                    </Group>
+                )}
             </Stack>
         </Card>
     );
