@@ -115,10 +115,11 @@
         var(--mantine-color-blue-5),
         transparent
     );
-    animation: searchLoading 0.8s linear infinite;
+    animation: search-loading 0.8s linear infinite;
 }
 
-@keyframes searchLoading {
+
+@keyframes search-loading {
     0% {
         transform: translateX(-100%);
     }
