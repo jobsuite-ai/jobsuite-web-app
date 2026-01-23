@@ -62,6 +62,7 @@ const ALL_STATUSES = Object.values(EstimateStatus);
 export default function EstimatesList() {
     const {
         estimates: cachedEstimates,
+        clients,
         loading: cacheLoading,
         refreshData,
         invalidateCache,
@@ -83,6 +84,10 @@ export default function EstimatesList() {
     const lastFetched = useAppSelector(selectEstimatesLastFetched);
 
     const router = useRouter();
+    const clientNameById = useMemo(
+        () => new Map(clients.map((client) => [client.id, client.name])),
+        [clients]
+    );
 
     // Update estimates when cache data changes
     useEffect(() => {
@@ -179,7 +184,9 @@ export default function EstimatesList() {
             const query = searchQuery.toLowerCase().trim();
             filtered = filtered.filter(estimate => {
                 const titleMatch = estimate.title?.toLowerCase().includes(query);
-                const clientMatch = estimate.client_name?.toLowerCase().includes(query);
+                const resolvedClientName =
+                    estimate.client_name || clientNameById.get(estimate.client_id) || '';
+                const clientMatch = resolvedClientName.toLowerCase().includes(query);
                 const addressMatch =
                     estimate.address_street?.toLowerCase().includes(query) ||
                     estimate.address_city?.toLowerCase().includes(query) ||
@@ -216,16 +223,18 @@ export default function EstimatesList() {
         // Client name filter
         if (clientNameFilter.trim()) {
             const clientQuery = clientNameFilter.toLowerCase().trim();
-            filtered = filtered.filter(estimate =>
-                estimate.client_name?.toLowerCase().includes(clientQuery)
-            );
+            filtered = filtered.filter(estimate => {
+                const resolvedClientName =
+                    estimate.client_name || clientNameById.get(estimate.client_id) || '';
+                return resolvedClientName.toLowerCase().includes(clientQuery);
+            });
         }
 
         // Sort by updated_at (newest first)
         return filtered.sort((a, b) =>
             new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
         );
-    }, [estimates, searchQuery, selectedStatuses, dateRange, clientNameFilter]);
+    }, [estimates, searchQuery, selectedStatuses, dateRange, clientNameFilter, clientNameById]);
 
     const clearFilters = () => {
         setSearchQuery('');
@@ -274,7 +283,10 @@ export default function EstimatesList() {
     };
 
     // Helper function to render a job card
-    const renderEstimateCard = (estimate: Estimate) => (
+    const renderEstimateCard = (estimate: Estimate) => {
+        const resolvedClientName =
+            estimate.client_name || clientNameById.get(estimate.client_id);
+        return (
         <Card
           key={estimate.id}
           shadow="sm"
@@ -303,7 +315,7 @@ export default function EstimatesList() {
                 <Text fw={600} size="md" mt="xs" mb="xs">{estimate.title}</Text>
             )}
             <Group justify="space-between" mt="md" mb="xs">
-                <Text fw={500}>{estimate.client_name || 'Unknown Client'}</Text>
+                <Text fw={500}>{resolvedClientName || 'Unknown Client'}</Text>
                 <Badge style={{ color: '#ffffff' }} color={getEstimateBadgeColor(estimate.status)}>
                     {getFormattedEstimateStatus(estimate.status)}
                 </Badge>
@@ -325,7 +337,8 @@ export default function EstimatesList() {
                 )}
             </Flex>
         </Card>
-    );
+        );
+    };
 
     // Helper function to render a column
     const renderColumn = (columnEstimates: Estimate[], title: string) => (
@@ -551,7 +564,9 @@ export default function EstimatesList() {
                                             </Table.Td>
                                             <Table.Td>
                                                 <Text lineClamp={1}>
-                                                    {estimate.client_name || 'Unknown Client'}
+                                                    {estimate.client_name ||
+                                                        clientNameById.get(estimate.client_id) ||
+                                                        'Unknown Client'}
                                                 </Text>
                                             </Table.Td>
                                             <Table.Td>

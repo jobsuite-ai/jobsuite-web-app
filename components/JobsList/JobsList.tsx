@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     DndContext,
@@ -89,9 +89,10 @@ function getTotalHours(estimate: Estimate): number {
 interface SortableJobCardProps {
     project: Estimate;
     onClick: (event: React.MouseEvent) => void;
+    resolveClientName: (project: Estimate) => string | undefined;
 }
 
-function SortableJobCard({ project, onClick }: SortableJobCardProps) {
+function SortableJobCard({ project, onClick, resolveClientName }: SortableJobCardProps) {
     const {
         attributes,
         listeners,
@@ -100,6 +101,8 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
         transition,
         isDragging,
     } = useSortable({ id: project.id });
+
+    const resolvedClientName = resolveClientName(project);
 
     const style = {
         transform: CSS.Transform.toString(transform),
@@ -128,7 +131,7 @@ function SortableJobCard({ project, onClick }: SortableJobCardProps) {
         >
             <Group justify="space-between" mb="xs">
                 <Text fw={500} size="sm" lineClamp={1}>
-                    {project.title || project.client_name || 'Untitled Project'}
+                    {project.title || resolvedClientName || 'Untitled Project'}
                 </Text>
                 <Badge
                   className={classes.badge}
@@ -176,6 +179,7 @@ interface KanbanColumnProps {
     column: ColumnConfig;
     jobs: Job[];
     onJobClick: (job: Job, event?: React.MouseEvent) => void;
+    resolveClientName: (project: Estimate) => string | undefined;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
     columnRef?: React.RefObject<HTMLDivElement>;
@@ -186,6 +190,7 @@ function KanbanColumn({
     column,
     jobs,
     onJobClick,
+    resolveClientName,
     isCollapsed,
     onToggleCollapse,
     columnRef,
@@ -289,6 +294,7 @@ function KanbanColumn({
                                 <SortableJobCard
                                   key={job.id}
                                   project={job}
+                                  resolveClientName={resolveClientName}
                                   onClick={(event) => onJobClick(job, event)}
                                 />
                             ))
@@ -338,6 +344,7 @@ function saveJobOrder(orderMap: JobOrderMap): void {
 
 export default function JobsList() {
     const {
+        clients,
         projects,
         loading: cacheLoading,
         refreshData,
@@ -361,6 +368,14 @@ export default function JobsList() {
     const hasEverHadDataRef = useRef(projects.length > 0);
     const router = useRouter();
     const lastFetched = useAppSelector(selectProjectsLastFetched);
+    const clientNameById = useMemo(
+        () => new Map(clients.map((client) => [client.id, client.name])),
+        [clients]
+    );
+    const resolveClientName = useCallback(
+        (project: Estimate) => project.client_name || clientNameById.get(project.client_id),
+        [clientNameById]
+    );
 
     // Configure sensors for drag and drop
     const sensors = useSensors(
@@ -883,6 +898,7 @@ export default function JobsList() {
                           column={column}
                           jobs={getJobsForColumn(column.id)}
                           onJobClick={handleJobClick}
+                          resolveClientName={resolveClientName}
                           isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
                           onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
                           columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
@@ -906,7 +922,7 @@ export default function JobsList() {
                     <Group justify="space-between" mb="xs">
                       <Text fw={500} size="sm" lineClamp={1}>
                         {(activeJob as Estimate).title ||
-                            (activeJob as Estimate).client_name ||
+                            resolveClientName(activeJob as Estimate) ||
                             'Untitled Project'}
                       </Text>
                       <Badge
