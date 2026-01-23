@@ -35,6 +35,8 @@ import UniversalError from '../Global/UniversalError';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useAppSelector } from '@/store/hooks';
+import { selectEstimatesLastFetched } from '@/store/slices/estimatesSlice';
 
 // Define column status groups and their order
 const PROPOSAL_PIPELINE_STATUSES = [
@@ -78,6 +80,7 @@ export default function EstimatesList() {
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [clientNameFilter, setClientNameFilter] = useState('');
+    const lastFetched = useAppSelector(selectEstimatesLastFetched);
 
     const router = useRouter();
 
@@ -106,7 +109,8 @@ export default function EstimatesList() {
             !cacheLoading.estimates &&
             estimates.length === 0 &&
             accessToken &&
-            !hasAttemptedAutoRefreshRef.current;
+            !hasAttemptedAutoRefreshRef.current &&
+            !lastFetched;
         if (shouldRefresh) {
             // Small delay to avoid race conditions with initial cache load
             const timeoutId = setTimeout(() => {
