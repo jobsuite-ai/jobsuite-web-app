@@ -20,8 +20,9 @@ import { useRouter } from 'next/navigation';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import LoadingState from '@/components/Global/LoadingState';
 import UniversalError from '@/components/Global/UniversalError';
-import { useSearchData } from '@/contexts/SearchDataContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 
 interface Notification {
   id: string;
@@ -64,7 +65,7 @@ function stripHtmlTags(html: string): string {
 export default function NotificationsPage() {
   const router = useRouter();
   const { isLoading: authLoading } = useAuth({ requireAuth: true });
-  const { estimates } = useSearchData();
+  const estimates = useAppSelector(selectAllEstimates);
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [showOlderNotifications, setShowOlderNotifications] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);

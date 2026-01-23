@@ -89,6 +89,44 @@
     max-width: rem(500px);
 }
 
+.searchWrapper {
+    position: relative;
+    width: 100%;
+    max-width: rem(500px);
+}
+
+.searchLoadingBar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: rem(2px);
+    height: rem(2px);
+    overflow: hidden;
+    border-radius: rem(8px);
+    pointer-events: none;
+}
+
+.searchLoadingIndicator {
+    width: 35%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent,
+        var(--mantine-color-blue-5),
+        transparent
+    );
+    animation: searchLoading 0.8s linear infinite;
+}
+
+@keyframes searchLoading {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(300%);
+    }
+}
+
 /* Media Query for smaller screens */
 @media (max-width: 768px) {
     .inner {
