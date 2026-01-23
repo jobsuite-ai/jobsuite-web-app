@@ -41,6 +41,8 @@ import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useAppSelector } from '@/store/hooks';
+import { selectProjectsLastFetched } from '@/store/slices/projectsSlice';
 
 // Utility functions for dates and hours
 function formatDate(dateString?: string): string {
@@ -358,6 +360,7 @@ export default function JobsList() {
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
     const router = useRouter();
+    const lastFetched = useAppSelector(selectProjectsLastFetched);
 
     // Configure sensors for drag and drop
     const sensors = useSensors(
@@ -394,7 +397,8 @@ export default function JobsList() {
             !cacheLoading.projects &&
             jobs.length === 0 &&
             accessToken &&
-            !hasAttemptedAutoRefreshRef.current
+            !hasAttemptedAutoRefreshRef.current &&
+            !lastFetched
         ) {
             // Small delay to avoid race conditions with initial cache load
             const timeoutId = setTimeout(() => {
