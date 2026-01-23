@@ -47,9 +47,9 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
 
     const validateFile = (file: FileWithPath): string | null => {
         // Validate file size
-        const maxSize = 150 * 1024 * 1024; // 150MB
+        const maxSize = 500 * 1024 * 1024; // 500MB
         if (file.size > maxSize) {
-            return `File size (${formatFileSize(file.size)}) exceeds the 150MB limit`;
+            return `File size (${formatFileSize(file.size)}) exceeds the 500MB limit`;
         }
 
         // Explicitly reject image files
@@ -467,7 +467,7 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
               loading={false}
               openRef={openRef}
               onDrop={(files) => handleFileDrop(files)}
-              maxSize={150 * 1024 * 1024}
+              maxSize={500 * 1024 * 1024}
               accept={[
                 MIME_TYPES.pdf,
                 'application/msword',
@@ -506,13 +506,13 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
 
                 <Text ta="center" fz="lg" mt="xl">
                     <Dropzone.Accept>Drop files here</Dropzone.Accept>
-                    <Dropzone.Reject>Files less than 150MB</Dropzone.Reject>
+                    <Dropzone.Reject>Files less than 500MB</Dropzone.Reject>
                     <Dropzone.Idle>Upload files</Dropzone.Idle>
                 </Text>
                 <Text ta="center" fz="sm" mt="xs" c="dimmed">
                     Drag and drop files here to upload. You can upload multiple files at once.
                     Supported formats: PDF, Word, Excel, PowerPoint, and text files.
-                    Maximum file size: 150MB.
+                    Maximum file size: 500MB.
                 </Text>
 
                 {uploadState === 'uploading' && fileUploads.length > 0 && (
