@@ -298,7 +298,8 @@ async function completeMultipartUpload(
 
 async function abortMultipartUpload(
     estimateID: string,
-    resourceID: string
+    resourceID: string,
+    reason: 'unmount' | 'error' | 'manual' = 'manual'
 ): Promise<void> {
     const accessToken = localStorage.getItem('access_token');
     if (!accessToken) {
@@ -308,6 +309,8 @@ async function abortMultipartUpload(
     }
 
     try {
+        // eslint-disable-next-line no-console
+        console.info(`Aborting multipart upload (${reason}) for resource ${resourceID}`);
         const response = await fetch(
             `/api/estimates/${estimateID}/resources/${resourceID}/multipart/abort`,
             {
@@ -346,6 +349,8 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
     const [currentResourceID, setCurrentResourceID] = useState<string | null>(null);
     const openRef = useRef<() => void>(null);
     const isMountedRef = useRef(true);
+    const currentResourceIDRef = useRef<string | null>(null);
+    const uploadStateRef = useRef<UploadState>('idle');
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -353,6 +358,14 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             isMountedRef.current = false;
         };
     }, []);
+
+    useEffect(() => {
+        currentResourceIDRef.current = currentResourceID;
+    }, [currentResourceID]);
+
+    useEffect(() => {
+        uploadStateRef.current = uploadState;
+    }, [uploadState]);
 
     const resetUploadState = () => {
         setVideo(null);
@@ -364,13 +377,15 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
 
     // Cleanup on unmount - abort any ongoing upload
     useEffect(() => () => {
-            if (currentResourceID && uploadState !== 'idle' && uploadState !== 'error') {
-                // Abort upload if component unmounts during upload
-                abortMultipartUpload(estimateID, currentResourceID).catch(() => {
-                    // Ignore errors during cleanup
-                });
-            }
-        }, [currentResourceID, uploadState, estimateID]);
+        const resourceID = currentResourceIDRef.current;
+        const state = uploadStateRef.current;
+        if (resourceID && state !== 'idle' && state !== 'error') {
+            // Abort upload if component unmounts during upload
+            abortMultipartUpload(estimateID, resourceID, 'unmount').catch(() => {
+                // Ignore errors during cleanup
+            });
+        }
+    }, [estimateID]);
 
     const handleFileUpload = async (files: File[]) => {
         if (files.length === 0) return;
@@ -422,7 +437,7 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             if (!isMountedRef.current) {
                 // Abort if component unmounted
                 if (resourceID) {
-                    await abortMultipartUpload(estimateID, resourceID);
+                    await abortMultipartUpload(estimateID, resourceID, 'unmount');
                 }
                 return;
             }
@@ -455,7 +470,7 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             if (!isMountedRef.current) {
                 // Abort if component unmounted
                 if (resourceID) {
-                    await abortMultipartUpload(estimateID, resourceID);
+                    await abortMultipartUpload(estimateID, resourceID, 'unmount');
                 }
                 return;
             }
@@ -495,7 +510,7 @@ export default function VideoUploader({ estimateID, refresh }: VideoUploaderProp
             // Attempt to abort the incomplete upload to cleanup S3
             if (resourceID) {
                 try {
-                    await abortMultipartUpload(estimateID, resourceID);
+                    await abortMultipartUpload(estimateID, resourceID, 'error');
                 } catch (abortError) {
                     // eslint-disable-next-line no-console
                     console.warn('Failed to abort incomplete upload:', abortError);
