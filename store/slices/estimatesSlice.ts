@@ -2,6 +2,23 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import { Estimate, EstimateStatus } from '@/components/Global/model';
 
+const mergeEstimatePreservingValues = (
+  existing: Estimate | undefined,
+  incoming: Estimate
+): Estimate => {
+  if (!existing) {
+    return incoming;
+  }
+
+  const nonNullFields = Object.fromEntries(
+    Object.entries(incoming).filter(([, value]) => value !== null && value !== undefined)
+  ) as Partial<Estimate>;
+  return {
+    ...existing,
+    ...nonNullFields,
+  };
+};
+
 interface EstimatesState {
   entities: Record<string, Estimate>;
   ids: string[];
@@ -38,11 +55,13 @@ const estimatesSlice = createSlice({
           est.status !== EstimateStatus.PROJECT_CANCELLED
       );
 
-      // Normalize into entities and ids
+      // Normalize into entities and ids (preserve richer existing fields)
+      const existingEntities = state.entities;
       state.entities = {};
       state.ids = [];
       filteredEstimates.forEach((estimate) => {
-        state.entities[estimate.id] = estimate;
+        const existing = existingEntities[estimate.id];
+        state.entities[estimate.id] = mergeEstimatePreservingValues(existing, estimate);
         state.ids.push(estimate.id);
       });
       state.lastFetched = Date.now();
@@ -86,7 +105,7 @@ const estimatesSlice = createSlice({
 
       // Update or add estimate
       if (existingEstimate) {
-        state.entities[estimate.id] = { ...existingEstimate, ...estimate };
+        state.entities[estimate.id] = mergeEstimatePreservingValues(existingEstimate, estimate);
       } else {
         state.entities[estimate.id] = estimate;
         state.ids.push(estimate.id);
