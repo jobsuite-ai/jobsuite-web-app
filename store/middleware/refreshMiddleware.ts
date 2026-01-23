@@ -135,7 +135,7 @@ function setupRefreshTimer(
     // Check if cache is expired or about to expire
     const now = Date.now();
     const cacheAge = lastFetched ? now - lastFetched : Infinity;
-    const isExpired = !isValid || cacheAge > CACHE_EXPIRATION_MS;
+    const isExpired = cacheAge > CACHE_EXPIRATION_MS && !isValid;
 
     // Only refresh if expired and user is active
     // Also check if there's already a request in flight
