@@ -89,6 +89,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   const clientsRef = useRef(clients);
   const projectsRef = useRef(projects);
   const hasInitialLoadRef = useRef(false);
+  const lastAccessTokenRef = useRef<string | null>(null);
   // Track in-flight requests to prevent duplicate fetches
   const inFlightRequestsRef = useRef<Map<'clients' | 'estimates' | 'projects', Promise<void>>>(new Map());
 
@@ -368,6 +369,8 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    lastAccessTokenRef.current = accessToken;
+
     // Mark as loaded to prevent duplicate fetches
     hasInitialLoadRef.current = true;
 
@@ -398,8 +401,19 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
 
   // Listen for storage changes (e.g., after login)
   useEffect(() => {
-    const handleStorageChange = () => {
+    const handleStorageChange = (event?: StorageEvent) => {
+      // Only react to auth token changes to avoid refresh loops across tabs.
+      if (event?.key && event.key !== 'access_token' && event.key !== 'refresh_token') {
+        return;
+      }
+
       const accessToken = localStorage.getItem('access_token');
+      if (accessToken === lastAccessTokenRef.current) {
+        return;
+      }
+
+      lastAccessTokenRef.current = accessToken;
+
       if (accessToken) {
         // Cleanup archived estimates/projects
         dispatch(cleanupArchivedEstimates());
