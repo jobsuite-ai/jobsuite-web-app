@@ -15,6 +15,7 @@ import type { User } from '@/hooks/useAuth';
 export function Shell({ children }: { children: any }) {
   const [sidebarOpened, setSidebarOpened] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const authCheckIdRef = useRef(0);
@@ -38,6 +39,7 @@ export function Shell({ children }: { children: any }) {
     const accessToken = localStorage.getItem('access_token');
     if (!accessToken) {
       setIsAuthenticated(false);
+      setHasCheckedAuth(true);
       return;
     }
 
@@ -54,10 +56,12 @@ export function Shell({ children }: { children: any }) {
 
     if (!isExpired && !cachedUserData) {
       setIsAuthenticated(true);
+      setHasCheckedAuth(true);
       return;
     }
 
     if (!isExpired) {
+      setHasCheckedAuth(true);
       return;
     }
 
@@ -69,17 +73,20 @@ export function Shell({ children }: { children: any }) {
         });
 
         if (authCheckIdRef.current !== currentCheckId) {
+          setHasCheckedAuth(true);
           return;
         }
 
         if (!response.ok) {
           clearAuthStorage();
           setIsAuthenticated(false);
+          setHasCheckedAuth(true);
           return;
         }
 
         const userData: User = await response.json();
         if (authCheckIdRef.current !== currentCheckId) {
+          setHasCheckedAuth(true);
           return;
         }
 
@@ -88,12 +95,15 @@ export function Shell({ children }: { children: any }) {
           setCachedContractorId(userData.contractor_id);
         }
         setIsAuthenticated(true);
+        setHasCheckedAuth(true);
       } catch {
         if (authCheckIdRef.current !== currentCheckId) {
+          setHasCheckedAuth(true);
           return;
         }
         clearAuthStorage();
         setIsAuthenticated(false);
+        setHasCheckedAuth(true);
       }
     };
 
@@ -164,10 +174,10 @@ export function Shell({ children }: { children: any }) {
       pathname.startsWith('/ios-app-redirect') ||
       pathname.startsWith('/sign/');
 
-    if (!isAuthenticated && !isPublicRoute) {
+    if (hasCheckedAuth && !isAuthenticated && !isPublicRoute) {
       router.replace('/');
     }
-  }, [isAuthenticated, pathname, router]);
+  }, [hasCheckedAuth, isAuthenticated, pathname, router]);
 
   // For signature pages, don't wrap with Shell/Header
   if (isSignaturePage) {
