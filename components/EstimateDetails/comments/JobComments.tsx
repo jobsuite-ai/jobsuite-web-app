@@ -204,11 +204,9 @@ export default function JobComments({
         // Keep the original text unchanged - don't replace @username with @user_id
         const mentionedUserIds: string[] = [];
 
-        // Find all @mentions - match @ followed by word characters,
-        // spaces, dots, hyphens, underscores
-        // This will match @Jonas, @Jonas Peek, @user.email, etc.
-        // Stop at punctuation, multiple spaces, or end of string
-        const mentionPattern = /@([a-zA-Z0-9._\s-]+?)(?=\s{2,}|[.,;:!?\n]|$)/g;
+    // Find all @mentions - allow letters, numbers, dots, underscores, hyphens, and spaces.
+    // Stop at punctuation, newlines, or end of string. Require a clean boundary after the name.
+    const mentionPattern = /@([a-zA-Z0-9._-]+(?:\s+[a-zA-Z0-9._-]+)*)(?=\s|[.,;:!?\n]|$)/g;
         const matches = Array.from(text.matchAll(mentionPattern));
 
         // Process matches to extract user IDs
