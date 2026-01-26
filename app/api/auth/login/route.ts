@@ -33,19 +33,26 @@ export async function POST(request: Request) {
       body: formData.toString(),
     });
 
-    const data = await response.json();
+    let data: any = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
 
     if (!response.ok) {
-      return NextResponse.json(
-        { message: data.message || `Login failed: ${data.error}` },
-        { status: response.status }
-      );
+      const errorMessage =
+        data?.message ||
+        data?.detail ||
+        data?.error_description ||
+        data?.error ||
+        'Email or password is incorrect';
+      return NextResponse.json({ message: errorMessage }, { status: response.status });
     }
 
     // Return the token and any other necessary data
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Login error:', error);
     return NextResponse.json(
       { message: 'An error occurred during login' },
       { status: 500 }
