@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { Header } from './Header/Header';
 import classes from './Shell.module.css';
@@ -16,6 +16,7 @@ export function Shell({ children }: { children: any }) {
   const [sidebarOpened, setSidebarOpened] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const authCheckIdRef = useRef(0);
 
   // Don't show header/navigation for signature pages
@@ -49,6 +50,11 @@ export function Shell({ children }: { children: any }) {
       if (cachedUserData.contractor_id) {
         setCachedContractorId(cachedUserData.contractor_id);
       }
+    }
+
+    if (!isExpired && !cachedUserData) {
+      setIsAuthenticated(true);
+      return;
     }
 
     if (!isExpired) {
@@ -144,6 +150,24 @@ export function Shell({ children }: { children: any }) {
     // Revalidate auth when navigating to a new page
     checkAuth().catch(() => {});
   }, [checkAuth, pathname]);
+
+  useEffect(() => {
+    if (!pathname) {
+      return;
+    }
+
+    const isPublicRoute =
+      pathname === '/' ||
+      pathname.startsWith('/accept-invitation') ||
+      pathname.startsWith('/forgot-password') ||
+      pathname.startsWith('/reset-password') ||
+      pathname.startsWith('/ios-app-redirect') ||
+      pathname.startsWith('/sign/');
+
+    if (!isAuthenticated && !isPublicRoute) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, pathname, router]);
 
   // For signature pages, don't wrap with Shell/Header
   if (isSignaturePage) {
