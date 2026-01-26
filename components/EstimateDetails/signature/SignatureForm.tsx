@@ -17,10 +17,20 @@ import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
+export interface SignaturePayload {
+    id?: string;
+    signature_type: string;
+    signature_data: string;
+    signer_name?: string;
+    signer_email: string;
+    signed_at: string;
+    is_valid?: boolean;
+}
+
 interface SignatureFormProps {
     signatureHash: string;
     clientEmail: string;
-    onSignatureSuccess: () => void;
+    onSignatureSuccess: (signature: SignaturePayload) => () => void;
     signatureType?: 'CLIENT' | 'CONTRACTOR';
     opened: boolean;
     onClose: () => void;
@@ -326,32 +336,18 @@ export default function SignatureForm({
 
         const signatureData = canvas.toDataURL('image/png');
 
-        setSubmitting(true);
-
         try {
-            // Use Next.js API route as proxy
-            const response = await fetch(
-                `/api/signature/${signatureHash}/sign`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        signature_type: signatureType,
-                        signature_data: signatureData,
-                        signer_name: signerName.trim(),
-                        signer_email: signerEmail.trim(),
-                        consent_given: true,
-                        device_info: navigator.userAgent,
-                    }),
-                }
-            );
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ detail: 'Failed to submit signature' }));
-                throw new Error(errorData.detail || 'Failed to submit signature');
-            }
+            setSubmitting(true);
+            const optimisticSignature: SignaturePayload = {
+                id: `temp-${Date.now()}`,
+                signature_type: signatureType,
+                signature_data: signatureData,
+                signer_name: signerName.trim(),
+                signer_email: signerEmail.trim(),
+                signed_at: new Date().toISOString(),
+                is_valid: true,
+            };
+            const rollback = onSignatureSuccess(optimisticSignature);
 
             notifications.show({
                 title: 'Success',
@@ -361,7 +357,45 @@ export default function SignatureForm({
             });
 
             onClose();
-            onSignatureSuccess();
+
+            const submitSignature = async () => {
+                const response = await fetch(
+                    `/api/signature/${signatureHash}/sign`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            signature_type: signatureType,
+                            signature_data: signatureData,
+                            signer_name: signerName.trim(),
+                            signer_email: signerEmail.trim(),
+                            consent_given: true,
+                            device_info: navigator.userAgent,
+                        }),
+                    }
+                );
+
+                if (!response.ok) {
+                    const errorData = await response
+                        .json()
+                        .catch(() => ({ detail: 'Failed to submit signature' }));
+                    throw new Error(errorData.detail || 'Failed to submit signature');
+                }
+            };
+
+            submitSignature().catch((submissionError) => {
+                rollback();
+                notifications.show({
+                    title: 'Error',
+                    message: submissionError instanceof Error
+                        ? submissionError.message
+                        : 'Failed to submit signature',
+                    color: 'red',
+                    icon: <IconX size={16} />,
+                });
+            });
         } catch (err: any) {
             setError(err.message || 'An error occurred while submitting your signature');
             notifications.show({
