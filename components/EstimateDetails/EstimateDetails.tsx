@@ -127,6 +127,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [timeEntries, setTimeEntries] = useState<any[]>(cachedTimeEntries);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
+    const [detailsFetched, setDetailsFetched] = useState(false);
     // Initialize signatures from cached data immediately
     const [signatures, setSignatures] = useState<Array<{
         signature_type: string;
@@ -229,6 +230,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             hasFetchedInitialDataRef.current !== estimateID
         ) {
             hasFetchedInitialDataRef.current = null;
+            setDetailsFetched(false);
         }
 
         // Prevent infinite loop - only fetch once per estimateID
@@ -487,10 +489,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                         if (isMountedRef.current) {
                             setDetailsLoaded(true);
+                            setDetailsFetched(true);
                         }
                     } catch (error) {
                         // eslint-disable-next-line no-console
                         console.error('Error parsing details response:', error);
+                        if (isMountedRef.current) {
+                            setDetailsFetched(true);
+                        }
                     }
                 } else if (
                     detailsResult.status === 'rejected' ||
@@ -501,6 +507,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         : {};
                     // eslint-disable-next-line no-console
                     console.error('Error fetching estimate details:', errorData);
+                    if (isMountedRef.current) {
+                        setDetailsFetched(true);
+                    }
                 }
 
                 // Process signatures response (independent data)
@@ -1643,6 +1652,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 and resources have been checked. */}
                                 {!initialLoading
                                     && detailsLoaded
+                                    && detailsFetched
                                     && (!hasVideo || !hasImages || lineItemsCount === 0) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
@@ -2192,6 +2202,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         </>
     ), [
         initialLoading,
+        detailsFetched,
         estimate,
         estimateID,
         hasVideo,
