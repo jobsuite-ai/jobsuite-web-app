@@ -48,7 +48,11 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        const errorMessage =
+          data?.message ||
+          data?.detail ||
+          'Login failed. Please check your email and password.';
+        throw new Error(errorMessage);
       }
 
       // Store tokens in localStorage
