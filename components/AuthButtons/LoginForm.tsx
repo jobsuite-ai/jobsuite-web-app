@@ -6,6 +6,7 @@ import { Anchor, Button, Checkbox, Divider, Group, Paper, PasswordInput, Stack, 
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
+import { setAccessTokenMetadata } from '@/app/utils/authToken';
 import { encryptPassword } from '@/app/utils/encryption';
 
 interface LoginFormProps {
@@ -53,6 +54,12 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
       // Store tokens in localStorage
       if (data.access_token) {
         localStorage.setItem('access_token', data.access_token);
+        const expiresInRaw = data.expires_in ?? data.expiresIn;
+        const expiresInSeconds = typeof expiresInRaw === 'number' ? expiresInRaw : Number(expiresInRaw);
+        setAccessTokenMetadata(
+          data.access_token,
+          Number.isFinite(expiresInSeconds) ? expiresInSeconds : undefined
+        );
         // Dispatch custom event to notify other components (e.g., Header)
         window.dispatchEvent(new Event('localStorageChange'));
       }
