@@ -57,7 +57,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   const [savingCustomer, setSavingCustomer] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
-  const { refreshData, updateEstimate } = useDataCache();
+  const { refreshData, updateEstimate, updateProject } = useDataCache();
 
   // Check QuickBooks connection status
   useEffect(() => {
@@ -332,6 +332,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
       // Update cache immediately with the returned estimate
       updateEstimate(updatedEstimate);
+      updateProject(updatedEstimate);
 
       // Optionally refresh in background for consistency (non-blocking)
       refreshData('estimates').catch(() => {});
@@ -378,6 +379,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
 
       // Update cache immediately with the returned estimate
       updateEstimate(updatedEstimate);
+      updateProject(updatedEstimate);
 
       // Optionally refresh in background for consistency (non-blocking)
       refreshData('estimates').catch(() => {});

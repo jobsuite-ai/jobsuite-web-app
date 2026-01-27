@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       queryParams.append('selected_year', selectedYear);
     }
 
-    const response = await fetch(`${apiBaseUrl}/api/v1/contractors/${contractorId}/dashboard/v2/metrics?${queryParams.toString()}`, {
+    const response = await fetch(`${apiBaseUrl}/api/v1/contractors/${contractorId}/dashboard/metrics?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
