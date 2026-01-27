@@ -40,11 +40,6 @@ export default function SignaturePageSections({
 }: SignaturePageSectionsProps) {
     const [pastProjects, setPastProjects] = useState<PastProject[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
-    const getReadonlyPdfUrl = (url?: string) => {
-        if (!url) return '';
-        const separator = url.includes('#') ? '&' : '#';
-        return `${url}${separator}toolbar=0&navpanes=0&scrollbar=0&view=FitH`;
-    };
 
     useEffect(() => {
         if (signaturePageConfig.show_past_projects) {
@@ -98,7 +93,7 @@ export default function SignaturePageSections({
                         }}>
                             <iframe
                               title="License PDF"
-                              src={getReadonlyPdfUrl(signaturePageConfig.license_pdf_url)}
+                              src={signaturePageConfig.license_pdf_url}
                               style={{
                                     width: '100%',
                                     height: 'calc(100vh - 300px)',
@@ -134,7 +129,7 @@ export default function SignaturePageSections({
                         }}>
                             <iframe
                               title="Insurance PDF"
-                              src={getReadonlyPdfUrl(signaturePageConfig.insurance_pdf_url)}
+                              src={signaturePageConfig.insurance_pdf_url}
                               style={{
                                     width: '100%',
                                     height: 'calc(100vh - 300px)',
@@ -166,7 +161,7 @@ export default function SignaturePageSections({
                     }}>
                         <iframe
                           title="W9 PDF"
-                          src={getReadonlyPdfUrl(signaturePageConfig.w9_pdf_url)}
+                          src={signaturePageConfig.w9_pdf_url}
                           style={{
                                 width: '100%',
                                 height: 'calc(100vh - 300px)',
