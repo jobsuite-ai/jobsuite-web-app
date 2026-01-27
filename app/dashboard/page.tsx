@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
@@ -11,6 +11,9 @@ import { BarChart, LineChart, PieChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
 import { useAuth } from '@/hooks/useAuth';
 import { logToCloudWatch } from '@/public/logger';
+
+const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 interface CategoryValue {
   category: string;
@@ -127,6 +130,37 @@ export default function Dashboard() {
     hoursLeftLastUpdated: null,
     upcomingFollowUps: [],
   });
+
+  const availableMonths = useMemo(() => {
+    const seen = new Set<number>();
+    const months: number[] = [];
+    const addMonthFromDate = (dateValue?: string) => {
+      if (!dateValue) {
+        return;
+      }
+      const monthToken = dateValue.split(' ')[0];
+      const monthIndex = MONTH_ABBREVIATIONS.indexOf(monthToken);
+      if (monthIndex >= 0 && !seen.has(monthIndex)) {
+        seen.add(monthIndex);
+        months.push(monthIndex);
+      }
+    };
+
+    metrics.revenueByWeek.forEach((item) => addMonthFromDate(item.date));
+    metrics.jobsByWeek.forEach((item) => addMonthFromDate(item.date));
+
+    if (months.length === 0) {
+      months.push(new Date().getMonth());
+    }
+
+    return months;
+  }, [metrics.revenueByWeek, metrics.jobsByWeek]);
+
+  useEffect(() => {
+    if (!availableMonths.includes(selectedMonth)) {
+      setSelectedMonth(availableMonths[availableMonths.length - 1]);
+    }
+  }, [availableMonths, selectedMonth]);
 
   useEffect(() => {
     async function fetchDashboardMetrics() {
@@ -387,20 +421,10 @@ export default function Dashboard() {
                       <Select
                         value={selectedMonth.toString()}
                         onChange={(value) => setSelectedMonth(parseInt(value || '0', 10))}
-                        data={[
-                          { value: '0', label: 'January' },
-                          { value: '1', label: 'February' },
-                          { value: '2', label: 'March' },
-                          { value: '3', label: 'April' },
-                          { value: '4', label: 'May' },
-                          { value: '5', label: 'June' },
-                          { value: '6', label: 'July' },
-                          { value: '7', label: 'August' },
-                          { value: '8', label: 'September' },
-                          { value: '9', label: 'October' },
-                          { value: '10', label: 'November' },
-                          { value: '11', label: 'December' },
-                        ]}
+                        data={availableMonths.map((monthIndex) => ({
+                          value: monthIndex.toString(),
+                          label: MONTH_LABELS[monthIndex],
+                        }))}
                         w={150}
                       />
                       <Select

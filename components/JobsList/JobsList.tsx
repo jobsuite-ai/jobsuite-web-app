@@ -349,6 +349,7 @@ export default function JobsList() {
         loading: cacheLoading,
         refreshData,
         updateEstimate,
+        updateProject,
     } = useDataCache();
 
     // Initialize jobs from Redux state (via context)
@@ -731,6 +732,7 @@ export default function JobsList() {
 
         // Optimistically update the cache
         updateEstimate(optimisticEstimate);
+        updateProject(optimisticEstimate);
 
         // Remove from old column's order and add to new column's order
         const oldColumn = columns.find((col) =>
@@ -793,6 +795,7 @@ export default function JobsList() {
             );
             // Revert cache update
             updateEstimate(originalEstimate);
+            updateProject(originalEstimate);
             return;
         }
 
@@ -819,6 +822,7 @@ export default function JobsList() {
                 );
                 // Revert cache update
                 updateEstimate(originalEstimate);
+                updateProject(originalEstimate);
                 const errorData = await response.json().catch(() => ({}));
                 // eslint-disable-next-line no-console
                 console.error('Error updating estimate status:', errorData);
@@ -827,6 +831,7 @@ export default function JobsList() {
                 const updatedEstimate = await response.json();
                 // Update cache with the confirmed estimate from server
                 updateEstimate(updatedEstimate);
+                updateProject(updatedEstimate);
                 // Optionally refresh in background for consistency (non-blocking)
                 refreshData('projects').catch(() => {});
             }
@@ -839,6 +844,7 @@ export default function JobsList() {
             );
             // Revert cache update
             updateEstimate(originalEstimate);
+            updateProject(originalEstimate);
             // eslint-disable-next-line no-console
             console.error('Error updating estimate status:', error);
         }
