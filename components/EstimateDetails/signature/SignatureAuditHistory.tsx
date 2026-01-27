@@ -26,6 +26,11 @@ interface SignatureLink {
     status: string;
     created_at: string;
     opened_at: string | null;
+    opened_at_client?: string | null;
+    opened_at_contractor?: string | null;
+    opened_count_client?: number;
+    opened_count_contractor?: number;
+    open_events?: OpenEvent[];
     expires_at: string;
 }
 
@@ -37,6 +42,13 @@ interface Signature {
     signer_email: string;
     signed_at: string;
     is_valid: boolean;
+    ip_address?: string;
+    user_agent?: string;
+}
+
+interface OpenEvent {
+    opened_at: string;
+    viewer_type: 'client' | 'contractor';
     ip_address?: string;
     user_agent?: string;
 }
@@ -136,7 +148,21 @@ export default function SignatureAuditHistory({ estimateId }: SignatureAuditHist
             data: link,
         });
 
-        if (link.opened_at) {
+        const openEvents = link.open_events || [];
+        if (openEvents.length > 0) {
+            openEvents.forEach((event) => {
+                if (!event.opened_at) return;
+                events.push({
+                    type: 'link_opened',
+                    timestamp: event.opened_at,
+                    data: {
+                        ...event,
+                        link,
+                    },
+                });
+            });
+        } else if (link.opened_at) {
+            // Legacy fallback for links without open_events
             events.push({
                 type: 'link_opened',
                 timestamp: link.opened_at,
@@ -182,6 +208,26 @@ export default function SignatureAuditHistory({ estimateId }: SignatureAuditHist
                 {status}
             </Badge>
         );
+    };
+
+    const getClientOpenEvents = (link: SignatureLink) => (link.open_events || []).filter((event) => event.viewer_type === 'client');
+
+    const getClientOpenCount = (link: SignatureLink) => {
+        if (typeof link.opened_count_client === 'number') {
+            return link.opened_count_client;
+        }
+        return link.opened_at ? 1 : 0;
+    };
+
+    const getLastClientOpen = (link: SignatureLink) => {
+        const clientOpenEvents = getClientOpenEvents(link);
+        if (clientOpenEvents.length > 0) {
+            const sorted = [...clientOpenEvents].sort(
+                (a, b) => new Date(b.opened_at).getTime() - new Date(a.opened_at).getTime()
+            );
+            return sorted[0]?.opened_at || null;
+        }
+        return link.opened_at_client || link.opened_at || null;
     };
 
     return (
@@ -243,7 +289,14 @@ export default function SignatureAuditHistory({ estimateId }: SignatureAuditHist
                                 icon = <IconCheck size={12} />;
                                 color = 'green';
                                 title = 'Link Opened';
-                                description = 'Client opened the signature page';
+                                if ('viewer_type' in event.data) {
+                                    const viewerLabel =
+                                        event.data.viewer_type === 'contractor' ? 'Contractor' : 'Client';
+                                    const ipInfo = event.data.ip_address ? ` (IP: ${event.data.ip_address})` : '';
+                                    description = `${viewerLabel} opened the signature page${ipInfo}`;
+                                } else {
+                                    description = 'Client opened the signature page';
+                                }
                                 break;
                             case 'signature':
                                 icon = <IconCheck size={12} />;
@@ -280,14 +333,15 @@ export default function SignatureAuditHistory({ estimateId }: SignatureAuditHist
                             <Table.Th>Status</Table.Th>
                             <Table.Th>Client Email</Table.Th>
                             <Table.Th>Created</Table.Th>
-                            <Table.Th>Opened</Table.Th>
+                            <Table.Th>Client Opens</Table.Th>
+                            <Table.Th>Last Client Open</Table.Th>
                             <Table.Th>Expires</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
                     <Table.Tbody>
                         {signature_links.length === 0 ? (
                             <Table.Tr>
-                                <Table.Td colSpan={5} ta="center" c="dimmed">
+                                <Table.Td colSpan={6} ta="center" c="dimmed">
                                     No signature links found
                                 </Table.Td>
                             </Table.Tr>
@@ -298,7 +352,12 @@ export default function SignatureAuditHistory({ estimateId }: SignatureAuditHist
                                     <Table.Td>{link.client_email}</Table.Td>
                                     <Table.Td>{formatDate(link.created_at)}</Table.Td>
                                     <Table.Td>
-                                        {link.opened_at ? formatDate(link.opened_at) : 'Never'}
+                                        {getClientOpenCount(link)}
+                                    </Table.Td>
+                                    <Table.Td>
+                                        {getLastClientOpen(link)
+                                            ? formatDate(getLastClientOpen(link) as string)
+                                            : 'Never'}
                                     </Table.Td>
                                     <Table.Td>{formatDate(link.expires_at)}</Table.Td>
                                 </Table.Tr>

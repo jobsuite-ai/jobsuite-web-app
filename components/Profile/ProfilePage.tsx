@@ -4,6 +4,9 @@ import { Button, Container, Loader, Paper, rem, Text, Title } from '@mantine/cor
 import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
+import { clearCachedContractorId } from '@/app/utils/apiClient';
+import { clearAccessTokenMetadata } from '@/app/utils/authToken';
+import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function ProfilePage() {
@@ -16,6 +19,9 @@ export default function ProfilePage() {
   const handleLogout = () => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
+    clearAccessTokenMetadata();
+    clearCachedAuthMe();
+    clearCachedContractorId();
     // Dispatch custom event to notify other components (e.g., Header)
     window.dispatchEvent(new Event('localStorageChange'));
     router.push('/');

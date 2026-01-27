@@ -13,7 +13,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconExternalLink, IconCheck, IconSignature } from '@tabler/icons-react';
 
-import SignatureForm from './signature/SignatureForm';
+import SignatureForm, { SignaturePayload } from './signature/SignatureForm';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,9 +29,11 @@ interface SignatureInfo {
     signatures: Array<{
         id: string;
         signature_type: string;
-        signer_name: string;
+        signature_data?: string;
+        signer_name?: string;
         signer_email: string;
         signed_at: string;
+        is_valid?: boolean;
     }>;
 }
 
@@ -224,22 +226,46 @@ export default function ContractorSignatureRequired({
         }
     };
 
-    const handleSignatureSuccess = async () => {
+    const handleSignatureSuccess = (signature: SignaturePayload) => {
+        const signatureWithId = {
+            id: signature.id || `temp-${Date.now()}`,
+            ...signature,
+        };
         setSigned(true);
+        setSignatureInfo((prev) => {
+            if (!prev) return prev;
+            const signatures = prev.signatures ? [...prev.signatures] : [];
+            signatures.push(signatureWithId);
+            return { ...prev, signatures };
+        });
         notifications.show({
             title: 'Success',
             message: 'Estimate signed successfully',
             color: 'green',
             icon: <IconCheck size={16} />,
         });
-        // Refresh signatures to get updated status
-        await fetchSignatures();
+        // Refresh signatures to get updated status in the background
+        fetchSignatures();
 
         // Note: PDF generation and storage is handled automatically by the backend
         // when signatures are recorded via _generate_and_store_pdf_after_signature.
         // No need to generate/upload PDF from the frontend.
 
         onSignatureComplete();
+
+        return () => {
+            setSigned(false);
+            setSignatureInfo((prev) => {
+                if (!prev?.signatures) return prev;
+                return {
+                    ...prev,
+                    signatures: prev.signatures.filter(
+                        (sig) =>
+                            sig.id !== signatureWithId.id
+                    ),
+                };
+            });
+        };
     };
 
     if (loading) {

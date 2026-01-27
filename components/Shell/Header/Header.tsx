@@ -351,7 +351,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }));
   }, [searchResults, autocompleteValue]);
 
-  const handleSearchSelect = useCallback((value: string | null) => {
+  const handleSearchSelect = useCallback((
+    value: string | null,
+    event?: MouseEvent<HTMLElement>
+  ) => {
     if (!value || value === 'no-results') {
       return false; // Return false to prevent default behavior
     }
@@ -366,10 +369,13 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       setSearchResults([]);
 
       // Navigate to the selected item
-      if (selectedResult.type === 'estimate') {
-        router.push(`/proposals/${selectedResult.id}`);
-      } else if (selectedResult.type === 'client') {
-        router.push(`/clients/${selectedResult.id}`);
+      const targetPath = selectedResult.type === 'estimate'
+        ? `/proposals/${selectedResult.id}`
+        : `/clients/${selectedResult.id}`;
+      if (event?.metaKey || event?.ctrlKey) {
+        window.open(targetPath, '_blank');
+      } else {
+        router.push(targetPath);
       }
 
       return false; // Prevent default behavior (setting value in input)
@@ -405,7 +411,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         onClick={(e) => {
           // Prevent default and handle navigation
           e.preventDefault();
-          handleSearchSelect(option.value);
+          handleSearchSelect(option.value, e);
         }}
       >
         <div

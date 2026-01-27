@@ -10,15 +10,16 @@
     overflow-x: auto;
     overflow-y: hidden;
     margin: 0 auto;
-    padding: 20px 0;
-    scrollbar-width: thin;
-    scrollbar-color: transparent transparent;
+    padding: 10px 0px;
+    margin-bottom: 15px;
+    scrollbar-width: auto;
+    scrollbar-color: rgba(120, 120, 120, 0.75) transparent;
     flex: 1;
     -webkit-overflow-scrolling: touch;
 }
 
 .flexWrapper::-webkit-scrollbar {
-    height: 16px;
+    height: 32px;
 }
 
 .flexWrapper::-webkit-scrollbar-track {
@@ -26,18 +27,18 @@
 }
 
 .flexWrapper::-webkit-scrollbar-thumb {
-    background-color: transparent;
-    border-radius: 4px;
+    background-color: rgba(120, 120, 120, 0.75);
+    border-radius: 8px;
     transition: background-color 0.2s ease;
 }
 
 .flexWrapper:hover::-webkit-scrollbar-thumb,
 .flexWrapper:active::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: rgba(180, 180, 180, 0.9);
 }
 
 .flexWrapper:hover {
-    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+    scrollbar-color: rgba(180, 180, 180, 0.9) transparent;
 }
 
 .archiveIcon {

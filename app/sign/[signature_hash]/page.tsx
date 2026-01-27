@@ -10,7 +10,7 @@ import { useParams } from 'next/navigation';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
 import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
 import SignatureAuditHistory from '@/components/EstimateDetails/signature/SignatureAuditHistory';
-import SignatureForm from '@/components/EstimateDetails/signature/SignatureForm';
+import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 
@@ -40,6 +40,7 @@ interface SignatureLinkInfo {
     };
     viewer_type?: 'contractor' | 'client';
     signatures?: Array<{
+        id?: string;
         signature_type: string;
         signature_data: string;
         signer_name?: string;
@@ -363,36 +364,66 @@ export default function SignaturePage() {
                             signatureHash={signatureHash}
                             clientEmail={linkInfo.client?.email || ''}
                             clientName={linkInfo.client?.name || undefined}
-                            onSignatureSuccess={async () => {
+                            onSignatureSuccess={(signature: SignaturePayload) => {
+                              const signatureWithDefaults = {
+                                id: signature.id || `temp-${Date.now()}`,
+                                ...signature,
+                                signature_type: signature.signature_type || 'CLIENT',
+                              };
                               setSigned(true);
                               setSignatureModalOpened(false);
-                              // Refresh linkInfo to get updated signatures
-                              try {
-                                const accessToken = localStorage.getItem('access_token');
-                                const headers: Record<string, string> = {
-                                  'Content-Type': 'application/json',
+                              setLinkInfo((prev) => {
+                                if (!prev) return prev;
+                                const signatures = prev.signatures ? [...prev.signatures] : [];
+                                signatures.push(signatureWithDefaults);
+                                return {
+                                  ...prev,
+                                  signatures,
                                 };
-                                if (accessToken) {
-                                  headers.Authorization = `Bearer ${accessToken}`;
-                                }
-                                const response = await fetch(
-                                  `/api/signature/${signatureHash}`,
-                                  {
-                                    method: 'GET',
-                                    headers,
-                                  }
-                                );
-                                if (response.ok) {
-                                  const data = await response.json();
-                                  setLinkInfo(data);
+                              });
 
-                                  // Note: PDF is automatically generated and stored by the backend
-                                  // when signatures are recorded. No need to upload from frontend.
+                              const rollback = () => {
+                                setSigned(false);
+                                setLinkInfo((prev) => {
+                                  if (!prev?.signatures) return prev;
+                                  return {
+                                    ...prev,
+                                    signatures: prev.signatures.filter(
+                                      (sig) => sig.id !== signatureWithDefaults.id
+                                    ),
+                                  };
+                                });
+                              };
+
+                              // Refresh linkInfo in the background to get authoritative data.
+                              const refreshLinkInfo = async () => {
+                                try {
+                                  const accessToken = localStorage.getItem('access_token');
+                                  const headers: Record<string, string> = {
+                                    'Content-Type': 'application/json',
+                                  };
+                                  if (accessToken) {
+                                    headers.Authorization = `Bearer ${accessToken}`;
+                                  }
+                                  const response = await fetch(
+                                    `/api/signature/${signatureHash}`,
+                                    {
+                                      method: 'GET',
+                                      headers,
+                                    }
+                                  );
+                                  if (response.ok) {
+                                    const data = await response.json();
+                                    setLinkInfo(data);
+                                  }
+                                } catch (err) {
+                                  // eslint-disable-next-line no-console
+                                  console.error('Error refreshing signature info:', err);
                                 }
-                              } catch (err) {
-                                // eslint-disable-next-line no-console
-                                console.error('Error refreshing signature info:', err);
-                              }
+                              };
+                              refreshLinkInfo();
+
+                              return rollback;
                             }}
                             opened={signatureModalOpened}
                             onClose={() => setSignatureModalOpened(false)}
