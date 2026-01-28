@@ -379,266 +379,276 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Paper withBorder p="md" radius="md">
-                  <Group justify="space-between" my="sm">
-                    <div>
-                      <Text size="sm" c="dimmed">Total Estimated Hours</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="sm" c="dimmed">Total Actual Hours</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="sm" c="dimmed">Variance</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text
-                          size="xl"
-                          fw={700}
-                          c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
-                        >
-                          {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
-                        </Text>
-                      )}
-                    </div>
-                  </Group>
-                </Paper>
-                <Paper withBorder p="md" radius="md" mt="sm">
-                  <Group justify="space-between" mb="sm">
-                    <Title order={3}>Projects Sold in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Title>
-                    <Group>
-                      <Select
-                        value={selectedMonth.toString()}
-                        onChange={(value) => setSelectedMonth(parseInt(value || '0', 10))}
-                        data={availableMonths.map((monthIndex) => ({
-                          value: monthIndex.toString(),
-                          label: MONTH_LABELS[monthIndex],
-                        }))}
-                        w={150}
-                      />
-                      <Select
-                        value={selectedYear.toString()}
-                        onChange={(value) => setSelectedYear(parseInt(value || '2024', 10))}
-                        data={Array.from({ length: 5 }, (_, i) => {
-                          const year = new Date().getFullYear() - 2 + i;
-                          return { value: year.toString(), label: year.toString() };
-                        })}
-                        w={100}
-                      />
-                    </Group>
-                  </Group>
-                  <Group justify="space-between" mt="sm">
-                    <div>
-                      <Text size="sm" c="dimmed">Projects in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text size="xl" fw={700}>{metrics.currentMonthJobs}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="sm" c="dimmed">Hours in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text size="xl" fw={700}>{metrics.currentMonthHours.toFixed(1)}</Text>
-                      )}
-                    </div>
-                  </Group>
-                </Paper>
-                <Paper withBorder p="md" radius="md" mt="sm">
-                  <Group justify="space-between" mb="sm">
-                    <Title order={3}>Hours Left to Sell</Title>
-                    <IconEdit
-                      onClick={() => {
-                        setEditingHoursValue(metrics.hoursLeftToSell);
-                        setEditHoursModalOpen(true);
-                      }}
-                      style={{ cursor: 'pointer' }}
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Title order={3} mb="sm" c="gray.0">Sales Performance</Title>
+              <Paper withBorder p="md" radius="md">
+                <Group justify="space-between" mb="sm">
+                  <Title order={3}>Projects Sold in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Title>
+                  <Group>
+                    <Select
+                      value={selectedMonth.toString()}
+                      onChange={(value) => setSelectedMonth(parseInt(value || '0', 10))}
+                      data={availableMonths.map((monthIndex) => ({
+                        value: monthIndex.toString(),
+                        label: MONTH_LABELS[monthIndex],
+                      }))}
+                      w={150}
+                    />
+                    <Select
+                      value={selectedYear.toString()}
+                      onChange={(value) => setSelectedYear(parseInt(value || '2024', 10))}
+                      data={Array.from({ length: 5 }, (_, i) => {
+                        const year = new Date().getFullYear() - 2 + i;
+                        return { value: year.toString(), label: year.toString() };
+                      })}
+                      w={100}
                     />
                   </Group>
-                  <Group justify="space-between" mt="sm">
-                    <div>
-                      <Text size="sm" c="dimmed">Current Hours</Text>
-                      {loading ? (
-                        <Skeleton height={28} mt={4} />
-                      ) : (
-                        <Text size="xl" fw={700}>{metrics.hoursLeftToSell.toFixed(1)}</Text>
-                      )}
-                    </div>
-                    <div>
-                      <Text size="sm" c="dimmed">Last Updated</Text>
-                      {loading ? (
-                        <Skeleton height={16} mt={4} width={150} />
-                      ) : (
-                        <Text size="sm" c="dimmed">
-                          {metrics.hoursLeftLastUpdated
-                            ? new Date(metrics.hoursLeftLastUpdated).toLocaleString()
-                            : 'Never'
-                          }
-                        </Text>
-                      )}
-                    </div>
-                  </Group>
-                </Paper>
+                </Group>
+                <Group justify="space-between" mt="sm">
+                  <div>
+                    <Text size="sm" c="dimmed">Projects in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.currentMonthJobs}</Text>
+                    )}
+                  </div>
+                </Group>
+              </Paper>
+              <Paper withBorder p="md" radius="md" mt="sm">
+                <Group justify="space-between" mb="sm">
+                  <Title order={3}>Hours Left to Sell</Title>
+                  <IconEdit
+                    onClick={() => {
+                      setEditingHoursValue(metrics.hoursLeftToSell);
+                      setEditHoursModalOpen(true);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  />
+                </Group>
+                <Group justify="space-between" mt="sm">
+                  <div>
+                    <Text size="sm" c="dimmed">Current Hours</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.hoursLeftToSell.toFixed(1)}</Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed">Last Updated</Text>
+                    {loading ? (
+                      <Skeleton height={16} mt={4} width={150} />
+                    ) : (
+                      <Text size="sm" c="dimmed">
+                        {metrics.hoursLeftLastUpdated
+                          ? new Date(metrics.hoursLeftLastUpdated).toLocaleString()
+                          : 'Never'
+                        }
+                      </Text>
+                    )}
+                  </div>
+                </Group>
+              </Paper>
 
-                <Paper withBorder p="md" radius="md" mt="md">
-                  <Title order={3}>
-                    Follow-Ups
-                  </Title>
-                  {loading ? (
-                    <Stack mt="md" gap="xs">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} height={40} />
-                      ))}
-                    </Stack>
-                  ) : metrics.upcomingFollowUps.length > 0 ? (
-                    <Table>
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Client Name</Table.Th>
-                          <Table.Th>Address</Table.Th>
-                          <Table.Th>Follow-Up Date</Table.Th>
+              <Paper withBorder p="md" radius="md" mt="md">
+                <Title order={3}>
+                  Follow-Ups
+                </Title>
+                {loading ? (
+                  <Stack mt="md" gap="xs">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} height={40} />
+                    ))}
+                  </Stack>
+                ) : metrics.upcomingFollowUps.length > 0 ? (
+                  <Table>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Client Name</Table.Th>
+                        <Table.Th>Address</Table.Th>
+                        <Table.Th>Follow-Up Date</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {metrics.upcomingFollowUps.map((job) => (
+                        <Table.Tr key={job.id}>
+                          <Table.Td>
+                            <Anchor
+                              c="blue"
+                              style={{ cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (e.metaKey || e.ctrlKey) {
+                                  window.open(`/jobs/${job.id}`, '_blank');
+                                } else {
+                                  router.push(`/jobs/${job.id}`);
+                                }
+                              }}
+                            >
+                              {job.name}
+                            </Anchor>
+                          </Table.Td>
+                          <Table.Td>
+                            <div>
+                              {job.client_address && <div>{job.client_address}</div>}
+                            </div>
+                          </Table.Td>
+                          <Table.Td>
+                            {new Date(job.follow_up_date).toLocaleDateString()}
+                          </Table.Td>
                         </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {metrics.upcomingFollowUps.map((job) => (
-                          <Table.Tr key={job.id}>
-                            <Table.Td>
-                              <Anchor
-                                c="blue"
-                                style={{ cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (e.metaKey || e.ctrlKey) {
-                                    window.open(`/jobs/${job.id}`, '_blank');
-                                  } else {
-                                    router.push(`/jobs/${job.id}`);
-                                  }
-                                }}
-                              >
-                                {job.name}
-                              </Anchor>
-                            </Table.Td>
-                            <Table.Td>
-                              <div>
-                                {job.client_address && <div>{job.client_address}</div>}
-                              </div>
-                            </Table.Td>
-                            <Table.Td>
-                              {new Date(job.follow_up_date).toLocaleDateString()}
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  ) : (
-                    <Text size="sm" c="dimmed" mt="md">
-                      No upcoming follow-ups
-                    </Text>
-                  )}
-                </Paper>
-              </Grid.Col>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                ) : (
+                  <Text size="sm" c="dimmed" mt="md">
+                    No upcoming follow-ups
+                  </Text>
+                )}
+              </Paper>
 
-              <Grid.Col span={{ base: 12, md: 6 }}>
-                <Paper withBorder p="md" radius="md">
-                  <Title order={3}>Hours by Crew Lead</Title>
-                  {loading ? (
-                    <Stack mt="md" gap="xs">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} height={40} />
-                      ))}
-                    </Stack>
-                  ) : (
-                    <Table mt="md">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Crew Lead</Table.Th>
-                          <Table.Th>Estimated</Table.Th>
-                          <Table.Th>Actual</Table.Th>
-                          <Table.Th>Variance</Table.Th>
+              <Paper withBorder p="md" radius="md" mt="md">
+                <Title order={3}>
+                  Recently Sold Projects
+                </Title>
+                {loading ? (
+                  <Stack mt="md" gap="xs">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} height={40} />
+                    ))}
+                  </Stack>
+                ) : (
+                  <Table mt="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Project Name</Table.Th>
+                        <Table.Th>Estimated Hours</Table.Th>
+                        <Table.Th>Sold Date</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {metrics.recentlySoldJobs.map((job) => (
+                        <Table.Tr key={job.id}>
+                          <Table.Td>
+                            <Anchor
+                              style={{ color: '#228be6', textDecoration: 'underline', cursor: 'pointer' }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                if (e.metaKey || e.ctrlKey) {
+                                  // Open in new tab
+                                  window.open(`/jobs/${job.id}`, '_blank');
+                                } else {
+                                  // Normal navigation
+                                  router.push(`/jobs/${job.id}`);
+                                }
+                              }}
+                            >
+                              {job.name}
+                            </Anchor>
+                          </Table.Td>
+                          <Table.Td>{job.estimatedHours.toFixed(1)}</Table.Td>
+                          <Table.Td>
+                            {new Date(job.soldDate).toLocaleDateString()}
+                          </Table.Td>
                         </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {metrics.crewLeadHours.map((lead) => (
-                          <Table.Tr key={lead.crewLead}>
-                            <Table.Td>{lead.crewLead}</Table.Td>
-                            <Table.Td>{lead.estimatedHours.toFixed(1)}</Table.Td>
-                            <Table.Td>{lead.actualHours.toFixed(1)}</Table.Td>
-                            <Table.Td>
-                              <Text
-                                c={lead.actualHours > lead.estimatedHours ? 'red' : 'green'}
-                              >
-                                {(lead.actualHours - lead.estimatedHours).toFixed(1)}
-                              </Text>
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  )}
-                </Paper>
-                <Paper withBorder p="md" radius="md" mt="md">
-                  <Title order={3}>
-                    Recently Sold Projects
-                  </Title>
-                  {loading ? (
-                    <Stack mt="md" gap="xs">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} height={40} />
                       ))}
-                    </Stack>
-                  ) : (
-                    <Table mt="md">
-                      <Table.Thead>
-                        <Table.Tr>
-                          <Table.Th>Project Name</Table.Th>
-                          <Table.Th>Estimated Hours</Table.Th>
-                          <Table.Th>Sold Date</Table.Th>
+                    </Table.Tbody>
+                  </Table>
+                )}
+              </Paper>
+            </Grid.Col>
+
+            <Grid.Col span={{ base: 12, md: 6 }}>
+              <Title order={3} mb="sm" c="gray.0">Job Performance</Title>
+              <Paper withBorder p="md" radius="md">
+                <Group justify="space-between" my="sm">
+                  <div>
+                    <Text size="sm" c="dimmed">Total Estimated Hours</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed">Total Actual Hours</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
+                    )}
+                  </div>
+                  <div>
+                    <Text size="sm" c="dimmed">Variance</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text
+                        size="xl"
+                        fw={700}
+                        c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
+                      >
+                        {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
+                      </Text>
+                    )}
+                  </div>
+                </Group>
+              </Paper>
+              <Paper withBorder p="md" radius="md" mt="sm">
+                <Title order={3}>
+                  Hours Completed in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
+                </Title>
+                <Group justify="space-between" mt="sm">
+                  <div>
+                    <Text size="sm" c="dimmed">Actual Hours</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.currentMonthHours.toFixed(1)}</Text>
+                    )}
+                  </div>
+                </Group>
+              </Paper>
+              <Paper withBorder p="md" radius="md" mt="md">
+                <Title order={3}>Hours by Crew Lead</Title>
+                {loading ? (
+                  <Stack mt="md" gap="xs">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} height={40} />
+                    ))}
+                  </Stack>
+                ) : (
+                  <Table mt="md">
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th>Crew Lead</Table.Th>
+                        <Table.Th>Estimated</Table.Th>
+                        <Table.Th>Actual</Table.Th>
+                        <Table.Th>Variance</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {metrics.crewLeadHours.map((lead) => (
+                        <Table.Tr key={lead.crewLead}>
+                          <Table.Td>{lead.crewLead}</Table.Td>
+                          <Table.Td>{lead.estimatedHours.toFixed(1)}</Table.Td>
+                          <Table.Td>{lead.actualHours.toFixed(1)}</Table.Td>
+                          <Table.Td>
+                            <Text
+                              c={lead.actualHours > lead.estimatedHours ? 'red' : 'green'}
+                            >
+                              {(lead.actualHours - lead.estimatedHours).toFixed(1)}
+                            </Text>
+                          </Table.Td>
                         </Table.Tr>
-                      </Table.Thead>
-                      <Table.Tbody>
-                        {metrics.recentlySoldJobs.map((job) => (
-                          <Table.Tr key={job.id}>
-                            <Table.Td>
-                              <Anchor
-                                style={{ color: '#228be6', textDecoration: 'underline', cursor: 'pointer' }}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (e.metaKey || e.ctrlKey) {
-                                    // Open in new tab
-                                    window.open(`/jobs/${job.id}`, '_blank');
-                                  } else {
-                                    // Normal navigation
-                                    router.push(`/jobs/${job.id}`);
-                                  }
-                                }}
-                              >
-                                {job.name}
-                              </Anchor>
-                            </Table.Td>
-                            <Table.Td>{job.estimatedHours.toFixed(1)}</Table.Td>
-                            <Table.Td>
-                              {new Date(job.soldDate).toLocaleDateString()}
-                            </Table.Td>
-                          </Table.Tr>
-                        ))}
-                      </Table.Tbody>
-                    </Table>
-                  )}
-                </Paper>
-              </Grid.Col>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                )}
+              </Paper>
+            </Grid.Col>
 
               {!loading && metrics.jobsWithHourDifferences.length > 0 && (
                 <Grid.Col span={12}>
