@@ -22,9 +22,15 @@ interface SidebarDetailsProps {
   estimate: Estimate;
   estimateID: string;
   onUpdate: () => void;
+  detailsLoaded?: boolean;
 }
 
-export default function SidebarDetails({ estimate, estimateID, onUpdate }: SidebarDetailsProps) {
+export default function SidebarDetails({
+  estimate,
+  estimateID,
+  onUpdate,
+  detailsLoaded = false,
+}: SidebarDetailsProps) {
   const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
@@ -241,6 +247,26 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
     }
 
     return estimateType as string;
+  };
+
+  // Helper to normalize job type values before sending to the backend
+  const normalizeEstimateTypeForBackend = (
+    value: string | null
+  ): EstimateType | null => {
+    if (!value) return null;
+
+    const normalizedValue = value.toUpperCase().trim();
+    if (normalizedValue === 'FULL HOUSE' || normalizedValue === 'BOTH') {
+      return EstimateType.BOTH;
+    }
+    if (normalizedValue === 'INTERIOR') {
+      return EstimateType.INTERIOR;
+    }
+    if (normalizedValue === 'EXTERIOR') {
+      return EstimateType.EXTERIOR;
+    }
+
+    return null;
   };
 
   // Sync selectedJobType when estimate changes (but not when editing)
@@ -674,21 +700,28 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const updateJobType = async (value: string | null) => {
+    if (!detailsLoaded) return;
     if (savingJobType) return;
+    const backendValue = normalizeEstimateTypeForBackend(value);
+    if (!backendValue) {
+      return;
+    }
+    const currentValue = normalizeEstimateTypeForSelect(estimate.estimate_type);
+    if (currentValue === value) {
+      setEditingJobType(false);
+      return;
+    }
+
     setSavingJobType(true);
     try {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
         // eslint-disable-next-line no-console
         console.error('No access token found');
-        setSavingJobType(false);
         return;
       }
 
-      // Map "Full House" to "BOTH" for backend
-      const backendValue = value === 'Full House' ? EstimateType.BOTH : value;
-
-      await fetch(`/api/estimates/${estimateID}`, {
+      const response = await fetch(`/api/estimates/${estimateID}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -697,6 +730,15 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
         body: JSON.stringify({ estimate_type: backendValue || null }),
       });
 
+      if (!response.ok) {
+        throw new Error('Failed to update job type');
+      }
+
+      // Optimistically update cache so the UI doesn't get reset by stale data
+      updateEstimate({
+        ...estimate,
+        estimate_type: backendValue,
+      });
       setEditingJobType(false);
       onUpdate();
     } catch (error) {
@@ -708,6 +750,9 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
   };
 
   const handleJobTypeClick = () => {
+    if (!detailsLoaded) {
+      return;
+    }
     setEditingJobType(true);
     setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
   };
@@ -1016,6 +1061,7 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 autoFocus
+                disabled={!detailsLoaded || savingJobType}
               />
             </Flex>
             <Flex gap="xs" justify="flex-end">
@@ -1025,6 +1071,11 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
                 onClick={() => updateJobType(selectedJobType)}
                 loading={savingJobType}
                 size="lg"
+                disabled={
+                  !detailsLoaded
+                  || !selectedJobType
+                  || selectedJobType === normalizeEstimateTypeForSelect(estimate.estimate_type)
+                }
               >
                 <IconCheck size={18} />
               </ActionIcon>
@@ -1046,8 +1097,13 @@ export default function SidebarDetails({ estimate, estimateID, onUpdate }: Sideb
             </Text>
             <Text
               size="sm"
-              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
-              onClick={handleJobTypeClick}
+              style={{
+                cursor: detailsLoaded ? 'pointer' : 'not-allowed',
+                textAlign: 'right',
+                flex: 1,
+                maxWidth: '200px',
+              }}
+              onClick={detailsLoaded ? handleJobTypeClick : undefined}
               c={estimate.estimate_type ? 'dark' : 'dimmed'}
             >
               {getJobTypeDisplayName()}

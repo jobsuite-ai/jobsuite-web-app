@@ -2047,6 +2047,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                       estimate={estimate}
                                       estimateID={estimateID}
                                       onUpdate={getEstimate}
+                                      detailsLoaded={detailsLoaded}
                                     />
 
                                     {/* Resource Links */}
