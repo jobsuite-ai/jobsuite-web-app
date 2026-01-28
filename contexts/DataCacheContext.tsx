@@ -93,6 +93,50 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   // Track in-flight requests to prevent duplicate fetches
   const inFlightRequestsRef = useRef<Map<'clients' | 'estimates' | 'projects', Promise<void>>>(new Map());
 
+  const getUpdatedAtMs = (value?: string | null) => {
+    if (!value) return 0;
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+
+  const mergeProjectsWithCache = (fetchedProjects: Job[]) => {
+    if (projectsRef.current.length === 0) {
+      return fetchedProjects;
+    }
+
+    const mergedMap = new Map<string, Job>();
+    fetchedProjects.forEach((project) => {
+      mergedMap.set(project.id, project);
+    });
+
+    projectsRef.current.forEach((cachedProject) => {
+      const fetchedProject = mergedMap.get(cachedProject.id);
+      if (!fetchedProject) {
+        mergedMap.set(cachedProject.id, cachedProject);
+        return;
+      }
+
+      const cachedUpdatedAt = getUpdatedAtMs(cachedProject.updated_at);
+      const fetchedUpdatedAt = getUpdatedAtMs(fetchedProject.updated_at);
+      if (cachedUpdatedAt > fetchedUpdatedAt) {
+        mergedMap.set(cachedProject.id, cachedProject);
+      }
+    });
+
+    // Preserve fetched order, append any cached-only items to the end.
+    const fetchedIds = new Set(fetchedProjects.map((project) => project.id));
+    const mergedList = fetchedProjects.map((project) =>
+      mergedMap.get(project.id) || project
+    );
+    mergedMap.forEach((project, projectId) => {
+      if (!fetchedIds.has(projectId)) {
+        mergedList.push(project);
+      }
+    });
+
+    return mergedList;
+  };
+
   // Update refs when values change
   useEffect(() => {
     estimatesRef.current = estimates;
@@ -259,7 +303,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         if (keysToFetch.includes('projects') && !inFlightRequestsRef.current.has('projects')) {
           const projectsPromise = fetchProjects()
             .then((data) => {
-              dispatch(setProjects(data));
+              dispatch(setProjects(mergeProjectsWithCache(data)));
             })
             .catch((err) => {
               dispatch(
