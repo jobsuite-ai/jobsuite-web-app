@@ -249,6 +249,9 @@ export default function SidebarDetails({
     return estimateType as string;
   };
 
+  const jobTypeValue = normalizeEstimateTypeForSelect(estimate.estimate_type);
+  const canEditJobType = detailsLoaded && jobTypeValue !== null;
+
   // Helper to normalize job type values before sending to the backend
   const normalizeEstimateTypeForBackend = (
     value: string | null
@@ -271,10 +274,16 @@ export default function SidebarDetails({
 
   // Sync selectedJobType when estimate changes (but not when editing)
   useEffect(() => {
-    if (!editingJobType) {
-      setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
+    if (!editingJobType && selectedJobType !== jobTypeValue) {
+      setSelectedJobType(jobTypeValue);
     }
-  }, [estimate.estimate_type, editingJobType]);
+  }, [jobTypeValue, editingJobType, selectedJobType]);
+
+  useEffect(() => {
+    if (!canEditJobType && editingJobType) {
+      setEditingJobType(false);
+    }
+  }, [canEditJobType, editingJobType]);
 
   // Sync currentStatus when estimate prop changes
   useEffect(() => {
@@ -750,11 +759,11 @@ export default function SidebarDetails({
   };
 
   const handleJobTypeClick = () => {
-    if (!detailsLoaded) {
+    if (!canEditJobType) {
       return;
     }
     setEditingJobType(true);
-    setSelectedJobType(normalizeEstimateTypeForSelect(estimate.estimate_type));
+    setSelectedJobType(jobTypeValue);
   };
 
   const handleJobTypeCancel = () => {
@@ -1043,7 +1052,7 @@ export default function SidebarDetails({
         </div>
 
         {/* Job Type */}
-        {editingJobType ? (
+        {editingJobType && canEditJobType ? (
           <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
             <Flex justify="space-between" align="center" gap="sm" mb="xs">
               <Text size="sm" fw={500} c="dimmed">
@@ -1055,26 +1064,26 @@ export default function SidebarDetails({
                   { value: EstimateType.EXTERIOR, label: 'Exterior' },
                   { value: 'Full House', label: 'Full House' },
                 ]}
-                value={selectedJobType}
+                value={selectedJobType ?? jobTypeValue}
                 onChange={(value) => setSelectedJobType(value)}
                 placeholder="Select job type"
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 autoFocus
-                disabled={!detailsLoaded || savingJobType}
+                disabled={!canEditJobType || savingJobType}
               />
             </Flex>
             <Flex gap="xs" justify="flex-end">
               <ActionIcon
                 color="green"
                 variant="light"
-                onClick={() => updateJobType(selectedJobType)}
+                onClick={() => updateJobType(selectedJobType ?? jobTypeValue)}
                 loading={savingJobType}
                 size="lg"
                 disabled={
-                  !detailsLoaded
-                  || !selectedJobType
-                  || selectedJobType === normalizeEstimateTypeForSelect(estimate.estimate_type)
+                  !canEditJobType
+                  || !(selectedJobType ?? jobTypeValue)
+                  || (selectedJobType ?? jobTypeValue) === jobTypeValue
                 }
               >
                 <IconCheck size={18} />
@@ -1098,12 +1107,12 @@ export default function SidebarDetails({
             <Text
               size="sm"
               style={{
-                cursor: detailsLoaded ? 'pointer' : 'not-allowed',
+                cursor: canEditJobType ? 'pointer' : 'not-allowed',
                 textAlign: 'right',
                 flex: 1,
                 maxWidth: '200px',
               }}
-              onClick={detailsLoaded ? handleJobTypeClick : undefined}
+              onClick={canEditJobType ? handleJobTypeClick : undefined}
               c={estimate.estimate_type ? 'dark' : 'dimmed'}
             >
               {getJobTypeDisplayName()}
