@@ -68,6 +68,7 @@ interface UpcomingFollowUp {
 }
 interface DashboardMetrics {
   totalJobs: number;
+  currentMonthLeads: number;
   activeBids: number;
   totalBidValue: number;
   totalSoldValue: number;
@@ -105,6 +106,7 @@ export default function Dashboard() {
   const [editingHoursValue, setEditingHoursValue] = useState(0);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalJobs: 0,
+    currentMonthLeads: 0,
     activeBids: 0,
     totalBidValue: 0,
     totalSoldValue: 0,
@@ -194,6 +196,7 @@ export default function Dashboard() {
         // Map the API response to our dashboard metrics structure
         setMetrics({
           totalJobs: data.total_jobs || 0,
+        currentMonthLeads: data.current_month_leads || 0,
           activeBids: data.active_bids || 0,
           totalBidValue: data.total_bid_value || 0,
           totalSoldValue: data.total_sold_value || 0,
@@ -381,7 +384,42 @@ export default function Dashboard() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 6 }}>
               <Title order={3} mb="sm" c="gray.0">Sales Performance</Title>
-              <Paper withBorder p="md" radius="md">
+              <Paper withBorder p="md" radius="md" mt="sm">
+                <Group justify="space-between" mb="sm">
+                  <Title order={3}>Leads in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Title>
+                  <Group>
+                    <Select
+                      value={selectedMonth.toString()}
+                      onChange={(value) => setSelectedMonth(parseInt(value || '0', 10))}
+                      data={availableMonths.map((monthIndex) => ({
+                        value: monthIndex.toString(),
+                        label: MONTH_LABELS[monthIndex],
+                      }))}
+                      w={150}
+                    />
+                    <Select
+                      value={selectedYear.toString()}
+                      onChange={(value) => setSelectedYear(parseInt(value || '2024', 10))}
+                      data={Array.from({ length: 5 }, (_, i) => {
+                        const year = new Date().getFullYear() - 2 + i;
+                        return { value: year.toString(), label: year.toString() };
+                      })}
+                      w={100}
+                    />
+                  </Group>
+                </Group>
+                <Group justify="space-between" mt="sm">
+                  <div>
+                    <Text size="sm" c="dimmed">Unique leads created</Text>
+                    {loading ? (
+                      <Skeleton height={28} mt={4} />
+                    ) : (
+                      <Text size="xl" fw={700}>{metrics.currentMonthLeads}</Text>
+                    )}
+                  </div>
+                </Group>
+              </Paper>
+              <Paper withBorder p="md" radius="md" mt="sm">
                 <Group justify="space-between" mb="sm">
                   <Title order={3}>Projects Sold in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}</Title>
                   <Group>
@@ -562,40 +600,77 @@ export default function Dashboard() {
 
             <Grid.Col span={{ base: 12, md: 6 }}>
               <Title order={3} mb="sm" c="gray.0">Job Performance</Title>
-              <Paper withBorder p="md" radius="md">
-                <Group justify="space-between" my="sm">
-                  <div>
-                    <Text size="sm" c="dimmed">Total Estimated Hours</Text>
-                    {loading ? (
-                      <Skeleton height={28} mt={4} />
-                    ) : (
-                      <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
-                    )}
-                  </div>
-                  <div>
-                    <Text size="sm" c="dimmed">Total Actual Hours</Text>
-                    {loading ? (
-                      <Skeleton height={28} mt={4} />
-                    ) : (
-                      <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
-                    )}
-                  </div>
-                  <div>
-                    <Text size="sm" c="dimmed">Variance</Text>
-                    {loading ? (
-                      <Skeleton height={28} mt={4} />
-                    ) : (
-                      <Text
-                        size="xl"
-                        fw={700}
-                        c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
-                      >
-                        {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
-                      </Text>
-                    )}
-                  </div>
-                </Group>
-              </Paper>
+              <Grid gutter="md">
+                <Grid.Col span={12}>
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Total Estimated Hours</Title>
+                    <Group justify="space-between" mt="sm">
+                      <div>
+                        <Text size="sm" c="dimmed">Estimated hours for completed jobs</Text>
+                        {loading ? (
+                          <Skeleton height={28} mt={4} />
+                        ) : (
+                          <Text size="xl" fw={700}>{metrics.totalEstimatedHours.toFixed(1)}</Text>
+                        )}
+                      </div>
+                    </Group>
+                  </Paper>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Total Actual Hours</Title>
+                    <Group justify="space-between" mt="sm">
+                      <div>
+                        <Text size="sm" c="dimmed">Actual hours for completed jobs</Text>
+                        {loading ? (
+                          <Skeleton height={28} mt={4} />
+                        ) : (
+                          <Text size="xl" fw={700}>{metrics.totalActualHours.toFixed(1)}</Text>
+                        )}
+                      </div>
+                    </Group>
+                  </Paper>
+                </Grid.Col>
+                <Grid.Col span={12}>
+                  <Paper withBorder p="md" radius="md">
+                    <Title order={3}>Variance</Title>
+                    <Group justify="space-between" mt="sm">
+                      <div>
+                        <Text size="sm" c="dimmed">Actual minus estimated hours</Text>
+                        {loading ? (
+                          <Skeleton height={28} mt={4} />
+                        ) : (
+                          <Text
+                            size="xl"
+                            fw={700}
+                            c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
+                          >
+                            {(metrics.totalActualHours - metrics.totalEstimatedHours).toFixed(1)}
+                          </Text>
+                        )}
+                      </div>
+                    </Group>
+                    <Group justify="space-between" mt="sm">
+                      <div>
+                        <Text size="sm" c="dimmed">Percentage variance</Text>
+                        {loading ? (
+                          <Skeleton height={20} mt={4} />
+                        ) : (
+                          <Text
+                            size="lg"
+                            fw={600}
+                            c={metrics.totalActualHours > metrics.totalEstimatedHours ? 'red' : 'green'}
+                          >
+                            {metrics.totalEstimatedHours > 0
+                              ? `${(((metrics.totalActualHours - metrics.totalEstimatedHours) / metrics.totalEstimatedHours) * 100).toFixed(1)}%`
+                              : '0.0%'}
+                          </Text>
+                        )}
+                      </div>
+                    </Group>
+                  </Paper>
+                </Grid.Col>
+              </Grid>
               <Paper withBorder p="md" radius="md" mt="sm">
                 <Title order={3}>
                   Hours Completed in {new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long', year: 'numeric' })}
