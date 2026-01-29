@@ -13,18 +13,8 @@ frontend:
           echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
           SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
           if [ -n "$SECRET_JSON" ]; then
-            APP_AWS_ACCESS_KEY_ID=$(python3 - <<'PY'
-import json, os
-data = json.loads(os.environ["SECRET_JSON"])
-print(data.get("AWS_ACCESS_KEY_ID", ""))
-PY
-)
-            APP_AWS_SECRET_ACCESS_KEY=$(python3 - <<'PY'
-import json, os
-data = json.loads(os.environ["SECRET_JSON"])
-print(data.get("AWS_SECRET_ACCESS_KEY", ""))
-PY
-)
+            APP_AWS_ACCESS_KEY_ID=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_ACCESS_KEY_ID',''))")
+            APP_AWS_SECRET_ACCESS_KEY=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_SECRET_ACCESS_KEY',''))")
             if [ -n "$APP_AWS_ACCESS_KEY_ID" ] && [ -n "$APP_AWS_SECRET_ACCESS_KEY" ]; then
               echo "APP_AWS_ACCESS_KEY_ID=$APP_AWS_ACCESS_KEY_ID" >> .env.production
               echo "APP_AWS_SECRET_ACCESS_KEY=$APP_AWS_SECRET_ACCESS_KEY" >> .env.production
