@@ -1,5 +1,7 @@
 import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from '@aws-sdk/client-cloudwatch-logs';
+import fs from 'fs';
 import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
 
 export const runtime = 'nodejs';
 
@@ -54,6 +56,27 @@ export async function GET() {
   const appSecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
   const logGroupName = process.env.LOG_GROUP_NAME;
   const logStreamName = process.env.LOG_STREAM_NAME;
+  const amplifyBranch = process.env.AMPLIFY_BRANCH;
+  const awsBranch = process.env.AWS_BRANCH;
+  let envFileExists = false;
+  let envFileHasLogGroupName = false;
+  let envFileHasLogStreamName = false;
+  let envFileHasAppAccessKeyId = false;
+  let envFileHasAppSecretAccessKey = false;
+
+  try {
+    const envFilePath = path.join(process.cwd(), '.env.production');
+    envFileExists = fs.existsSync(envFilePath);
+    if (envFileExists) {
+      const content = fs.readFileSync(envFilePath, 'utf8');
+      envFileHasLogGroupName = content.includes('LOG_GROUP_NAME=');
+      envFileHasLogStreamName = content.includes('LOG_STREAM_NAME=');
+      envFileHasAppAccessKeyId = content.includes('APP_AWS_ACCESS_KEY_ID=');
+      envFileHasAppSecretAccessKey = content.includes('APP_AWS_SECRET_ACCESS_KEY=');
+    }
+  } catch {
+    envFileExists = false;
+  }
 
   return NextResponse.json({
     appAccessKeyIdSet: Boolean(appAccessKeyId),
@@ -62,8 +85,17 @@ export async function GET() {
       Boolean(appAccessKeyId) && !isResolverString(appAccessKeyId),
     appSecretAccessKeyLooksResolved:
       Boolean(appSecretAccessKey) && !isResolverString(appSecretAccessKey),
-    logGroupNameSet: logGroupName,
-    logStreamNameSet: logStreamName,
+    logGroupNameSet: Boolean(logGroupName),
+    logStreamNameSet: Boolean(logStreamName),
+    logGroupNameValue: logGroupName || null,
+    logStreamNameValue: logStreamName || null,
+    amplifyBranch: amplifyBranch || null,
+    awsBranch: awsBranch || null,
+    envFileExists,
+    envFileHasLogGroupName,
+    envFileHasLogStreamName,
+    envFileHasAppAccessKeyId,
+    envFileHasAppSecretAccessKey,
     region: REGION,
   });
 }
