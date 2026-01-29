@@ -43,8 +43,6 @@ PY
             echo "Failed to fetch secret value from Secrets Manager"
             exit 1
           fi
-        # Log branch info (don't override NODE_ENV - Next.js needs it as 'production' for builds)
-        # Note: main branch uses QA/development endpoints, not production
         - |
           if [ "$AWS_BRANCH" = "prod" ] || [ "$AWS_BRANCH" = "production" ]; then
             echo "Building for PRODUCTION ($AWS_BRANCH branch) - will use api.jobsuite.app"
