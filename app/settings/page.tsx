@@ -25,8 +25,10 @@ import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import ActionsTab from '@/components/Settings/ActionsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
+import NotificationsTab from '@/components/Settings/NotificationsTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
+import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
 
 interface ContractorConfiguration {
@@ -43,6 +45,7 @@ interface ContractorConfiguration {
 }
 
 export default function SettingsPage() {
+    const { user } = useAuth({ fetchUser: true });
     const [activeTab, setActiveTab] = useState<string | null>('contractor-config');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -57,7 +60,6 @@ export default function SettingsPage() {
     const [configId, setConfigId] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
     const [baseHourlyRate, setBaseHourlyRate] = useState<string>('');
-
     // Load existing configuration on mount
     useEffect(() => {
         loadConfiguration();
@@ -290,7 +292,6 @@ export default function SettingsPage() {
         setBaseHourlyRate(value);
         setHasChanges(true);
     };
-
     const verifySesIdentity = async () => {
         if (!clientCommunicationEmail) {
             notifications.show({
@@ -447,11 +448,11 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
+                    <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
+                    <Tabs.Tab value="actions">Actions</Tabs.Tab>
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
-                    <Tabs.Tab value="actions">Actions</Tabs.Tab>
-                    <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="contractor-config" pt="md">
@@ -606,13 +607,7 @@ export default function SettingsPage() {
                 </Tabs.Panel>
 
                 <Tabs.Panel value="notifications" pt="md">
-                    <Card shadow="sm" padding="lg" withBorder>
-                        <Stack gap="md">
-                            <Text c="dimmed">
-                                Notification settings will be available here soon.
-                            </Text>
-                        </Stack>
-                    </Card>
+                    <NotificationsTab user={user} />
                 </Tabs.Panel>
             </Tabs>
         </div>

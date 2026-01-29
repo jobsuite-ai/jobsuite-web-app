@@ -25,6 +25,7 @@ import {
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
+import { notifications } from '@mantine/notifications';
 import { IconX, IconChevronDown, IconSearch, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -64,6 +65,7 @@ export default function EstimatesList() {
         estimates: cachedEstimates,
         clients,
         loading: cacheLoading,
+        errors: cacheErrors,
         refreshData,
         invalidateCache,
     } = useDataCache();
@@ -75,6 +77,7 @@ export default function EstimatesList() {
     const [viewMode, setViewMode] = useState<'main' | 'list'>('main');
     const [refreshing, setRefreshing] = useState(false);
     const hasAttemptedAutoRefreshRef = useRef(false);
+    const lastEstimatesErrorRef = useRef<string | null>(null);
 
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -134,6 +137,22 @@ export default function EstimatesList() {
         }
         return undefined;
     }, [estimates.length, cacheLoading.estimates, refreshData]);
+
+    useEffect(() => {
+        if (cacheErrors.estimates && cacheErrors.estimates !== lastEstimatesErrorRef.current) {
+            lastEstimatesErrorRef.current = cacheErrors.estimates;
+            notifications.show({
+                title: 'Estimate request failed',
+                message: cacheErrors.estimates,
+                color: 'red',
+                position: 'bottom-right',
+                autoClose: 5000,
+            });
+        }
+        if (!cacheErrors.estimates) {
+            lastEstimatesErrorRef.current = null;
+        }
+    }, [cacheErrors.estimates]);
 
     useEffect(() => {
         // Sort jobs into columns based on status

@@ -272,12 +272,11 @@ export default function SidebarDetails({
     return null;
   };
 
-  // Sync selectedJobType when estimate changes (but not when editing)
   useEffect(() => {
-    if (!editingJobType && selectedJobType !== jobTypeValue) {
-      setSelectedJobType(jobTypeValue);
+    if (!editingJobType && selectedJobType !== null) {
+      setSelectedJobType(null);
     }
-  }, [jobTypeValue, editingJobType, selectedJobType]);
+  }, [editingJobType, selectedJobType]);
 
   useEffect(() => {
     if (!canEditJobType && editingJobType) {
@@ -1069,7 +1068,6 @@ export default function SidebarDetails({
                 placeholder="Select job type"
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
-                autoFocus
                 disabled={!canEditJobType || savingJobType}
               />
             </Flex>

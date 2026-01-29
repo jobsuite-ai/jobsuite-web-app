@@ -32,6 +32,7 @@ import {
     Text,
     Title,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { IconArrowsMoveHorizontal, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -347,6 +348,7 @@ export default function JobsList() {
         clients,
         projects,
         loading: cacheLoading,
+        errors: cacheErrors,
         refreshData,
         updateEstimate,
         updateProject,
@@ -367,6 +369,7 @@ export default function JobsList() {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
+    const lastProjectsErrorRef = useRef<string | null>(null);
     const router = useRouter();
     const lastFetched = useAppSelector(selectProjectsLastFetched);
     const clientNameById = useMemo(
@@ -433,6 +436,22 @@ export default function JobsList() {
         }
         return undefined;
     }, [jobs.length, cacheLoading.projects, refreshData]);
+
+    useEffect(() => {
+        if (cacheErrors.projects && cacheErrors.projects !== lastProjectsErrorRef.current) {
+            lastProjectsErrorRef.current = cacheErrors.projects;
+            notifications.show({
+                title: 'Project request failed',
+                message: cacheErrors.projects,
+                color: 'red',
+                position: 'bottom-right',
+                autoClose: 5000,
+            });
+        }
+        if (!cacheErrors.projects) {
+            lastProjectsErrorRef.current = null;
+        }
+    }, [cacheErrors.projects]);
 
     // Listen for storage changes to reload column settings
     useEffect(() => {
