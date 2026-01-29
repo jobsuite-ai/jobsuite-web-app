@@ -38,6 +38,14 @@ function getCloudWatchClient(): CloudWatchLogsClient {
     );
   }
 
+  if (isResolverString(accessKeyId) || isResolverString(secretAccessKey)) {
+    throw new Error(
+      'AWS credentials are still resolver strings. ' +
+      'Amplify does not resolve {{resolve:secretsmanager:...}} at runtime. ' +
+      'Set the actual values in Amplify secrets and redeploy.',
+    );
+  }
+
   return new CloudWatchLogsClient({
     region: REGION,
     credentials: {

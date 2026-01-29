@@ -6,6 +6,43 @@ frontend:
         - npm ci
         # Write AWS_BRANCH to .env file for runtime access in Next.js API routes
         - echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
+        # Resolve AWS credentials from Secrets Manager and write to .env.production
+        # Uses AWS_CREDENTIALS_SECRET_ARN if set, otherwise defaults to known secret ARN.
+        - |
+          SECRET_ARN="${AWS_CREDENTIALS_SECRET_ARN:-arn:aws:secretsmanager:us-west-2:122610504404:secret:jobsuite-web-app/aws-credentials-O7MIkg}"
+          echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
+          if [ -n "$SECRET_JSON" ]; then
+            APP_AWS_ACCESS_KEY_ID=$(python3 - <<'PY'
+import json, os
+data = json.loads(os.environ["SECRET_JSON"])
+print(data.get("AWS_ACCESS_KEY_ID", ""))
+PY
+)
+            APP_AWS_SECRET_ACCESS_KEY=$(python3 - <<'PY'
+import json, os
+data = json.loads(os.environ["SECRET_JSON"])
+print(data.get("AWS_SECRET_ACCESS_KEY", ""))
+PY
+)
+            if [ -n "$APP_AWS_ACCESS_KEY_ID" ] && [ -n "$APP_AWS_SECRET_ACCESS_KEY" ]; then
+              echo "APP_AWS_ACCESS_KEY_ID=$APP_AWS_ACCESS_KEY_ID" >> .env.production
+              echo "APP_AWS_SECRET_ACCESS_KEY=$APP_AWS_SECRET_ACCESS_KEY" >> .env.production
+              if [ -n "$APP_AWS_REGION" ]; then
+                echo "APP_AWS_REGION=$APP_AWS_REGION" >> .env.production
+              fi
+              if [ -n "$LOG_GROUP_NAME" ]; then
+                echo "LOG_GROUP_NAME=$LOG_GROUP_NAME" >> .env.production
+              fi
+              echo "Resolved AWS credentials into .env.production"
+            else
+              echo "Failed to parse AWS credentials from secret JSON"
+              exit 1
+            fi
+          else
+            echo "Failed to fetch secret value from Secrets Manager"
+            exit 1
+          fi
         # Log branch info (don't override NODE_ENV - Next.js needs it as 'production' for builds)
         # Note: main branch uses QA/development endpoints, not production
         - |
