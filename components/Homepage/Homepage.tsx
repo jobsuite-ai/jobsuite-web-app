@@ -76,6 +76,7 @@ interface HomepageMetrics {
   conversion_rate: number;
   average_estimate_value: number;
   active_projects: number;
+  completed_this_month: number;
 }
 
 interface HomepageData {
@@ -551,9 +552,9 @@ export default function Homepage() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
               <MetricCard
-                title="Active Projects"
-                value={data.metrics.active_projects.toString()}
-                description="Projects currently in progress"
+                title="Projects Completed This Month"
+                value={data.metrics.completed_this_month.toString()}
+                description="Projects completed this month"
               />
             </Grid.Col>
           </Grid>
