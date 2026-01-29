@@ -1,7 +1,19 @@
 import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { NextRequest, NextResponse } from 'next/server';
 
-const REGION = process.env.AWS_REGION || 'us-east-1';
+const REGION = process.env.APP_AWS_REGION || 'us-east-1';
+
+function getDateStamp() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDailyLogStreamName(baseStreamName: string) {
+  return `${baseStreamName}-${getDateStamp()}`;
+}
 
 // Store sequence token per log stream
 const sequenceTokens: Record<string, string | undefined> = {};
@@ -11,13 +23,13 @@ const sequenceTokens: Record<string, string | undefined> = {};
  * Amplify automatically injects secrets as environment variables at runtime
  */
 function getCloudWatchClient(): CloudWatchLogsClient {
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const accessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
       'AWS credentials not found. ' +
-      'Please ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY ' +
+      'Please ensure APP_AWS_ACCESS_KEY_ID and APP_AWS_SECRET_ACCESS_KEY ' +
       'are configured as Amplify secrets.',
     );
   }
@@ -41,14 +53,15 @@ export async function POST(request: NextRequest) {
     }
 
     const logGroupName = process.env.LOG_GROUP_NAME;
-    const logStreamName = logStream || process.env.LOG_STREAM_NAME;
+    const baseStreamName = logStream || process.env.LOG_STREAM_NAME;
 
-    if (!logGroupName || !logStreamName) {
+    if (!logGroupName || !baseStreamName) {
       return NextResponse.json(
         { error: 'LOG_GROUP_NAME and LOG_STREAM_NAME must be configured' },
         { status: 500 },
       );
     }
+    const logStreamName = getDailyLogStreamName(baseStreamName);
 
     // Get CloudWatch client with credentials from Amplify secrets
     const client = getCloudWatchClient();

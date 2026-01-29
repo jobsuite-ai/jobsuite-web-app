@@ -13,6 +13,7 @@ import SignatureAuditHistory from '@/components/EstimateDetails/signature/Signat
 import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
+import { logToCloudWatch } from '@/public/logger';
 
 interface SignatureLinkInfo {
     signature_hash: string;
@@ -97,8 +98,16 @@ export default function SignaturePage() {
                 if (!response.ok) {
                     if (response.status === 404) {
                         setError('This signature link is invalid or has expired.');
+                        await logToCloudWatch(
+                            '[SIGNATURE_FLOW_ALERT] Signature link not found or expired. ' +
+                            `hash=${signatureHash}, status=404`
+                        );
                     } else {
                         setError('Failed to load signature page. Please try again later.');
+                        await logToCloudWatch(
+                            '[SIGNATURE_FLOW_ALERT] Failed to load signature page. ' +
+                            `hash=${signatureHash}, status=${response.status}`
+                        );
                     }
                     return;
                 }
@@ -125,6 +134,10 @@ export default function SignaturePage() {
                 console.error('Error fetching signature link info:', err);
                 const errorMessage = err.message || 'An error occurred while loading the signature page.';
                 setError(errorMessage);
+                await logToCloudWatch(
+                    '[SIGNATURE_FLOW_ALERT] Error fetching signature link info. ' +
+                    `hash=${signatureHash}, error=${err?.message || err}`
+                );
             } finally {
                 setLoading(false);
             }
@@ -419,6 +432,10 @@ export default function SignaturePage() {
                                 } catch (err) {
                                   // eslint-disable-next-line no-console
                                   console.error('Error refreshing signature info:', err);
+                                  await logToCloudWatch(
+                                    '[SIGNATURE_FLOW_ALERT] Error refreshing signature link info after signing. ' +
+                                    `hash=${signatureHash}, error=${(err as Error)?.message || err}`
+                                  );
                                 }
                               };
                               refreshLinkInfo();
