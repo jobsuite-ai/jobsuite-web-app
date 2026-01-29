@@ -116,6 +116,10 @@ export default function SignaturePage() {
                 // Data contains locked estimate content that was stored when the estimate
                 // was sent for signing
                 setLinkInfo(data);
+                await logToCloudWatch(
+                    '[SIGNATURE_FLOW_EVENT] Signature page loaded successfully. ' +
+                    `hash=${signatureHash}, status=${data.status}`
+                );
 
                 // Check if viewer is contractor
                 setIsContractorViewer(data.viewer_type === 'contractor' || data.is_contractor_viewer === true);
@@ -130,8 +134,6 @@ export default function SignaturePage() {
                     setSigned(true);
                 }
             } catch (err: any) {
-                // eslint-disable-next-line no-console
-                console.error('Error fetching signature link info:', err);
                 const errorMessage = err.message || 'An error occurred while loading the signature page.';
                 setError(errorMessage);
                 await logToCloudWatch(
@@ -378,6 +380,10 @@ export default function SignaturePage() {
                             clientEmail={linkInfo.client?.email || ''}
                             clientName={linkInfo.client?.name || undefined}
                             onSignatureSuccess={(signature: SignaturePayload) => {
+                              logToCloudWatch(
+                                '[SIGNATURE_FLOW_EVENT] Signature submitted successfully (client). ' +
+                                `hash=${signatureHash}, signature_id=${signature.id || 'unknown'}`
+                              ).catch(() => {});
                               const signatureWithDefaults = {
                                 id: signature.id || `temp-${Date.now()}`,
                                 ...signature,
@@ -430,8 +436,6 @@ export default function SignaturePage() {
                                     setLinkInfo(data);
                                   }
                                 } catch (err) {
-                                  // eslint-disable-next-line no-console
-                                  console.error('Error refreshing signature info:', err);
                                   await logToCloudWatch(
                                     '[SIGNATURE_FLOW_ALERT] Error refreshing signature link info after signing. ' +
                                     `hash=${signatureHash}, error=${(err as Error)?.message || err}`
