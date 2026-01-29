@@ -1,6 +1,8 @@
 import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from '@aws-sdk/client-cloudwatch-logs';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const runtime = 'nodejs';
+
 const REGION = process.env.APP_AWS_REGION || 'us-east-1';
 
 function getDateStamp() {
@@ -60,8 +62,8 @@ export async function GET() {
       Boolean(appAccessKeyId) && !isResolverString(appAccessKeyId),
     appSecretAccessKeyLooksResolved:
       Boolean(appSecretAccessKey) && !isResolverString(appSecretAccessKey),
-    logGroupNameSet: Boolean(logGroupName),
-    logStreamNameSet: Boolean(logStreamName),
+    logGroupNameSet: logGroupName,
+    logStreamNameSet: logStreamName,
     region: REGION,
   });
 }
