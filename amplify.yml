@@ -3,12 +3,12 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
-        # Write AWS_BRANCH to .env file for runtime access in Next.js API routes
-        - echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
-        # Resolve AWS credentials from Secrets Manager and write to .env.production
-        # Uses AWS_CREDENTIALS_SECRET_ARN if set, otherwise defaults to known secret ARN.
         - |
+          set -e
+          npm ci
+
+          echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
+
           SECRET_ARN="${AWS_CREDENTIALS_SECRET_ARN:-arn:aws:secretsmanager:us-west-2:122610504404:secret:jobsuite-web-app/aws-credentials-O7MIkg}"
           echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
           SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
@@ -43,7 +43,7 @@ PY
             echo "Failed to fetch secret value from Secrets Manager"
             exit 1
           fi
-        - |
+
           if [ "$AWS_BRANCH" = "prod" ] || [ "$AWS_BRANCH" = "production" ]; then
             echo "Building for PRODUCTION ($AWS_BRANCH branch) - will use api.jobsuite.app"
           elif [ "$AWS_BRANCH" = "main" ] || [ "$AWS_BRANCH" = "qa" ] || [ "$AWS_BRANCH" = "staging" ]; then
