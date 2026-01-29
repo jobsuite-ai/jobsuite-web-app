@@ -12,6 +12,7 @@ frontend:
           SECRET_ARN="${AWS_CREDENTIALS_SECRET_ARN:-arn:aws:secretsmanager:us-west-2:122610504404:secret:jobsuite-web-app/aws-credentials-O7MIkg}"
           echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
           SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
+          export SECRET_JSON
           if [ -n "$SECRET_JSON" ]; then
             APP_AWS_ACCESS_KEY_ID=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_ACCESS_KEY_ID',''))")
             APP_AWS_SECRET_ACCESS_KEY=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_SECRET_ACCESS_KEY',''))")
