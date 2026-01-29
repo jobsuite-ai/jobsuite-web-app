@@ -43,6 +43,29 @@ function getCloudWatchClient(): CloudWatchLogsClient {
   });
 }
 
+function isResolverString(value?: string) {
+  return Boolean(value && value.includes('{{resolve:secretsmanager:'));
+}
+
+export async function GET() {
+  const appAccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
+  const appSecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
+  const logGroupName = process.env.LOG_GROUP_NAME;
+  const logStreamName = process.env.LOG_STREAM_NAME;
+
+  return NextResponse.json({
+    appAccessKeyIdSet: Boolean(appAccessKeyId),
+    appSecretAccessKeySet: Boolean(appSecretAccessKey),
+    appAccessKeyIdLooksResolved:
+      Boolean(appAccessKeyId) && !isResolverString(appAccessKeyId),
+    appSecretAccessKeyLooksResolved:
+      Boolean(appSecretAccessKey) && !isResolverString(appSecretAccessKey),
+    logGroupNameSet: Boolean(logGroupName),
+    logStreamNameSet: Boolean(logStreamName),
+    region: REGION,
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
