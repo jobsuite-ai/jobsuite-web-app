@@ -51,13 +51,13 @@ PY
           else
             echo "Building for DEVELOPMENT ($AWS_BRANCH branch) - will use qa.api.jobsuite.app"
           fi
-          echo "Branch: $AWS_BRANCH"
-          echo "NODE_ENV: $NODE_ENV (Next.js sets this automatically)"
-          echo "AMPLIFY_BRANCH written to .env.production: $AWS_BRANCH"
+          echo Branch=$AWS_BRANCH
+          echo NODE_ENV=$NODE_ENV
+          echo AMPLIFY_BRANCH_WRITTEN=$AWS_BRANCH
           if [ -n "$WEBHOOK_EMAIL" ]; then
-            echo "WEBHOOK_EMAIL configured: yes"
+            echo WEBHOOK_EMAIL_CONFIGURED=yes
           else
-            echo "WEBHOOK_EMAIL configured: no"
+            echo WEBHOOK_EMAIL_CONFIGURED=no
           fi
     build:
       commands:
