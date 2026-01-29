@@ -13,6 +13,7 @@ import SignatureAuditHistory from '@/components/EstimateDetails/signature/Signat
 import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/signature/SignatureForm';
 import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
+import { logToCloudWatch } from '@/public/logger';
 
 interface SignatureLinkInfo {
     signature_hash: string;
@@ -97,8 +98,16 @@ export default function SignaturePage() {
                 if (!response.ok) {
                     if (response.status === 404) {
                         setError('This signature link is invalid or has expired.');
+                        await logToCloudWatch(
+                            '[SIGNATURE_FLOW_ALERT] Signature link not found or expired. ' +
+                            `hash=${signatureHash}, status=404`
+                        );
                     } else {
                         setError('Failed to load signature page. Please try again later.');
+                        await logToCloudWatch(
+                            '[SIGNATURE_FLOW_ALERT] Failed to load signature page. ' +
+                            `hash=${signatureHash}, status=${response.status}`
+                        );
                     }
                     return;
                 }
@@ -107,6 +116,10 @@ export default function SignaturePage() {
                 // Data contains locked estimate content that was stored when the estimate
                 // was sent for signing
                 setLinkInfo(data);
+                await logToCloudWatch(
+                    '[SIGNATURE_FLOW_EVENT] Signature page loaded successfully. ' +
+                    `hash=${signatureHash}, status=${data.status}`
+                );
 
                 // Check if viewer is contractor
                 setIsContractorViewer(data.viewer_type === 'contractor' || data.is_contractor_viewer === true);
@@ -121,10 +134,12 @@ export default function SignaturePage() {
                     setSigned(true);
                 }
             } catch (err: any) {
-                // eslint-disable-next-line no-console
-                console.error('Error fetching signature link info:', err);
                 const errorMessage = err.message || 'An error occurred while loading the signature page.';
                 setError(errorMessage);
+                await logToCloudWatch(
+                    '[SIGNATURE_FLOW_ALERT] Error fetching signature link info. ' +
+                    `hash=${signatureHash}, error=${err?.message || err}`
+                );
             } finally {
                 setLoading(false);
             }
@@ -365,6 +380,10 @@ export default function SignaturePage() {
                             clientEmail={linkInfo.client?.email || ''}
                             clientName={linkInfo.client?.name || undefined}
                             onSignatureSuccess={(signature: SignaturePayload) => {
+                              logToCloudWatch(
+                                '[SIGNATURE_FLOW_EVENT] Signature submitted successfully (client). ' +
+                                `hash=${signatureHash}, signature_id=${signature.id || 'unknown'}`
+                              ).catch(() => {});
                               const signatureWithDefaults = {
                                 id: signature.id || `temp-${Date.now()}`,
                                 ...signature,
@@ -417,8 +436,10 @@ export default function SignaturePage() {
                                     setLinkInfo(data);
                                   }
                                 } catch (err) {
-                                  // eslint-disable-next-line no-console
-                                  console.error('Error refreshing signature info:', err);
+                                  await logToCloudWatch(
+                                    '[SIGNATURE_FLOW_ALERT] Error refreshing signature link info after signing. ' +
+                                    `hash=${signatureHash}, error=${(err as Error)?.message || err}`
+                                  );
                                 }
                               };
                               refreshLinkInfo();

@@ -3,12 +3,38 @@ frontend:
   phases:
     preBuild:
       commands:
-        - npm ci
-        # Write AWS_BRANCH to .env file for runtime access in Next.js API routes
-        - echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
-        # Log branch info (don't override NODE_ENV - Next.js needs it as 'production' for builds)
-        # Note: main branch uses QA/development endpoints, not production
         - |
+          set -e
+          npm ci
+
+          echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
+
+          SECRET_ARN="${AWS_CREDENTIALS_SECRET_ARN:-arn:aws:secretsmanager:us-west-2:122610504404:secret:jobsuite-web-app/aws-credentials-O7MIkg}"
+          echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
+          SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
+          export SECRET_JSON
+          if [ -n "$SECRET_JSON" ]; then
+            APP_AWS_ACCESS_KEY_ID=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_ACCESS_KEY_ID',''))")
+            APP_AWS_SECRET_ACCESS_KEY=$(python3 -c "import json,os; print(json.loads(os.environ['SECRET_JSON']).get('AWS_SECRET_ACCESS_KEY',''))")
+            if [ -n "$APP_AWS_ACCESS_KEY_ID" ] && [ -n "$APP_AWS_SECRET_ACCESS_KEY" ]; then
+              echo "APP_AWS_ACCESS_KEY_ID=$APP_AWS_ACCESS_KEY_ID" >> .env.production
+              echo "APP_AWS_SECRET_ACCESS_KEY=$APP_AWS_SECRET_ACCESS_KEY" >> .env.production
+              if [ -n "$APP_AWS_REGION" ]; then
+                echo "APP_AWS_REGION=$APP_AWS_REGION" >> .env.production
+              fi
+              if [ -n "$LOG_GROUP_NAME" ]; then
+                echo "LOG_GROUP_NAME=$LOG_GROUP_NAME" >> .env.production
+              fi
+              echo "Resolved AWS credentials into .env.production"
+            else
+              echo "Failed to parse AWS credentials from secret JSON"
+              exit 1
+            fi
+          else
+            echo "Failed to fetch secret value from Secrets Manager"
+            exit 1
+          fi
+
           if [ "$AWS_BRANCH" = "prod" ] || [ "$AWS_BRANCH" = "production" ]; then
             echo "Building for PRODUCTION ($AWS_BRANCH branch) - will use api.jobsuite.app"
           elif [ "$AWS_BRANCH" = "main" ] || [ "$AWS_BRANCH" = "qa" ] || [ "$AWS_BRANCH" = "staging" ]; then
@@ -16,11 +42,14 @@ frontend:
           else
             echo "Building for DEVELOPMENT ($AWS_BRANCH branch) - will use qa.api.jobsuite.app"
           fi
-        # Debug: Show which environment variables are available
-        - "echo \"Branch: $AWS_BRANCH\""
-        - "echo \"NODE_ENV: $NODE_ENV (Next.js sets this automatically)\""
-        - "echo \"AMPLIFY_BRANCH written to .env.production: $AWS_BRANCH\""
-        - "echo \"WEBHOOK_EMAIL configured: $([ -n \"$WEBHOOK_EMAIL\" ] && echo 'yes' || echo 'no')\""
+          echo Branch=$AWS_BRANCH
+          echo NODE_ENV=$NODE_ENV
+          echo AMPLIFY_BRANCH_WRITTEN=$AWS_BRANCH
+          if [ -n "$WEBHOOK_EMAIL" ]; then
+            echo WEBHOOK_EMAIL_CONFIGURED=yes
+          else
+            echo WEBHOOK_EMAIL_CONFIGURED=no
+          fi
     build:
       commands:
         - npm run build

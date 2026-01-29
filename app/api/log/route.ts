@@ -1,7 +1,23 @@
 import { CloudWatchLogsClient, PutLogEventsCommand, CreateLogStreamCommand } from '@aws-sdk/client-cloudwatch-logs';
+import fs from 'fs';
 import { NextRequest, NextResponse } from 'next/server';
+import path from 'path';
 
-const REGION = process.env.AWS_REGION || 'us-east-1';
+export const runtime = 'nodejs';
+
+const REGION = process.env.APP_AWS_REGION || 'us-east-1';
+
+function getDateStamp() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(now.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getDailyLogStreamName(baseStreamName: string) {
+  return `${baseStreamName}-${getDateStamp()}`;
+}
 
 // Store sequence token per log stream
 const sequenceTokens: Record<string, string | undefined> = {};
@@ -11,14 +27,22 @@ const sequenceTokens: Record<string, string | undefined> = {};
  * Amplify automatically injects secrets as environment variables at runtime
  */
 function getCloudWatchClient(): CloudWatchLogsClient {
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const accessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
 
   if (!accessKeyId || !secretAccessKey) {
     throw new Error(
       'AWS credentials not found. ' +
-      'Please ensure AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY ' +
+      'Please ensure APP_AWS_ACCESS_KEY_ID and APP_AWS_SECRET_ACCESS_KEY ' +
       'are configured as Amplify secrets.',
+    );
+  }
+
+  if (isResolverString(accessKeyId) || isResolverString(secretAccessKey)) {
+    throw new Error(
+      'AWS credentials are still resolver strings. ' +
+      'Amplify does not resolve {{resolve:secretsmanager:...}} at runtime. ' +
+      'Set the actual values in Amplify secrets and redeploy.',
     );
   }
 
@@ -28,6 +52,59 @@ function getCloudWatchClient(): CloudWatchLogsClient {
       accessKeyId,
       secretAccessKey,
     },
+  });
+}
+
+function isResolverString(value?: string) {
+  return Boolean(value && value.includes('{{resolve:secretsmanager:'));
+}
+
+export async function GET() {
+  const appAccessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
+  const appSecretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
+  const logGroupName = process.env.LOG_GROUP_NAME;
+  const logStreamName = process.env.LOG_STREAM_NAME;
+  const amplifyBranch = process.env.AMPLIFY_BRANCH;
+  const awsBranch = process.env.AWS_BRANCH;
+  let envFileExists = false;
+  let envFileHasLogGroupName = false;
+  let envFileHasLogStreamName = false;
+  let envFileHasAppAccessKeyId = false;
+  let envFileHasAppSecretAccessKey = false;
+
+  try {
+    const envFilePath = path.join(process.cwd(), '.env.production');
+    envFileExists = fs.existsSync(envFilePath);
+    if (envFileExists) {
+      const content = fs.readFileSync(envFilePath, 'utf8');
+      envFileHasLogGroupName = content.includes('LOG_GROUP_NAME=');
+      envFileHasLogStreamName = content.includes('LOG_STREAM_NAME=');
+      envFileHasAppAccessKeyId = content.includes('APP_AWS_ACCESS_KEY_ID=');
+      envFileHasAppSecretAccessKey = content.includes('APP_AWS_SECRET_ACCESS_KEY=');
+    }
+  } catch {
+    envFileExists = false;
+  }
+
+  return NextResponse.json({
+    appAccessKeyIdSet: Boolean(appAccessKeyId),
+    appSecretAccessKeySet: Boolean(appSecretAccessKey),
+    appAccessKeyIdLooksResolved:
+      Boolean(appAccessKeyId) && !isResolverString(appAccessKeyId),
+    appSecretAccessKeyLooksResolved:
+      Boolean(appSecretAccessKey) && !isResolverString(appSecretAccessKey),
+    logGroupNameSet: Boolean(logGroupName),
+    logStreamNameSet: Boolean(logStreamName),
+    logGroupNameValue: logGroupName || null,
+    logStreamNameValue: logStreamName || null,
+    amplifyBranch: amplifyBranch || null,
+    awsBranch: awsBranch || null,
+    envFileExists,
+    envFileHasLogGroupName,
+    envFileHasLogStreamName,
+    envFileHasAppAccessKeyId,
+    envFileHasAppSecretAccessKey,
+    region: REGION,
   });
 }
 
@@ -41,14 +118,15 @@ export async function POST(request: NextRequest) {
     }
 
     const logGroupName = process.env.LOG_GROUP_NAME;
-    const logStreamName = logStream || process.env.LOG_STREAM_NAME;
+    const baseStreamName = logStream || process.env.LOG_STREAM_NAME;
 
-    if (!logGroupName || !logStreamName) {
+    if (!logGroupName || !baseStreamName) {
       return NextResponse.json(
         { error: 'LOG_GROUP_NAME and LOG_STREAM_NAME must be configured' },
         { status: 500 },
       );
     }
+    const logStreamName = getDailyLogStreamName(baseStreamName);
 
     // Get CloudWatch client with credentials from Amplify secrets
     const client = getCloudWatchClient();
