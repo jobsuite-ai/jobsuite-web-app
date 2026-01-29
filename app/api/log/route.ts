@@ -62,8 +62,8 @@ export async function GET() {
       Boolean(appAccessKeyId) && !isResolverString(appAccessKeyId),
     appSecretAccessKeyLooksResolved:
       Boolean(appSecretAccessKey) && !isResolverString(appSecretAccessKey),
-    logGroupNameSet: Boolean(logGroupName),
-    logStreamNameSet: Boolean(logStreamName),
+    logGroupNameSet: logGroupName,
+    logStreamNameSet: logStreamName,
     region: REGION,
   });
 }
