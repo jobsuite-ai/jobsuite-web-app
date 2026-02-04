@@ -142,6 +142,49 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const signatureLinksRef = useRef<any[] | null>(null);
     const hasProcessedSignatureLinksRef = useRef<string | null>(null);
 
+    const renderTimeEntryRows = () => {
+        const parseEntryDate = (value: any) => {
+            if (!value) {
+                return null;
+            }
+            const hasTimeZone =
+                typeof value === 'string' && /Z$|[+-]\d{2}:?\d{2}$/.test(value);
+            const isoValue =
+                typeof value === 'string' && !hasTimeZone ? `${value}Z` : value;
+            return new Date(isoValue);
+        };
+
+        return [...timeEntries]
+            .sort((a: any, b: any) => {
+                const dateA = parseEntryDate(a.date);
+                const dateB = parseEntryDate(b.date);
+                const timeA = dateA ? dateA.getTime() : 0;
+                const timeB = dateB ? dateB.getTime() : 0;
+                // Newest first (descending)
+                return timeB - timeA;
+            })
+            .map((entry: any) => {
+                const hoursDisplay = (() => {
+                    if (typeof entry.hours === 'number') {
+                        return entry.hours.toFixed(2);
+                    }
+                    return entry.hours || '0.00';
+                })();
+                const entryDate = parseEntryDate(entry.date);
+                const dateDisplay = entryDate
+                    ? entryDate.toLocaleDateString(undefined, { timeZone: 'UTC' })
+                    : 'N/A';
+                const employeeName = entry.employee_name || 'N/A';
+                return (
+                    <Table.Tr key={entry.id}>
+                        <Table.Td>{employeeName}</Table.Td>
+                        <Table.Td>{hoursDisplay}</Table.Td>
+                        <Table.Td>{dateDisplay}</Table.Td>
+                    </Table.Tr>
+                );
+            });
+    };
+
     // Load cached details data immediately for instant display
     useEffect(() => {
         if (isMountedRef.current) {
@@ -1753,42 +1796,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                             </Table.Tr>
                                                         </Table.Thead>
                                                         <Table.Tbody>
-                                                            {[...timeEntries]
-                                                                .sort((a: any, b: any) => {
-                                                                    const dateA = a.date
-                                                                        ? new Date(a.date).getTime()
-                                                                        : 0;
-                                                                    const dateB = b.date
-                                                                        ? new Date(b.date).getTime()
-                                                                        : 0;
-                                                                    // Newest first (descending)
-                                                                    return dateB - dateA;
-                                                                })
-                                                                .map((entry: any) => {
-                                                                    const hoursDisplay =
-                                                                        typeof entry.hours === 'number'
-                                                                            ? entry.hours.toFixed(2)
-                                                                            : entry.hours || '0.00';
-                                                                    const dateDisplay = entry.date
-                                                                        ? new Date(entry.date)
-                                                                              .toLocaleDateString()
-                                                                        : 'N/A';
-                                                                    const employeeName =
-                                                                        entry.employee_name || 'N/A';
-                                                                    return (
-                                                                        <Table.Tr key={entry.id}>
-                                                                            <Table.Td>
-                                                                                {employeeName}
-                                                                            </Table.Td>
-                                                                            <Table.Td>
-                                                                                {hoursDisplay}
-                                                                            </Table.Td>
-                                                                            <Table.Td>
-                                                                                {dateDisplay}
-                                                                            </Table.Td>
-                                                                        </Table.Tr>
-                                                                    );
-                                                                })}
+                                                            {renderTimeEntryRows()}
                                                         </Table.Tbody>
                                                     </Table>
                                                 </div>

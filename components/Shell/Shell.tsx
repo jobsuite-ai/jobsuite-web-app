@@ -23,6 +23,23 @@ export function Shell({ children }: { children: any }) {
   // Don't show header/navigation for signature pages
   const isSignaturePage = pathname?.startsWith('/sign/');
 
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const stored = window.localStorage.getItem('jobsuite_sidebar_open');
+    if (stored !== null) {
+      setSidebarOpened(stored === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem('jobsuite_sidebar_open', String(sidebarOpened));
+  }, [sidebarOpened]);
+
   const clearAuthStorage = useCallback(() => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
