@@ -46,7 +46,7 @@ interface JobWithHourDifference {
   actualHours: number;
   difference: number;
   differencePercentage: number;
-  updatedAt: string;
+  finishedDate: string;
   crewLead: string;
 }
 
@@ -229,7 +229,7 @@ export default function Dashboard() {
             actualHours: Number(job.actual_hours) || 0,
             difference: Number(job.difference) || 0,
             differencePercentage: Number(job.difference_percentage) || 0,
-            updatedAt: job.updated_at,
+            finishedDate: job.finished_date,
             crewLead: job.crew_lead,
           })),
           recentlySoldJobs: (data.recently_sold_jobs || []).map((job: any) => ({
@@ -742,7 +742,7 @@ export default function Dashboard() {
                           <Table.Th>Actual Hours</Table.Th>
                           <Table.Th>Difference</Table.Th>
                           <Table.Th>Difference %</Table.Th>
-                          <Table.Th>Last Updated</Table.Th>
+                          <Table.Th>Finished Date</Table.Th>
                           <Table.Th>Crew Lead</Table.Th>
                         </Table.Tr>
                       </Table.Thead>
@@ -763,7 +763,7 @@ export default function Dashboard() {
                               </Text>
                             </Table.Td>
                             <Table.Td>
-                              {new Date(job.updatedAt).toLocaleDateString()}
+                              {new Date(job.finishedDate).toLocaleDateString()}
                             </Table.Td>
                             <Table.Td>{job.crewLead}</Table.Td>
                           </Table.Tr>

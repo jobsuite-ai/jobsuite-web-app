@@ -25,6 +25,7 @@ const links = [
   { link: '/projects', label: 'Projects' },
   { link: '/proposals', label: 'Proposals' },
   { link: '/messaging-center', label: 'Messaging Center' },
+  { link: '/notifications', label: 'Notifications' },
 ];
 
 interface HeaderProps {
@@ -121,6 +122,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         return <IconFileText size={18} />;
       case '/messaging-center':
         return <IconMail size={18} />;
+      case '/notifications':
+        return <IconNotification size={18} />;
       default:
         return undefined;
     }
