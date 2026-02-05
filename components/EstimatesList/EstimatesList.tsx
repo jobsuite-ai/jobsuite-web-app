@@ -361,11 +361,20 @@ export default function EstimatesList() {
                         </>
                     );
                 })()}
-                {(estimate.estimate_hours || estimate.hours_bid) && (
-                    <Text size="sm" c="dimmed" mt="xs">
-                        Hours: {estimate.estimate_hours || estimate.hours_bid}
-                    </Text>
-                )}
+                {(() => {
+                    const rawHours = estimate.estimate_hours ?? estimate.hours_bid;
+                    const hoursValue =
+                        typeof rawHours === 'string' ? Number(rawHours) : rawHours;
+                    const shouldShowHours =
+                        typeof hoursValue === 'number' &&
+                        Number.isFinite(hoursValue) &&
+                        hoursValue > 0;
+                    return shouldShowHours ? (
+                        <Text size="sm" c="dimmed" mt="xs">
+                            Hours: {hoursValue}
+                        </Text>
+                    ) : null;
+                })()}
                 {estimate.sent_date && (
                     <Text size="sm" c="dimmed">
                         Sent: {new Date(estimate.sent_date).toLocaleDateString()}

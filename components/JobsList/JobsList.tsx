@@ -304,14 +304,15 @@ function KanbanColumn({
                         {column.title}
                     </Title>
                     {column.id === 'scheduling' && hoursSummary ? (
-                        <Stack gap={0} align="center">
+                        <Group gap="xs" justify="center">
                             <Text size="xs" c="dimmed">
                                 Interior: {hoursSummary.interior.toFixed(1)} hrs
                             </Text>
+                            <Text size="xs" c="dimmed">•</Text>
                             <Text size="xs" c="dimmed">
                                 Exterior: {hoursSummary.exterior.toFixed(1)} hrs
                             </Text>
-                        </Stack>
+                        </Group>
                     ) : null}
                 </Stack>
                 {isHistorical && onToggleCollapse ? (
