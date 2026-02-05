@@ -37,7 +37,7 @@ import { IconArrowsMoveHorizontal, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
-import { Estimate, EstimateStatus, Job, JobStatus } from '../Global/model';
+import { Estimate, EstimateStatus, EstimateType, Job, JobStatus } from '../Global/model';
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
@@ -84,6 +84,39 @@ function getTotalHours(estimate: Estimate): number {
         return estimate.actual_hours;
     }
     return estimate.hours_bid || 0;
+}
+
+function getInteriorExteriorTotals(jobs: Job[]) {
+    return jobs.reduce(
+        (totals, job) => {
+            const estimate = job as Estimate;
+            const totalHours = getTotalHours(estimate);
+
+            if (!totalHours) {
+                return totals;
+            }
+
+            switch (estimate.estimate_type) {
+                case EstimateType.INTERIOR:
+                    totals.interior += totalHours;
+                    break;
+                case EstimateType.EXTERIOR:
+                    totals.exterior += totalHours;
+                    break;
+                case EstimateType.BOTH: {
+                    const splitHours = totalHours / 2;
+                    totals.interior += splitHours;
+                    totals.exterior += splitHours;
+                    break;
+                }
+                default:
+                    break;
+            }
+
+            return totals;
+        },
+        { interior: 0, exterior: 0 }
+    );
 }
 
 // Sortable job card component
@@ -137,11 +170,11 @@ function SortableJobCard({ project, onClick, resolveClientName }: SortableJobCar
                 <Badge
                   className={classes.badge}
                   color={getEstimateBadgeColor(
-                    (project.status) || EstimateStatus.NEW_LEAD
+                    project.status || EstimateStatus.NEW_LEAD
                   )}
                   size="sm"
                 >
-                    {String(project.status || 'UNKNOWN')}
+                    {String(getFormattedEstimateStatus(project.status) || 'UNKNOWN')}
                 </Badge>
             </Group>
 
@@ -185,6 +218,7 @@ interface KanbanColumnProps {
     onToggleCollapse?: () => void;
     columnRef?: React.RefObject<HTMLDivElement>;
     isOver?: boolean;
+    hoursSummary?: { interior: number; exterior: number };
 }
 
 function KanbanColumn({
@@ -196,6 +230,7 @@ function KanbanColumn({
     onToggleCollapse,
     columnRef,
     isOver: isOverProp,
+    hoursSummary,
 }: KanbanColumnProps) {
     const jobIds = jobs.map((job) => job.id);
     const { setNodeRef, isOver: isOverDroppable } = useDroppable({
@@ -268,6 +303,17 @@ function KanbanColumn({
                     <Title order={5} ta="center">
                         {column.title}
                     </Title>
+                    {column.id === 'scheduling' && hoursSummary ? (
+                        <Group gap="xs" justify="center">
+                            <Text size="xs" c="dimmed">
+                                Interior: {hoursSummary.interior.toFixed(1)} hrs
+                            </Text>
+                            <Text size="xs" c="dimmed">•</Text>
+                            <Text size="xs" c="dimmed">
+                                Exterior: {hoursSummary.exterior.toFixed(1)} hrs
+                            </Text>
+                        </Group>
+                    ) : null}
                 </Stack>
                 {isHistorical && onToggleCollapse ? (
                     <Group gap="xs">
@@ -917,19 +963,28 @@ export default function JobsList() {
                   h="100%"
                   className={classes.flexContainer}
                 >
-                    {columns.map((column) => (
-                        <KanbanColumn
-                          key={column.id}
-                          column={column}
-                          jobs={getJobsForColumn(column.id)}
-                          onJobClick={handleJobClick}
-                          resolveClientName={resolveClientName}
-                          isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
-                          onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
-                          columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
-                          isOver={overId === column.id}
-                        />
-                    ))}
+                    {columns.map((column) => {
+                        const columnJobs = getJobsForColumn(column.id);
+                        const hoursSummary =
+                            column.id === 'scheduling'
+                                ? getInteriorExteriorTotals(columnJobs)
+                                : undefined;
+
+                        return (
+                            <KanbanColumn
+                              key={column.id}
+                              column={column}
+                              jobs={columnJobs}
+                              onJobClick={handleJobClick}
+                              resolveClientName={resolveClientName}
+                              isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
+                              onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
+                              columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
+                              isOver={overId === column.id}
+                              hoursSummary={hoursSummary}
+                            />
+                        );
+                    })}
                 </Flex>
                 </div>
             </div>

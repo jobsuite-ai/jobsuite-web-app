@@ -55,6 +55,7 @@ const SENT_PROPOSAL_STATUSES = [
 const ACCEPTED_STATUSES = [
     EstimateStatus.ESTIMATE_ACCEPTED,
     EstimateStatus.CONTRACTOR_OPENED,
+    EstimateStatus.CONTRACTOR_SIGNED,
 ];
 
 // All statuses for filter dropdown
@@ -341,14 +342,39 @@ export default function EstimatesList() {
             </Group>
 
             <Flex direction="column" align="flex-start" gap="xs">
-                <Text size="sm" c="dimmed">{estimate.address_street}</Text>
-                <Text size="sm" c="dimmed">{estimate.address_city}, {estimate.address_state}</Text>
-                <Text size="sm" c="dimmed">{estimate.address_zipcode}</Text>
-                {(estimate.estimate_hours || estimate.hours_bid) && (
-                    <Text size="sm" c="dimmed" mt="xs">
-                        Hours: {estimate.estimate_hours || estimate.hours_bid}
-                    </Text>
-                )}
+                {(() => {
+                    const street = estimate.address_street ? String(estimate.address_street).trim() : '';
+                    const city = estimate.address_city ? String(estimate.address_city).trim() : '';
+                    const state = estimate.address_state ? String(estimate.address_state).trim() : '';
+                    const zipcodeRaw = estimate.address_zipcode ? String(estimate.address_zipcode).trim() : '';
+                    const zipcode = zipcodeRaw && zipcodeRaw !== '0' ? zipcodeRaw : '';
+
+                    return (
+                        <>
+                            {street && <Text size="sm" c="dimmed">{street}</Text>}
+                            {(city || state) && (
+                                <Text size="sm" c="dimmed">
+                                    {[city, state].filter(Boolean).join(', ')}
+                                </Text>
+                            )}
+                            {zipcode && <Text size="sm" c="dimmed">{zipcode}</Text>}
+                        </>
+                    );
+                })()}
+                {(() => {
+                    const rawHours = estimate.estimate_hours ?? estimate.hours_bid;
+                    const hoursValue =
+                        typeof rawHours === 'string' ? Number(rawHours) : rawHours;
+                    const shouldShowHours =
+                        typeof hoursValue === 'number' &&
+                        Number.isFinite(hoursValue) &&
+                        hoursValue > 0;
+                    return shouldShowHours ? (
+                        <Text size="sm" c="dimmed" mt="xs">
+                            Hours: {hoursValue}
+                        </Text>
+                    ) : null;
+                })()}
                 {estimate.sent_date && (
                     <Text size="sm" c="dimmed">
                         Sent: {new Date(estimate.sent_date).toLocaleDateString()}

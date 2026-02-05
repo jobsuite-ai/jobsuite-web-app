@@ -25,6 +25,7 @@ const links = [
   { link: '/projects', label: 'Projects' },
   { link: '/proposals', label: 'Proposals' },
   { link: '/messaging-center', label: 'Messaging Center' },
+  { link: '/notifications', label: 'Notifications' },
 ];
 
 interface HeaderProps {
@@ -65,6 +66,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
   const unacknowledgedCountRef = useRef<number>(0);
+  const inFlightJobTitlesRef = useRef<Record<string, Promise<string | null>>>({});
   const router = useRouter();
   const pathname = usePathname();
   const clients = useAppSelector(selectAllClients);
@@ -121,6 +123,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         return <IconFileText size={18} />;
       case '/messaging-center':
         return <IconMail size={18} />;
+      case '/notifications':
+        return <IconNotification size={18} />;
       default:
         return undefined;
     }
@@ -653,6 +657,15 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
   // Fetch job title for a notification
   const fetchJobTitle = useCallback(async (estimateId: string) => {
+    if (jobTitles[estimateId]) {
+      return jobTitles[estimateId];
+    }
+    const existingPromise = inFlightJobTitlesRef.current[estimateId];
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const fetchPromise = (async () => {
     // Check cache first
     const cachedEstimate = estimates.find((e) => e.id === estimateId);
     if (cachedEstimate?.title) {
@@ -687,7 +700,15 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }
 
     return null;
-  }, [estimates]);
+    })();
+
+    inFlightJobTitlesRef.current[estimateId] = fetchPromise;
+    try {
+      return await fetchPromise;
+    } finally {
+      delete inFlightJobTitlesRef.current[estimateId];
+    }
+  }, [estimates, jobTitles]);
 
   // Fetch notifications when menu opens
   const fetchNotifications = useCallback(async () => {
@@ -702,15 +723,18 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
       if (response.ok) {
         const data = await response.json();
-        const notificationsData = data || [];
+        const notificationsData: Notification[] = Array.isArray(data) ? data : [];
         setNotifications(notificationsData);
 
         // Fetch job titles for all notifications
-        const titlePromises = notificationsData
-          .map((n: Notification) => {
-            const estimateId = extractEstimateId(n.link);
-            return estimateId ? fetchJobTitle(estimateId) : Promise.resolve(null);
-          });
+        const estimateIds = Array.from(
+          new Set(
+            notificationsData
+              .map((n: Notification) => extractEstimateId(n.link))
+              .filter((id): id is string => typeof id === 'string' && id.length > 0)
+          )
+        );
+        const titlePromises = estimateIds.map((estimateId) => fetchJobTitle(estimateId));
         await Promise.all(titlePromises);
       }
     } catch (error) {
@@ -903,7 +927,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                 ) : notifications.length === 0 ? (
                   <Menu.Item disabled>
                     <Text size="sm" c="dimmed" ta="center">
-                      No notifications
+                      All Caught Up!
                     </Text>
                   </Menu.Item>
                 ) : (
