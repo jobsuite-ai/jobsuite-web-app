@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   Badge,
@@ -72,6 +72,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
+  const inFlightJobTitlesRef = useRef<Record<string, Promise<string | null>>>({});
 
   const fetchNotifications = useCallback(
     async (includeOlder: boolean = false) => {
@@ -127,15 +128,24 @@ export default function NotificationsPage() {
 
   // Fetch job title for a notification
   const fetchJobTitle = useCallback(async (estimateId: string) => {
-    // Check cache first
-    const cachedEstimate = estimates.find((e) => e.id === estimateId);
-    if (cachedEstimate?.title) {
-      setJobTitles((prev) => {
-        if (prev[estimateId]) return prev; // Already set
-        return { ...prev, [estimateId]: cachedEstimate.title! };
-      });
-      return cachedEstimate.title;
+    if (jobTitles[estimateId]) {
+      return jobTitles[estimateId];
     }
+    const existingPromise = inFlightJobTitlesRef.current[estimateId];
+    if (existingPromise) {
+      return existingPromise;
+    }
+
+    const fetchPromise = (async () => {
+    // Check cache first
+      const cachedEstimate = estimates.find((e) => e.id === estimateId);
+      if (cachedEstimate?.title) {
+        setJobTitles((prev) => {
+          if (prev[estimateId]) return prev; // Already set
+          return { ...prev, [estimateId]: cachedEstimate.title! };
+        });
+        return cachedEstimate.title;
+      }
 
     // Fetch from API
     try {
@@ -161,23 +171,34 @@ export default function NotificationsPage() {
     }
 
     return null;
-  }, [estimates]);
+    })();
+
+    inFlightJobTitlesRef.current[estimateId] = fetchPromise;
+    try {
+      return await fetchPromise;
+    } finally {
+      delete inFlightJobTitlesRef.current[estimateId];
+    }
+  }, [estimates, jobTitles]);
 
   // Fetch job titles for all notifications with links
   useEffect(() => {
     const fetchTitles = async () => {
-      const titlePromises = allNotifications
-        .map((n) => {
-          const estimateId = extractEstimateId(n.link);
-          return estimateId ? fetchJobTitle(estimateId) : Promise.resolve(null);
-        });
+      const estimateIds = Array.from(
+        new Set(
+          allNotifications
+            .map((n) => extractEstimateId(n.link))
+            .filter((id): id is string => Boolean(id))
+        )
+      );
+      const titlePromises = estimateIds.map((estimateId) => fetchJobTitle(estimateId));
       await Promise.all(titlePromises);
     };
 
     if (allNotifications.length > 0) {
       fetchTitles();
     }
-  }, [allNotifications]);
+  }, [allNotifications, fetchJobTitle]);
 
   const acknowledgeNotification = useCallback(async (notificationId: string) => {
     // Optimistically update UI immediately
