@@ -17,6 +17,10 @@ interface RichTextBodyEditorProps {
     disabled?: boolean;
 }
 
+interface EditorLike {
+    getHTML: () => string;
+}
+
 export default function RichTextBodyEditor({
     value,
     onChange,
@@ -30,7 +34,7 @@ export default function RichTextBodyEditor({
             Link.configure({ openOnClick: false }),
         ],
         content: value,
-        onUpdate: ({ editor: editorInstance }) => {
+        onUpdate: ({ editor: editorInstance }: { editor: EditorLike }) => {
             onChange(editorInstance.getHTML());
         },
     });
