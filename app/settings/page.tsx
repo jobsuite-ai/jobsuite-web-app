@@ -451,7 +451,7 @@ export default function SettingsPage() {
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                     <Tabs.Tab value="actions">Actions</Tabs.Tab>
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
-                    <Tabs.Tab value="templates">Templates</Tabs.Tab>
+                    <Tabs.Tab value="templates">Message Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
                 </Tabs.List>
 

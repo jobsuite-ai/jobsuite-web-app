@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import {
     Modal,
     Stack,
+    Text,
     TextInput,
-    Textarea,
     Button,
     Group,
     Select,
@@ -15,6 +15,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 
 interface OutreachMessage {
     id: string;
@@ -32,7 +33,7 @@ interface OutreachMessage {
 
 interface MessageEditorProps {
     message: OutreachMessage;
-    onClose: () => void;
+    onClose: (didUpdate: boolean) => void;
 }
 
 export default function MessageEditor({ message, onClose }: MessageEditorProps) {
@@ -75,7 +76,20 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
         }
     };
 
+    const hasChanges =
+        subject !== message.subject ||
+        body !== message.body ||
+        recipientType !== message.recipient_type ||
+        (recipientType === 'SINGLE_SUB_CLIENT'
+            ? selectedSubClient !== (message.recipient_sub_client_id || null)
+            : message.recipient_type === 'SINGLE_SUB_CLIENT');
+
     const handleSave = async () => {
+        if (!hasChanges) {
+            onClose(false);
+            return;
+        }
+
         try {
             setSaving(true);
 
@@ -107,7 +121,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                 icon: <IconCheck size={16} />,
             });
 
-            onClose();
+            onClose(true);
         } catch (err) {
             notifications.show({
                 title: 'Error',
@@ -123,9 +137,9 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
     return (
         <Modal
           opened
-          onClose={onClose}
+          onClose={() => onClose(false)}
           title="Edit Message"
-          size="lg"
+          size="xl"
           centered
           zIndex={1000}
           overlayProps={{
@@ -143,12 +157,15 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                 />
-                <Textarea
-                  label="Body (HTML supported)"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  minRows={8}
-                />
+                <Stack gap="xs">
+                    <Text size="sm" fw={500}>
+                        Body
+                    </Text>
+                    <Text c="dimmed" size="xs">
+                        Use the toolbar to format text. Line breaks are preserved.
+                    </Text>
+                    <RichTextBodyEditor value={body} onChange={setBody} />
+                </Stack>
                 <Select
                   label="Recipients"
                   data={[
@@ -173,7 +190,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                     />
                 )}
                 <Group justify="flex-end" mt="md">
-                    <Button variant="subtle" onClick={onClose}>
+                    <Button variant="subtle" onClick={() => onClose(false)}>
                         Cancel
                     </Button>
                     <Button onClick={handleSave} loading={saving}>
