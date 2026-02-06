@@ -5,8 +5,8 @@ import { useState, useEffect } from 'react';
 import {
     Modal,
     Stack,
+    Text,
     TextInput,
-    Textarea,
     Button,
     Group,
     Select,
@@ -15,6 +15,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 
 interface OutreachMessage {
     id: string;
@@ -156,14 +157,15 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                 />
-                <Textarea
-                  label="Body (HTML supported)"
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  autosize
-                  minRows={16}
-                  maxRows={26}
-                />
+                <Stack gap="xs">
+                    <Text size="sm" fw={500}>
+                        Body
+                    </Text>
+                    <Text c="dimmed" size="xs">
+                        Use the toolbar to format text. Line breaks are preserved.
+                    </Text>
+                    <RichTextBodyEditor value={body} onChange={setBody} />
+                </Stack>
                 <Select
                   label="Recipients"
                   data={[

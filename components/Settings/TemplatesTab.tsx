@@ -15,17 +15,11 @@ import {
     Accordion,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { RichTextEditor } from '@mantine/tiptap';
 import '@mantine/tiptap/styles.css';
 import { IconCheck, IconX } from '@tabler/icons-react';
-import Link from '@tiptap/extension-link';
-import Underline from '@tiptap/extension-underline';
-import { useEditor } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
-
-import styles from './TemplatesTab.module.css';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 import { useUsers } from '@/hooks/useUsers';
 
 const MESSAGE_TYPES = [
@@ -68,97 +62,6 @@ function isTemplate(value: unknown): value is Template {
         'subject' in value &&
         'body' in value &&
         'enabled' in value
-    );
-}
-
-interface TemplateBodyEditorProps {
-    value: string;
-    onChange: (value: string) => void;
-    onSave: (value: string) => void;
-    disabled: boolean;
-}
-
-interface EditorLike {
-    getHTML: () => string;
-}
-
-function TemplateBodyEditor({
-    value,
-    onChange,
-    onSave,
-    disabled,
-}: TemplateBodyEditorProps) {
-    const editor = useEditor({
-        extensions: [
-            StarterKit,
-            Underline,
-            Link.configure({ openOnClick: false }),
-        ],
-        content: value,
-        onUpdate: ({ editor: editorInstance }: { editor: EditorLike }) => {
-            onChange(editorInstance.getHTML());
-        },
-    });
-
-    useEffect(() => {
-        if (!editor) {
-            return;
-        }
-        const current = editor.getHTML();
-        if (value !== current) {
-            editor.commands.setContent(value || '', false);
-        }
-    }, [editor, value]);
-
-    useEffect(() => {
-        if (!editor) {
-            return;
-        }
-        editor.setEditable(!disabled);
-    }, [editor, disabled]);
-
-    useEffect(() => {
-        if (!editor) {
-            return undefined;
-        }
-        const handleBlur = () => {
-            onSave(editor.getHTML());
-        };
-        editor.on('blur', handleBlur);
-        return () => {
-            editor.off('blur', handleBlur);
-        };
-    }, [editor, onSave]);
-
-    return (
-        <RichTextEditor
-          editor={editor}
-          classNames={{
-                root: styles.templateBodyEditor,
-                content: styles.templateBodyEditorContent,
-                toolbar: styles.templateBodyEditorToolbar,
-            }}
-          variant="subtle"
-        >
-            <RichTextEditor.Content />
-            <RichTextEditor.Toolbar sticky={false}>
-                <RichTextEditor.ControlsGroup>
-                    <RichTextEditor.Bold />
-                    <RichTextEditor.Italic />
-                    <RichTextEditor.Underline />
-                    <RichTextEditor.Strikethrough />
-                    <RichTextEditor.ClearFormatting />
-                </RichTextEditor.ControlsGroup>
-                <RichTextEditor.ControlsGroup>
-                    <RichTextEditor.BulletList />
-                    <RichTextEditor.OrderedList />
-                </RichTextEditor.ControlsGroup>
-                <RichTextEditor.ControlsGroup>
-                    <RichTextEditor.Link />
-                    <RichTextEditor.Unlink />
-                </RichTextEditor.ControlsGroup>
-            </RichTextEditor.Toolbar>
-        </RichTextEditor>
     );
 }
 
@@ -378,7 +281,7 @@ export default function TemplatesTab() {
                                                     Use the toolbar to format text. Line breaks
                                                     are preserved.
                                                 </Text>
-                                                <TemplateBodyEditor
+                                                <RichTextBodyEditor
                                                   value={template.body}
                                                   disabled={saving === type.value}
                                                   onChange={(nextValue) => {
@@ -397,7 +300,7 @@ export default function TemplatesTab() {
                                                             return prev;
                                                         });
                                                     }}
-                                                  onSave={(nextValue) => {
+                                                  onBlur={(nextValue) => {
                                                         if (nextValue === template.body) {
                                                             return;
                                                         }
