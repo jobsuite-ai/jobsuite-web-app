@@ -512,21 +512,21 @@ export default function Homepage() {
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
                 title="New Leads This Month"
-                value={data.metrics.estimates_this_month.toString()}
+                value={(data.metrics.estimates_this_month ?? 0).toString()}
                 description="New estimates created this month"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
                 title="Signed This Month"
-                value={data.metrics.signed_this_month.toString()}
+                value={(data.metrics.signed_this_month ?? 0).toString()}
                 description="Estimates signed this month"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
                 title="Revenue This Month"
-                value={`$${data.metrics.revenue_this_month.toLocaleString(undefined, {
+                value={`$${(data.metrics.revenue_this_month ?? 0).toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
@@ -536,14 +536,14 @@ export default function Homepage() {
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
                 title="Conversion Rate"
-                value={`${data.metrics.conversion_rate.toFixed(1)}%`}
+                value={`${(data.metrics.conversion_rate ?? 0).toFixed(1)}%`}
                 description="Percentage of estimates signed this month"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
               <MetricCard
                 title="Average Estimate Value"
-                value={`$${data.metrics.average_estimate_value.toLocaleString(undefined, {
+                value={`$${(data.metrics.average_estimate_value ?? 0).toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
@@ -553,7 +553,7 @@ export default function Homepage() {
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
               <MetricCard
                 title="Projects Completed This Month"
-                value={data.metrics.completed_this_month.toString()}
+                value={(data.metrics.completed_this_month ?? 0).toString()}
                 description="Projects completed this month"
               />
             </Grid.Col>
