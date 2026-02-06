@@ -32,7 +32,7 @@ interface OutreachMessage {
 
 interface MessageEditorProps {
     message: OutreachMessage;
-    onClose: () => void;
+    onClose: (didUpdate: boolean) => void;
 }
 
 export default function MessageEditor({ message, onClose }: MessageEditorProps) {
@@ -75,7 +75,20 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
         }
     };
 
+    const hasChanges =
+        subject !== message.subject ||
+        body !== message.body ||
+        recipientType !== message.recipient_type ||
+        (recipientType === 'SINGLE_SUB_CLIENT'
+            ? selectedSubClient !== (message.recipient_sub_client_id || null)
+            : message.recipient_type === 'SINGLE_SUB_CLIENT');
+
     const handleSave = async () => {
+        if (!hasChanges) {
+            onClose(false);
+            return;
+        }
+
         try {
             setSaving(true);
 
@@ -107,7 +120,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                 icon: <IconCheck size={16} />,
             });
 
-            onClose();
+            onClose(true);
         } catch (err) {
             notifications.show({
                 title: 'Error',
@@ -123,9 +136,9 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
     return (
         <Modal
           opened
-          onClose={onClose}
+          onClose={() => onClose(false)}
           title="Edit Message"
-          size="lg"
+          size="xl"
           centered
           zIndex={1000}
           overlayProps={{
@@ -147,7 +160,9 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                   label="Body (HTML supported)"
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
-                  minRows={8}
+                  autosize
+                  minRows={16}
+                  maxRows={26}
                 />
                 <Select
                   label="Recipients"
@@ -173,7 +188,7 @@ export default function MessageEditor({ message, onClose }: MessageEditorProps) 
                     />
                 )}
                 <Group justify="flex-end" mt="md">
-                    <Button variant="subtle" onClick={onClose}>
+                    <Button variant="subtle" onClick={() => onClose(false)}>
                         Cancel
                     </Button>
                     <Button onClick={handleSave} loading={saving}>

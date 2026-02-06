@@ -1,0 +1,40 @@
+.templateBodyEditor {
+  border-radius: 8px;
+  border: 1px solid var(--mantine-color-gray-4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.templateBodyEditorContent {
+  padding: 0;
+  min-height: 240px;
+  max-height: 400px;
+  overflow: auto;
+}
+
+.templateBodyEditorContent :global(.ProseMirror) {
+  min-height: 240px;
+  padding: 24px;
+  box-sizing: border-box;
+  outline: none;
+  box-shadow: none;
+}
+
+.templateBodyEditorContent :global(.ProseMirror-focused) {
+  outline: none;
+  box-shadow: none;
+}
+
+.templateBodyEditorToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--mantine-color-gray-3);
+  border-bottom: none;
+  background-color: transparent;
+  visibility: visible;
+  opacity: 1;
+  min-height: 44px;
+}

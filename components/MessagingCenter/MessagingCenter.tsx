@@ -702,16 +702,16 @@ export default function MessagingCenter() {
                                                 fontSize: '0.875rem',
                                                 lineHeight: 1.5,
                                                 color: 'var(--mantine-color-text)',
-                                                maxHeight: '7.5em', // ~5 lines at 1.5 line-height
-                                                overflow: 'hidden',
                                                 wordBreak: 'break-word',
                                             }}
                                           dangerouslySetInnerHTML={{
-                                                __html: (
+                                            __html: (
                                                     renderedMessages[message.id]?.body ||
                                                     message.body
                                                 )
-                                                    .replace(/<br\s*\/?>/gi, '<br />'), // Normalize br tags
+                                                    // Normalize br tags and plain text newlines
+                                                    .replace(/<br\s*\/?>/gi, '<br />')
+                                                    .replace(/\r\n|\r|\n/g, '<br />'),
                                             }}
                                         />
 
@@ -751,9 +751,11 @@ export default function MessagingCenter() {
             {editingMessage && (
                 <MessageEditor
                   message={editingMessage}
-                  onClose={() => {
+                  onClose={(didUpdate) => {
                         setEditingMessage(null);
-                        loadMessages();
+                        if (didUpdate) {
+                            loadMessages();
+                        }
                     }}
                 />
             )}

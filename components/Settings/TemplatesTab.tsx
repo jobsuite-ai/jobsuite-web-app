@@ -8,7 +8,6 @@ import {
     Stack,
     Text,
     TextInput,
-    Textarea,
     Switch,
     Select,
     Loader,
@@ -16,7 +15,15 @@ import {
     Accordion,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { RichTextEditor } from '@mantine/tiptap';
+import '@mantine/tiptap/styles.css';
 import { IconCheck, IconX } from '@tabler/icons-react';
+import Link from '@tiptap/extension-link';
+import Underline from '@tiptap/extension-underline';
+import { useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+
+import styles from './TemplatesTab.module.css';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useUsers } from '@/hooks/useUsers';
@@ -64,6 +71,97 @@ function isTemplate(value: unknown): value is Template {
     );
 }
 
+interface TemplateBodyEditorProps {
+    value: string;
+    onChange: (value: string) => void;
+    onSave: (value: string) => void;
+    disabled: boolean;
+}
+
+interface EditorLike {
+    getHTML: () => string;
+}
+
+function TemplateBodyEditor({
+    value,
+    onChange,
+    onSave,
+    disabled,
+}: TemplateBodyEditorProps) {
+    const editor = useEditor({
+        extensions: [
+            StarterKit,
+            Underline,
+            Link.configure({ openOnClick: false }),
+        ],
+        content: value,
+        onUpdate: ({ editor: editorInstance }: { editor: EditorLike }) => {
+            onChange(editorInstance.getHTML());
+        },
+    });
+
+    useEffect(() => {
+        if (!editor) {
+            return;
+        }
+        const current = editor.getHTML();
+        if (value !== current) {
+            editor.commands.setContent(value || '', false);
+        }
+    }, [editor, value]);
+
+    useEffect(() => {
+        if (!editor) {
+            return;
+        }
+        editor.setEditable(!disabled);
+    }, [editor, disabled]);
+
+    useEffect(() => {
+        if (!editor) {
+            return undefined;
+        }
+        const handleBlur = () => {
+            onSave(editor.getHTML());
+        };
+        editor.on('blur', handleBlur);
+        return () => {
+            editor.off('blur', handleBlur);
+        };
+    }, [editor, onSave]);
+
+    return (
+        <RichTextEditor
+          editor={editor}
+          classNames={{
+                root: styles.templateBodyEditor,
+                content: styles.templateBodyEditorContent,
+                toolbar: styles.templateBodyEditorToolbar,
+            }}
+          variant="subtle"
+        >
+            <RichTextEditor.Content />
+            <RichTextEditor.Toolbar sticky={false}>
+                <RichTextEditor.ControlsGroup>
+                    <RichTextEditor.Bold />
+                    <RichTextEditor.Italic />
+                    <RichTextEditor.Underline />
+                    <RichTextEditor.Strikethrough />
+                    <RichTextEditor.ClearFormatting />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                    <RichTextEditor.BulletList />
+                    <RichTextEditor.OrderedList />
+                </RichTextEditor.ControlsGroup>
+                <RichTextEditor.ControlsGroup>
+                    <RichTextEditor.Link />
+                    <RichTextEditor.Unlink />
+                </RichTextEditor.ControlsGroup>
+            </RichTextEditor.Toolbar>
+        </RichTextEditor>
+    );
+}
+
 export default function TemplatesTab() {
     const [templates, setTemplates] = useState<TemplatesData>({});
     const [loading, setLoading] = useState(true);
@@ -105,10 +203,12 @@ export default function TemplatesTab() {
             setSaving(messageType);
             setError(null);
 
+            const normalizedUpdates = { ...updates };
+
             const response = await fetch(`/api/outreach-templates/${messageType}`, {
                 method: 'PUT',
                 headers: getApiHeaders(),
-                body: JSON.stringify(updates),
+                body: JSON.stringify(normalizedUpdates),
             });
 
             if (!response.ok) {
@@ -229,8 +329,7 @@ export default function TemplatesTab() {
                             return (
                                 <Accordion.Item key={type.value} value={type.value}>
                                     <Accordion.Control>
-                                        <Group justify="space-between" style={{ width: '100%' }}>
-                                            <Text fw={500}>{type.label}</Text>
+                                        <Group justify="flex-start" style={{ width: '100%' }}>
                                             <Switch
                                               checked={template.enabled}
                                               onChange={(e) =>
@@ -242,6 +341,7 @@ export default function TemplatesTab() {
                                               onClick={(e) => e.stopPropagation()}
                                               disabled={saving === type.value}
                                             />
+                                            <Text fw={500}>{type.label}</Text>
                                         </Group>
                                     </Accordion.Control>
                                     <Accordion.Panel>
@@ -270,33 +370,46 @@ export default function TemplatesTab() {
                                                     })
                                                 }
                                             />
-                                            <Textarea
-                                              label="Body (HTML supported)"
-                                              value={template.body}
-                                              onChange={(e) => {
-                                                    setTemplates((prev) => {
-                                                        const prevTemplate = prev[type.value];
-                                                        if (isTemplate(prevTemplate)) {
-                                                            return {
-                                                                ...prev,
-                                                                [type.value]: {
-                                                                    ...prevTemplate,
-                                                                    body: e.target.value,
-                                                                },
-                                                            };
+                                            <Stack gap="xs">
+                                                <Text fw={500} size="sm">
+                                                    Body
+                                                </Text>
+                                                <Text c="dimmed" size="xs">
+                                                    Use the toolbar to format text. Line breaks
+                                                    are preserved.
+                                                </Text>
+                                                <TemplateBodyEditor
+                                                  value={template.body}
+                                                  disabled={saving === type.value}
+                                                  onChange={(nextValue) => {
+                                                        setTemplates((prev) => {
+                                                            const prevTemplate =
+                                                                prev[type.value];
+                                                            if (isTemplate(prevTemplate)) {
+                                                                return {
+                                                                    ...prev,
+                                                                    [type.value]: {
+                                                                        ...prevTemplate,
+                                                                        body: nextValue,
+                                                                    },
+                                                                };
+                                                            }
+                                                            return prev;
+                                                        });
+                                                    }}
+                                                  onSave={(nextValue) => {
+                                                        if (nextValue === template.body) {
+                                                            return;
                                                         }
-                                                        return prev;
-                                                    });
-                                                }}
-                                              onBlur={() =>
-                                                    updateTemplate(type.value, {
-                                                        body: template.body,
-                                                    })
-                                                }
-                                              minRows={5}
-                                            />
+                                                        updateTemplate(type.value, {
+                                                            body: nextValue,
+                                                        });
+                                                    }}
+                                                />
+                                            </Stack>
                                             <Select
-                                              label="Notify Employee"
+                                              label="Notify Employee (Optional)"
+                                              description="Send an internal notification to a team member when this message is scheduled to be sent."
                                               placeholder="Select employee"
                                               data={users.map((u) => ({
                                                     value: u.id,
@@ -313,7 +426,8 @@ export default function TemplatesTab() {
                                             />
                                             {template.interval_days !== undefined && (
                                                 <TextInput
-                                                  label="Interval (days)"
+                                                  label="Interval (days, Optional)"
+                                                  description="How many days to wait before sending the next follow-up for this template."
                                                   type="number"
                                                   value={template.interval_days || ''}
                                                   onChange={(e) => {
