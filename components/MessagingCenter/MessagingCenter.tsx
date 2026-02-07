@@ -167,6 +167,7 @@ export default function MessagingCenter() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [count, setCount] = useState(0);
+    const [pastDueCount, setPastDueCount] = useState(0);
     const [activeTab, setActiveTab] = useState<string | null>('today');
     const [editingMessage, setEditingMessage] = useState<OutreachMessage | null>(null);
     const [creatingMessage, setCreatingMessage] = useState(false);
@@ -190,9 +191,13 @@ export default function MessagingCenter() {
 
         loadMessages();
         loadCount();
+        loadPastDueCount();
         // Refresh count every minute
         const interval = setInterval(() => {
             loadCount().catch(() => {
+                // Ignore errors
+            });
+            loadPastDueCount().catch(() => {
                 // Ignore errors
             });
             return undefined;
@@ -390,6 +395,34 @@ export default function MessagingCenter() {
         }
     };
 
+    const loadPastDueCount = async () => {
+        // Don't make request if not authenticated
+        if (!isAuthenticated || isLoading) {
+            return;
+        }
+
+        try {
+            const now = new Date();
+            now.setUTCHours(0, 0, 0, 0);
+            const response = await fetch(
+                `/api/outreach-messages?status=PENDING&due_before=${encodeURIComponent(
+                    now.toISOString()
+                )}`,
+                {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                }
+            );
+
+            if (response.ok) {
+                const data: OutreachMessage[] = await response.json();
+                setPastDueCount(data.length);
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load past due count');
+        }
+    };
+
     useEffect(() => {
         // Only load messages if authenticated
         if (!isAuthenticated || isLoading) {
@@ -554,6 +587,11 @@ export default function MessagingCenter() {
                     </Text>
                 </div>
                 <Group gap="md">
+                    {pastDueCount > 0 && (
+                        <Badge size="lg" color="orange" variant="filled">
+                            {pastDueCount} past due
+                        </Badge>
+                    )}
                     {count > 0 && (
                         <Badge size="lg" color="red" variant="filled">
                             {count} due today
