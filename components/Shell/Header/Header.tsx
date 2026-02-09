@@ -81,23 +81,6 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     return match ? match[1] : null;
   }, []);
 
-  // Utility function to strip HTML tags from notification messages
-  const stripHtmlTags = useCallback((html: string): string => {
-    // Create a temporary div element to parse HTML
-    if (typeof document === 'undefined') {
-      // Fallback for SSR: simple regex-based HTML tag removal
-      return html.replace(/<[^>]*>/g, '').replace(/\n\s*\n/g, '\n').trim();
-    }
-    const tmp = document.createElement('div');
-    tmp.innerHTML = html;
-
-    // Replace <br> tags with newlines, then get text content
-    const text = tmp.innerText || tmp.textContent || '';
-
-    // Clean up multiple consecutive newlines/spaces
-    return text.replace(/\n\s*\n/g, '\n').trim();
-  }, []);
-
   const handleNavLinkClick = (
     event: MouseEvent<HTMLAnchorElement, globalThis.MouseEvent>,
     link: string
@@ -724,12 +707,15 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       if (response.ok) {
         const data = await response.json();
         const notificationsData: Notification[] = Array.isArray(data) ? data : [];
-        setNotifications(notificationsData);
+        const unacknowledgedNotifications = notificationsData.filter(
+          (notification) => !notification.is_acknowledged
+        );
+        setNotifications(unacknowledgedNotifications);
 
         // Fetch job titles for all notifications
         const estimateIds = Array.from(
           new Set(
-            notificationsData
+            unacknowledgedNotifications
               .map((n: Notification) => extractEstimateId(n.link))
               .filter((id): id is string => typeof id === 'string' && id.length > 0)
           )
@@ -947,9 +933,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                         <Text size="sm" fw={500} lineClamp={1}>
                           {notification.title}
                         </Text>
-                        <Text size="xs" c="dimmed" lineClamp={2}>
-                          {stripHtmlTags(notification.message)}
-                        </Text>
+
                         {(() => {
                           const estimateId = extractEstimateId(notification.link);
                           const jobTitle = estimateId ? jobTitles[estimateId] : null;

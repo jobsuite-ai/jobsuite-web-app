@@ -51,9 +51,13 @@ function extractEstimateId(link: string | null): string | null {
 
 // Utility function to strip HTML tags from notification messages
 function stripHtmlTags(html: string): string {
+  // Normalize line breaks before stripping tags
+  const normalized = html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li)>/gi, '\n');
   // Create a temporary div element to parse HTML
   const tmp = document.createElement('div');
-  tmp.innerHTML = html;
+  tmp.innerHTML = normalized;
 
   // Replace <br> tags with newlines, then get text content
   const text = tmp.innerText || tmp.textContent || '';
@@ -69,6 +73,7 @@ export default function NotificationsPage() {
   const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
   const [showOlderNotifications, setShowOlderNotifications] = useState(false);
   const [hasFetchedAll, setHasFetchedAll] = useState(false);
+  const [autoLoadedOlder, setAutoLoadedOlder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
@@ -199,6 +204,47 @@ export default function NotificationsPage() {
       fetchTitles();
     }
   }, [allNotifications, fetchJobTitle]);
+
+  useEffect(() => {
+    const maybeLoadOlderUnacknowledged = async () => {
+      if (hasFetchedAll || autoLoadedOlder || allNotifications.length === 0) {
+        return;
+      }
+
+      // Avoid extra request if we're already at the page size limit.
+      if (allNotifications.length >= 100) {
+        return;
+      }
+
+      try {
+        const response = await fetch('/api/notifications/unacknowledged', {
+          method: 'GET',
+          headers: getApiHeaders(),
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        const totalUnacknowledged = data.count || 0;
+        const recentUnacknowledged = allNotifications.filter(
+          (notification) => !notification.is_acknowledged
+        ).length;
+
+        if (totalUnacknowledged > recentUnacknowledged) {
+          setAutoLoadedOlder(true);
+          await fetchNotifications(true);
+          setShowOlderNotifications(true);
+        }
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Error checking unacknowledged count:', err);
+      }
+    };
+
+    maybeLoadOlderUnacknowledged();
+  }, [allNotifications, autoLoadedOlder, fetchNotifications, hasFetchedAll]);
 
   const acknowledgeNotification = useCallback(async (notificationId: string) => {
     // Optimistically update UI immediately
@@ -361,7 +407,7 @@ export default function NotificationsPage() {
                           New
                         </Badge>
                       </Group>
-                      <Text size="sm" c="dimmed">
+                      <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-line' }}>
                         {stripHtmlTags(notification.message)}
                       </Text>
                       {(() => {
@@ -468,7 +514,7 @@ export default function NotificationsPage() {
                           New
                         </Badge>
                       </Group>
-                      <Text size="sm" c="dimmed">
+                      <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-line' }}>
                         {stripHtmlTags(notification.message)}
                       </Text>
                       {(() => {
@@ -601,7 +647,7 @@ export default function NotificationsPage() {
                           Acknowledged
                         </Badge>
                       </Group>
-                      <Text size="sm" c="dimmed">
+                      <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-line' }}>
                         {stripHtmlTags(notification.message)}
                       </Text>
                       {(() => {
@@ -717,7 +763,7 @@ export default function NotificationsPage() {
                           Acknowledged
                         </Badge>
                       </Group>
-                      <Text size="sm" c="dimmed">
+                      <Text size="sm" c="dimmed" style={{ whiteSpace: 'pre-line' }}>
                         {stripHtmlTags(notification.message)}
                       </Text>
                       {(() => {

@@ -9,6 +9,7 @@ import { Notifications } from '@mantine/notifications';
 import '@mantine/carousel/styles.css';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
+import '@mantine/tiptap/styles.css';
 
 import { Provider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';

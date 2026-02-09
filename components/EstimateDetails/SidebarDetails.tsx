@@ -61,6 +61,7 @@ export default function SidebarDetails({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(
     estimate.quickbooks_customer_id || null);
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [syncingMainStatus, setSyncingMainStatus] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData, updateEstimate, updateProject } = useDataCache();
@@ -375,6 +376,42 @@ export default function SidebarDetails({
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to update estimate status: ${error}`);
+    }
+  };
+
+  const syncToMainEstimateStatus = async () => {
+    if (!estimate.original_estimate_id) {
+      return;
+    }
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    setSyncingMainStatus(true);
+    try {
+      const response = await fetch(`/api/estimates/${estimateID}/sync-to-main-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to sync change order status');
+      }
+
+      const updatedEstimate = await response.json();
+      setCurrentStatus(updatedEstimate.status);
+      updateEstimate(updatedEstimate);
+      onUpdate();
+    } catch (error) {
+      logToCloudWatch(`Failed to sync change order status: ${error}`);
+    } finally {
+      setSyncingMainStatus(false);
     }
   };
 
@@ -1048,6 +1085,18 @@ export default function SidebarDetails({
               )}
             </Flex>
           </Flex>
+          {estimate.original_estimate_id && (
+            <Flex justify="flex-end">
+              <Button
+                size="xs"
+                variant="light"
+                onClick={syncToMainEstimateStatus}
+                loading={syncingMainStatus}
+              >
+                Sync To Main Estimate Status
+              </Button>
+            </Flex>
+          )}
         </div>
 
         {/* Job Type */}

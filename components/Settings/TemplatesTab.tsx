@@ -8,7 +8,6 @@ import {
     Stack,
     Text,
     TextInput,
-    Textarea,
     Switch,
     Select,
     Loader,
@@ -16,9 +15,11 @@ import {
     Accordion,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import '@mantine/tiptap/styles.css';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 import { useUsers } from '@/hooks/useUsers';
 
 const MESSAGE_TYPES = [
@@ -105,10 +106,12 @@ export default function TemplatesTab() {
             setSaving(messageType);
             setError(null);
 
+            const normalizedUpdates = { ...updates };
+
             const response = await fetch(`/api/outreach-templates/${messageType}`, {
                 method: 'PUT',
                 headers: getApiHeaders(),
-                body: JSON.stringify(updates),
+                body: JSON.stringify(normalizedUpdates),
             });
 
             if (!response.ok) {
@@ -229,8 +232,7 @@ export default function TemplatesTab() {
                             return (
                                 <Accordion.Item key={type.value} value={type.value}>
                                     <Accordion.Control>
-                                        <Group justify="space-between" style={{ width: '100%' }}>
-                                            <Text fw={500}>{type.label}</Text>
+                                        <Group justify="flex-start" style={{ width: '100%' }}>
                                             <Switch
                                               checked={template.enabled}
                                               onChange={(e) =>
@@ -242,6 +244,7 @@ export default function TemplatesTab() {
                                               onClick={(e) => e.stopPropagation()}
                                               disabled={saving === type.value}
                                             />
+                                            <Text fw={500}>{type.label}</Text>
                                         </Group>
                                     </Accordion.Control>
                                     <Accordion.Panel>
@@ -270,33 +273,46 @@ export default function TemplatesTab() {
                                                     })
                                                 }
                                             />
-                                            <Textarea
-                                              label="Body (HTML supported)"
-                                              value={template.body}
-                                              onChange={(e) => {
-                                                    setTemplates((prev) => {
-                                                        const prevTemplate = prev[type.value];
-                                                        if (isTemplate(prevTemplate)) {
-                                                            return {
-                                                                ...prev,
-                                                                [type.value]: {
-                                                                    ...prevTemplate,
-                                                                    body: e.target.value,
-                                                                },
-                                                            };
+                                            <Stack gap="xs">
+                                                <Text fw={500} size="sm">
+                                                    Body
+                                                </Text>
+                                                <Text c="dimmed" size="xs">
+                                                    Use the toolbar to format text. Line breaks
+                                                    are preserved.
+                                                </Text>
+                                                <RichTextBodyEditor
+                                                  value={template.body}
+                                                  disabled={saving === type.value}
+                                                  onChange={(nextValue) => {
+                                                        setTemplates((prev) => {
+                                                            const prevTemplate =
+                                                                prev[type.value];
+                                                            if (isTemplate(prevTemplate)) {
+                                                                return {
+                                                                    ...prev,
+                                                                    [type.value]: {
+                                                                        ...prevTemplate,
+                                                                        body: nextValue,
+                                                                    },
+                                                                };
+                                                            }
+                                                            return prev;
+                                                        });
+                                                    }}
+                                                  onBlur={(nextValue) => {
+                                                        if (nextValue === template.body) {
+                                                            return;
                                                         }
-                                                        return prev;
-                                                    });
-                                                }}
-                                              onBlur={() =>
-                                                    updateTemplate(type.value, {
-                                                        body: template.body,
-                                                    })
-                                                }
-                                              minRows={5}
-                                            />
+                                                        updateTemplate(type.value, {
+                                                            body: nextValue,
+                                                        });
+                                                    }}
+                                                />
+                                            </Stack>
                                             <Select
-                                              label="Notify Employee"
+                                              label="Notify Employee (Optional)"
+                                              description="Send an internal notification to a team member when this message is scheduled to be sent."
                                               placeholder="Select employee"
                                               data={users.map((u) => ({
                                                     value: u.id,
@@ -313,7 +329,8 @@ export default function TemplatesTab() {
                                             />
                                             {template.interval_days !== undefined && (
                                                 <TextInput
-                                                  label="Interval (days)"
+                                                  label="Interval (days, Optional)"
+                                                  description="How many days to wait before sending the next follow-up for this template."
                                                   type="number"
                                                   value={template.interval_days || ''}
                                                   onChange={(e) => {
