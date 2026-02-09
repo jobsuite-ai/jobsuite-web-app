@@ -219,6 +219,8 @@ export type Estimate = {
     started_date?: string;
     finished_date?: string;
     tentative_scheduling_date?: string;
+    invoiced_date?: string;
+    payment_received_date?: string;
     quickbooks_customer_id?: string;
     hours_worked?: number; // Calculated from time entries
 };

@@ -1665,6 +1665,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     >
                                                         Add Line Item
                                                     </Menu.Item>
+                                                    {!hasDescription && (
+                                                        <Menu.Item
+                                                          leftSection={<IconEdit size={16} />}
+                                                          onClick={() =>
+                                                            setShowDescriptionEditor(true)
+                                                          }
+                                                        >
+                                                            Add Description
+                                                        </Menu.Item>
+                                                    )}
                                                     {!estimate?.original_estimate_id && (
                                                         <Menu.Item
                                                           leftSection={<IconReceipt size={16} />}
@@ -1686,14 +1696,20 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 and resources have been checked. */}
                                 {!initialLoading
                                     && detailsLoaded
-                                    && (!hasVideo || !hasImages || lineItemsCount === 0) && (
+                                    && (
+                                        (!hasVideo && !hasDescription)
+                                        || !hasImages
+                                        || lineItemsCount === 0
+                                    ) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
                                           active={(() => {
                                             // Find the first incomplete step
-                                            const firstIncomplete = !hasVideo ? 0 :
-                                                !hasImages ? 1 :
-                                                lineItemsCount === 0 ? 2 : 3;
+                                            const firstIncomplete = (!hasVideo && !hasDescription)
+                                                ? 0
+                                                : !hasImages
+                                                    ? 1
+                                                    : lineItemsCount === 0 ? 2 : 3;
 
                                             // If all steps are complete, set to 3
                                             if (firstIncomplete === 3) return 3;
@@ -1710,8 +1726,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                           allowNextStepsSelect={false}
                                         >
                                             <Stepper.Step
-                                              label="Upload Video"
-                                              description={hasVideo ? 'Complete' : 'Required'}
+                                              label="Add Description or Video"
+                                              description={(hasVideo || hasDescription)
+                                                ? 'Complete'
+                                                : 'Required'}
                                               completedIcon={<IconVideo size={18} />}
                                             />
                                             <Stepper.Step
@@ -1901,21 +1919,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Show description editor if triggered from menu */}
-                                    {showDescriptionEditor && !hasDescription && (
-                                        <CollapsibleSection title="Description" defaultOpen>
-                                            <TranscriptionSummary
-                                              ref={transcriptionSummaryRef}
-                                              estimate={estimate}
-                                              estimateID={estimateID}
-                                              refresh={() => {
-                                                getEstimate();
-                                                setShowDescriptionEditor(false);
-                                              }}
-                                            />
-                                        </CollapsibleSection>
-                                    )}
-
                                     {/* Spanish Transcription - Only show if it exists */}
                                     {hasSpanishTranscription && (
                                         <CollapsibleSection
@@ -1993,10 +1996,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     {estimate &&
                                     detailsLoaded &&
                                     signaturesLoaded &&
-                                    hasVideo &&
+                                    (hasVideo || hasDescription) &&
                                     hasImages &&
-                                    lineItemsCount > 0 &&
-                                    hasDescription && (
+                                    lineItemsCount > 0 && (
                                         <CollapsibleSection
                                           title={
                                             isSignatureRequired
@@ -2183,6 +2185,40 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                   setShowModal={setShowFileUploadModal}
                 />
             </Modal>
+
+            {/* Description Modal */}
+            {estimate && (
+                <Modal
+                  opened={showDescriptionEditor}
+                  onClose={() => setShowDescriptionEditor(false)}
+                  size="lg"
+                  className={classes.uploadModal}
+                  centered
+                  closeOnClickOutside={false}
+                  closeOnEscape={false}
+                  title={<Text fz={24} fw={700}>Add Description</Text>}
+                >
+                    <TranscriptionSummary
+                      ref={transcriptionSummaryRef}
+                      estimate={estimate}
+                      estimateID={estimateID}
+                      refresh={getEstimate}
+                      autoEdit
+                      showSaveButton={false}
+                      useRichTextEditor
+                      onSaveSuccess={() => setShowDescriptionEditor(false)}
+                    />
+                    <Flex justify="center" mt="lg">
+                        <Button
+                          onClick={() =>
+                            transcriptionSummaryRef.current?.handleSave()
+                          }
+                        >
+                            Completed
+                        </Button>
+                    </Flex>
+                </Modal>
+            )}
 
             {/* Create Change Order Modal */}
             {estimate && (

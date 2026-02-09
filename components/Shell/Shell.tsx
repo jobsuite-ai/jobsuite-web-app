@@ -19,6 +19,8 @@ export function Shell({ children }: { children: any }) {
   const pathname = usePathname();
   const router = useRouter();
   const authCheckIdRef = useRef(0);
+  const lastAuthCheckRef = useRef(0);
+  const FOCUS_REVALIDATE_MS = 5 * 60 * 1000;
 
   // Don't show header/navigation for signature pages
   const isSignaturePage = pathname?.startsWith('/sign/');
@@ -49,9 +51,11 @@ export function Shell({ children }: { children: any }) {
     window.dispatchEvent(new Event('localStorageChange'));
   }, []);
 
-  const checkAuth = useCallback(async () => {
+  const checkAuth = useCallback(async (options?: { forceValidate?: boolean }) => {
     const currentCheckId = authCheckIdRef.current + 1;
     authCheckIdRef.current = currentCheckId;
+    lastAuthCheckRef.current = Date.now();
+    const forceValidate = options?.forceValidate ?? false;
 
     const accessToken = localStorage.getItem('access_token');
     if (!accessToken) {
@@ -71,13 +75,13 @@ export function Shell({ children }: { children: any }) {
       }
     }
 
-    if (!isExpired && !cachedUserData) {
+    if (!isExpired && !cachedUserData && !forceValidate) {
       setIsAuthenticated(true);
       setHasCheckedAuth(true);
       return;
     }
 
-    if (!isExpired) {
+    if (!isExpired && !forceValidate) {
       setHasCheckedAuth(true);
       return;
     }
@@ -124,7 +128,7 @@ export function Shell({ children }: { children: any }) {
       }
     };
 
-    if (cachedUserData) {
+    if (cachedUserData && !forceValidate) {
       validateToken().catch(() => {});
       return;
     }
@@ -153,12 +157,20 @@ export function Shell({ children }: { children: any }) {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        checkAuth().catch(() => {});
+        const now = Date.now();
+        if (now - lastAuthCheckRef.current < FOCUS_REVALIDATE_MS) {
+          return;
+        }
+        checkAuth({ forceValidate: true }).catch(() => {});
       }
     };
 
     const handleWindowFocus = () => {
-      checkAuth().catch(() => {});
+      const now = Date.now();
+      if (now - lastAuthCheckRef.current < FOCUS_REVALIDATE_MS) {
+        return;
+      }
+      checkAuth({ forceValidate: true }).catch(() => {});
     };
 
     window.addEventListener('localStorageChange', handleCustomStorageChange as EventListener);

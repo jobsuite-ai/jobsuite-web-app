@@ -114,8 +114,11 @@ export async function buildEstimateTemplateHtml(
     const imagePath = await getImagePath(estimate, imageResources);
 
     // Process transcription summary to HTML
-    const result = await remark().use(html).process(estimate.transcription_summary || '');
-    const htmlString = result.toString();
+    const transcriptionSummary = estimate.transcription_summary || '';
+    const isHtmlDescription = /<\/?[a-z][\s\S]*>/i.test(transcriptionSummary);
+    const htmlString = isHtmlDescription
+        ? transcriptionSummary
+        : (await remark().use(html).process(transcriptionSummary)).toString();
 
     // Convert line items to template format
     const templateLineItems: TemplateDescription[] = lineItems.map((item) => ({

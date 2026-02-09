@@ -245,8 +245,7 @@ export function UploadNewTemplate({
 
     const isDisabled = !(
         imageResources.length > 0 &&
-        videoResources.length > 0 &&
-        !!estimate.transcription_summary &&
+        (videoResources.length > 0 || !!estimate.transcription_summary) &&
         lineItems.length > 0
     );
 
