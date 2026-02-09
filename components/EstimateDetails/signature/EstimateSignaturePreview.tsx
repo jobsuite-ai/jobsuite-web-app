@@ -141,8 +141,11 @@ function EstimateSignaturePreviewBase({
     }, [imageResources, estimate.cover_photo_resource_id, estimate.id]);
 
     const buildTemplate = useCallback(async () => {
-        const result = await remark().use(html).process(estimate.transcription_summary || '');
-        const htmlString = result.toString();
+        const transcriptionSummary = estimate.transcription_summary || '';
+        const isHtmlDescription = /<\/?[a-z][\s\S]*>/i.test(transcriptionSummary);
+        const htmlString = isHtmlDescription
+            ? transcriptionSummary
+            : (await remark().use(html).process(transcriptionSummary)).toString();
 
         // Use line items from props
         const templateLineItems: TemplateDescription[] = lineItems.map((item) => ({
