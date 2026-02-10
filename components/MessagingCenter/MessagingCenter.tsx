@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
     Badge,
@@ -31,6 +31,7 @@ import MessageCreator from './MessageCreator';
 import MessageEditor from './MessageEditor';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/hooks/useAuth';
 
 interface OutreachMessage {
@@ -176,6 +177,48 @@ export default function MessagingCenter() {
         useState<Record<string, { subject: string; body: string }>>({});
     const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
+    const { clients, estimates } = useDataCache();
+
+    const clientMap = useMemo(
+        () => new Map(clients.map((client) => [client.id, client])),
+        [clients]
+    );
+    const estimateMap = useMemo(
+        () => new Map(estimates.map((estimate) => [estimate.id, estimate])),
+        [estimates]
+    );
+
+    const getUtcStartOfToday = () => {
+        const now = new Date();
+        return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    };
+
+    const getUtcStartOfTomorrow = () => {
+        const today = getUtcStartOfToday();
+        const tomorrow = new Date(today);
+        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+        return tomorrow;
+    };
+
+    const filterMessagesForTab = (
+        data: OutreachMessage[],
+        tab: string | null
+    ): OutreachMessage[] => {
+        if (tab === 'upcoming') {
+            const tomorrow = getUtcStartOfTomorrow();
+            return data.filter((msg) => new Date(msg.to_be_sent_date) >= tomorrow);
+        }
+        if (tab === 'past') {
+            const today = getUtcStartOfToday();
+            return data.filter((msg) => new Date(msg.to_be_sent_date) < today);
+        }
+        const today = getUtcStartOfToday();
+        const tomorrow = getUtcStartOfTomorrow();
+        return data.filter((msg) => {
+            const msgDate = new Date(msg.to_be_sent_date);
+            return msgDate >= today && msgDate < tomorrow;
+        });
+    };
 
     useEffect(() => {
         // Wait until authentication check is complete
@@ -219,11 +262,10 @@ export default function MessagingCenter() {
 
             const url = new URL('/api/outreach-messages', window.location.origin);
             if (activeTab === 'today') {
-                const today = new Date().toISOString().split('T')[0];
-                url.searchParams.append('due_before', `${today}T23:59:59Z`);
+                const tomorrow = getUtcStartOfTomorrow();
+                url.searchParams.append('due_before', tomorrow.toISOString());
             } else if (activeTab === 'past') {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
+                const today = getUtcStartOfToday();
                 url.searchParams.append('due_before', today.toISOString());
             } else if (activeTab === 'upcoming') {
                 // For upcoming, we'll load all and filter client-side
@@ -241,30 +283,7 @@ export default function MessagingCenter() {
 
             let data: OutreachMessage[] = await response.json();
 
-            // Filter by tab (using UTC to match backend count logic)
-            const now = new Date();
-            if (activeTab === 'upcoming') {
-                const tomorrow = new Date(now);
-                tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-                tomorrow.setUTCHours(0, 0, 0, 0);
-                data = data.filter((msg) => new Date(msg.to_be_sent_date) >= tomorrow);
-            } else if (activeTab === 'past') {
-                const today = new Date(now);
-                today.setUTCHours(0, 0, 0, 0);
-                data = data.filter((msg) => new Date(msg.to_be_sent_date) < today);
-            } else if (activeTab === 'today') {
-                // Use UTC dates to match backend count calculation
-                const today = new Date(now);
-                today.setUTCHours(0, 0, 0, 0);
-                const tomorrow = new Date(today);
-                tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-                data = data.filter(
-                    (msg) => {
-                        const msgDate = new Date(msg.to_be_sent_date);
-                        return msgDate >= today && msgDate < tomorrow;
-                    }
-                );
-            }
+            data = filterMessagesForTab(data, activeTab);
 
             // Sort by to_be_sent_date
             data.sort(
@@ -274,99 +293,6 @@ export default function MessagingCenter() {
             );
 
             setMessages(data);
-
-            // Check if any messages need client/estimate data for template rendering
-            // Only fetch if templates contain variables that need this data
-            const needsClientData = data.some(
-                (m) =>
-                    m.subject.includes('{{client_') ||
-                    m.body.includes('{{client_') ||
-                    m.subject.includes('{{estimate_') ||
-                    m.body.includes('{{estimate_')
-            );
-
-            const clientMap = new Map<string, Client>();
-            const estimateMap = new Map<string, Estimate>();
-
-            if (needsClientData && data.length > 0) {
-                // Fetch client and estimate data for template rendering
-                // Fetch all unique client and estimate IDs
-                const uniqueClientIds = [...new Set(data.map((m) => m.client_id))];
-                const uniqueEstimateIds = [
-                    ...new Set(data.map((m) => m.estimate_id).filter((id): id is string => !!id)),
-                ];
-
-                // Fetch all clients and estimates in parallel
-                const [clientPromises, estimatePromises] = [
-                    uniqueClientIds.map(async (clientId) => {
-                        try {
-                            const clientResponse = await fetch(`/api/clients/${clientId}`, {
-                                method: 'GET',
-                                headers: getApiHeaders(),
-                            });
-                            if (clientResponse.ok) {
-                                const clientData = await clientResponse.json();
-                                return { id: clientId, data: clientData.Item || clientData };
-                            }
-                            return { id: clientId, data: null };
-                        } catch {
-                            return { id: clientId, data: null };
-                        }
-                    }),
-                    uniqueEstimateIds.map(async (estimateId) => {
-                        try {
-                            const estimatesResponse = await fetch(`/api/estimates/${estimateId}`, {
-                                method: 'GET',
-                                headers: getApiHeaders(),
-                            });
-                            if (estimatesResponse.ok) {
-                                const estimatesData = await estimatesResponse.json();
-                                return {
-                                    id: estimateId,
-                                    data: estimatesData.Item || estimatesData,
-                                };
-                            }
-                            return { id: estimateId, data: null };
-                        } catch {
-                            return { id: estimateId, data: null };
-                        }
-                    }),
-                ];
-
-                const [clientResults, estimateResults] = await Promise.all([
-                    Promise.all(clientPromises),
-                    Promise.all(estimatePromises),
-                ]);
-
-                // Create lookup maps
-                clientResults.forEach(({ id, data: clientData }) => {
-                    if (clientData) clientMap.set(id, clientData);
-                });
-
-                estimateResults.forEach(({ id, data: estimateData }) => {
-                    if (estimateData) estimateMap.set(id, estimateData);
-                });
-            }
-
-            // Render templates for each message
-            const renderedRecord: Record<string, { subject: string; body: string }> = {};
-
-            data.forEach((message) => {
-                const client = clientMap.get(message.client_id);
-                const estimate = message.estimate_id
-                    ? estimateMap.get(message.estimate_id)
-                    : undefined;
-
-                const renderedSubject = renderTemplate(message.subject, client, estimate);
-                const renderedBody = renderTemplate(message.body, client, estimate);
-
-                renderedRecord[message.id] = {
-                    subject: renderedSubject,
-                    body: renderedBody,
-                };
-            });
-
-            setRenderedMessages(renderedRecord);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load messages');
         } finally {
@@ -402,8 +328,7 @@ export default function MessagingCenter() {
         }
 
         try {
-            const now = new Date();
-            now.setUTCHours(0, 0, 0, 0);
+            const now = getUtcStartOfToday();
             const response = await fetch(
                 `/api/outreach-messages?status=PENDING&due_before=${encodeURIComponent(
                     now.toISOString()
@@ -431,6 +356,29 @@ export default function MessagingCenter() {
         loadMessages();
     }, [activeTab, isAuthenticated, isLoading]);
 
+    useEffect(() => {
+        if (messages.length === 0) {
+            setRenderedMessages({});
+            return;
+        }
+
+        // Render templates from cached clients/estimates (no per-message fetches)
+        const renderedRecord: Record<string, { subject: string; body: string }> = {};
+        messages.forEach((message) => {
+            const client = clientMap.get(message.client_id);
+            const estimate = message.estimate_id
+                ? estimateMap.get(message.estimate_id)
+                : undefined;
+
+            renderedRecord[message.id] = {
+                subject: renderTemplate(message.subject, client, estimate),
+                body: renderTemplate(message.body, client, estimate),
+            };
+        });
+
+        setRenderedMessages(renderedRecord);
+    }, [messages, clientMap, estimateMap]);
+
     const handleSend = async (message: OutreachMessage) => {
         // Check if SES email identity is configured
         if (!message.from_email || message.from_email === 'info@jobsuite.app') {
@@ -455,15 +403,10 @@ export default function MessagingCenter() {
             // Message was sent successfully - remove from state since it's no longer PENDING
             // (sent messages have status SENT and won't show in PENDING filter)
             setMessages((prev) => prev.filter((m) => m.id !== message.id));
-            // Remove rendered message
-            setRenderedMessages((prev) => {
-                const updated = { ...prev };
-                delete updated[message.id];
-                return updated;
-            });
 
             // Update count without reloading all messages
             await loadCount();
+            await loadPastDueCount();
 
             notifications.show({
                 title: 'Success',
@@ -500,53 +443,25 @@ export default function MessagingCenter() {
             // If message was rescheduled (check-in messages), update it in state
             if (!dismissedMessage || dismissedMessage === null) {
                 // Message was deleted - remove from state
-                setMessages((prev) => prev.filter((m) => m.id !== message.id));
-                // Remove rendered message if it exists
-                setRenderedMessages((prev) => {
-                    const updated = { ...prev };
-                    delete updated[message.id];
-                    return updated;
-                });
-            } else {
-                // Message was rescheduled - update in state
                 setMessages((prev) =>
-                    prev.map((m) => (m.id === message.id ? dismissedMessage : m))
+                    filterMessagesForTab(
+                        prev.filter((m) => m.id !== message.id),
+                        activeTab
+                    )
                 );
-                // Re-render the updated message if needed
-                // We'll need to fetch client/estimate data for the updated message
-                const clientResponse = await fetch(`/api/clients/${dismissedMessage.client_id}`, {
-                    method: 'GET',
-                    headers: getApiHeaders(),
-                });
-                const estimateResponse = await fetch(
-                    `/api/estimates/${dismissedMessage.estimate_id}`,
-                    {
-                        method: 'GET',
-                        headers: getApiHeaders(),
-                    }
+            } else {
+                // Message was rescheduled - update in state and re-filter by tab
+                setMessages((prev) =>
+                    filterMessagesForTab(
+                        prev.map((m) => (m.id === message.id ? dismissedMessage : m)),
+                        activeTab
+                    )
                 );
-
-                const client = clientResponse.ok
-                    ? await clientResponse.json().then((data) => data.Item || data)
-                    : undefined;
-                const estimate = estimateResponse.ok
-                    ? await estimateResponse.json().then((data) => data.Item || data)
-                    : undefined;
-
-                const renderedSubject = renderTemplate(dismissedMessage.subject, client, estimate);
-                const renderedBody = renderTemplate(dismissedMessage.body, client, estimate);
-
-                setRenderedMessages((prev) => ({
-                    ...prev,
-                    [dismissedMessage.id]: {
-                        subject: renderedSubject,
-                        body: renderedBody,
-                    },
-                }));
             }
 
             // Update count without reloading all messages
             await loadCount();
+            await loadPastDueCount();
 
             notifications.show({
                 title: 'Success',

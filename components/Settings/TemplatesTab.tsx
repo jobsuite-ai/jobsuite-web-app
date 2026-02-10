@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import {
     Card,
+    Button,
     Group,
     Stack,
     Text,
@@ -70,6 +71,7 @@ export default function TemplatesTab() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [dirtyTemplates, setDirtyTemplates] = useState<Record<string, boolean>>({});
     const { users, loading: usersLoading } = useUsers();
 
     useEffect(() => {
@@ -92,6 +94,7 @@ export default function TemplatesTab() {
 
             const data: TemplatesData = await response.json();
             setTemplates(data);
+            setDirtyTemplates({});
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error loading templates:', err);
@@ -133,6 +136,7 @@ export default function TemplatesTab() {
                     [messageType]: updated as Template,
                 };
             });
+            setDirtyTemplates((prev) => ({ ...prev, [messageType]: false }));
 
             notifications.show({
                 title: 'Success',
@@ -152,6 +156,10 @@ export default function TemplatesTab() {
         } finally {
             setSaving(null);
         }
+    };
+
+    const markTemplateDirty = (messageType: string) => {
+        setDirtyTemplates((prev) => ({ ...prev, [messageType]: true }));
     };
 
     const toggleMessageType = async (messageType: string, enabled: boolean) => {
@@ -266,12 +274,8 @@ export default function TemplatesTab() {
                                                         }
                                                         return prev;
                                                     });
+                                                    markTemplateDirty(type.value);
                                                 }}
-                                              onBlur={() =>
-                                                    updateTemplate(type.value, {
-                                                        subject: template.subject,
-                                                    })
-                                                }
                                             />
                                             <Stack gap="xs">
                                                 <Text fw={500} size="sm">
@@ -299,14 +303,7 @@ export default function TemplatesTab() {
                                                             }
                                                             return prev;
                                                         });
-                                                    }}
-                                                  onBlur={(nextValue) => {
-                                                        if (nextValue === template.body) {
-                                                            return;
-                                                        }
-                                                        updateTemplate(type.value, {
-                                                            body: nextValue,
-                                                        });
+                                                        markTemplateDirty(type.value);
                                                     }}
                                                 />
                                             </Stack>
@@ -320,9 +317,24 @@ export default function TemplatesTab() {
                                                 }))}
                                               value={template.notification_user_id || null}
                                               onChange={(value) =>
-                                                    updateTemplate(type.value, {
-                                                        notification_user_id: value || undefined,
-                                                    })
+                                                    (() => {
+                                                        setTemplates((prev) => {
+                                                            const prevTemplate =
+                                                                prev[type.value];
+                                                            if (isTemplate(prevTemplate)) {
+                                                                return {
+                                                                    ...prev,
+                                                                    [type.value]: {
+                                                                        ...prevTemplate,
+                                                                        notification_user_id:
+                                                                            value || undefined,
+                                                                    },
+                                                                };
+                                                            }
+                                                            return prev;
+                                                        });
+                                                        markTemplateDirty(type.value);
+                                                    })()
                                                 }
                                               clearable
                                               disabled={usersLoading}
@@ -356,13 +368,28 @@ export default function TemplatesTab() {
                                                             }
                                                             return prev;
                                                         });
+                                                        markTemplateDirty(type.value);
                                                     }}
-                                                  onBlur={() =>
-                                                        updateTemplate(type.value, {
-                                                            interval_days: template.interval_days,
-                                                        })
-                                                    }
                                                 />
+                                            )}
+                                            {dirtyTemplates[type.value] && (
+                                                <Group justify="flex-end">
+                                                    <Button
+                                                      onClick={() =>
+                                                            updateTemplate(type.value, {
+                                                                subject: template.subject,
+                                                                body: template.body,
+                                                                notification_user_id:
+                                                                    template.notification_user_id,
+                                                                interval_days:
+                                                                    template.interval_days,
+                                                            })
+                                                        }
+                                                      loading={saving === type.value}
+                                                    >
+                                                        Save Changes
+                                                    </Button>
+                                                </Group>
                                             )}
                                         </Stack>
                                     </Accordion.Panel>

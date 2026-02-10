@@ -464,7 +464,7 @@ export default function Homepage() {
                           Dismiss
                         </Button>
                       </Group>
-                      <Text size="xs" c="dimmed" lineClamp={2}>
+                      <Text size="xs" c="dimmed" lineClamp={2} style={{ whiteSpace: 'pre-line' }}>
                         {stripHtmlTags(notification.message)}
                       </Text>
                       {(() => {

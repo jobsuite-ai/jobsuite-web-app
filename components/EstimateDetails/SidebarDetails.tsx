@@ -819,7 +819,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Scheduling phase
@@ -828,7 +827,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.ESTIMATE_SCHEDULED:
@@ -837,7 +835,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_NOT_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Estimate creation phase
@@ -847,7 +844,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Estimate sent phase
@@ -859,7 +855,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_IN_PROGRESS,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.ESTIMATE_OPENED:
@@ -869,7 +864,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SENT,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Client decision phase
@@ -880,7 +874,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_OPENED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.ESTIMATE_DECLINED:
@@ -889,8 +882,6 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_OPENED,
           EstimateStatus.ESTIMATE_SENT,
           EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Contractor review phase
@@ -900,7 +891,6 @@ export default function SidebarDetails({
           EstimateStatus.CONTRACTOR_DECLINED,
           EstimateStatus.ESTIMATE_ACCEPTED,
           EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.CONTRACTOR_DECLINED:
@@ -908,7 +898,6 @@ export default function SidebarDetails({
           EstimateStatus.CONTRACTOR_OPENED,
           EstimateStatus.ESTIMATE_ACCEPTED,
           EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Signed phase - can move to accounting and project statuses
@@ -917,8 +906,6 @@ export default function SidebarDetails({
           EstimateStatus.ACCOUNTING_NEEDED,
           EstimateStatus.PROJECT_NOT_SCHEDULED,
           EstimateStatus.CONTRACTOR_DECLINED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Accounting phase
@@ -926,8 +913,6 @@ export default function SidebarDetails({
         return [
           EstimateStatus.PROJECT_NOT_SCHEDULED,
           EstimateStatus.CONTRACTOR_SIGNED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Project scheduling phase
@@ -936,8 +921,6 @@ export default function SidebarDetails({
           EstimateStatus.PROJECT_SCHEDULED,
           EstimateStatus.ACCOUNTING_NEEDED,
           EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_SCHEDULED:
@@ -945,8 +928,6 @@ export default function SidebarDetails({
           EstimateStatus.PROJECT_IN_PROGRESS,
           EstimateStatus.PROJECT_NOT_SCHEDULED,
           EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Project execution phase
@@ -954,9 +935,6 @@ export default function SidebarDetails({
         return [
           EstimateStatus.PROJECT_BILLING_NEEDED,
           EstimateStatus.PROJECT_SCHEDULED,
-          EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_BILLING_NEEDED:
@@ -964,8 +942,6 @@ export default function SidebarDetails({
           EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE,
           EstimateStatus.PROJECT_IN_PROGRESS,
           EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE:
@@ -973,45 +949,31 @@ export default function SidebarDetails({
           EstimateStatus.PROJECT_PAYMENTS_RECEIVED,
           EstimateStatus.PROJECT_BILLING_NEEDED,
           EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.NEEDS_FOLLOW_UP,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_PAYMENTS_RECEIVED:
         return [
           EstimateStatus.PROJECT_COMPLETED,
-          EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE,
-          EstimateStatus.PROJECT_CANCELLED,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_COMPLETED:
         return [
           EstimateStatus.PROJECT_PAYMENTS_RECEIVED,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.PROJECT_CANCELLED:
         return [
+          EstimateStatus.ESTIMATE_IN_PROGRESS,
           EstimateStatus.PROJECT_NOT_SCHEDULED,
           EstimateStatus.PROJECT_SCHEDULED,
           EstimateStatus.PROJECT_IN_PROGRESS,
-          EstimateStatus.ARCHIVED,
         ];
 
       // Special statuses
       case EstimateStatus.NEEDS_FOLLOW_UP:
         return [
-          // Can move back to most statuses, but prioritize common next steps
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.ESTIMATE_IN_PROGRESS,
-          EstimateStatus.ESTIMATE_SENT,
-          EstimateStatus.ESTIMATE_ACCEPTED,
-          EstimateStatus.CONTRACTOR_OPENED,
-          EstimateStatus.PROJECT_NOT_SCHEDULED,
-          EstimateStatus.PROJECT_SCHEDULED,
-          EstimateStatus.STALE_ESTIMATE,
-          EstimateStatus.ARCHIVED,
         ];
 
       case EstimateStatus.STALE_ESTIMATE:
@@ -1024,12 +986,7 @@ export default function SidebarDetails({
 
       case EstimateStatus.ARCHIVED:
         return [
-          // Can unarchive to most statuses, but prioritize common ones
-          EstimateStatus.ESTIMATE_SENT,
-          EstimateStatus.ESTIMATE_ACCEPTED,
-          EstimateStatus.CONTRACTOR_SIGNED,
-          EstimateStatus.PROJECT_NOT_SCHEDULED,
-          EstimateStatus.PROJECT_COMPLETED,
+          EstimateStatus.ESTIMATE_IN_PROGRESS,
         ];
 
       default:
