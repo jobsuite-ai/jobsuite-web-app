@@ -42,11 +42,11 @@ export default function SidebarDetails({
   const [editingJobType, setEditingJobType] = useState(false);
   const [selectedJobType, setSelectedJobType] = useState<string | null>(null);
   const [savingJobType, setSavingJobType] = useState(false);
-  const [editingTentativeDate, setEditingTentativeDate] = useState(false);
-  const [selectedTentativeDate, setSelectedTentativeDate] = useState<Date | null>(
-    estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+  const [editingScheduledDate, setEditingScheduledDate] = useState(false);
+  const [selectedScheduledDate, setSelectedScheduledDate] = useState<Date | null>(
+    estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
   );
-  const [savingTentativeDate, setSavingTentativeDate] = useState(false);
+  const [savingScheduledDate, setSavingScheduledDate] = useState(false);
   // Local state for optimistic status updates
   const [currentStatus, setCurrentStatus] = useState<EstimateStatus>(estimate.status);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
@@ -290,14 +290,14 @@ export default function SidebarDetails({
     setCurrentStatus(estimate.status);
   }, [estimate.status]);
 
-  // Sync selectedTentativeDate when estimate changes (but not when editing)
+  // Sync selectedScheduledDate when estimate changes (but not when editing)
   useEffect(() => {
-    if (!editingTentativeDate) {
-      setSelectedTentativeDate(
-        estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+    if (!editingScheduledDate) {
+      setSelectedScheduledDate(
+        estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
       );
     }
-  }, [estimate.tentative_scheduling_date, editingTentativeDate]);
+  }, [estimate.scheduled_date, editingScheduledDate]);
 
   // Sync selectedCustomerId when estimate changes (but not when modal is open)
   useEffect(() => {
@@ -649,15 +649,15 @@ export default function SidebarDetails({
     onUpdate();
   };
 
-  const updateTentativeSchedulingDate = async (date: Date | null) => {
-    if (savingTentativeDate) return;
-    setSavingTentativeDate(true);
+  const updateScheduledDate = async (date: Date | null) => {
+    if (savingScheduledDate) return;
+    setSavingScheduledDate(true);
     try {
       const accessToken = localStorage.getItem('access_token');
       if (!accessToken) {
         // eslint-disable-next-line no-console
         console.error('No access token found');
-        setSavingTentativeDate(false);
+        setSavingScheduledDate(false);
         return;
       }
 
@@ -668,32 +668,32 @@ export default function SidebarDetails({
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({
-          tentative_scheduling_date: date ? date.toISOString() : null,
+          scheduled_date: date ? date.toISOString() : null,
         }),
       });
 
-      setEditingTentativeDate(false);
+      setEditingScheduledDate(false);
       onUpdate();
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error('Failed to update tentative scheduling date:', error);
+      console.error('Failed to update scheduled date:', error);
     } finally {
-      setSavingTentativeDate(false);
+      setSavingScheduledDate(false);
     }
   };
 
-  const handleTentativeDateClick = () => {
-    setEditingTentativeDate(true);
-    setSelectedTentativeDate(
-      estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+  const handleScheduledDateClick = () => {
+    setEditingScheduledDate(true);
+    setSelectedScheduledDate(
+      estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
     );
   };
 
-  const handleTentativeDateCancel = () => {
-    setSelectedTentativeDate(
-      estimate.tentative_scheduling_date ? new Date(estimate.tentative_scheduling_date) : null
+  const handleScheduledDateCancel = () => {
+    setSelectedScheduledDate(
+      estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
     );
-    setEditingTentativeDate(false);
+    setEditingScheduledDate(false);
   };
 
   const updateOwnedBy = async (userId: string | null) => {
@@ -1423,17 +1423,17 @@ export default function SidebarDetails({
           placeholder="Enter actual hours"
         />
 
-        {/* Tentative Scheduling Date - Only show for projects */}
+        {/* Scheduled Date - Only show for projects */}
         {estimate.is_project && (
-          editingTentativeDate ? (
+          editingScheduledDate ? (
             <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
               <Flex justify="space-between" align="center" gap="sm" mb="xs">
                 <Text size="sm" fw={500} c="dimmed">
-                  Tentative Scheduling Date:
+                  Scheduled Date:
                 </Text>
                 <DatePickerInput
-                  value={selectedTentativeDate}
-                  onChange={setSelectedTentativeDate}
+                  value={selectedScheduledDate}
+                  onChange={setSelectedScheduledDate}
                   placeholder="Select date"
                   style={{ flex: 1, maxWidth: '200px' }}
                   size="sm"
@@ -1445,8 +1445,8 @@ export default function SidebarDetails({
                 <ActionIcon
                   color="green"
                   variant="light"
-                  onClick={() => updateTentativeSchedulingDate(selectedTentativeDate)}
-                  loading={savingTentativeDate}
+                  onClick={() => updateScheduledDate(selectedScheduledDate)}
+                  loading={savingScheduledDate}
                   size="lg"
                 >
                   <IconCheck size={18} />
@@ -1454,8 +1454,8 @@ export default function SidebarDetails({
                 <ActionIcon
                   color="red"
                   variant="light"
-                  onClick={handleTentativeDateCancel}
-                  disabled={savingTentativeDate}
+                  onClick={handleScheduledDateCancel}
+                  disabled={savingScheduledDate}
                   size="lg"
                 >
                   <IconX size={18} />
@@ -1465,16 +1465,16 @@ export default function SidebarDetails({
           ) : (
             <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
               <Text size="sm" fw={500} c="dimmed">
-                Tentative Scheduling Date:
+                Scheduled Date:
               </Text>
               <Text
                 size="sm"
                 style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
-                onClick={handleTentativeDateClick}
-                c={estimate.tentative_scheduling_date ? 'dark' : 'dimmed'}
+                onClick={handleScheduledDateClick}
+                c={estimate.scheduled_date ? 'dark' : 'dimmed'}
               >
-                {estimate.tentative_scheduling_date
-                  ? new Date(estimate.tentative_scheduling_date).toLocaleDateString()
+                {estimate.scheduled_date
+                  ? new Date(estimate.scheduled_date).toLocaleDateString()
                   : '—'}
               </Text>
             </Flex>

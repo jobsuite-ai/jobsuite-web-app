@@ -56,34 +56,85 @@ function formatDate(dateString?: string): string {
     }
 }
 
-function getDisplayDate(estimate: Estimate): string {
-    const { status } = estimate;
-
-    // For projects, prioritize tentative_scheduling_date
-    if (estimate.is_project && estimate.tentative_scheduling_date) {
-        return formatDate(estimate.tentative_scheduling_date);
-    }
-
-    // If in progress, show started_date
-    if (status === EstimateStatus.PROJECT_IN_PROGRESS) {
-        return estimate.started_date ? formatDate(estimate.started_date) : '';
-    }
-
-    // If completed, show finished_date
-    if (status === EstimateStatus.PROJECT_COMPLETED) {
-        return estimate.finished_date ? formatDate(estimate.finished_date) : '';
-    }
-
-    // Otherwise, show sold_date (for signed contracts)
-    return estimate.sold_date ? formatDate(estimate.sold_date) : '';
-}
-
 function getTotalHours(estimate: Estimate): number {
     // Prefer actual_hours if available, otherwise use hours_bid
     if (estimate.actual_hours && estimate.actual_hours > 0) {
         return estimate.actual_hours;
     }
     return estimate.hours_bid || 0;
+}
+
+function getDateTimestamp(dateString?: string): number | null {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.getTime();
+}
+
+type DateDisplayInfo = {
+    label: string;
+    value: string;
+};
+
+function getColumnDateInfo(columnId: string, estimate: Estimate): DateDisplayInfo | null {
+    const createdAt = estimate.created_at;
+
+    const buildInfo = (primaryDate?: string, primaryLabel?: string) => {
+        if (primaryDate) {
+            const formatted = formatDate(primaryDate);
+            if (formatted) {
+                return { label: primaryLabel || 'Date', value: formatted };
+            }
+        }
+        const createdFormatted = formatDate(createdAt);
+        return createdFormatted ? { label: 'Created Date', value: createdFormatted } : null;
+    };
+
+    switch (columnId) {
+        case 'accounting-needed':
+        case 'scheduling':
+            return buildInfo(estimate.sold_date, 'Sold Date');
+        case 'project-scheduled':
+            return buildInfo(estimate.scheduled_date, 'Scheduled Date');
+        case 'in-progress':
+            return buildInfo(estimate.started_date, 'Started Date');
+        case 'billing-needed':
+            return buildInfo(estimate.finished_date, 'Finished Date');
+        case 'accounts-receivable':
+            return buildInfo(estimate.invoiced_date, 'Invoiced Date');
+        case 'payments-received':
+            return buildInfo(estimate.payment_received_date, 'Payment Received Date');
+        case 'historical':
+            return buildInfo(estimate.finished_date, 'Finished Date');
+        default:
+            return buildInfo();
+    }
+}
+
+function getSortDateForColumn(columnId: string, estimate: Estimate): number {
+    const createdTimestamp = getDateTimestamp(estimate.created_at) || 0;
+    const resolveTimestamp = (dateString?: string) =>
+        getDateTimestamp(dateString) ?? createdTimestamp;
+
+    switch (columnId) {
+        case 'accounting-needed':
+        case 'scheduling':
+            return resolveTimestamp(estimate.sold_date);
+        case 'project-scheduled':
+            return resolveTimestamp(estimate.scheduled_date);
+        case 'in-progress':
+            return resolveTimestamp(estimate.started_date);
+        case 'billing-needed':
+            return resolveTimestamp(estimate.finished_date);
+        case 'accounts-receivable':
+            return resolveTimestamp(estimate.invoiced_date);
+        case 'payments-received':
+            return resolveTimestamp(estimate.payment_received_date);
+        case 'historical':
+            return resolveTimestamp(estimate.finished_date);
+        default:
+            return createdTimestamp;
+    }
 }
 
 function getInteriorExteriorTotals(jobs: Job[]) {
@@ -124,9 +175,15 @@ interface SortableJobCardProps {
     project: Estimate;
     onClick: (event: React.MouseEvent) => void;
     resolveClientName: (project: Estimate) => string | undefined;
+    columnId: string;
 }
 
-function SortableJobCard({ project, onClick, resolveClientName }: SortableJobCardProps) {
+function SortableJobCard({
+    project,
+    onClick,
+    resolveClientName,
+    columnId,
+}: SortableJobCardProps) {
     const {
         attributes,
         listeners,
@@ -143,6 +200,7 @@ function SortableJobCard({ project, onClick, resolveClientName }: SortableJobCar
         transition,
         opacity: isDragging ? 0.5 : 1,
     };
+    const dateInfo = getColumnDateInfo(columnId, project);
 
     return (
         <Card
@@ -198,9 +256,9 @@ function SortableJobCard({ project, onClick, resolveClientName }: SortableJobCar
                 <Text size="xs" c="dimmed">
                     {getTotalHours(project) > 0 ? `${getTotalHours(project).toFixed(1)} hrs` : 'No hours'}
                 </Text>
-                {getDisplayDate(project) && (
+                {dateInfo && (
                     <Text size="xs" c="dimmed">
-                        {getDisplayDate(project)}
+                        {dateInfo.label}: {dateInfo.value}
                     </Text>
                 )}
             </Group>
@@ -343,6 +401,7 @@ function KanbanColumn({
                                   project={job}
                                   resolveClientName={resolveClientName}
                                   onClick={(event) => onJobClick(job, event)}
+                                  columnId={column.id}
                                 />
                             ))
                         ) : (
@@ -593,6 +652,14 @@ export default function JobsList() {
         }
     };
 
+    function getColumnIdForEstimate(estimate: Estimate): string | null {
+        const jobStatus = String(estimate.status);
+        const column = columns.find((col) =>
+            col.statuses.some((status) => String(status) === jobStatus)
+        );
+        return column?.id ?? null;
+    }
+
     // Get jobs for each column
     function getJobsForColumn(columnId: string): Job[] {
         const column = columns.find((col) => col.id === columnId);
@@ -627,57 +694,25 @@ export default function JobsList() {
             }
 
             // Add any new jobs that weren't in the saved order
-            // (sorted by tentative_scheduling_date if available, otherwise updated_at)
+            // (sorted by the column-specific date)
             const newJobs = filteredJobs
                 .filter(job => !usedIds.has(job.id))
                 .sort((a, b) => {
                     const estimateA = a as Estimate;
                     const estimateB = b as Estimate;
-
-                    // Sort by tentative_scheduling_date if available (soonest first)
-                    const dateA = estimateA.tentative_scheduling_date
-                        ? new Date(estimateA.tentative_scheduling_date).getTime()
-                        : null;
-                    const dateB = estimateB.tentative_scheduling_date
-                        ? new Date(estimateB.tentative_scheduling_date).getTime()
-                        : null;
-
-                    if (dateA && dateB) {
-                        return dateA - dateB; // Soonest first
-                    }
-                    if (dateA && !dateB) return -1; // Jobs with dates come first
-                    if (!dateA && dateB) return 1;
-
-                    // Fallback to updated_at (newest first)
-                    return new Date(estimateB.updated_at).getTime() -
-                        new Date(estimateA.updated_at).getTime();
+                    return getSortDateForColumn(columnId, estimateA) -
+                        getSortDateForColumn(columnId, estimateB);
                 });
 
             return [...orderedJobs, ...newJobs];
         }
 
-        // No saved order, sort by tentative_scheduling_date if available, otherwise updated_at
+        // No saved order, sort by the column-specific date
         return filteredJobs.sort((a, b) => {
             const estimateA = a as Estimate;
             const estimateB = b as Estimate;
-
-            // Sort by tentative_scheduling_date if available (soonest first)
-            const dateA = estimateA.tentative_scheduling_date
-                ? new Date(estimateA.tentative_scheduling_date).getTime()
-                : null;
-            const dateB = estimateB.tentative_scheduling_date
-                ? new Date(estimateB.tentative_scheduling_date).getTime()
-                : null;
-
-            if (dateA && dateB) {
-                return dateA - dateB; // Soonest first
-            }
-            if (dateA && !dateB) return -1; // Jobs with dates come first
-            if (!dateA && dateB) return 1;
-
-            // Fallback to updated_at (newest first)
-            return new Date(estimateB.updated_at).getTime() -
-                new Date(estimateA.updated_at).getTime();
+            return getSortDateForColumn(columnId, estimateA) -
+                getSortDateForColumn(columnId, estimateB);
         });
     }
 
@@ -925,6 +960,9 @@ export default function JobsList() {
 
     // Get active job for drag overlay
     const activeJob = activeId ? jobs.find((job) => job.id === activeId) : null;
+    const activeJobDateInfo = activeJob
+        ? getColumnDateInfo(getColumnIdForEstimate(activeJob as Estimate) ?? 'unknown', activeJob as Estimate)
+        : null;
 
     return (
         <DndContext
@@ -1045,9 +1083,9 @@ export default function JobsList() {
                           ? `${getTotalHours(activeJob as Estimate).toFixed(1)} hrs`
                           : 'No hours'}
                       </Text>
-                      {getDisplayDate(activeJob as Estimate) && (
+                      {activeJobDateInfo && (
                         <Text size="xs" c="dimmed">
-                          {getDisplayDate(activeJob as Estimate)}
+                          {activeJobDateInfo.label}: {activeJobDateInfo.value}
                         </Text>
                       )}
                     </Group>

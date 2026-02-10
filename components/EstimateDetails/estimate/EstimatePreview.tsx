@@ -182,8 +182,7 @@ export default function EstimatePreview({
     // Check if all required todos are complete
     const hasAllItems =
         imageResources.length > 0 &&
-        videoResources.length > 0 &&
-        !!estimate.transcription_summary &&
+        (videoResources.length > 0 || !!estimate.transcription_summary) &&
         lineItems.length > 0;
 
     // Show preview if fully signed, has all items, OR has any signatures

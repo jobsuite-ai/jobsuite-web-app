@@ -12,20 +12,32 @@ import classes from '../styles/EstimateDetails.module.css';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 
 export interface TranscriptionSummaryRef {
     copyToClipboard: () => void;
     handleEdit: () => void;
+    handleSave: () => void;
 }
 
-const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
+type TranscriptionSummaryProps = {
     estimate: Estimate;
     estimateID: string;
     refresh: Function;
-}>(({
+    autoEdit?: boolean;
+    onSaveSuccess?: () => void;
+    showSaveButton?: boolean;
+    useRichTextEditor?: boolean;
+};
+
+const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSummaryProps>(({
     estimate,
     estimateID,
     refresh,
+    autoEdit = false,
+    onSaveSuccess,
+    showSaveButton = true,
+    useRichTextEditor = false,
 }, ref) => {
     const [editMarkdown, setEditMarkdown] = useState(false);
     const [markdown, setMarkdown] = useState(estimate.transcription_summary ?? '');
@@ -37,6 +49,13 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
             setMarkdown(estimate.transcription_summary ?? '');
         }
     }, [estimate.transcription_summary, editMarkdown]);
+
+    useEffect(() => {
+        if (autoEdit) {
+            setMarkdown(estimate.transcription_summary ?? '');
+            setEditMarkdown(true);
+        }
+    }, [autoEdit, estimate.transcription_summary]);
 
     const copyToClipboard = async () => {
         try {
@@ -67,6 +86,7 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
     useImperativeHandle(ref, () => ({
         copyToClipboard,
         handleEdit,
+        handleSave: handleEditSave,
     }));
 
     const handleMarkdownChange = (event: any) => {
@@ -119,6 +139,9 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
             await response.json();
             setEditMarkdown(false);
             refresh();
+            if (onSaveSuccess) {
+                onSaveSuccess();
+            }
             notifications.show({
                 title: 'Success!',
                 position: 'top-center',
@@ -149,6 +172,29 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
     const hasTranscription = transcriptionSummary
         && typeof transcriptionSummary === 'string'
         && transcriptionSummary.trim().length > 0;
+    const isHtmlDescription = !!transcriptionSummary
+        && /<\/?[a-z][\s\S]*>/i.test(transcriptionSummary);
+
+    const renderEditor = () => (
+        useRichTextEditor ? (
+            <RichTextBodyEditor value={markdown} onChange={setMarkdown} />
+        ) : (
+            <textarea
+              value={markdown}
+              onChange={handleMarkdownChange}
+              style={{
+                    width: '100%',
+                    height: '300px',
+                    padding: '10px',
+                    fontSize: '16px',
+                    fontFamily: 'monospace',
+                    border: '1px solid #ccc',
+                    borderRadius: '5px',
+                }}
+              placeholder={markdown}
+            />
+        )
+    );
 
     return (
         <div className={classes.transcriptionContainer}>
@@ -156,43 +202,62 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, {
                 <>
                     {editMarkdown ?
                         <>
-                            <textarea
-                              value={markdown}
-                              onChange={handleMarkdownChange}
-                              style={{
-                                    width: '100%',
-                                    height: '300px',
-                                    padding: '10px',
-                                    fontSize: '16px',
-                                    fontFamily: 'monospace',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '5px',
-                                }}
-                              placeholder={markdown}
-                            />
-                            <Group justify="center" mt="lg">
-                                <Button onClick={handleEditSave}>Save</Button>
-                            </Group>
+                            {renderEditor()}
+                            {showSaveButton && (
+                                <Group justify="center" mt="lg">
+                                    <Button onClick={handleEditSave}>Save</Button>
+                                </Group>
+                            )}
                         </>
                     :
-                        <MarkdownRenderer markdown={estimate.transcription_summary || ''} />
+                        (isHtmlDescription ? (
+                            <div
+                              className={classes.transcriptionContainer}
+                              dangerouslySetInnerHTML={{
+                                __html: estimate.transcription_summary || '',
+                              }}
+                            />
+                        ) : (
+                            <MarkdownRenderer markdown={estimate.transcription_summary || ''} />
+                        ))
                     }
                 </>
                 :
                 <>
-                    {loading ?
-                        <LoadingState size="sm" />
-                        :
+                    {editMarkdown ? (
                         <>
-                            <div style={{ position: 'relative' }}>
-                                <IconReload
-                                  onClick={() => reload()}
-                                  style={{ cursor: 'pointer', position: 'absolute', right: '0px' }}
-                                />
-                            </div>
-                            <Text>The transcription summary is still processing.</Text>
+                            {renderEditor()}
+                            {showSaveButton && (
+                                <Group justify="center" mt="lg">
+                                    <Button onClick={handleEditSave}>Save</Button>
+                                </Group>
+                            )}
                         </>
-                    }
+                    ) : (
+                        <>
+                            {loading ?
+                                <LoadingState size="sm" />
+                                :
+                                <>
+                                    <Group justify="space-between" align="center">
+                                        <Text>The transcription summary is still processing.</Text>
+                                        <IconReload
+                                          onClick={() => reload()}
+                                          style={{ cursor: 'pointer' }}
+                                        />
+                                    </Group>
+                                    <Group justify="center" mt="lg">
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => setEditMarkdown(true)}
+                                        >
+                                            Add Description
+                                        </Button>
+                                    </Group>
+                                </>
+                            }
+                        </>
+                    )}
                 </>
             }
         </div>
