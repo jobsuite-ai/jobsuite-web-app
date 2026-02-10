@@ -17,7 +17,7 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Button, Group, Modal, NumberInput, TextInput, Textarea } from '@mantine/core';
+import { Button, Group, LoadingOverlay, Modal, NumberInput, TextInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 
@@ -513,63 +513,60 @@ const LineItems = forwardRef<LineItemsRef, {
               size="lg"
               centered
             >
-                {isSubmitting ?
-                    <LoadingState />
-                    :
-                    <div>
-                        <TextInput
-                          withAsterisk
-                          label="Title"
-                          placeholder="Enter the title"
-                          key={form.key('title')}
-                          {...form.getInputProps('title')}
-                          mb="md"
-                        />
-                        <Textarea
-                          withAsterisk
-                          label="Description"
-                          placeholder="Enter the description"
-                          key={form.key('description')}
-                          {...form.getInputProps('description')}
-                          mb="md"
-                        />
-                        <NumberInput
-                          withAsterisk
-                          label="Hours"
-                          placeholder="Enter the hours"
-                          min={0}
-                          decimalScale={2}
-                          allowNegative={false}
-                          key={form.key('hours')}
-                          {...form.getInputProps('hours')}
-                          mb="md"
-                        />
-                        <NumberInput
-                          withAsterisk
-                          label="Rate"
-                          placeholder="Enter the rate"
-                          prefix="$"
-                          min={0}
-                          decimalScale={2}
-                          allowNegative={false}
-                          key={form.key('rate')}
-                          {...form.getInputProps('rate')}
-                          mb="md"
-                        />
+                <div style={{ position: 'relative' }}>
+                    <LoadingOverlay visible={isSubmitting} />
+                    <TextInput
+                      withAsterisk
+                      label="Title"
+                      placeholder="Enter the title"
+                      key={form.key('title')}
+                      {...form.getInputProps('title')}
+                      mb="md"
+                    />
+                    <Textarea
+                      withAsterisk
+                      label="Description"
+                      placeholder="Enter the description"
+                      key={form.key('description')}
+                      {...form.getInputProps('description')}
+                      mb="md"
+                    />
+                    <NumberInput
+                      withAsterisk
+                      label="Hours"
+                      placeholder="Enter the hours"
+                      min={0}
+                      decimalScale={2}
+                      allowNegative={false}
+                      key={form.key('hours')}
+                      {...form.getInputProps('hours')}
+                      mb="md"
+                    />
+                    <NumberInput
+                      withAsterisk
+                      label="Rate"
+                      placeholder="Enter the rate"
+                      prefix="$"
+                      min={0}
+                      decimalScale={2}
+                      allowNegative={false}
+                      key={form.key('rate')}
+                      {...form.getInputProps('rate')}
+                      mb="md"
+                    />
 
-                        <Group mt="md">
-                            <Button
-                              type="submit"
-                              onClick={editingItem ? updateLineItem : addLineItem}
-                            >
-                                {editingItem ? 'Update Line Item' : 'Add Line Item'}
-                            </Button>
-                            <Button variant="outline" onClick={handleClose}>
-                                Cancel
-                            </Button>
-                        </Group>
-                    </div>
-                }
+                    <Group mt="md">
+                        <Button
+                          type="submit"
+                          onClick={editingItem ? updateLineItem : addLineItem}
+                        >
+                            {editingItem ? 'Update Line Item' : 'Add Line Item'}
+                        </Button>
+                        <Button variant="outline" onClick={handleClose}>
+                            Cancel
+                        </Button>
+                    </Group>
+                </div>
             </Modal>
         </div>
     );
