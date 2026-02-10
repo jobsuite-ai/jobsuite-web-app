@@ -250,7 +250,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     useEffect(() => {
         if (cachedEstimate && isMountedRef.current) {
             // Use cached estimate data immediately - this provides instant UI
-            setEstimate(cachedEstimate);
+            // Merge to avoid clobbering detail-only fields (e.g. discount_percentage).
+            setEstimate((prev) => (prev ? { ...prev, ...cachedEstimate } : cachedEstimate));
             // If we have cached estimate and details, show UI immediately
             if (cachedDetails?.lastFetched !== null ||
                 cachedLineItems.length > 0 ||
@@ -2214,7 +2215,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             transcriptionSummaryRef.current?.handleSave()
                           }
                         >
-                            Completed
+                            Complete
                         </Button>
                     </Flex>
                 </Modal>
