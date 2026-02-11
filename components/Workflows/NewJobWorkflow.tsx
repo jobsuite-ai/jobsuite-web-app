@@ -567,9 +567,10 @@ export function NewJobWorkflow() {
                                         clientSearchValue.trim().length < 2
                                           ? []
                                           : clientSearchResults.length === 0
-                                            ? [{ value: 'no-results', disabled: true }]
+                                            ? [{ value: 'no-results', label: 'No results found', disabled: true }]
                                             : clientSearchResults.slice(0, 10).map((client) => ({
                                                 value: client.id,
+                                                label: client.name,
                                             }))
                                       }
                                       onChange={(value) => {
