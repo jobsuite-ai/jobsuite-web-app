@@ -272,6 +272,7 @@ interface KanbanColumnProps {
     jobs: Job[];
     onJobClick: (job: Job, event?: React.MouseEvent) => void;
     resolveClientName: (project: Estimate) => string | undefined;
+    isLoading?: boolean;
     isCollapsed?: boolean;
     onToggleCollapse?: () => void;
     columnRef?: React.RefObject<HTMLDivElement>;
@@ -284,6 +285,7 @@ function KanbanColumn({
     jobs,
     onJobClick,
     resolveClientName,
+    isLoading,
     isCollapsed,
     onToggleCollapse,
     columnRef,
@@ -413,7 +415,7 @@ function KanbanColumn({
                               className={classes.emptyStateCard}
                             >
                                 <Text fw={500} ta="center" size="sm" c="dimmed">
-                                    No jobs
+                                    {isLoading ? 'Loading…' : 'No jobs'}
                                 </Text>
                             </Card>
                         )}
@@ -1015,6 +1017,7 @@ export default function JobsList() {
                               jobs={columnJobs}
                               onJobClick={handleJobClick}
                               resolveClientName={resolveClientName}
+                              isLoading={cacheLoading.projects}
                               isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
                               onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
                               columnRef={column.id === 'historical' ? historicalColumnRef : undefined}

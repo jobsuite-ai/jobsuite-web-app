@@ -261,7 +261,17 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
         }
         if (cachedClient && isMountedRef.current) {
-            setClient(cachedClient);
+            setClient((prev) => {
+                if (!prev) {
+                    return cachedClient;
+                }
+                const cachedSubClients = cachedClient.sub_clients || [];
+                const prevSubClients = prev.sub_clients || [];
+                if (cachedSubClients.length === 0 && prevSubClients.length > 0) {
+                    return { ...cachedClient, sub_clients: prevSubClients };
+                }
+                return { ...prev, ...cachedClient };
+            });
         }
     }, [cachedEstimate, cachedClient, cachedDetails, cachedLineItems, cachedResources]);
 
