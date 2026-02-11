@@ -555,7 +555,6 @@ export default function MessageCreator({
                       searchable
                       disabled={!!selectedClientId}
                       comboboxProps={{ withinPortal: true, zIndex: 1001 }}
-                      filter={() => true} // Use custom filtering via filteredEstimates
                     />
 
                     <Select
