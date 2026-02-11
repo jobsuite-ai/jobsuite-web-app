@@ -168,7 +168,13 @@ export default function ClientsList() {
                         withBorder
                         mb="lg"
                         style={{ cursor: 'pointer' }}
-                        onClick={() => router.push(`/clients/${client.id}`)}
+                        onClick={(event) => {
+                          if (event.metaKey || event.ctrlKey) {
+                            window.open(`/clients/${client.id}`, '_blank');
+                          } else {
+                            router.push(`/clients/${client.id}`);
+                          }
+                        }}
                       >
                         <Group justify="space-between" mb="md">
                           <Text fw={600} size="lg">
@@ -243,7 +249,11 @@ export default function ClientsList() {
                                   withBorder
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    router.push(`/projects/${job.id}`);
+                                    if (e.metaKey || e.ctrlKey) {
+                                      window.open(`/projects/${job.id}`, '_blank');
+                                    } else {
+                                      router.push(`/projects/${job.id}`);
+                                    }
                                   }}
                                   style={{ cursor: 'pointer' }}
                                 >

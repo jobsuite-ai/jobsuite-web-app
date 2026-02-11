@@ -386,7 +386,11 @@ export default function EstimatesList() {
     };
 
     // Helper function to render a column
-    const renderColumn = (columnEstimates: Estimate[], title: string) => (
+    const renderColumn = (
+        columnEstimates: Estimate[],
+        title: string,
+        isLoading: boolean
+    ) => (
         <Paper
           bg="gray.0"
           p="md"
@@ -417,7 +421,9 @@ export default function EstimatesList() {
                           w="100%"
                           withBorder
                         >
-                            <Text fw={500} ta="center">No estimates in this category</Text>
+                            <Text fw={500} ta="center" c="dimmed">
+                                {isLoading ? 'Loading…' : 'No estimates in this category'}
+                            </Text>
                         </Card>
                     )}
                 </Flex>
@@ -711,9 +717,21 @@ export default function EstimatesList() {
                                   w={{ base: '100%', md: '95%' }}
                                   gap="xl"
                                 >
-                                    {renderColumn(columnOneEstimates, 'In Progress')}
-                                    {renderColumn(columnTwoEstimates, 'Sent to Client')}
-                                    {renderColumn(columnThreeEstimates, 'Client Accepted')}
+                                    {renderColumn(
+                                        columnOneEstimates,
+                                        'In Progress',
+                                        cacheLoading.estimates
+                                    )}
+                                    {renderColumn(
+                                        columnTwoEstimates,
+                                        'Sent to Client',
+                                        cacheLoading.estimates
+                                    )}
+                                    {renderColumn(
+                                        columnThreeEstimates,
+                                        'Client Accepted',
+                                        cacheLoading.estimates
+                                    )}
                                 </Flex>
                             ) : (
                                 <div style={{ marginTop: '100px' }}>

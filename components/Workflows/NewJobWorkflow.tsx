@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react';
 
 import {
+    Autocomplete,
+    AutocompleteProps,
+    Badge,
     Button,
     Checkbox,
     Container,
@@ -16,18 +19,20 @@ import {
     Textarea,
     TextInput,
     Title,
+    rem,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
+import { IconUserCircle } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
-import { ClientSearch } from '../Forms/NewJobForm/ClientSearch';
-import ClientTypeSelector from '../Forms/NewJobForm/ClientTypeSelector';
 import { USStatesMap } from '../Global/usStates';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { EstimateType } from '@/components/Global/model';
+import { ContractorClient, EstimateType } from '@/components/Global/model';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useAppSelector } from '@/store/hooks';
+import { selectAllClients } from '@/store/slices/clientsSlice';
 
 const NUMBER_OF_STEPS = 3;
 
@@ -69,6 +74,63 @@ const validateZipCode = (zipcode: string): string | null => {
     return null;
 };
 
+// Fuzzy match function - similar to header search
+const fuzzyMatch = (text: string, searchTerm: string): boolean => {
+    if (!text || !searchTerm) {
+        return false;
+    }
+
+    const textLower = text.toLowerCase().trim();
+    const searchLower = searchTerm.toLowerCase().trim();
+
+    if (!textLower || !searchLower) {
+        return false;
+    }
+
+    // Exact substring match (fastest and most reliable)
+    if (textLower.includes(searchLower)) {
+        return true;
+    }
+
+    // Remove punctuation and normalize whitespace for matching
+    const cleanedText = textLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+    const cleanedSearch = searchLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+
+    // Check if cleaned search appears in cleaned text
+    if (cleanedText.includes(cleanedSearch)) {
+        return true;
+    }
+
+    // Word-by-word matching for multi-word searches
+    const searchWords = cleanedSearch.split(/\s+/).filter((w) => w.length > 0);
+    if (searchWords.length > 1) {
+        const allWordsMatch = searchWords.every((searchWord) =>
+            cleanedText.includes(searchWord));
+        if (allWordsMatch) {
+            return true;
+        }
+    }
+
+    // For single-word searches, check if it appears in any word
+    if (searchWords.length === 1) {
+        const searchWord = searchWords[0];
+        const textWords = cleanedText.split(/\s+/);
+        if (textWords.some((textWord) => textWord.includes(searchWord))) {
+            return true;
+        }
+    }
+
+    // Fuzzy match: check if all characters of search term appear in order
+    let searchIndex = 0;
+    for (let i = 0; i < textLower.length && searchIndex < searchLower.length; i += 1) {
+        if (textLower[i] === searchLower[searchIndex]) {
+            searchIndex += 1;
+        }
+    }
+
+    return searchIndex === searchLower.length;
+};
+
 interface FormValues {
     // Client fields
     client_id: string | null;
@@ -97,11 +159,13 @@ interface FormValues {
 
 export function NewJobWorkflow() {
     const [active, setActive] = useState(0);
-    const [clientType, setClientType] = useState<string>('new');
     const [existingClientSelected, setExistingClientSelected] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [referralSource, setReferralSource] = useState<string>('');
     const [sameAsClientAddress, setSameAsClientAddress] = useState(false);
+    const [clientSearchValue, setClientSearchValue] = useState('');
+    const [clientSearchResults, setClientSearchResults] = useState<ContractorClient[]>([]);
+    const clients = useAppSelector(selectAllClients);
     const router = useRouter();
     const { refreshData, updateEstimate } = useDataCache();
 
@@ -134,13 +198,8 @@ export function NewJobWorkflow() {
             if (active === 0) {
                 const errors: Record<string, string | null> = {};
 
-                // If existing client is selected, we need client_id
-                if (clientType === 'existing' && !existingClientSelected) {
-                    errors.client_id = 'Please select an existing client';
-                }
-
-                // If new client, validate required fields
-                if (clientType === 'new' || existingClientSelected) {
+                // If no existing client is selected, validate required fields
+                if (!values.client_id) {
                     if (!values.client_name.trim()) {
                         errors.client_name = 'Client name is required';
                     }
@@ -206,6 +265,84 @@ export function NewJobWorkflow() {
         },
     });
 
+    useEffect(() => {
+        if (existingClientSelected) {
+            setClientSearchResults([]);
+            return;
+        }
+
+        const searchTerm = clientSearchValue.trim().toLowerCase();
+        if (searchTerm.length < 2) {
+            setClientSearchResults([]);
+            return;
+        }
+
+        const results = clients.filter((client) => {
+            const name = client.name || '';
+            const email = client.email || '';
+            return fuzzyMatch(name, searchTerm) || fuzzyMatch(email, searchTerm);
+        });
+
+        setClientSearchResults(results.slice(0, 10));
+    }, [clientSearchValue, existingClientSelected, clients]);
+
+    const renderClientSearchOption: AutocompleteProps['renderOption'] = ({ option }) => {
+        if (option.value === 'no-results') {
+            return (
+                <Group gap="sm" p="xs">
+                    <Text size="sm" c="dimmed" style={{ fontStyle: 'italic' }}>
+                        No results found
+                    </Text>
+                </Group>
+            );
+        }
+
+        const client = clientSearchResults.find((result) => result.id === option.value);
+        if (!client) return null;
+
+        return (
+            <Group
+              gap="md"
+              wrap="nowrap"
+              p={4}
+              style={{ width: '100%' }}
+            >
+                <div
+                  style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: rem(36),
+                        height: rem(36),
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--mantine-color-green-0)',
+                        flexShrink: 0,
+                    }}
+                >
+                    <IconUserCircle size={20} color="var(--mantine-color-green-6)" stroke={1.5} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text size="sm" fw={500} lineClamp={1}>
+                        {client.name}
+                    </Text>
+                    {client.email && (
+                        <Text size="xs" c="dimmed" lineClamp={1} mt={2}>
+                            {client.email}
+                        </Text>
+                    )}
+                </div>
+                <Badge
+                  size="sm"
+                  variant="light"
+                  color="green"
+                  style={{ textTransform: 'capitalize', flexShrink: 0 }}
+                >
+                    client
+                </Badge>
+            </Group>
+        );
+    };
+
     // Helper function to copy client address to project address
     const copyClientAddressToProject = () => {
         const formValues = form.getValues();
@@ -232,7 +369,30 @@ export function NewJobWorkflow() {
             // Step 1: Create or get client
             let clientId = formValues.client_id;
 
-            if (clientType === 'new' || !clientId) {
+            if (!clientId) {
+                const clientAddressMissing = ![
+                    formValues.client_address_street,
+                    formValues.client_address_city,
+                    formValues.client_address_state,
+                    formValues.client_address_zipcode,
+                ].some((value) => value && value.trim());
+
+                const clientAddress = clientAddressMissing
+                    ? {
+                        address_street: formValues.address_street || null,
+                        address_city: formValues.address_city || null,
+                        address_state: formValues.address_state || null,
+                        address_zipcode: formValues.address_zipcode || null,
+                        address_country: formValues.address_country || null,
+                    }
+                    : {
+                        address_street: formValues.client_address_street || null,
+                        address_city: formValues.client_address_city || null,
+                        address_state: formValues.client_address_state || null,
+                        address_zipcode: formValues.client_address_zipcode || null,
+                        address_country: formValues.client_address_country || null,
+                    };
+
                 // Create new client
                 const clientResponse = await fetch('/api/clients', {
                     method: 'POST',
@@ -241,11 +401,7 @@ export function NewJobWorkflow() {
                         name: formValues.client_name,
                         email: formValues.client_email,
                         phone_number: formValues.client_phone_number,
-                        address_street: formValues.client_address_street || null,
-                        address_city: formValues.client_address_city || null,
-                        address_state: formValues.client_address_state || null,
-                        address_zipcode: formValues.client_address_zipcode || null,
-                        address_country: formValues.client_address_country || null,
+                        ...clientAddress,
                     }),
                 });
 
@@ -262,9 +418,9 @@ export function NewJobWorkflow() {
 
                         if (searchResponse.ok) {
                             const searchData = await searchResponse.json();
-                            const clients = searchData.Items || [];
+                            const foundClients = searchData.Items || [];
                             // Find the client with matching email (case-insensitive)
-                            const existingClient = clients.find(
+                            const existingClient = foundClients.find(
                                 (client: any) =>
                                     client.email?.toLowerCase() ===
                                     formValues.client_email.toLowerCase()
@@ -341,7 +497,7 @@ export function NewJobWorkflow() {
             updateEstimate(estimate);
 
             // Also update client cache if a new client was created
-            if (clientType === 'new' || !formValues.client_id) {
+            if (!formValues.client_id) {
                 // Try to get the client from the response if available
                 // Otherwise, refresh in background
                 refreshData('clients').catch(() => {});
@@ -398,91 +554,178 @@ export function NewJobWorkflow() {
                     <Stepper active={active}>
                         <Stepper.Step label="Client Information" description="Select or create a client">
                             <Stack gap="md" mt="xl">
-                                <ClientTypeSelector setClientType={setClientType} />
-
-                                {clientType === 'existing' && !existingClientSelected ? (
-                                    <ClientSearch
-                                      form={form}
-                                      setExistingClientSelected={setExistingClientSelected}
+                                <Stack gap="xs">
+                                    <Autocomplete
+                                      withAsterisk
+                                      label="Client Name"
+                                      placeholder="Enter client name"
+                                      value={clientSearchValue}
+                                      disabled={existingClientSelected}
+                                      renderOption={renderClientSearchOption}
+                                      filter={({ options }) => options}
+                                      data={
+                                        clientSearchValue.trim().length < 2
+                                          ? []
+                                          : clientSearchResults.length === 0
+                                            ? [{ value: 'no-results', disabled: true }]
+                                            : clientSearchResults.slice(0, 10).map(
+                                                (client) => client.id
+                                            )
+                                      }
+                                      onChange={(value) => {
+                                        const isResultId = clientSearchResults.some(
+                                            (client) => client.id === value
+                                        );
+                                        if (isResultId) {
+                                          return;
+                                        }
+                                        form.setFieldValue('client_name', value);
+                                        setClientSearchValue(value);
+                                      }}
+                                      onOptionSubmit={(value) => {
+                                        if (value === 'no-results') {
+                                            return;
+                                        }
+                                        const selectedClient = clientSearchResults.find(
+                                          (client) => client.id === value
+                                        );
+                                        if (!selectedClient) {
+                                            return;
+                                        }
+                                        form.setValues((current) => ({
+                                            ...current,
+                                            client_id: selectedClient.id,
+                                            existing_client: true,
+                                            client_name: selectedClient.name,
+                                            client_email: selectedClient.email,
+                                            client_phone_number: selectedClient.phone_number,
+                                            client_address_street: selectedClient.address_street || '',
+                                            client_address_city: selectedClient.address_city || '',
+                                            client_address_state: selectedClient.address_state || '',
+                                            client_address_zipcode: selectedClient.address_zipcode || '',
+                                            client_address_country: selectedClient.address_country || 'USA',
+                                        }));
+                                        setExistingClientSelected(true);
+                                        setTimeout(() => {
+                                            setClientSearchValue(selectedClient.name);
+                                        }, 0);
+                                        setClientSearchResults([]);
+                                      }}
+                                      limit={10}
+                                      styles={{
+                                        dropdown: {
+                                            borderRadius: rem(8),
+                                            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                                        },
+                                        option: {
+                                            padding: rem(8),
+                                            borderRadius: rem(6),
+                                            cursor: 'pointer',
+                                            '&[data-hovered]': {
+                                                backgroundColor: 'var(--mantine-color-gray-1)',
+                                            },
+                                        },
+                                      }}
                                     />
-                                ) : (
-                                    <Stack gap="md">
-                                        <TextInput
-                                          withAsterisk
-                                          label="Client Name"
-                                          placeholder="Enter client name"
-                                          key={form.key('client_name')}
-                                          {...form.getInputProps('client_name')}
-                                        />
-                                        <TextInput
-                                          withAsterisk
-                                          label="Email"
-                                          placeholder="client@example.com"
-                                          key={form.key('client_email')}
-                                          {...form.getInputProps('client_email')}
-                                        />
-                                        <TextInput
-                                          withAsterisk
-                                          label="Phone Number"
-                                          placeholder="(555) 123-4567"
-                                          key={form.key('client_phone_number')}
-                                          {...form.getInputProps('client_phone_number')}
-                                        />
-                                        <Text size="sm" c="dimmed" mt="xs" mb="xs">
-                                            Billing Address (for GCs or property managers,
-                                            this is the business address)
-                                        </Text>
-                                        <TextInput
-                                          label="Billing Address"
-                                          placeholder="Street address"
-                                          key={form.key('client_address_street')}
-                                          {...form.getInputProps('client_address_street')}
-                                          onChange={(e) => {
-                                            form.getInputProps('client_address_street').onChange?.(e);
-                                            if (sameAsClientAddress) {
-                                              form.setFieldValue('address_street', e.currentTarget.value);
-                                            }
-                                          }}
-                                        />
-                                        <TextInput
-                                          label="City"
-                                          placeholder="City"
-                                          key={form.key('client_address_city')}
-                                          {...form.getInputProps('client_address_city')}
-                                          onChange={(e) => {
-                                            form.getInputProps('client_address_city').onChange?.(e);
-                                            if (sameAsClientAddress) {
-                                              form.setFieldValue('address_city', e.currentTarget.value);
-                                            }
-                                          }}
-                                        />
-                                        <Select
-                                          label="State"
-                                          placeholder="Select state"
-                                          data={USStatesMap}
-                                          key={form.key('client_address_state')}
-                                          {...form.getInputProps('client_address_state')}
-                                          onChange={(value) => {
-                                            form.getInputProps('client_address_state').onChange?.(value);
-                                            if (sameAsClientAddress) {
-                                              form.setFieldValue('address_state', value || 'UT');
-                                            }
-                                          }}
-                                        />
-                                        <TextInput
-                                          label="Zip Code"
-                                          placeholder="12345"
-                                          key={form.key('client_address_zipcode')}
-                                          {...form.getInputProps('client_address_zipcode')}
-                                          onChange={(e) => {
-                                            form.getInputProps('client_address_zipcode').onChange?.(e);
-                                            if (sameAsClientAddress) {
-                                              form.setFieldValue('address_zipcode', e.currentTarget.value);
-                                            }
-                                          }}
-                                        />
-                                    </Stack>
+                                </Stack>
+                                {existingClientSelected && (
+                                    <Button
+                                      variant="default"
+                                      onClick={() => {
+                                        setExistingClientSelected(false);
+                                        setClientSearchValue('');
+                                        setClientSearchResults([]);
+                                        form.setValues((current) => ({
+                                            ...current,
+                                            client_id: null,
+                                            existing_client: false,
+                                            client_name: '',
+                                            client_email: '',
+                                            client_phone_number: '',
+                                            client_address_street: '',
+                                            client_address_city: '',
+                                            client_address_state: 'UT',
+                                            client_address_zipcode: '',
+                                            client_address_country: 'USA',
+                                        }));
+                                      }}
+                                    >
+                                        Clear selected client
+                                    </Button>
                                 )}
+                                <TextInput
+                                  withAsterisk
+                                  label="Email"
+                                  placeholder="client@example.com"
+                                  key={form.key('client_email')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_email')}
+                                />
+                                <TextInput
+                                  withAsterisk
+                                  label="Phone Number"
+                                  placeholder="(555) 123-4567"
+                                  key={form.key('client_phone_number')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_phone_number')}
+                                />
+                                <Text size="sm" c="dimmed" mt="xs" mb="xs">
+                                    Billing Address (for GCs or property managers,
+                                    this is the business address)
+                                </Text>
+                                <TextInput
+                                  label="Billing Address"
+                                  placeholder="Street address"
+                                  key={form.key('client_address_street')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_address_street')}
+                                  onChange={(e) => {
+                                    form.getInputProps('client_address_street').onChange?.(e);
+                                    if (sameAsClientAddress) {
+                                      form.setFieldValue('address_street', e.currentTarget.value);
+                                    }
+                                  }}
+                                />
+                                <TextInput
+                                  label="City"
+                                  placeholder="City"
+                                  key={form.key('client_address_city')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_address_city')}
+                                  onChange={(e) => {
+                                    form.getInputProps('client_address_city').onChange?.(e);
+                                    if (sameAsClientAddress) {
+                                      form.setFieldValue('address_city', e.currentTarget.value);
+                                    }
+                                  }}
+                                />
+                                <Select
+                                  label="State"
+                                  placeholder="Select state"
+                                  data={USStatesMap}
+                                  key={form.key('client_address_state')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_address_state')}
+                                  onChange={(value) => {
+                                    form.getInputProps('client_address_state').onChange?.(value);
+                                    if (sameAsClientAddress) {
+                                      form.setFieldValue('address_state', value || 'UT');
+                                    }
+                                  }}
+                                />
+                                <TextInput
+                                  label="Zip Code"
+                                  placeholder="12345"
+                                  key={form.key('client_address_zipcode')}
+                                  disabled={existingClientSelected}
+                                  {...form.getInputProps('client_address_zipcode')}
+                                  onChange={(e) => {
+                                    form.getInputProps('client_address_zipcode').onChange?.(e);
+                                    if (sameAsClientAddress) {
+                                      form.setFieldValue('address_zipcode', e.currentTarget.value);
+                                    }
+                                  }}
+                                />
                             </Stack>
                         </Stepper.Step>
 
