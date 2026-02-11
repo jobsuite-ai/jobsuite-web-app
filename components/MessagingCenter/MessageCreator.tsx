@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import {
     Modal,
@@ -21,19 +21,9 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-
-interface Estimate {
-    id: string;
-    client_id: string;
-    client_name?: string;
-    title?: string;
-}
-
-interface Client {
-    id: string;
-    name?: string;
-    email?: string;
-}
+import { useAppSelector } from '@/store/hooks';
+import { selectAllClients } from '@/store/slices/clientsSlice';
+import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 
 interface User {
     id: string;
@@ -66,17 +56,76 @@ const MESSAGE_TYPE_LABELS: Record<string, string> = {
     CLIENT_FOLLOW_UP: 'Client Follow-up',
 };
 
+// Fuzzy match function - same as in Header component
+const fuzzyMatch = (text: string, searchTerm: string): boolean => {
+    if (!text || !searchTerm) {
+        return false;
+    }
+
+    const textLower = text.toLowerCase().trim();
+    const searchLower = searchTerm.toLowerCase().trim();
+
+    if (!textLower || !searchLower) {
+        return false;
+    }
+
+    // Exact substring match (fastest and most reliable)
+    if (textLower.includes(searchLower)) {
+        return true;
+    }
+
+    // Remove punctuation and normalize whitespace for matching
+    const cleanedText = textLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+    const cleanedSearch = searchLower.replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+
+    // Check if cleaned search appears in cleaned text
+    if (cleanedText.includes(cleanedSearch)) {
+        return true;
+    }
+
+    // Word-by-word matching for multi-word searches
+    const searchWords = cleanedSearch.split(/\s+/).filter((w) => w.length > 0);
+    if (searchWords.length > 1) {
+        const allWordsMatch = searchWords.every((searchWord) => cleanedText.includes(searchWord));
+        if (allWordsMatch) {
+            return true;
+        }
+    }
+
+    // For single-word searches, check if it appears in any word
+    if (searchWords.length === 1) {
+        const searchWord = searchWords[0];
+        const textWords = cleanedText.split(/\s+/);
+        if (textWords.some((textWord) => textWord.includes(searchWord))) {
+            return true;
+        }
+    }
+
+    // Fuzzy match: check if all characters of search term appear in order
+    let searchIndex = 0;
+    for (let i = 0; i < textLower.length && searchIndex < searchLower.length; i += 1) {
+        if (textLower[i] === searchLower[searchIndex]) {
+            searchIndex += 1;
+        }
+    }
+
+    return searchIndex === searchLower.length;
+};
+
 export default function MessageCreator({
     opened,
     onClose,
     onSuccess,
 }: MessageCreatorProps) {
+    // Use Redux selectors for estimates and clients
+    const estimates = useAppSelector(selectAllEstimates);
+    const clients = useAppSelector(selectAllClients);
+
     const [loading, setLoading] = useState(false);
-    const [estimates, setEstimates] = useState<Estimate[]>([]);
-    const [clients, setClients] = useState<Client[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [templates, setTemplates] = useState<Record<string, Template>>({});
     const [loadingData, setLoadingData] = useState(true);
+    const [estimateSearchValue, setEstimateSearchValue] = useState('');
 
     // Form state
     const [selectedEstimateId, setSelectedEstimateId] = useState<string | null>(null);
@@ -95,9 +144,58 @@ export default function MessageCreator({
     const [subClients, setSubClients] = useState<Array<{ value: string; label: string }>>([]);
     const [clientEmail, setClientEmail] = useState<string>('');
 
+    // Create a map of clients by ID for quick lookup
+    const clientMap = useMemo(
+        () => new Map(clients.map((client) => [client.id, client])),
+        [clients]
+    );
+
+    // Filter estimates based on search query (matches title, client name, or client email)
+    const filteredEstimates = useMemo(() => {
+        if (!estimateSearchValue || estimateSearchValue.trim().length < 1) {
+            return estimates;
+        }
+
+        const searchTerm = estimateSearchValue.trim();
+        return estimates.filter((estimate) => {
+            // Match on estimate title
+            const titleText = estimate.title || '';
+            const titleMatch = titleText ? fuzzyMatch(titleText, searchTerm) : false;
+
+            // Get client info
+            const client = clientMap.get(estimate.client_id);
+            const clientName = estimate.client_name || client?.name || '';
+            const email = client?.email || '';
+
+            // Match on client name
+            const clientNameMatch = clientName ? fuzzyMatch(clientName, searchTerm) : false;
+
+            // Match on client email (exact substring match is fine for email)
+            const clientEmailMatch = email
+                ? email.toLowerCase().includes(searchTerm.toLowerCase())
+                : false;
+
+            return titleMatch || clientNameMatch || clientEmailMatch;
+        });
+    }, [estimates, estimateSearchValue, clientMap]);
+
+    // Create estimate options for Select component
+    const estimateOptions = useMemo(() => filteredEstimates.map((estimate) => {
+            const client = clientMap.get(estimate.client_id);
+            const clientName = estimate.client_name || client?.name || '';
+            const displayName = clientName ? ` - ${clientName}` : '';
+            return {
+                value: estimate.id,
+                label: `${estimate.title || estimate.id}${displayName}`,
+            };
+        }), [filteredEstimates, clientMap]);
+
     useEffect(() => {
         if (opened) {
             loadData();
+        } else {
+            // Reset search value when modal closes
+            setEstimateSearchValue('');
         }
     }, [opened]);
 
@@ -139,32 +237,7 @@ export default function MessageCreator({
         try {
             setLoadingData(true);
 
-            // Load estimates
-            const estimatesResponse = await fetch('/api/estimates', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-            if (estimatesResponse.ok) {
-                const estimatesData = await estimatesResponse.json();
-                // Handle both { Items: [...] } and direct array responses
-                const estimatesArray = Array.isArray(estimatesData)
-                    ? estimatesData
-                    : estimatesData.Items || [];
-                setEstimates(estimatesArray);
-            }
-
-            // Load clients
-            const clientsResponse = await fetch('/api/clients', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-            if (clientsResponse.ok) {
-                const clientsData = await clientsResponse.json();
-                const clientsArray = Array.isArray(clientsData)
-                    ? clientsData
-                    : clientsData.Items || [];
-                setClients(clientsArray);
-            }
+            // Estimates and clients are now loaded from Redux, no need to fetch them
 
             // Load users
             const usersResponse = await fetch('/api/users', {
@@ -200,7 +273,7 @@ export default function MessageCreator({
     };
 
     const loadSubClients = async () => {
-        if (!selectedEstimateId || !Array.isArray(estimates)) return;
+        if (!selectedEstimateId) return;
 
         const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
         if (!selectedEstimate) return;
@@ -328,10 +401,6 @@ export default function MessageCreator({
             let estimateId: string | null = null;
 
             if (selectedEstimateId) {
-                if (!Array.isArray(estimates)) {
-                    throw new Error('Estimates data is not available');
-                }
-
                 const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
                 if (!selectedEstimate) {
                     throw new Error('Selected estimate not found');
@@ -422,6 +491,7 @@ export default function MessageCreator({
             setCustomBody('');
             setRecipientType('ALL_SUB_CLIENTS');
             setSelectedSubClientId(null);
+            setEstimateSearchValue('');
 
             onSuccess();
             onClose();
@@ -471,14 +541,7 @@ export default function MessageCreator({
                     <Select
                       label="Estimate (Optional)"
                       placeholder="Select an estimate (or select a client below)"
-                      data={
-                            Array.isArray(estimates)
-                                ? estimates.map((e) => ({
-                                      value: e.id,
-                                      label: `${e.title || e.id}${e.client_name ? ` - ${e.client_name}` : ''}`,
-                                  }))
-                                : []
-                        }
+                      data={estimateOptions}
                       value={selectedEstimateId}
                       onChange={(value) => {
                             setSelectedEstimateId(value);
@@ -486,6 +549,8 @@ export default function MessageCreator({
                                 setSelectedClientId(null); // Clear client when estimate is selected
                             }
                         }}
+                      onSearchChange={setEstimateSearchValue}
+                      searchValue={estimateSearchValue}
                       clearable
                       searchable
                       disabled={!!selectedClientId}
@@ -495,14 +560,10 @@ export default function MessageCreator({
                     <Select
                       label="Client (Optional - for client-only messages)"
                       placeholder="Select a client (if no estimate selected)"
-                      data={
-                            Array.isArray(clients)
-                                ? clients.map((c) => ({
-                                      value: c.id,
-                                      label: c.name || c.email || c.id,
-                                  }))
-                                : []
-                        }
+                      data={clients.map((c) => ({
+                            value: c.id,
+                            label: c.name || c.email || c.id,
+                        }))}
                       value={selectedClientId}
                       onChange={(value) => {
                             setSelectedClientId(value);

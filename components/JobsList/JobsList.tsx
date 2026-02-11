@@ -662,6 +662,16 @@ export default function JobsList() {
         return column?.id ?? null;
     }
 
+    // Helper function to check if a project was completed within the past 2 weeks
+    function isCompletedWithinTwoWeeks(estimate: Estimate): boolean {
+        if (!estimate.finished_date) return false;
+        const finishedDate = new Date(estimate.finished_date);
+        if (Number.isNaN(finishedDate.getTime())) return false;
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        return finishedDate >= twoWeeksAgo;
+    }
+
     // Get jobs for each column
     function getJobsForColumn(columnId: string): Job[] {
         const column = columns.find((col) => col.id === columnId);
@@ -673,6 +683,19 @@ export default function JobsList() {
             const jobStatus = typeof estimate.status === 'string'
                 ? estimate.status
                 : estimate.status;
+
+            // Special handling for historical column:
+            // include projects completed within past 2 weeks
+            // and has PROJECT_COMPLETED status
+            if (columnId === 'historical') {
+                const isStatusMatch = column.statuses.includes(jobStatus as JobStatus);
+                const isRecentlyCompleted = isCompletedWithinTwoWeeks(estimate);
+                return isStatusMatch && isRecentlyCompleted;
+            }
+
+            // For other columns, show projects matching their status
+            // (projects finished within 2 weeks will ALSO appear in historical,
+            // but not be removed from here)
             return column.statuses.includes(jobStatus as JobStatus);
         });
 
@@ -822,13 +845,28 @@ export default function JobsList() {
         // Store original estimate for potential revert
         const originalEstimate = { ...estimate };
 
+        // If moving to historical, ensure finished_date is set if not already set
+        const isMovingToHistorical = targetColumnId === 'historical';
+        const finishedDate = isMovingToHistorical && !estimate.finished_date
+            ? new Date().toISOString()
+            : estimate.finished_date;
+
         // Create optimistic update
-        const optimisticEstimate = { ...estimate, status: newStatus };
+        const finishedDateUpdate = isMovingToHistorical && !estimate.finished_date
+            ? { finished_date: finishedDate }
+            : {};
+        const optimisticEstimate = {
+            ...estimate,
+            status: newStatus,
+            ...finishedDateUpdate,
+        };
 
         // Optimistically update the UI
         setJobs((prevJobs) =>
             prevJobs.map((j) =>
-                j.id === estimateId ? { ...j, status: newStatus } : j
+                j.id === estimateId
+                    ? { ...j, status: newStatus, ...finishedDateUpdate }
+                    : j
             )
         );
 
@@ -892,7 +930,13 @@ export default function JobsList() {
             // Revert if no token
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === estimateId ? { ...j, status: originalEstimate.status } : j
+                    j.id === estimateId
+                        ? {
+                            ...j,
+                            status: originalEstimate.status,
+                            finished_date: originalEstimate.finished_date,
+                        }
+                        : j
                 )
             );
             // Revert cache update
@@ -902,15 +946,21 @@ export default function JobsList() {
         }
 
         try {
+            const updatePayload: { status: EstimateStatus; finished_date?: string } = {
+                status: newStatus,
+            };
+            // If moving to historical and finished_date is not set, include it in the update
+            if (isMovingToHistorical && !estimate.finished_date) {
+                updatePayload.finished_date = finishedDate;
+            }
+
             const response = await fetch(`/api/estimates/${estimateId}`, {
                 method: 'PUT',
                 headers: {
                     Authorization: `Bearer ${accessToken}`,
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    status: newStatus,
-                }),
+                body: JSON.stringify(updatePayload),
             });
 
             if (!response.ok) {
@@ -918,7 +968,11 @@ export default function JobsList() {
                 setJobs((prevJobs) =>
                     prevJobs.map((j) =>
                         j.id === estimateId
-                            ? { ...j, status: originalEstimate.status }
+                            ? {
+                                ...j,
+                                status: originalEstimate.status,
+                                finished_date: originalEstimate.finished_date,
+                            }
                             : j
                     )
                 );
@@ -941,7 +995,13 @@ export default function JobsList() {
             // Revert on error
             setJobs((prevJobs) =>
                 prevJobs.map((j) =>
-                    j.id === estimateId ? { ...j, status: originalEstimate.status } : j
+                    j.id === estimateId
+                        ? {
+                            ...j,
+                            status: originalEstimate.status,
+                            finished_date: originalEstimate.finished_date,
+                        }
+                        : j
                 )
             );
             // Revert cache update
