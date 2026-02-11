@@ -25,10 +25,12 @@ let credentialsCache: ServiceAccountCredentials | null = null;
 
 export const getApiBaseUrl = () => {
   // Local development - check if we're running locally
-  if (process.env.IS_LOCAL_ENV === 'true' && !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH) {
-    const url = process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
-    // eslint-disable-next-line no-console
-    console.log('Local mode detected');
+  // Use NEXT_PUBLIC_ prefix for client-side access
+  const isLocalEnv = process.env.NEXT_PUBLIC_IS_LOCAL_ENV === 'true' || process.env.IS_LOCAL_ENV === 'true';
+  const hasNoBranch = !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH;
+
+  if (isLocalEnv && hasNoBranch) {
+    const url = process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL || process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
     return url;
   }
 
