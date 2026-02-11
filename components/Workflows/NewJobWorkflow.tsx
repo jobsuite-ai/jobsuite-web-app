@@ -162,7 +162,7 @@ export function NewJobWorkflow() {
     const [existingClientSelected, setExistingClientSelected] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [referralSource, setReferralSource] = useState<string>('');
-    const [sameAsClientAddress, setSameAsClientAddress] = useState(false);
+    const [sameAsClientAddress, setSameAsClientAddress] = useState(true);
     const [clientSearchValue, setClientSearchValue] = useState('');
     const [clientSearchResults, setClientSearchResults] = useState<ContractorClient[]>([]);
     const clients = useAppSelector(selectAllClients);
@@ -353,12 +353,57 @@ export function NewJobWorkflow() {
         form.setFieldValue('address_country', formValues.client_address_country || 'USA');
     };
 
-    // Handle copying client address to project address when checkbox is checked
+    // Helper function to copy project address to client address
+    const copyProjectAddressToClient = () => {
+        const formValues = form.getValues();
+        form.setFieldValue('client_address_street', formValues.address_street || '');
+        form.setFieldValue('client_address_city', formValues.address_city || '');
+        form.setFieldValue('client_address_state', formValues.address_state || 'UT');
+        form.setFieldValue('client_address_zipcode', formValues.address_zipcode || '');
+        form.setFieldValue('client_address_country', formValues.address_country || 'USA');
+    };
+
+    // Helper function to check if client has an address
+    const clientHasAddress = (): boolean => {
+        const formValues = form.getValues();
+        return !!(
+            formValues.client_address_street?.trim() ||
+            formValues.client_address_city?.trim() ||
+            formValues.client_address_zipcode?.trim()
+        );
+    };
+
+    // Handle copying addresses when checkbox is checked
     useEffect(() => {
         if (sameAsClientAddress) {
-            copyClientAddressToProject();
+            if (clientHasAddress()) {
+                // Client has address, copy to project
+                copyClientAddressToProject();
+            } else {
+                // Client doesn't have address, copy project to client if project has address
+                const formValues = form.getValues();
+                const hasProjectAddress =
+                    formValues.address_street?.trim() ||
+                    formValues.address_city?.trim() ||
+                    formValues.address_zipcode?.trim();
+                if (hasProjectAddress) {
+                    copyProjectAddressToClient();
+                }
+            }
         }
     }, [sameAsClientAddress]);
+
+    // Handle address syncing when existing client is selected
+    useEffect(() => {
+        if (existingClientSelected && sameAsClientAddress) {
+            if (clientHasAddress()) {
+                // Client has address, copy to project
+                copyClientAddressToProject();
+            }
+            // If client doesn't have address, project fields will be enabled
+            // and user can enter project address
+        }
+    }, [existingClientSelected]);
 
     async function submitJob() {
         setIsSubmitting(true);
@@ -369,13 +414,24 @@ export function NewJobWorkflow() {
             // Step 1: Create or get client
             let clientId = formValues.client_id;
 
+            // Helper to check if address fields are populated
+            const hasAddress = (address: {
+                address_street?: string | null;
+                address_city?: string | null;
+                address_zipcode?: string | null;
+            }): boolean =>
+                !!(
+                    address.address_street?.trim() ||
+                    address.address_city?.trim() ||
+                    address.address_zipcode?.trim()
+                );
+
             if (!clientId) {
-                const clientAddressMissing = ![
-                    formValues.client_address_street,
-                    formValues.client_address_city,
-                    formValues.client_address_state,
-                    formValues.client_address_zipcode,
-                ].some((value) => value && value.trim());
+                const clientAddressMissing = !hasAddress({
+                    address_street: formValues.client_address_street,
+                    address_city: formValues.client_address_city,
+                    address_zipcode: formValues.client_address_zipcode,
+                });
 
                 const clientAddress = clientAddressMissing
                     ? {
@@ -445,6 +501,43 @@ export function NewJobWorkflow() {
                 } else {
                     const newClient = await clientResponse.json();
                     clientId = newClient.id;
+                }
+            }
+
+            // If existing client doesn't have an address, update it with project address
+            if (clientId) {
+                const clientAddressMissing = !hasAddress({
+                    address_street: formValues.client_address_street,
+                    address_city: formValues.client_address_city,
+                    address_zipcode: formValues.client_address_zipcode,
+                });
+
+                if (clientAddressMissing && hasAddress({
+                    address_street: formValues.address_street,
+                    address_city: formValues.address_city,
+                    address_zipcode: formValues.address_zipcode,
+                })) {
+                    // Update existing client with project address
+                    const updateResponse = await fetch(`/api/clients/${clientId}`, {
+                        method: 'PATCH',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            address_street: formValues.address_street || null,
+                            address_city: formValues.address_city || null,
+                            address_state: formValues.address_state || null,
+                            address_zipcode: formValues.address_zipcode || null,
+                            address_country: formValues.address_country || null,
+                        }),
+                    });
+
+                    if (!updateResponse.ok) {
+                        // Don't fail the whole operation if client update fails
+                        // eslint-disable-next-line no-console
+                        console.warn('Failed to update client address:', await updateResponse.json().catch(() => ({})));
+                    } else {
+                        // Refresh client cache after update
+                        refreshData('clients').catch(() => {});
+                    }
                 }
             }
 
@@ -744,7 +837,16 @@ export function NewJobWorkflow() {
                                   label="Project address is same as client address"
                                   checked={sameAsClientAddress}
                                   onChange={(event) => {
-                                    setSameAsClientAddress(event.currentTarget.checked);
+                                    const isChecked = event.currentTarget.checked;
+                                    setSameAsClientAddress(isChecked);
+                                    if (!isChecked) {
+                                      // Clear project address fields when unchecked
+                                      form.setFieldValue('address_street', '');
+                                      form.setFieldValue('address_city', '');
+                                      form.setFieldValue('address_state', 'UT');
+                                      form.setFieldValue('address_zipcode', '');
+                                      form.setFieldValue('address_country', 'USA');
+                                    }
                                   }}
                                 />
                                 <TextInput
@@ -753,7 +855,13 @@ export function NewJobWorkflow() {
                                   placeholder="Street address"
                                   key={form.key('address_street')}
                                   {...form.getInputProps('address_street')}
-                                  disabled={sameAsClientAddress}
+                                  disabled={sameAsClientAddress && clientHasAddress()}
+                                  onChange={(e) => {
+                                    form.getInputProps('address_street').onChange?.(e);
+                                    if (sameAsClientAddress && !clientHasAddress()) {
+                                      form.setFieldValue('client_address_street', e.currentTarget.value);
+                                    }
+                                  }}
                                 />
                                 <TextInput
                                   withAsterisk
@@ -761,7 +869,13 @@ export function NewJobWorkflow() {
                                   placeholder="City"
                                   key={form.key('address_city')}
                                   {...form.getInputProps('address_city')}
-                                  disabled={sameAsClientAddress}
+                                  disabled={sameAsClientAddress && clientHasAddress()}
+                                  onChange={(e) => {
+                                    form.getInputProps('address_city').onChange?.(e);
+                                    if (sameAsClientAddress && !clientHasAddress()) {
+                                      form.setFieldValue('client_address_city', e.currentTarget.value);
+                                    }
+                                  }}
                                 />
                                 <Select
                                   withAsterisk
@@ -770,7 +884,13 @@ export function NewJobWorkflow() {
                                   data={USStatesMap}
                                   key={form.key('address_state')}
                                   {...form.getInputProps('address_state')}
-                                  disabled={sameAsClientAddress}
+                                  disabled={sameAsClientAddress && clientHasAddress()}
+                                  onChange={(value) => {
+                                    form.getInputProps('address_state').onChange?.(value);
+                                    if (sameAsClientAddress && !clientHasAddress()) {
+                                      form.setFieldValue('client_address_state', value || 'UT');
+                                    }
+                                  }}
                                 />
                                 <TextInput
                                   withAsterisk
@@ -778,7 +898,13 @@ export function NewJobWorkflow() {
                                   placeholder="12345"
                                   key={form.key('address_zipcode')}
                                   {...form.getInputProps('address_zipcode')}
-                                  disabled={sameAsClientAddress}
+                                  disabled={sameAsClientAddress && clientHasAddress()}
+                                  onChange={(e) => {
+                                    form.getInputProps('address_zipcode').onChange?.(e);
+                                    if (sameAsClientAddress && !clientHasAddress()) {
+                                      form.setFieldValue('client_address_zipcode', e.currentTarget.value);
+                                    }
+                                  }}
                                 />
                                 <Select
                                   withAsterisk
