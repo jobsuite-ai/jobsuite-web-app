@@ -562,7 +562,7 @@ export function NewJobWorkflow() {
                                       value={clientSearchValue}
                                       disabled={existingClientSelected}
                                       renderOption={renderClientSearchOption}
-                                      filter={() => true}
+                                      filter={(value, items) => items}
                                       data={
                                         clientSearchValue.trim().length < 2
                                           ? []
