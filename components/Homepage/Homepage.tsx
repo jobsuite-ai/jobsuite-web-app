@@ -146,7 +146,13 @@ function stripHtmlTags(html: string): string {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
 
-  // Replace <br> tags with newlines, then get text content
+  // Replace <br> and <br/> tags with newlines before extracting text
+  const brElements = tmp.querySelectorAll('br');
+  brElements.forEach((br) => {
+    br.replaceWith('\n');
+  });
+
+  // Get text content (which now includes newlines from <br> tags)
   const text = tmp.innerText || tmp.textContent || '';
 
   // Clean up multiple consecutive newlines/spaces
