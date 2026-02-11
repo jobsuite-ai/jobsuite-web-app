@@ -567,13 +567,18 @@ export function NewJobWorkflow() {
                                         clientSearchValue.trim().length < 2
                                           ? []
                                           : clientSearchResults.length === 0
-                                            ? [{ value: 'no-results', label: 'No results found', disabled: true }]
-                                            : clientSearchResults.slice(0, 10).map((client) => ({
-                                                value: client.id,
-                                                label: client.name,
-                                            }))
+                                            ? [{ value: 'no-results', disabled: true }]
+                                            : clientSearchResults.slice(0, 10).map(
+                                                (client) => client.id
+                                            )
                                       }
                                       onChange={(value) => {
+                                        const isResultId = clientSearchResults.some(
+                                            (client) => client.id === value
+                                        );
+                                        if (isResultId) {
+                                          return;
+                                        }
                                         form.setFieldValue('client_name', value);
                                         setClientSearchValue(value);
                                       }}
@@ -601,7 +606,9 @@ export function NewJobWorkflow() {
                                             client_address_country: selectedClient.address_country || 'USA',
                                         }));
                                         setExistingClientSelected(true);
-                                        setClientSearchValue(selectedClient.name);
+                                        setTimeout(() => {
+                                            setClientSearchValue(selectedClient.name);
+                                        }, 0);
                                         setClientSearchResults([]);
                                       }}
                                       limit={10}
