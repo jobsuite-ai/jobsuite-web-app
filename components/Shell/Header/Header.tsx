@@ -3,7 +3,7 @@
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail, IconHome, IconLayoutDashboard, IconUsers, IconFilePlus, IconFolder, IconFileText } from '@tabler/icons-react';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail, IconHome, IconLayoutDashboard, IconUsers, IconFilePlus, IconFolder, IconFileText, IconCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -913,13 +913,27 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
                 ) : notifications.length === 0 ? (
                   <Menu.Item disabled>
                     <Text size="sm" c="dimmed" ta="center">
-                      All Caught Up!
+                      {unacknowledgedCount > 0 ? 'No notifications to show' : 'All Caught Up!'}
                     </Text>
                   </Menu.Item>
                 ) : (
                   notifications.map((notification) => (
                     <Menu.Item
                       key={notification.id}
+                      rightSection={(
+                        <UnstyledButton
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            acknowledgeNotification(notification.id);
+                          }}
+                          aria-label="Acknowledge notification"
+                          title="Acknowledge"
+                          style={{ display: 'flex', alignItems: 'center' }}
+                        >
+                          <IconCheck size={16} color="var(--mantine-color-blue-6)" />
+                        </UnstyledButton>
+                      )}
                       onClick={() => {
                         acknowledgeNotification(notification.id);
                         if (notification.link) {
