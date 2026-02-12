@@ -150,7 +150,7 @@ export default function MessageCreator({
         [clients]
     );
 
-    // Filter estimates based on search query (matches title, client name, or client email)
+    // Filter estimates based on search query (matches title, client name, email, address)
     const filteredEstimates = useMemo(() => {
         if (!estimateSearchValue || estimateSearchValue.trim().length < 1) {
             return estimates;
@@ -175,7 +175,41 @@ export default function MessageCreator({
                 ? email.toLowerCase().includes(searchTerm.toLowerCase())
                 : false;
 
-            return titleMatch || clientNameMatch || clientEmailMatch;
+            // Match on address fields
+            const addressStreet = estimate.address_street || estimate.client_address || '';
+            const addressCity = estimate.address_city || estimate.city || '';
+            const addressState = estimate.address_state || estimate.state || '';
+            const addressZipcode = estimate.address_zipcode || estimate.zip_code || '';
+
+            const addressStreetMatch = addressStreet
+                ? fuzzyMatch(addressStreet, searchTerm)
+                : false;
+            const addressCityMatch = addressCity
+                ? fuzzyMatch(addressCity, searchTerm)
+                : false;
+            const addressStateMatch = addressState
+                ? fuzzyMatch(addressState, searchTerm)
+                : false;
+            const addressZipcodeMatch = addressZipcode
+                ? fuzzyMatch(addressZipcode, searchTerm)
+                : false;
+
+            // Also try matching on full address string
+            const fullAddress = [addressStreet, addressCity, addressState, addressZipcode]
+                .filter(Boolean)
+                .join(' ');
+            const fullAddressMatch = fullAddress ? fuzzyMatch(fullAddress, searchTerm) : false;
+
+            return (
+                titleMatch ||
+                clientNameMatch ||
+                clientEmailMatch ||
+                addressStreetMatch ||
+                addressCityMatch ||
+                addressStateMatch ||
+                addressZipcodeMatch ||
+                fullAddressMatch
+            );
         });
     }, [estimates, estimateSearchValue, clientMap]);
 
@@ -448,14 +482,21 @@ export default function MessageCreator({
                 createData.estimate_id = estimateId;
             }
 
-            // Only include recipient_type if there are sub-clients
-            if (subClients.length > 0) {
-                createData.recipient_type = recipientType;
-                if (recipientType === 'SINGLE_SUB_CLIENT' && selectedSubClientId) {
-                    // Only include recipient_sub_client_id if it's not the main client
-                    if (selectedSubClientId !== 'MAIN_CLIENT') {
-                        createData.recipient_sub_client_id = selectedSubClientId;
-                    }
+            // Always include recipient_type (default to ALL_SUB_CLIENTS if no sub-clients)
+            const finalRecipientType = subClients.length > 0
+                ? recipientType
+                : 'ALL_SUB_CLIENTS';
+            createData.recipient_type = finalRecipientType;
+
+            // Only include recipient_sub_client_id if SINGLE_SUB_CLIENT is selected
+            if (
+                finalRecipientType === 'SINGLE_SUB_CLIENT' &&
+                selectedSubClientId &&
+                subClients.length > 0
+            ) {
+                // Only include recipient_sub_client_id if it's not the main client
+                if (selectedSubClientId !== 'MAIN_CLIENT') {
+                    createData.recipient_sub_client_id = selectedSubClientId;
                 }
             }
 
