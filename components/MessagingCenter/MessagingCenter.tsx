@@ -204,18 +204,26 @@ export default function MessagingCenter() {
         data: OutreachMessage[],
         tab: string | null
     ): OutreachMessage[] => {
-        if (tab === 'upcoming') {
-            const tomorrow = getUtcStartOfTomorrow();
-            return data.filter((msg) => new Date(msg.to_be_sent_date) >= tomorrow);
-        }
-        if (tab === 'past') {
-            const today = getUtcStartOfToday();
-            return data.filter((msg) => new Date(msg.to_be_sent_date) < today);
-        }
         const today = getUtcStartOfToday();
         const tomorrow = getUtcStartOfTomorrow();
+
+        if (tab === 'upcoming') {
+            return data.filter((msg) => {
+                const msgDate = new Date(msg.to_be_sent_date);
+                return msgDate >= tomorrow;
+            });
+        }
+        if (tab === 'past') {
+            // Past due: messages scheduled before today (not including today)
+            return data.filter((msg) => {
+                const msgDate = new Date(msg.to_be_sent_date);
+                return msgDate < today;
+            });
+        }
+        // Today: messages scheduled for today (any time on today's date)
         return data.filter((msg) => {
             const msgDate = new Date(msg.to_be_sent_date);
+            // Include all messages scheduled for today, regardless of time
             return msgDate >= today && msgDate < tomorrow;
         });
     };
