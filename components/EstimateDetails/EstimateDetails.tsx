@@ -1626,6 +1626,30 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     </Anchor>
                                                 </Flex>
                                             )}
+                                            {estimate.quickbooks_invoice_id && (
+                                                <Anchor
+                                                  component="button"
+                                                  onClick={() => {
+                                                      // QuickBooks invoice URL
+                                                      const baseUrl =
+                                                          'https://app.qbo.intuit.com/app/invoice';
+                                                      const qbUrl = `${baseUrl}?txnId=${
+                                                          estimate.quickbooks_invoice_id
+                                                      }`;
+                                                      window.open(qbUrl, '_blank');
+                                                  }}
+                                                  size="sm"
+                                                  style={{
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      gap: '4px',
+                                                      color: 'var(--mantine-color-blue-6)',
+                                                  }}
+                                                >
+                                                    <IconReceipt size={16} />
+                                                    View QuickBooks Invoice
+                                                </Anchor>
+                                            )}
                                         </Flex>
                                         <div
                                           className={`${classes.addButtonWrapper} ${classes.addButtonFixed}`}
