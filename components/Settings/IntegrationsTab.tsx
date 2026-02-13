@@ -13,6 +13,9 @@ import {
     Loader,
     Alert,
     Badge,
+    TextInput,
+    Switch,
+    ScrollArea,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconExternalLink } from '@tabler/icons-react';
@@ -30,6 +33,8 @@ interface QuickBooksStatus {
         company_name: string;
         realm_id: string;
     };
+    service_item_names?: Record<string, string | null>;
+    auto_create_customers_and_estimates?: boolean;
     message?: string;
 }
 
@@ -40,10 +45,45 @@ export default function IntegrationsTab() {
     const [status, setStatus] = useState<QuickBooksStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+    const [serviceItemNames, setServiceItemNames] = useState<Record<string, string>>({
+        INTERIOR: '',
+        EXTERIOR: '',
+        BOTH: '',
+    });
+    const [autoCreate, setAutoCreate] = useState<boolean>(false);
+    const [savingSettings, setSavingSettings] = useState<boolean>(false);
+    const [showBatchSyncModal, setShowBatchSyncModal] = useState(false);
+    const [accountingNeededEstimates, setAccountingNeededEstimates] = useState<
+        Array<{ id: string; title?: string; client_name?: string }>
+    >([]);
+    const [syncingEstimates, setSyncingEstimates] = useState<boolean>(false);
 
     useEffect(() => {
         loadStatus();
     }, []);
+
+    // Check for Accounting Needed estimates when auto-create is enabled on load
+    useEffect(() => {
+        const checkForPendingEstimates = async () => {
+            if (autoCreate && status?.connected) {
+                const estimates = await checkAccountingNeededEstimates();
+                if (estimates.length > 0) {
+                    // Auto-create is enabled but there are still Accounting Needed estimates
+                    // This shouldn't happen normally, but show a notification
+                    notifications.show({
+                        title: 'Pending Estimates',
+                        message: `You have ${estimates.length} estimate(s) in Accounting Needed status. Consider syncing them.`,
+                        color: 'yellow',
+                        autoClose: 10000,
+                    });
+                }
+            }
+        };
+
+        if (status && !loading) {
+            checkForPendingEstimates();
+        }
+    }, [autoCreate, status, loading]);
 
     const loadStatus = async () => {
         try {
@@ -67,6 +107,14 @@ export default function IntegrationsTab() {
 
             const statusData: QuickBooksStatus = await response.json();
             setStatus(statusData);
+            setAutoCreate(statusData.auto_create_customers_and_estimates || false);
+            if (statusData.service_item_names) {
+                setServiceItemNames({
+                    INTERIOR: statusData.service_item_names.INTERIOR || '',
+                    EXTERIOR: statusData.service_item_names.EXTERIOR || '',
+                    BOTH: statusData.service_item_names.BOTH || '',
+                });
+            }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error loading QuickBooks status:', err);
@@ -197,6 +245,238 @@ export default function IntegrationsTab() {
         }
     };
 
+    const checkAccountingNeededEstimates = async (): Promise<
+        Array<{ id: string; title?: string; client_name?: string }>
+    > => {
+        try {
+            const response = await fetch('/api/estimates?status=ACCOUNTING_NEEDED', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+
+            if (!response.ok) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to fetch estimates:', response.status, response.statusText);
+                return [];
+            }
+
+            const data = await response.json();
+            // API returns estimates wrapped in Items property
+            const estimates = data.Items || data || [];
+            // eslint-disable-next-line no-console
+            console.log('Accounting Needed estimates response:', { data, estimates, count: estimates.length });
+            return Array.isArray(estimates) ? estimates : [];
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error checking accounting needed estimates:', err);
+            return [];
+        }
+    };
+
+    const handleAutoCreateToggle = async (newValue: boolean) => {
+        // If enabling auto-create, check for Accounting Needed estimates
+        if (newValue && !autoCreate) {
+            try {
+                const estimates = await checkAccountingNeededEstimates();
+                // eslint-disable-next-line no-console
+                console.log('Found Accounting Needed estimates:', estimates.length);
+                if (estimates.length > 0) {
+                    setAccountingNeededEstimates(estimates);
+                    setShowBatchSyncModal(true);
+                    // Don't update autoCreate yet - wait for user decision
+                    return;
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Error checking for Accounting Needed estimates:', err);
+                // If check fails, still allow enabling but show warning
+                notifications.show({
+                    title: 'Warning',
+                    message: 'Could not check for existing Accounting Needed estimates. Please verify manually.',
+                    color: 'yellow',
+                });
+            }
+        }
+        // If disabling or no estimates to sync, update immediately
+        setAutoCreate(newValue);
+    };
+
+    const handleBatchSync = async () => {
+        try {
+            setSyncingEstimates(true);
+            setError(null);
+
+            const response = await fetch('/api/estimates/batch-sync-accounting-needed', {
+                method: 'POST',
+                headers: getApiHeaders(),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to sync estimates');
+            }
+
+            const result = await response.json();
+
+            // Save auto-create setting to backend
+            const autoCreateResponse = await fetch('/api/quickbooks/settings/auto-create', {
+                method: 'PUT',
+                headers: {
+                    ...getApiHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    auto_create_customers_and_estimates: true,
+                }),
+            });
+
+            if (!autoCreateResponse.ok) {
+                const errorData = await autoCreateResponse.json();
+                throw new Error(errorData.message || 'Failed to update auto-create setting');
+            }
+
+            notifications.show({
+                title: 'Success',
+                message: `Successfully synced ${result.successful} estimate(s) to QuickBooks ` +
+                    'and enabled auto-create',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Close modal and enable auto-create
+            setShowBatchSyncModal(false);
+            setAutoCreate(true);
+            setAccountingNeededEstimates([]);
+
+            // Reload status to refresh data
+            await loadStatus();
+
+            // Trigger event to notify other components (like JobsList) that the setting changed
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('quickbooks-auto-create-changed', {
+                    detail: { enabled: true },
+                }));
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error syncing estimates:', err);
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to sync estimates';
+            setError(errorMessage);
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSyncingEstimates(false);
+        }
+    };
+
+    const handleCancelBatchSync = () => {
+        setShowBatchSyncModal(false);
+        setAccountingNeededEstimates([]);
+        // Don't enable auto-create
+        setAutoCreate(false);
+    };
+
+    const handleSaveAllSettings = async () => {
+        try {
+            setSavingSettings(true);
+            setError(null);
+
+            // Validate: if auto-create is enabled, all service item names must be filled
+            if (autoCreate) {
+                const missingFields = ['INTERIOR', 'EXTERIOR', 'BOTH'].filter(
+                    (type) => !serviceItemNames[type] || serviceItemNames[type].trim() === ''
+                );
+                if (missingFields.length > 0) {
+                    throw new Error(
+                        `Please fill in all service item names. Missing: ${missingFields.join(', ')}`
+                    );
+                }
+            }
+
+            // Save auto-create setting
+            const autoCreateResponse = await fetch('/api/quickbooks/settings/auto-create', {
+                method: 'PUT',
+                headers: {
+                    ...getApiHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    auto_create_customers_and_estimates: autoCreate,
+                }),
+            });
+
+            if (!autoCreateResponse.ok) {
+                const errorData = await autoCreateResponse.json();
+                throw new Error(errorData.message || 'Failed to update auto-create setting');
+            }
+
+            // Save all service item names
+            const savePromises = ['INTERIOR', 'EXTERIOR', 'BOTH'].map((estimateType) =>
+                fetch('/api/quickbooks/settings/service-item-name', {
+                    method: 'PUT',
+                    headers: {
+                        ...getApiHeaders(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        estimate_type: estimateType,
+                        service_item_name: serviceItemNames[estimateType] || null,
+                    }),
+                })
+            );
+
+            const responses = await Promise.all(savePromises);
+            const errors = responses
+                .map((response, index) => {
+                    if (!response.ok) {
+                        return `Failed to save ${['INTERIOR', 'EXTERIOR', 'BOTH'][index]}`;
+                    }
+                    return null;
+                })
+                .filter(Boolean);
+
+            if (errors.length > 0) {
+                throw new Error(errors.join(', '));
+            }
+
+            notifications.show({
+                title: 'Success',
+                message: 'QuickBooks settings saved successfully',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Reload status
+            await loadStatus();
+
+            // Trigger event to notify other components (like JobsList) that the setting changed
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('quickbooks-auto-create-changed', {
+                    detail: { enabled: autoCreate },
+                }));
+            }
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error saving settings:', err);
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to save settings';
+            setError(errorMessage);
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSavingSettings(false);
+        }
+    };
+
     return (
         <Card shadow="sm" padding="lg" withBorder>
             {loading ? (
@@ -215,6 +495,7 @@ export default function IntegrationsTab() {
                     )}
 
                     {status?.connected ? (
+                        <>
                         <Stack gap="md">
                             <Group justify="space-between" align="center">
                                 <Badge color="green" size="lg">
@@ -226,7 +507,7 @@ export default function IntegrationsTab() {
                                   onClick={() => setShowDisconnectModal(true)}
                                   loading={disconnecting}
                                 >
-                                  Disconnect
+                                Disconnect
                                 </Button>
                             </Group>
 
@@ -282,6 +563,94 @@ export default function IntegrationsTab() {
                                 </Alert>
                             )}
                         </Stack>
+
+                        <Card shadow="sm" padding="lg" withBorder>
+                            <Stack gap="md">
+                                <Title order={4}>Auto-Create Settings</Title>
+
+                                <Group justify="space-between" align="flex-start">
+                                    <div style={{ flex: 1 }}>
+                                        <Text size="sm" fw={500} mb="xs">
+                                            Auto-Create Customers and Estimates:
+                                        </Text>
+                                        <Text size="xs" c="dimmed">
+                                            When enabled, customers and estimates are automatically
+                                            created in QuickBooks when an estimate is accepted. If
+                                            disabled, estimates will skip QuickBooks sync and go to
+                                            Accounting Needed status.
+                                        </Text>
+                                    </div>
+                                    <Switch
+                                      checked={autoCreate}
+                                      onChange={(e) => {
+                                            handleAutoCreateToggle(e.currentTarget.checked);
+                                        }}
+                                      disabled={savingSettings}
+                                    />
+                                </Group>
+
+                                {autoCreate && (
+                                    <div>
+                                        <Text size="sm" fw={500} mb="xs">
+                                            Service Item Names by Estimate Type:
+                                        </Text>
+                                        <Text size="xs" c="dimmed" mb="md">
+                                            Configure QuickBooks service item names for each
+                                            estimate type. This should match the exact name of a
+                                            Service item in QuickBooks. For nested items
+                                            (sub-items), use the format &apos;Category:Item
+                                            Name&apos; (e.g., &apos;Interior painting:Interior
+                                            painting&apos;). All fields are required when
+                                            auto-create is enabled.
+                                        </Text>
+                                        <Stack gap="md">
+                                            {(['INTERIOR', 'EXTERIOR', 'BOTH'] as const).map(
+                                                (estimateType) => (
+                                                    <Group
+                                                      key={estimateType}
+                                                      gap="sm"
+                                                      align="flex-end"
+                                                    >
+                                                        <Text size="sm" style={{ minWidth: '100px' }}>
+                                                            {estimateType}:
+                                                        </Text>
+                                                        <TextInput
+                                                          placeholder="e.g., Interior painting:Interior painting"
+                                                          value={serviceItemNames[estimateType]}
+                                                          onChange={(e) =>
+                                                                setServiceItemNames((prev) => ({
+                                                                    ...prev,
+                                                                    [estimateType]: e.target.value,
+                                                                }))
+                                                            }
+                                                          style={{ flex: 1 }}
+                                                          required={autoCreate}
+                                                        />
+                                                    </Group>
+                                                )
+                                            )}
+                                        </Stack>
+                                    </div>
+                                )}
+
+                                <Group justify="flex-end" mt="md">
+                                    <Button
+                                      onClick={handleSaveAllSettings}
+                                      loading={savingSettings}
+                                      disabled={
+                                            savingSettings ||
+                                            (autoCreate &&
+                                                (!serviceItemNames.INTERIOR?.trim() ||
+                                                    !serviceItemNames.EXTERIOR?.trim() ||
+                                                    !serviceItemNames.BOTH?.trim()))
+                                        }
+                                    >
+                                        Save Settings
+                                    </Button>
+                                </Group>
+                            </Stack>
+                        </Card>
+                        </>
                     ) : (
                         <Stack gap="md">
                             <Badge color="gray" size="lg">
@@ -332,6 +701,55 @@ export default function IntegrationsTab() {
               loading={disconnecting}
             >
               Disconnect
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Batch Sync Modal */}
+      <Modal
+        opened={showBatchSyncModal}
+        onClose={handleCancelBatchSync}
+        title="Sync Existing Estimates to QuickBooks?"
+        centered
+        size="lg"
+      >
+        <Stack gap="md">
+          <Text>
+            You have {accountingNeededEstimates.length} estimate(s) in Accounting Needed
+            status. Would you like to automatically create customers and estimates in
+            QuickBooks for these estimates? After syncing, they will be moved to Project
+            Not Scheduled status.
+          </Text>
+          {accountingNeededEstimates.length > 0 && (
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Estimates to sync:
+              </Text>
+              <ScrollArea h={200} type="scroll">
+                <Stack gap="xs">
+                  {accountingNeededEstimates.map((estimate) => (
+                    <Text key={estimate.id} size="sm" c="dimmed">
+                      • {estimate.title || estimate.client_name || estimate.id}
+                    </Text>
+                  ))}
+                </Stack>
+              </ScrollArea>
+            </div>
+          )}
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="outline"
+              onClick={handleCancelBatchSync}
+              disabled={syncingEstimates}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchSync}
+              loading={syncingEstimates}
+            >
+              Sync Estimates
             </Button>
           </Group>
         </Stack>
