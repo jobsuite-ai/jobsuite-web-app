@@ -62,6 +62,29 @@ export default function IntegrationsTab() {
         loadStatus();
     }, []);
 
+    // Check for Accounting Needed estimates when auto-create is enabled on load
+    useEffect(() => {
+        const checkForPendingEstimates = async () => {
+            if (autoCreate && status?.connected) {
+                const estimates = await checkAccountingNeededEstimates();
+                if (estimates.length > 0) {
+                    // Auto-create is enabled but there are still Accounting Needed estimates
+                    // This shouldn't happen normally, but show a notification
+                    notifications.show({
+                        title: 'Pending Estimates',
+                        message: `You have ${estimates.length} estimate(s) in Accounting Needed status. Consider syncing them.`,
+                        color: 'yellow',
+                        autoClose: 10000,
+                    });
+                }
+            }
+        };
+
+        if (status && !loading) {
+            checkForPendingEstimates();
+        }
+    }, [autoCreate, status, loading]);
+
     const loadStatus = async () => {
         try {
             setLoading(true);
@@ -247,12 +270,25 @@ export default function IntegrationsTab() {
     const handleAutoCreateToggle = async (newValue: boolean) => {
         // If enabling auto-create, check for Accounting Needed estimates
         if (newValue && !autoCreate) {
-            const estimates = await checkAccountingNeededEstimates();
-            if (estimates.length > 0) {
-                setAccountingNeededEstimates(estimates);
-                setShowBatchSyncModal(true);
-                // Don't update autoCreate yet - wait for user decision
-                return;
+            try {
+                const estimates = await checkAccountingNeededEstimates();
+                // eslint-disable-next-line no-console
+                console.log('Found Accounting Needed estimates:', estimates.length);
+                if (estimates.length > 0) {
+                    setAccountingNeededEstimates(estimates);
+                    setShowBatchSyncModal(true);
+                    // Don't update autoCreate yet - wait for user decision
+                    return;
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Error checking for Accounting Needed estimates:', err);
+                // If check fails, still allow enabling but show warning
+                notifications.show({
+                    title: 'Warning',
+                    message: 'Could not check for existing Accounting Needed estimates. Please verify manually.',
+                    color: 'yellow',
+                });
             }
         }
         // If disabling or no estimates to sync, update immediately
@@ -275,9 +311,28 @@ export default function IntegrationsTab() {
             }
 
             const result = await response.json();
+
+            // Save auto-create setting to backend
+            const autoCreateResponse = await fetch('/api/quickbooks/settings/auto-create', {
+                method: 'PUT',
+                headers: {
+                    ...getApiHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    auto_create_customers_and_estimates: true,
+                }),
+            });
+
+            if (!autoCreateResponse.ok) {
+                const errorData = await autoCreateResponse.json();
+                throw new Error(errorData.message || 'Failed to update auto-create setting');
+            }
+
             notifications.show({
                 title: 'Success',
-                message: `Successfully synced ${result.successful} estimate(s) to QuickBooks`,
+                message: `Successfully synced ${result.successful} estimate(s) to QuickBooks ` +
+                    'and enabled auto-create',
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
@@ -285,9 +340,17 @@ export default function IntegrationsTab() {
             // Close modal and enable auto-create
             setShowBatchSyncModal(false);
             setAutoCreate(true);
+            setAccountingNeededEstimates([]);
 
             // Reload status to refresh data
             await loadStatus();
+
+            // Trigger event to notify other components (like JobsList) that the setting changed
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('quickbooks-auto-create-changed', {
+                    detail: { enabled: true },
+                }));
+            }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error syncing estimates:', err);
@@ -384,6 +447,13 @@ export default function IntegrationsTab() {
 
             // Reload status
             await loadStatus();
+
+            // Trigger event to notify other components (like JobsList) that the setting changed
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(new CustomEvent('quickbooks-auto-create-changed', {
+                    detail: { enabled: autoCreate },
+                }));
+            }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error saving settings:', err);
