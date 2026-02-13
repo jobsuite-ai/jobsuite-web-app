@@ -14,6 +14,7 @@ import {
     Alert,
     Badge,
     TextInput,
+    Switch,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconExternalLink } from '@tabler/icons-react';
@@ -32,6 +33,7 @@ interface QuickBooksStatus {
         realm_id: string;
     };
     service_item_names?: Record<string, string | null>;
+    auto_create_customers_and_estimates?: boolean;
     message?: string;
 }
 
@@ -52,6 +54,8 @@ export default function IntegrationsTab() {
         EXTERIOR: false,
         BOTH: false,
     });
+    const [autoCreate, setAutoCreate] = useState<boolean>(false);
+    const [savingAutoCreate, setSavingAutoCreate] = useState<boolean>(false);
 
     useEffect(() => {
         loadStatus();
@@ -79,6 +83,7 @@ export default function IntegrationsTab() {
 
             const statusData: QuickBooksStatus = await response.json();
             setStatus(statusData);
+            setAutoCreate(statusData.auto_create_customers_and_estimates || false);
             if (statusData.service_item_names) {
                 setServiceItemNames({
                     INTERIOR: statusData.service_item_names.INTERIOR || '',
@@ -213,6 +218,57 @@ export default function IntegrationsTab() {
             });
         } finally {
             setDisconnecting(false);
+        }
+    };
+
+    const handleSaveAutoCreate = async (value: boolean) => {
+        try {
+            setSavingAutoCreate(true);
+            setError(null);
+
+            const response = await fetch('/api/quickbooks/settings/auto-create', {
+                method: 'PUT',
+                headers: {
+                    ...getApiHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    auto_create_customers_and_estimates: value,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update auto-create setting');
+            }
+
+            await response.json();
+
+            notifications.show({
+                title: 'Success',
+                message: 'Auto-create setting updated successfully',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Reload status
+            await loadStatus();
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error saving auto-create setting:', err);
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to update auto-create setting';
+            setError(errorMessage);
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            // Revert the toggle on error
+            setAutoCreate(!value);
+        } finally {
+            setSavingAutoCreate(false);
         }
     };
 
@@ -352,9 +408,36 @@ export default function IntegrationsTab() {
                             )}
 
                             <div>
-                                <Text size="sm" fw={500} mb="xs">
-                                    Service Item Names by Estimate Type:
-                                </Text>
+                                <Group justify="space-between" align="center" mb="md">
+                                    <div>
+                                        <Text size="sm" fw={500} mb="xs">
+                                            Auto-Create Customers and Estimates:
+                                        </Text>
+                                        <Text size="xs" c="dimmed">
+                                            When enabled, customers and estimates are automatically
+                                            created in QuickBooks when an estimate is accepted. If
+                                            disabled, estimates will skip QuickBooks sync and go to
+                                            Accounting Needed status.
+                                        </Text>
+                                    </div>
+                                    <Switch
+                                      checked={autoCreate}
+                                      onChange={(e) => {
+                                            const newValue = e.currentTarget.checked;
+                                            setAutoCreate(newValue);
+                                            handleSaveAutoCreate(newValue);
+                                        }}
+                                      disabled={savingAutoCreate}
+                                      loading={savingAutoCreate}
+                                    />
+                                </Group>
+                            </div>
+
+                            {autoCreate && (
+                                <div>
+                                    <Text size="sm" fw={500} mb="xs">
+                                        Service Item Names by Estimate Type:
+                                    </Text>
                                 <Text size="xs" c="dimmed" mb="md">
                                     Configure QuickBooks service item names for each estimate type.
                                     This should match the exact name of a Service item in
@@ -392,7 +475,8 @@ export default function IntegrationsTab() {
                                         </Group>
                                     ))}
                                 </Stack>
-                            </div>
+                                </div>
+                            )}
                         </Stack>
                     ) : (
                         <Stack gap="md">
