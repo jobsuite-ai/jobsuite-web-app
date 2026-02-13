@@ -428,7 +428,6 @@ export default function IntegrationsTab() {
                                             handleSaveAutoCreate(newValue);
                                         }}
                                       disabled={savingAutoCreate}
-                                      loading={savingAutoCreate}
                                     />
                                 </Group>
                             </div>
