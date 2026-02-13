@@ -49,13 +49,8 @@ export default function IntegrationsTab() {
         EXTERIOR: '',
         BOTH: '',
     });
-    const [savingServiceItemName, setSavingServiceItemName] = useState<Record<string, boolean>>({
-        INTERIOR: false,
-        EXTERIOR: false,
-        BOTH: false,
-    });
     const [autoCreate, setAutoCreate] = useState<boolean>(false);
-    const [savingAutoCreate, setSavingAutoCreate] = useState<boolean>(false);
+    const [savingSettings, setSavingSettings] = useState<boolean>(false);
 
     useEffect(() => {
         loadStatus();
@@ -221,84 +216,72 @@ export default function IntegrationsTab() {
         }
     };
 
-    const handleSaveAutoCreate = async (value: boolean) => {
+    const handleSaveAllSettings = async () => {
         try {
-            setSavingAutoCreate(true);
+            setSavingSettings(true);
             setError(null);
 
-            const response = await fetch('/api/quickbooks/settings/auto-create', {
+            // Validate: if auto-create is enabled, all service item names must be filled
+            if (autoCreate) {
+                const missingFields = ['INTERIOR', 'EXTERIOR', 'BOTH'].filter(
+                    (type) => !serviceItemNames[type] || serviceItemNames[type].trim() === ''
+                );
+                if (missingFields.length > 0) {
+                    throw new Error(
+                        `Please fill in all service item names. Missing: ${missingFields.join(', ')}`
+                    );
+                }
+            }
+
+            // Save auto-create setting
+            const autoCreateResponse = await fetch('/api/quickbooks/settings/auto-create', {
                 method: 'PUT',
                 headers: {
                     ...getApiHeaders(),
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    auto_create_customers_and_estimates: value,
+                    auto_create_customers_and_estimates: autoCreate,
                 }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
+            if (!autoCreateResponse.ok) {
+                const errorData = await autoCreateResponse.json();
                 throw new Error(errorData.message || 'Failed to update auto-create setting');
             }
 
-            await response.json();
+            // Save all service item names
+            const savePromises = ['INTERIOR', 'EXTERIOR', 'BOTH'].map((estimateType) =>
+                fetch('/api/quickbooks/settings/service-item-name', {
+                    method: 'PUT',
+                    headers: {
+                        ...getApiHeaders(),
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        estimate_type: estimateType,
+                        service_item_name: serviceItemNames[estimateType] || null,
+                    }),
+                })
+            );
 
-            notifications.show({
-                title: 'Success',
-                message: 'Auto-create setting updated successfully',
-                color: 'green',
-                icon: <IconCheck size={16} />,
-            });
+            const responses = await Promise.all(savePromises);
+            const errors = responses
+                .map((response, index) => {
+                    if (!response.ok) {
+                        return `Failed to save ${['INTERIOR', 'EXTERIOR', 'BOTH'][index]}`;
+                    }
+                    return null;
+                })
+                .filter(Boolean);
 
-            // Reload status
-            await loadStatus();
-        } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error('Error saving auto-create setting:', err);
-            const errorMessage =
-                err instanceof Error ? err.message : 'Failed to update auto-create setting';
-            setError(errorMessage);
-            notifications.show({
-                title: 'Error',
-                message: errorMessage,
-                color: 'red',
-                icon: <IconX size={16} />,
-            });
-            // Revert the toggle on error
-            setAutoCreate(!value);
-        } finally {
-            setSavingAutoCreate(false);
-        }
-    };
-
-    const handleSaveServiceItemName = async (estimateType: string) => {
-        try {
-            setSavingServiceItemName((prev) => ({ ...prev, [estimateType]: true }));
-            setError(null);
-
-            const response = await fetch('/api/quickbooks/settings/service-item-name', {
-                method: 'PUT',
-                headers: {
-                    ...getApiHeaders(),
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    estimate_type: estimateType,
-                    service_item_name: serviceItemNames[estimateType] || null,
-                }),
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to update service item name');
+            if (errors.length > 0) {
+                throw new Error(errors.join(', '));
             }
 
-            await response.json();
-
             notifications.show({
                 title: 'Success',
-                message: `Service item name for ${estimateType} updated successfully`,
+                message: 'QuickBooks settings saved successfully',
                 color: 'green',
                 icon: <IconCheck size={16} />,
             });
@@ -307,9 +290,9 @@ export default function IntegrationsTab() {
             await loadStatus();
         } catch (err) {
             // eslint-disable-next-line no-console
-            console.error('Error saving service item name:', err);
+            console.error('Error saving settings:', err);
             const errorMessage =
-                err instanceof Error ? err.message : 'Failed to update service item name';
+                err instanceof Error ? err.message : 'Failed to save settings';
             setError(errorMessage);
             notifications.show({
                 title: 'Error',
@@ -318,7 +301,7 @@ export default function IntegrationsTab() {
                 icon: <IconX size={16} />,
             });
         } finally {
-            setSavingServiceItemName((prev) => ({ ...prev, [estimateType]: false }));
+            setSavingSettings(false);
         }
     };
 
@@ -340,6 +323,7 @@ export default function IntegrationsTab() {
                     )}
 
                     {status?.connected ? (
+                        <>
                         <Stack gap="md">
                             <Group justify="space-between" align="center">
                                 <Badge color="green" size="lg">
@@ -351,7 +335,7 @@ export default function IntegrationsTab() {
                                   onClick={() => setShowDisconnectModal(true)}
                                   loading={disconnecting}
                                 >
-                                  Disconnect
+                                Disconnect
                                 </Button>
                             </Group>
 
@@ -406,10 +390,14 @@ export default function IntegrationsTab() {
                                     The connection will be refreshed automatically when needed.
                                 </Alert>
                             )}
+                        </Stack>
 
-                            <div>
-                                <Group justify="space-between" align="center" mb="md">
-                                    <div>
+                        <Card shadow="sm" padding="lg" withBorder>
+                            <Stack gap="md">
+                                <Title order={4}>Auto-Create Settings</Title>
+
+                                <Group justify="space-between" align="flex-start">
+                                    <div style={{ flex: 1 }}>
                                         <Text size="sm" fw={500} mb="xs">
                                             Auto-Create Customers and Estimates:
                                         </Text>
@@ -423,60 +411,74 @@ export default function IntegrationsTab() {
                                     <Switch
                                       checked={autoCreate}
                                       onChange={(e) => {
-                                            const newValue = e.currentTarget.checked;
-                                            setAutoCreate(newValue);
-                                            handleSaveAutoCreate(newValue);
+                                            setAutoCreate(e.currentTarget.checked);
                                         }}
-                                      disabled={savingAutoCreate}
+                                      disabled={savingSettings}
                                     />
                                 </Group>
-                            </div>
 
-                            {autoCreate && (
-                                <div>
-                                    <Text size="sm" fw={500} mb="xs">
-                                        Service Item Names by Estimate Type:
-                                    </Text>
-                                <Text size="xs" c="dimmed" mb="md">
-                                    Configure QuickBooks service item names for each estimate type.
-                                    This should match the exact name of a Service item in
-                                    QuickBooks. For nested items (sub-items), use the format
-                                    &apos;Category:Item Name&apos; (e.g., &apos;Interior
-                                    painting:Interior painting&apos;). If not set, defaults will be
-                                    used based on estimate type.
-                                </Text>
-                                <Stack gap="md">
-                                    {(['INTERIOR', 'EXTERIOR', 'BOTH'] as const).map((estimateType) => (
-                                        <Group key={estimateType} gap="sm" align="flex-end">
-                                            <Text size="sm" style={{ minWidth: '100px' }}>
-                                                {estimateType}:
-                                            </Text>
-                                            <TextInput
-                                              placeholder="e.g., Interior painting:Interior painting"
-                                              value={serviceItemNames[estimateType]}
-                                              onChange={(e) =>
-                                                    setServiceItemNames((prev) => ({
-                                                        ...prev,
-                                                        [estimateType]: e.target.value,
-                                                    }))
-                                                }
-                                              style={{ flex: 1 }}
-                                            />
-                                            <Button
-                                              onClick={() =>
-                                                    handleSaveServiceItemName(estimateType)
-                                                }
-                                              loading={savingServiceItemName[estimateType]}
-                                              size="sm"
-                                            >
-                                                Save
-                                            </Button>
-                                        </Group>
-                                    ))}
-                                </Stack>
-                                </div>
-                            )}
-                        </Stack>
+                                {autoCreate && (
+                                    <div>
+                                        <Text size="sm" fw={500} mb="xs">
+                                            Service Item Names by Estimate Type:
+                                        </Text>
+                                        <Text size="xs" c="dimmed" mb="md">
+                                            Configure QuickBooks service item names for each
+                                            estimate type. This should match the exact name of a
+                                            Service item in QuickBooks. For nested items
+                                            (sub-items), use the format &apos;Category:Item
+                                            Name&apos; (e.g., &apos;Interior painting:Interior
+                                            painting&apos;). All fields are required when
+                                            auto-create is enabled.
+                                        </Text>
+                                        <Stack gap="md">
+                                            {(['INTERIOR', 'EXTERIOR', 'BOTH'] as const).map(
+                                                (estimateType) => (
+                                                    <Group
+                                                      key={estimateType}
+                                                      gap="sm"
+                                                      align="flex-end"
+                                                    >
+                                                        <Text size="sm" style={{ minWidth: '100px' }}>
+                                                            {estimateType}:
+                                                        </Text>
+                                                        <TextInput
+                                                          placeholder="e.g., Interior painting:Interior painting"
+                                                          value={serviceItemNames[estimateType]}
+                                                          onChange={(e) =>
+                                                                setServiceItemNames((prev) => ({
+                                                                    ...prev,
+                                                                    [estimateType]: e.target.value,
+                                                                }))
+                                                            }
+                                                          style={{ flex: 1 }}
+                                                          required={autoCreate}
+                                                        />
+                                                    </Group>
+                                                )
+                                            )}
+                                        </Stack>
+                                    </div>
+                                )}
+
+                                <Group justify="flex-end" mt="md">
+                                    <Button
+                                      onClick={handleSaveAllSettings}
+                                      loading={savingSettings}
+                                      disabled={
+                                            savingSettings ||
+                                            (autoCreate &&
+                                                (!serviceItemNames.INTERIOR?.trim() ||
+                                                    !serviceItemNames.EXTERIOR?.trim() ||
+                                                    !serviceItemNames.BOTH?.trim()))
+                                        }
+                                    >
+                                        Save Settings
+                                    </Button>
+                                </Group>
+                            </Stack>
+                        </Card>
+                        </>
                     ) : (
                         <Stack gap="md">
                             <Badge color="gray" size="lg">
