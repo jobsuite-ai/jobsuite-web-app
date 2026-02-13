@@ -15,6 +15,7 @@ import {
     Badge,
     TextInput,
     Switch,
+    ScrollArea,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconExternalLink } from '@tabler/icons-react';
@@ -51,6 +52,11 @@ export default function IntegrationsTab() {
     });
     const [autoCreate, setAutoCreate] = useState<boolean>(false);
     const [savingSettings, setSavingSettings] = useState<boolean>(false);
+    const [showBatchSyncModal, setShowBatchSyncModal] = useState(false);
+    const [accountingNeededEstimates, setAccountingNeededEstimates] = useState<
+        Array<{ id: string; title?: string; client_name?: string }>
+    >([]);
+    const [syncingEstimates, setSyncingEstimates] = useState<boolean>(false);
 
     useEffect(() => {
         loadStatus();
@@ -214,6 +220,96 @@ export default function IntegrationsTab() {
         } finally {
             setDisconnecting(false);
         }
+    };
+
+    const checkAccountingNeededEstimates = async (): Promise<
+        Array<{ id: string; title?: string; client_name?: string }>
+    > => {
+        try {
+            const response = await fetch('/api/estimates?status=ACCOUNTING_NEEDED', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+
+            if (!response.ok) {
+                return [];
+            }
+
+            const estimates = await response.json();
+            return estimates || [];
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error checking accounting needed estimates:', err);
+            return [];
+        }
+    };
+
+    const handleAutoCreateToggle = async (newValue: boolean) => {
+        // If enabling auto-create, check for Accounting Needed estimates
+        if (newValue && !autoCreate) {
+            const estimates = await checkAccountingNeededEstimates();
+            if (estimates.length > 0) {
+                setAccountingNeededEstimates(estimates);
+                setShowBatchSyncModal(true);
+                // Don't update autoCreate yet - wait for user decision
+                return;
+            }
+        }
+        // If disabling or no estimates to sync, update immediately
+        setAutoCreate(newValue);
+    };
+
+    const handleBatchSync = async () => {
+        try {
+            setSyncingEstimates(true);
+            setError(null);
+
+            const response = await fetch('/api/estimates/batch-sync-accounting-needed', {
+                method: 'POST',
+                headers: getApiHeaders(),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to sync estimates');
+            }
+
+            const result = await response.json();
+            notifications.show({
+                title: 'Success',
+                message: `Successfully synced ${result.successful} estimate(s) to QuickBooks`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Close modal and enable auto-create
+            setShowBatchSyncModal(false);
+            setAutoCreate(true);
+
+            // Reload status to refresh data
+            await loadStatus();
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error syncing estimates:', err);
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to sync estimates';
+            setError(errorMessage);
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSyncingEstimates(false);
+        }
+    };
+
+    const handleCancelBatchSync = () => {
+        setShowBatchSyncModal(false);
+        setAccountingNeededEstimates([]);
+        // Don't enable auto-create
+        setAutoCreate(false);
     };
 
     const handleSaveAllSettings = async () => {
@@ -411,7 +507,7 @@ export default function IntegrationsTab() {
                                     <Switch
                                       checked={autoCreate}
                                       onChange={(e) => {
-                                            setAutoCreate(e.currentTarget.checked);
+                                            handleAutoCreateToggle(e.currentTarget.checked);
                                         }}
                                       disabled={savingSettings}
                                     />
@@ -529,6 +625,55 @@ export default function IntegrationsTab() {
               loading={disconnecting}
             >
               Disconnect
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Batch Sync Modal */}
+      <Modal
+        opened={showBatchSyncModal}
+        onClose={handleCancelBatchSync}
+        title="Sync Existing Estimates to QuickBooks?"
+        centered
+        size="lg"
+      >
+        <Stack gap="md">
+          <Text>
+            You have {accountingNeededEstimates.length} estimate(s) in Accounting Needed
+            status. Would you like to automatically create customers and estimates in
+            QuickBooks for these estimates? After syncing, they will be moved to Project
+            Not Scheduled status.
+          </Text>
+          {accountingNeededEstimates.length > 0 && (
+            <div>
+              <Text size="sm" fw={500} mb="xs">
+                Estimates to sync:
+              </Text>
+              <ScrollArea h={200} type="scroll">
+                <Stack gap="xs">
+                  {accountingNeededEstimates.map((estimate) => (
+                    <Text key={estimate.id} size="sm" c="dimmed">
+                      • {estimate.title || estimate.client_name || estimate.id}
+                    </Text>
+                  ))}
+                </Stack>
+              </ScrollArea>
+            </div>
+          )}
+          <Group justify="flex-end" gap="sm">
+            <Button
+              variant="outline"
+              onClick={handleCancelBatchSync}
+              disabled={syncingEstimates}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBatchSync}
+              loading={syncingEstimates}
+            >
+              Sync Estimates
             </Button>
           </Group>
         </Stack>
