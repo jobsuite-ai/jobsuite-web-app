@@ -474,7 +474,8 @@ export default function JobsList() {
         return saved === 'true';
     });
     const [refreshing, setRefreshing] = useState(false);
-    const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean>(false);
+    // null = loading, true/false = loaded
+    const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -513,14 +514,30 @@ export default function JobsList() {
                     setAutoCreateEnabled(
                         statusData.auto_create_customers_and_estimates || false
                     );
+                } else {
+                    // If not connected or error, default to false
+                    setAutoCreateEnabled(false);
                 }
             } catch (err) {
                 // eslint-disable-next-line no-console
                 console.error('Error checking QuickBooks auto-create setting:', err);
+                // On error, default to false to show the column
+                setAutoCreateEnabled(false);
             }
         };
 
         checkAutoCreate();
+
+        // Listen for changes to the auto-create setting
+        const handleAutoCreateChange = (event: CustomEvent) => {
+            setAutoCreateEnabled(event.detail.enabled);
+        };
+
+        window.addEventListener('quickbooks-auto-create-changed', handleAutoCreateChange as EventListener);
+
+        return () => {
+            window.removeEventListener('quickbooks-auto-create-changed', handleAutoCreateChange as EventListener);
+        };
     }, []);
 
     // Update jobs when cache data changes
@@ -1092,7 +1109,8 @@ export default function JobsList() {
                     {columns
                         .filter((column) => {
                             // Hide Accounting Needed column if auto-create is enabled
-                            if (column.id === 'accounting-needed' && autoCreateEnabled) {
+                            // Only filter if we've loaded the setting (not null)
+                            if (column.id === 'accounting-needed' && autoCreateEnabled === true) {
                                 return false;
                             }
                             return true;
