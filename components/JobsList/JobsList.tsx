@@ -41,6 +41,7 @@ import { Estimate, EstimateStatus, EstimateType, Job, JobStatus } from '../Globa
 import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppSelector } from '@/store/hooks';
 import { selectProjectsLastFetched } from '@/store/slices/projectsSlice';
@@ -473,6 +474,7 @@ export default function JobsList() {
         return saved === 'true';
     });
     const [refreshing, setRefreshing] = useState(false);
+    const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean>(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -496,6 +498,30 @@ export default function JobsList() {
             },
         })
     );
+
+    // Check QuickBooks auto-create setting
+    useEffect(() => {
+        const checkAutoCreate = async () => {
+            try {
+                const response = await fetch('/api/quickbooks/status', {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                });
+
+                if (response.ok) {
+                    const statusData = await response.json();
+                    setAutoCreateEnabled(
+                        statusData.auto_create_customers_and_estimates || false
+                    );
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Error checking QuickBooks auto-create setting:', err);
+            }
+        };
+
+        checkAutoCreate();
+    }, []);
 
     // Update jobs when cache data changes
     // Always keep lanes visible - loading happens in background
@@ -1063,29 +1089,37 @@ export default function JobsList() {
                   h="100%"
                   className={classes.flexContainer}
                 >
-                    {columns.map((column) => {
-                        const columnJobs = getJobsForColumn(column.id);
-                        const hoursSummary =
-                            column.id === 'scheduling'
-                                ? getInteriorExteriorTotals(columnJobs)
-                                : undefined;
+                    {columns
+                        .filter((column) => {
+                            // Hide Accounting Needed column if auto-create is enabled
+                            if (column.id === 'accounting-needed' && autoCreateEnabled) {
+                                return false;
+                            }
+                            return true;
+                        })
+                        .map((column) => {
+                            const columnJobs = getJobsForColumn(column.id);
+                            const hoursSummary =
+                                column.id === 'scheduling'
+                                    ? getInteriorExteriorTotals(columnJobs)
+                                    : undefined;
 
-                        return (
-                            <KanbanColumn
-                              key={column.id}
-                              column={column}
-                              jobs={columnJobs}
-                              onJobClick={handleJobClick}
-                              resolveClientName={resolveClientName}
-                              isLoading={cacheLoading.projects}
-                              isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
-                              onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
-                              columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
-                              isOver={overId === column.id}
-                              hoursSummary={hoursSummary}
-                            />
-                        );
-                    })}
+                            return (
+                                <KanbanColumn
+                                  key={column.id}
+                                  column={column}
+                                  jobs={columnJobs}
+                                  onJobClick={handleJobClick}
+                                  resolveClientName={resolveClientName}
+                                  isLoading={cacheLoading.projects}
+                                  isCollapsed={column.id === 'historical' ? isHistoricalCollapsed : false}
+                                  onToggleCollapse={column.id === 'historical' ? toggleHistoricalCollapse : undefined}
+                                  columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
+                                  isOver={overId === column.id}
+                                  hoursSummary={hoursSummary}
+                                />
+                            );
+                        })}
                 </Flex>
                 </div>
             </div>
