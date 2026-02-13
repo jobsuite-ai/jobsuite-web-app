@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getContractorId } from '../../../../utils/getContractorId';
-import { getApiBaseUrl } from '../../../../utils/serviceAuth';
+import { getContractorId } from '@/app/api/utils/getContractorId';
+import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function PUT(request: NextRequest) {
     try {
