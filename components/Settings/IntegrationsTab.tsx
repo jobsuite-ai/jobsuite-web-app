@@ -255,11 +255,17 @@ export default function IntegrationsTab() {
             });
 
             if (!response.ok) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to fetch estimates:', response.status, response.statusText);
                 return [];
             }
 
-            const estimates = await response.json();
-            return estimates || [];
+            const data = await response.json();
+            // API returns estimates wrapped in Items property
+            const estimates = data.Items || data || [];
+            // eslint-disable-next-line no-console
+            console.log('Accounting Needed estimates response:', { data, estimates, count: estimates.length });
+            return Array.isArray(estimates) ? estimates : [];
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error checking accounting needed estimates:', err);
