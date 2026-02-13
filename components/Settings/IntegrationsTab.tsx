@@ -13,6 +13,7 @@ import {
     Loader,
     Alert,
     Badge,
+    TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconExternalLink } from '@tabler/icons-react';
@@ -30,6 +31,7 @@ interface QuickBooksStatus {
         company_name: string;
         realm_id: string;
     };
+    service_item_names?: Record<string, string | null>;
     message?: string;
 }
 
@@ -40,6 +42,16 @@ export default function IntegrationsTab() {
     const [status, setStatus] = useState<QuickBooksStatus | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+    const [serviceItemNames, setServiceItemNames] = useState<Record<string, string>>({
+        INTERIOR: '',
+        EXTERIOR: '',
+        BOTH: '',
+    });
+    const [savingServiceItemName, setSavingServiceItemName] = useState<Record<string, boolean>>({
+        INTERIOR: false,
+        EXTERIOR: false,
+        BOTH: false,
+    });
 
     useEffect(() => {
         loadStatus();
@@ -67,6 +79,13 @@ export default function IntegrationsTab() {
 
             const statusData: QuickBooksStatus = await response.json();
             setStatus(statusData);
+            if (statusData.service_item_names) {
+                setServiceItemNames({
+                    INTERIOR: statusData.service_item_names.INTERIOR || '',
+                    EXTERIOR: statusData.service_item_names.EXTERIOR || '',
+                    BOTH: statusData.service_item_names.BOTH || '',
+                });
+            }
         } catch (err) {
             // eslint-disable-next-line no-console
             console.error('Error loading QuickBooks status:', err);
@@ -197,6 +216,56 @@ export default function IntegrationsTab() {
         }
     };
 
+    const handleSaveServiceItemName = async (estimateType: string) => {
+        try {
+            setSavingServiceItemName((prev) => ({ ...prev, [estimateType]: true }));
+            setError(null);
+
+            const response = await fetch('/api/quickbooks/settings/service-item-name', {
+                method: 'PUT',
+                headers: {
+                    ...getApiHeaders(),
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    estimate_type: estimateType,
+                    service_item_name: serviceItemNames[estimateType] || null,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to update service item name');
+            }
+
+            await response.json();
+
+            notifications.show({
+                title: 'Success',
+                message: `Service item name for ${estimateType} updated successfully`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+
+            // Reload status
+            await loadStatus();
+        } catch (err) {
+            // eslint-disable-next-line no-console
+            console.error('Error saving service item name:', err);
+            const errorMessage =
+                err instanceof Error ? err.message : 'Failed to update service item name';
+            setError(errorMessage);
+            notifications.show({
+                title: 'Error',
+                message: errorMessage,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSavingServiceItemName((prev) => ({ ...prev, [estimateType]: false }));
+        }
+    };
+
     return (
         <Card shadow="sm" padding="lg" withBorder>
             {loading ? (
@@ -281,6 +350,49 @@ export default function IntegrationsTab() {
                                     The connection will be refreshed automatically when needed.
                                 </Alert>
                             )}
+
+                            <div>
+                                <Text size="sm" fw={500} mb="xs">
+                                    Service Item Names by Estimate Type:
+                                </Text>
+                                <Text size="xs" c="dimmed" mb="md">
+                                    Configure QuickBooks service item names for each estimate type.
+                                    This should match the exact name of a Service item in
+                                    QuickBooks. For nested items (sub-items), use the format
+                                    &apos;Category:Item Name&apos; (e.g., &apos;Interior
+                                    painting:Interior painting&apos;). If not set, defaults will be
+                                    used based on estimate type.
+                                </Text>
+                                <Stack gap="md">
+                                    {(['INTERIOR', 'EXTERIOR', 'BOTH'] as const).map((estimateType) => (
+                                        <Group key={estimateType} gap="sm" align="flex-end">
+                                            <Text size="sm" style={{ minWidth: '100px' }}>
+                                                {estimateType}:
+                                            </Text>
+                                            <TextInput
+                                              placeholder="e.g., Interior painting:Interior painting"
+                                              value={serviceItemNames[estimateType]}
+                                              onChange={(e) =>
+                                                    setServiceItemNames((prev) => ({
+                                                        ...prev,
+                                                        [estimateType]: e.target.value,
+                                                    }))
+                                                }
+                                              style={{ flex: 1 }}
+                                            />
+                                            <Button
+                                              onClick={() =>
+                                                    handleSaveServiceItemName(estimateType)
+                                                }
+                                              loading={savingServiceItemName[estimateType]}
+                                              size="sm"
+                                            >
+                                                Save
+                                            </Button>
+                                        </Group>
+                                    ))}
+                                </Stack>
+                            </div>
                         </Stack>
                     ) : (
                         <Stack gap="md">
