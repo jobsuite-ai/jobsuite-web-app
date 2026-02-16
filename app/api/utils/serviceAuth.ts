@@ -24,8 +24,29 @@ let tokenCache: TokenCache | null = null;
 let credentialsCache: ServiceAccountCredentials | null = null;
 
 export const getApiBaseUrl = () => {
+  // Client-side: detect environment from current hostname
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+
+    // Production domain - use production API
+    if (hostname === 'www.jobsuite.app' || hostname === 'jobsuite.app') {
+      return 'https://api.jobsuite.app';
+    }
+
+    // QA/Staging domains - use QA API
+    if (hostname.includes('qa') || hostname.includes('staging') || hostname.includes('amplifyapp.com')) {
+      return 'https://qa.api.jobsuite.app';
+    }
+
+    // Local development
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      const url = process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL || process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
+      return url;
+    }
+  }
+
+  // Server-side: check environment variables
   // Local development - check if we're running locally
-  // Use NEXT_PUBLIC_ prefix for client-side access
   const isLocalEnv = process.env.NEXT_PUBLIC_IS_LOCAL_ENV === 'true' || process.env.IS_LOCAL_ENV === 'true';
   const hasNoBranch = !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH;
 
