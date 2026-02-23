@@ -224,6 +224,12 @@ export default function SettingsPage() {
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
+                    // Preserve estimate-received email body
+                    // (edited in Settings > Message Templates)
+                    ...(existingConfig?.configuration?.estimate_received_email_body != null && {
+                        estimate_received_email_body:
+                            existingConfig.configuration.estimate_received_email_body,
+                    }),
                 },
             };
 
@@ -537,7 +543,7 @@ export default function SettingsPage() {
                                 <TextInput
                                   label="Sales person phone"
                                   placeholder="+1 555 123 4567"
-                                  description="When a new estimate is created, this number will be called so the sales person can press 1 to connect to the customer. E.164 format (e.g. +15551234567) is recommended."
+                                  description="When a new estimate is created, this number will be called so the sales person or office manager can press 1 to connect to the customer. E.164 format (e.g. +15551234567) is recommended."
                                   value={salesPersonPhone}
                                   onChange={(e) =>
                                     handleSalesPersonPhoneChange(e.target.value)
