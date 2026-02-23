@@ -2,8 +2,9 @@
 
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton } from '@mantine/core';
-import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail, IconHome, IconLayoutDashboard, IconUsers, IconFilePlus, IconFolder, IconFileText, IconCheck } from '@tabler/icons-react';
+import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton, useMantineTheme } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { IconBuilding, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconMenu2, IconNotification, IconSearch, IconSettings, IconUser, IconUserCircle, IconList, IconMail, IconHome, IconLayoutDashboard, IconUsers, IconFilePlus, IconFolder, IconFileText, IconCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -73,6 +74,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const estimates = useAppSelector(selectAllEstimates);
   const { isAuthenticated, isLoading } = useAuth();
   const { logoUrl } = useContractorLogo();
+  const theme = useMantineTheme();
+  const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
 
   // Utility function to extract estimate_id from notification link
   const extractEstimateId = useCallback((link: string | null): string | null => {
@@ -87,6 +90,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   ) => {
     event.preventDefault();
     router.push(link);
+    if (isMobile) {
+      setSidebarOpened(false);
+    }
   };
 
   // Map links to their icons
@@ -772,6 +778,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
             >
               {sidebarOpened ? (
                 <IconLayoutSidebarLeftCollapse size={22} />
+              ) : isMobile ? (
+                <IconMenu2 size={22} />
               ) : (
                 <IconLayoutSidebarLeftExpand size={22} />
               )}
