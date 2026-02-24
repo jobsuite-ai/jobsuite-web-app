@@ -5,28 +5,29 @@ import { useMemo, useEffect, useState, useRef } from 'react';
 import {
     ActionIcon,
     Badge,
+    Box,
+    Button,
     Card,
     Center,
     Flex,
     Group,
+    Menu,
+    Modal,
+    MultiSelect,
     Paper,
+    Pill,
     ScrollArea,
+    Stack,
+    Table,
     Text,
+    TextInput,
     Title,
     SegmentedControl,
-    TextInput,
-    MultiSelect,
-    Button,
-    Table,
-    Stack,
-    Box,
-    Menu,
-    Pill,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
-import { IconX, IconChevronDown, IconSearch, IconRefresh } from '@tabler/icons-react';
+import { IconX, IconChevronDown, IconSearch, IconRefresh, IconMessageCircle } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './EstimatesList.module.css';
@@ -50,6 +51,7 @@ const PROPOSAL_PIPELINE_STATUSES = [
 const SENT_PROPOSAL_STATUSES = [
     EstimateStatus.ESTIMATE_SENT,
     EstimateStatus.ESTIMATE_OPENED,
+    EstimateStatus.NEEDS_FOLLOW_UP,
 ];
 
 const ACCEPTED_STATUSES = [
@@ -85,6 +87,9 @@ export default function EstimatesList() {
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [clientNameFilter, setClientNameFilter] = useState('');
+    const [markingFollowUpId, setMarkingFollowUpId] = useState<string | null>(null);
+    const [followUpModalEstimate, setFollowUpModalEstimate] = useState<Estimate | null>(null);
+    const [followUpDate, setFollowUpDate] = useState<Date | null>(null);
     const lastFetched = useAppSelector(selectEstimatesLastFetched);
 
     const router = useRouter();
@@ -168,15 +173,34 @@ export default function EstimatesList() {
                 return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
             });
 
+        const now = new Date();
+        const isSnoozed = (e: Estimate) =>
+            e.needs_follow_up === true &&
+            e.needs_follow_up_at != null &&
+            new Date(e.needs_follow_up_at) > now;
         const sortedColumnTwo = estimates
             .filter(estimate => SENT_PROPOSAL_STATUSES.includes(estimate.status))
+            .filter(estimate => !isSnoozed(estimate))
             .sort((a, b) => {
-                // First sort by status order
+                // Resurfacing: needs_follow_up && needs_follow_up_at due first
+                const aDue = a.needs_follow_up && a.needs_follow_up_at
+                    && new Date(a.needs_follow_up_at) <= now;
+                const bDue = b.needs_follow_up && b.needs_follow_up_at
+                    && new Date(b.needs_follow_up_at) <= now;
+                if (aDue && !bDue) return -1;
+                if (!aDue && bDue) return 1;
+                // Then by status order
                 const statusDiff = SENT_PROPOSAL_STATUSES.indexOf(a.status) -
                     SENT_PROPOSAL_STATUSES.indexOf(b.status);
                 if (statusDiff !== 0) return statusDiff;
-                // Then sort by updated_at (newest first) within each status
-                return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+                // Then by column_entered_at (oldest first) or updated_at
+                const aEntered = a.column_entered_at
+                    ? new Date(a.column_entered_at).getTime()
+                    : new Date(a.updated_at).getTime();
+                const bEntered = b.column_entered_at
+                    ? new Date(b.column_entered_at).getTime()
+                    : new Date(b.updated_at).getTime();
+                return aEntered - bEntered;
             });
 
         const sortedColumnThree = estimates
@@ -197,7 +221,12 @@ export default function EstimatesList() {
 
     // Filter estimates for list view
     const filteredEstimates = useMemo(() => {
-        let filtered = [...estimates];
+        const now = new Date();
+        const isSnoozed = (e: Estimate) =>
+            e.needs_follow_up === true &&
+            e.needs_follow_up_at != null &&
+            new Date(e.needs_follow_up_at) > now;
+        let filtered = estimates.filter(e => !isSnoozed(e));
 
         // Search query filter (title, client name, address)
         if (searchQuery.trim()) {
@@ -302,10 +331,76 @@ export default function EstimatesList() {
         }
     };
 
+    const handleMarkNeedsFollowUp = async (
+        estimateId: string,
+        e: React.MouseEvent,
+        needsFollowUpAt?: Date | null
+    ) => {
+        e?.stopPropagation?.();
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!accessToken) return;
+        setMarkingFollowUpId(estimateId);
+        try {
+            const body: { needs_follow_up_at?: string } = {};
+            if (needsFollowUpAt) {
+                body.needs_follow_up_at = needsFollowUpAt.toISOString();
+            }
+            const res = await fetch(
+                `/api/estimates/${estimateId}/mark-needs-follow-up`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                    body: JSON.stringify(body),
+                }
+            );
+            if (res.ok) {
+                setFollowUpModalEstimate(null);
+                setFollowUpDate(null);
+                invalidateCache('estimates');
+                await refreshData('estimates', true);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Failed to set check-in date',
+                    message: err?.detail || res.statusText,
+                    color: 'red',
+                    position: 'bottom-right',
+                });
+            }
+        } finally {
+            setMarkingFollowUpId(null);
+        }
+    };
+
+    const openMarkFollowUpModal = (estimate: Estimate, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const defaultDate = new Date();
+        defaultDate.setDate(defaultDate.getDate() + 3);
+        setFollowUpDate(defaultDate);
+        setFollowUpModalEstimate(estimate);
+    };
+
+    const handleMarkFollowUpModalConfirm = (e: React.MouseEvent) => {
+        if (!followUpModalEstimate) return;
+        handleMarkNeedsFollowUp(
+            followUpModalEstimate.id,
+            e,
+            followUpDate ?? undefined
+        );
+    };
+
     // Helper function to render a job card
     const renderEstimateCard = (estimate: Estimate) => {
         const resolvedClientName =
             estimate.client_name || clientNameById.get(estimate.client_id);
+        const daysInCol = estimate.days_in_column ?? null;
+        const showDaysBadge = typeof daysInCol === 'number';
+        const isStale = showDaysBadge && daysInCol > 20;
+        const isTerminal = estimate.is_terminal === true;
+        const canMarkFollowUp = !isTerminal && showDaysBadge && daysInCol > 20;
         return (
         <Card
           key={estimate.id}
@@ -318,29 +413,60 @@ export default function EstimatesList() {
           style={{ cursor: 'pointer', minHeight: 44 }}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey) {
-              // Open in new tab
               window.open(`/proposals/${estimate.id}`, '_blank');
             } else {
-              // Normal navigation
               router.push(`/proposals/${estimate.id}`);
             }
           }}
         >
-            <Center>
-                {estimate.estimate_type &&
+            {canMarkFollowUp && (
+                <Box mb="xs" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      fullWidth
+                      leftSection={<IconMessageCircle size={16} />}
+                      loading={markingFollowUpId === estimate.id}
+                      onClick={(e) => openMarkFollowUpModal(estimate, e)}
+                    >
+                        Set check-in date
+                    </Button>
+                </Box>
+            )}
+            <Group justify="space-between" align="center" mb="xs">
+                {estimate.estimate_type ? (
                     <Text size="sm" fw={700}>{estimate.estimate_type}</Text>
-                }
-            </Center>
+                ) : (
+                    <Box />
+                )}
+                {showDaysBadge && (
+                    <Badge
+                      color={isStale ? 'red' : 'gray'}
+                      size="sm"
+                      title="Days in current status"
+                    >
+                        {daysInCol} days in column
+                    </Badge>
+                )}
+            </Group>
             {estimate.title && (
                 <Text fw={600} size="md" mt="xs" mb="xs">{estimate.title}</Text>
             )}
             <Group justify="space-between" mt="md" mb="xs">
                 <Text fw={500}>{resolvedClientName || 'Unknown Client'}</Text>
-                <Badge style={{ color: '#ffffff' }} color={getEstimateBadgeColor(estimate.status)}>
-                    {getFormattedEstimateStatus(estimate.status)}
-                </Badge>
+                <Group gap="xs">
+                    {estimate.needs_follow_up && (
+                        <Badge size="sm" variant="light" color="orange" title="Resurface for follow-up on this date">
+                            {estimate.needs_follow_up_at
+                                ? `Follow-up ${new Date(estimate.needs_follow_up_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+                                : 'Needs follow-up'}
+                        </Badge>
+                    )}
+                    <Badge style={{ color: '#ffffff' }} color={getEstimateBadgeColor(estimate.status)}>
+                        {getFormattedEstimateStatus(estimate.status)}
+                    </Badge>
+                </Group>
             </Group>
-
             <Flex direction="column" align="flex-start" gap="xs">
                 {(() => {
                     const street = estimate.address_street ? String(estimate.address_street).trim() : '';
@@ -379,6 +505,12 @@ export default function EstimatesList() {
                     <Text size="sm" c="dimmed">
                         Sent: {new Date(estimate.sent_date).toLocaleDateString()}
                     </Text>
+                )}
+                {(estimate.follow_up_count != null && estimate.follow_up_count > 0) && (
+                    <Text size="sm" c="dimmed">Reach-outs: {estimate.follow_up_count}</Text>
+                )}
+                {estimate.next_follow_up_at && (
+                    <Text size="sm" c="dimmed">Next follow-up: {new Date(estimate.next_follow_up_at).toLocaleDateString()}</Text>
                 )}
             </Flex>
         </Card>
@@ -590,13 +722,21 @@ export default function EstimatesList() {
                                     <Table.Th>Client</Table.Th>
                                     <Table.Th>Address</Table.Th>
                                     <Table.Th>Status</Table.Th>
+                                    <Table.Th>Days</Table.Th>
                                     <Table.Th>Type</Table.Th>
                                     <Table.Th>Updated</Table.Th>
+                                    <Table.Th></Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>
                                 {filteredEstimates.length > 0 ? (
-                                    filteredEstimates.map((estimate) => (
+                                    filteredEstimates.map((estimate) => {
+                                        const daysInCol = estimate.days_in_column ?? null;
+                                        const showDays = typeof daysInCol === 'number';
+                                        const isStale = showDays && daysInCol > 20;
+                                        const isTerminal = estimate.is_terminal === true;
+                                        const canMark = !isTerminal && showDays && daysInCol > 20;
+                                        return (
                                         <Table.Tr
                                           key={estimate.id}
                                           style={{ cursor: 'pointer' }}
@@ -641,6 +781,15 @@ export default function EstimatesList() {
                                                 </Badge>
                                             </Table.Td>
                                             <Table.Td>
+                                                {showDays ? (
+                                                    <Badge color={isStale ? 'red' : 'gray'} size="sm">
+                                                        {daysInCol}d
+                                                    </Badge>
+                                                ) : (
+                                                    <Text size="sm" c="dimmed">-</Text>
+                                                )}
+                                            </Table.Td>
+                                            <Table.Td>
                                                 <Text size="sm" c="dimmed">
                                                     {estimate.estimate_type || '-'}
                                                 </Text>
@@ -651,11 +800,26 @@ export default function EstimatesList() {
                                                         .toLocaleDateString()}
                                                 </Text>
                                             </Table.Td>
+                                            <Table.Td onClick={(e) => e.stopPropagation()}>
+                                                {canMark && (
+                                                    <Button
+                                                      size="xs"
+                                                      variant="light"
+                                                      loading={markingFollowUpId === estimate.id}
+                                                      onClick={(e) =>
+                                                          openMarkFollowUpModal(estimate, e)
+                                                      }
+                                                    >
+                                                        Set check-in date
+                                                    </Button>
+                                                )}
+                                            </Table.Td>
                                         </Table.Tr>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     <Table.Tr>
-                                        <Table.Td colSpan={6}>
+                                        <Table.Td colSpan={8}>
                                             <Center py="xl">
                                                 <Text c="dimmed">No estimates found</Text>
                                             </Center>
@@ -744,6 +908,56 @@ export default function EstimatesList() {
                     )}
                 </Stack>
             )}
+
+            <Modal
+              title="Set check-in date"
+              opened={!!followUpModalEstimate}
+              centered
+              onClose={() => {
+                setFollowUpModalEstimate(null);
+                setFollowUpDate(null);
+              }}
+            >
+              <Stack gap="md">
+                {followUpModalEstimate && (
+                  <Text size="sm" c="dimmed">
+                    {followUpModalEstimate.title
+                      || `Estimate #${followUpModalEstimate.id.slice(0, 8)}`}
+                  </Text>
+                )}
+                <DatePickerInput
+                  label="Check-in date"
+                  placeholder="Pick date"
+                  value={followUpDate}
+                  onChange={setFollowUpDate}
+                  minDate={new Date()}
+                />
+                <Group justify="flex-end" gap="xs">
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      setFollowUpModalEstimate(null);
+                      setFollowUpDate(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="filled"
+                    leftSection={<IconMessageCircle size={14} />}
+                    loading={
+                      followUpModalEstimate
+                        ? markingFollowUpId === followUpModalEstimate.id
+                        : false
+                    }
+                    onClick={handleMarkFollowUpModalConfirm}
+                    disabled={!followUpDate}
+                  >
+                    Set check-in date
+                  </Button>
+                </Group>
+              </Stack>
+            </Modal>
         </>
     );
 }

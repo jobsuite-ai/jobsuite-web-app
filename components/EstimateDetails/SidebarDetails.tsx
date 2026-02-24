@@ -1011,7 +1011,7 @@ export default function SidebarDetails({
 
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
-      <Flex direction="column" gap="md">
+      <Flex direction="column" gap="sm">
         {/* Status */}
         <div>
           <Flex align="center" gap="sm" mb="xs">
@@ -1059,6 +1059,28 @@ export default function SidebarDetails({
             </Flex>
           )}
         </div>
+
+        {(estimate.follow_up_count != null && estimate.follow_up_count > 0) && (
+          <Flex justify="space-between" align="center" gap="sm" mb="md">
+            <Text size="sm" fw={500} c="dimmed">
+              Reach-outs:
+            </Text>
+            <Text size="sm" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }} c="dark">
+              {estimate.follow_up_count}
+            </Text>
+          </Flex>
+        )}
+
+        {estimate.needs_follow_up && estimate.needs_follow_up_at && (
+            <Flex justify="space-between" align="center" gap="sm" mb="md">
+                <Text size="sm" fw={500} c="dimmed">
+                Check-in date:
+                </Text>
+                <Text size="sm" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }} c="dark">
+                {new Date(estimate.needs_follow_up_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                </Text>
+            </Flex>
+        )}
 
         {/* Job Type */}
         {editingJobType && canEditJobType ? (

@@ -225,6 +225,15 @@ export type Estimate = {
     quickbooks_estimate_id?: string;
     quickbooks_invoice_id?: string;
     hours_worked?: number; // Calculated from time entries
+    // Follow-up and column tracking
+    column_entered_at?: string;
+    follow_up_count?: number;
+    last_follow_up_at?: string;
+    next_follow_up_at?: string;
+    needs_follow_up?: boolean;
+    needs_follow_up_at?: string;
+    days_in_column?: number | null;
+    is_terminal?: boolean;
 };
 
 // Status Actions Configuration Types
