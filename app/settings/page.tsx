@@ -53,6 +53,7 @@ export default function SettingsPage() {
     const [reviewLink, setReviewLink] = useState('');
     const [clientCommunicationEmail, setClientCommunicationEmail] = useState('');
     const [clientCommunicationName, setClientCommunicationName] = useState('');
+    const [salesPersonPhone, setSalesPersonPhone] = useState('');
     const [sesVerificationStatus, setSesVerificationStatus] = useState<string | null>(null);
     const [sesVerifying, setSesVerifying] = useState(false);
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
@@ -106,6 +107,9 @@ export default function SettingsPage() {
                 setClientCommunicationName(
                     config.configuration?.client_communication_name || ''
                 );
+                setSalesPersonPhone(
+                    config.configuration?.sales_person_phone || ''
+                );
                 setSesVerificationStatus(
                     config.configuration?.ses_verification_status || null
                 );
@@ -152,6 +156,7 @@ export default function SettingsPage() {
                 setReviewLink('');
                 setClientCommunicationEmail('');
                 setClientCommunicationName('');
+                setSalesPersonPhone('');
                 setSesVerificationStatus(null);
                 setLogoUrl(null);
                 setBaseHourlyRate('');
@@ -201,6 +206,7 @@ export default function SettingsPage() {
                     review_link: reviewLink,
                     client_communication_email: clientCommunicationEmail,
                     client_communication_name: clientCommunicationName,
+                    sales_person_phone: salesPersonPhone?.trim() || null,
                     base_hourly_rate: baseHourlyRate ? parseFloat(baseHourlyRate) : null,
                     // Preserve SES verification status if it exists
                     ...(existingConfig?.configuration?.ses_verification_status && {
@@ -217,6 +223,12 @@ export default function SettingsPage() {
                     // Preserve signature page config if it exists
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
+                    }),
+                    // Preserve estimate-received email body
+                    // (edited in Settings > Message Templates)
+                    ...(existingConfig?.configuration?.estimate_received_email_body != null && {
+                        estimate_received_email_body:
+                            existingConfig.configuration.estimate_received_email_body,
                     }),
                 },
             };
@@ -285,6 +297,11 @@ export default function SettingsPage() {
 
     const handleClientCommunicationNameChange = (value: string) => {
         setClientCommunicationName(value);
+        setHasChanges(true);
+    };
+
+    const handleSalesPersonPhoneChange = (value: string) => {
+        setSalesPersonPhone(value);
         setHasChanges(true);
     };
 
@@ -520,6 +537,16 @@ export default function SettingsPage() {
                                   value={clientCommunicationName}
                                   onChange={(e) =>
                                     handleClientCommunicationNameChange(e.target.value)
+                                  }
+                                />
+
+                                <TextInput
+                                  label="Sales person phone"
+                                  placeholder="+1 555 123 4567"
+                                  description="When a new estimate is created, this number will be called so the sales person or office manager can press 1 to connect to the customer. E.164 format (e.g. +15551234567) is recommended."
+                                  value={salesPersonPhone}
+                                  onChange={(e) =>
+                                    handleSalesPersonPhoneChange(e.target.value)
                                   }
                                 />
 

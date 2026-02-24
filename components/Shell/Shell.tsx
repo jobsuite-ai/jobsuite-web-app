@@ -99,8 +99,12 @@ export function Shell({ children }: { children: any }) {
         }
 
         if (!response.ok) {
-          clearAuthStorage();
-          setIsAuthenticated(false);
+          // Only clear auth on explicit unauthorized (401/403). Transient failures
+          // (network, 5xx) should not log the user out and redirect to welcome.
+          if (response.status === 401 || response.status === 403) {
+            clearAuthStorage();
+            setIsAuthenticated(false);
+          }
           setHasCheckedAuth(true);
           return;
         }
@@ -118,12 +122,12 @@ export function Shell({ children }: { children: any }) {
         setIsAuthenticated(true);
         setHasCheckedAuth(true);
       } catch {
+        // Network/parse errors: do not clear auth so user isn't redirected to
+        // welcome page transiently (e.g. when clicking a client from search).
         if (authCheckIdRef.current !== currentCheckId) {
           setHasCheckedAuth(true);
           return;
         }
-        clearAuthStorage();
-        setIsAuthenticated(false);
         setHasCheckedAuth(true);
       }
     };
@@ -185,10 +189,9 @@ export function Shell({ children }: { children: any }) {
     };
   }, [checkAuth]);
 
-  useEffect(() => {
-    // Revalidate auth when navigating to a new page
-    checkAuth().catch(() => {});
-  }, [checkAuth, pathname]);
+  // Intentionally not re-running checkAuth on pathname change: it caused
+  // transient redirects to welcome when /api/auth/me failed during navigation
+  // (e.g. clicking a client from search or Clients list).
 
   useEffect(() => {
     if (!pathname) {

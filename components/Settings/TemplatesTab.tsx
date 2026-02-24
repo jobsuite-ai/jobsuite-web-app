@@ -23,6 +23,13 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 import { useUsers } from '@/hooks/useUsers';
 
+interface ContractorConfig {
+    id: string;
+    contractor_id: string;
+    configuration_type: string;
+    configuration: Record<string, unknown>;
+}
+
 const MESSAGE_TYPES = [
     { value: 'FOLLOW_UP_CHECK_IN', label: 'Follow-up Check-in' },
     { value: 'LAST_FOLLOW_UP', label: 'Last Follow-up' },
@@ -72,11 +79,81 @@ export default function TemplatesTab() {
     const [saving, setSaving] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [dirtyTemplates, setDirtyTemplates] = useState<Record<string, boolean>>({});
+    const [contractorConfig, setContractorConfig] = useState<ContractorConfig | null>(null);
+    const [estimateReceivedBody, setEstimateReceivedBody] = useState('');
+    const [estimateReceivedDirty, setEstimateReceivedDirty] = useState(false);
+    const [savingEstimateReceived, setSavingEstimateReceived] = useState(false);
     const { users, loading: usersLoading } = useUsers();
 
     useEffect(() => {
         loadTemplates();
+        loadContractorConfig();
     }, []);
+
+    const loadContractorConfig = async () => {
+        try {
+            const response = await fetch('/api/configurations?config_type=contractor_config', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+            if (!response.ok) return;
+            const configs: ContractorConfig[] = await response.json();
+            const config = configs.find((c) => c.configuration_type === 'contractor_config');
+            if (config) {
+                setContractorConfig(config);
+                setEstimateReceivedBody(
+                    (config.configuration?.estimate_received_email_body as string) || ''
+                );
+                setEstimateReceivedDirty(false);
+            }
+        } catch {
+            // Non-blocking
+        }
+    };
+
+    const saveEstimateReceivedEmail = async () => {
+        if (!contractorConfig) return;
+        try {
+            setSavingEstimateReceived(true);
+            setError(null);
+            const configuration = {
+                ...contractorConfig.configuration,
+                estimate_received_email_body: estimateReceivedBody.trim() || null,
+            };
+            const response = await fetch(`/api/configurations/${contractorConfig.id}`, {
+                method: 'PUT',
+                headers: getApiHeaders(),
+                body: JSON.stringify({
+                    configuration_type: 'contractor_config',
+                    configuration,
+                }),
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || 'Failed to save');
+            }
+            const updated: ContractorConfig = await response.json();
+            setContractorConfig(updated);
+            setEstimateReceivedDirty(false);
+            notifications.show({
+                title: 'Success',
+                message: 'Estimate received email saved',
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : 'Failed to save';
+            setError(msg);
+            notifications.show({
+                title: 'Error',
+                message: msg,
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        } finally {
+            setSavingEstimateReceived(false);
+        }
+    };
 
     const loadTemplates = async () => {
         try {
@@ -220,6 +297,46 @@ export default function TemplatesTab() {
                     {error}
                 </Alert>
             )}
+
+            {/* Estimate received email (contractor_config) */}
+            <Card shadow="sm" padding="lg" withBorder>
+                <Stack gap="md">
+                    <Text fw={600} size="lg">
+                        Estimate received email
+                    </Text>
+                    <Text c="dimmed" size="sm">
+                        Email body when a client submits an estimate. Subject is fixed. Leave empty
+                        for the default message.
+                    </Text>
+                    <Stack gap="xs">
+                        <Text fw={500} size="sm">
+                            Body — use {'{client_first}'} for the client&apos;s first name
+                        </Text>
+                        <Text c="dimmed" size="xs">
+                            Format with the toolbar or HTML. Use {'{client_first}'} to insert the
+                            client&apos;s first name (e.g. &quot;Hi {'{client_first}'},&quot;).
+                        </Text>
+                        <RichTextBodyEditor
+                          value={estimateReceivedBody}
+                          disabled={savingEstimateReceived}
+                          onChange={(nextValue) => {
+                            setEstimateReceivedBody(nextValue);
+                            setEstimateReceivedDirty(true);
+                          }}
+                        />
+                    </Stack>
+                    {estimateReceivedDirty && (
+                        <Group justify="flex-end">
+                          <Button
+                            onClick={saveEstimateReceivedEmail}
+                            loading={savingEstimateReceived}
+                          >
+                            Save changes
+                          </Button>
+                        </Group>
+                    )}
+                </Stack>
+            </Card>
 
             {/* Message Templates */}
             <Card shadow="sm" padding="lg" withBorder>
