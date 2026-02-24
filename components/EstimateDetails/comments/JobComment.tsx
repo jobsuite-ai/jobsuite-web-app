@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import {
   ActionIcon,
   Avatar,
+  Badge,
   Button,
   Card,
   Group,
@@ -28,9 +29,16 @@ interface JobCommentProps {
   commentDetails: SingleComment;
   estimateId: string;
   onCommentUpdated?: () => void;
+  /** When true, show an "Event" badge (used in Activity "All" view for system comments) */
+  showEventBadge?: boolean;
 }
 
-export function JobComment({ commentDetails, estimateId, onCommentUpdated }: JobCommentProps) {
+export function JobComment({
+    commentDetails,
+    estimateId,
+    onCommentUpdated,
+    showEventBadge = false,
+}: JobCommentProps) {
   const { user } = useAuth({ fetchUser: true });
   const [isEditing, setIsEditing] = useState(false);
   const [editedContent, setEditedContent] = useState(commentDetails.comment_contents);
@@ -39,8 +47,10 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [currentComment, setCurrentComment] = useState<SingleComment>(commentDetails);
 
-  // Check if current user is the comment author
-  const isCommentAuthor = user?.id && currentComment.user_id && user.id === currentComment.user_id;
+  const isSystemComment = currentComment.commenter === 'System';
+  // Check if current user is the comment author (system comments are not editable)
+  const isCommentAuthor = !isSystemComment && user?.id &&
+    currentComment.user_id && user.id === currentComment.user_id;
 
   // Update current comment when commentDetails prop changes
   useEffect(() => {
@@ -209,9 +219,16 @@ export function JobComment({ commentDetails, estimateId, onCommentUpdated }: Job
               {initials}
             </Avatar>
             <div>
-              <Text size="sm" fw={500} lineClamp={1}>
-                {currentComment.commenter}
-              </Text>
+              <Group gap="xs" align="center" wrap="nowrap">
+                <Text size="sm" fw={500} lineClamp={1}>
+                  {currentComment.commenter}
+                </Text>
+                {showEventBadge && (
+                  <Badge size="xs" variant="light" color="gray">
+                    Event
+                  </Badge>
+                )}
+              </Group>
               <Group gap={4} mt={2}>
                 <IconClock size={12} style={{ opacity: 0.6 }} />
                 <Text size="xs" c="dimmed">
