@@ -818,6 +818,7 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_NOT_SCHEDULED,
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ESTIMATE_DECLINED,
           EstimateStatus.STALE_ESTIMATE,
         ];
 
@@ -827,6 +828,7 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
           EstimateStatus.STALE_ESTIMATE,
+          EstimateStatus.ESTIMATE_DECLINED,
         ];
 
       case EstimateStatus.ESTIMATE_SCHEDULED:
@@ -834,6 +836,7 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_IN_PROGRESS,
           EstimateStatus.ESTIMATE_NOT_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ESTIMATE_DECLINED,
           EstimateStatus.STALE_ESTIMATE,
         ];
 
@@ -843,6 +846,7 @@ export default function SidebarDetails({
           EstimateStatus.ESTIMATE_SENT,
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.NEEDS_FOLLOW_UP,
+          EstimateStatus.ESTIMATE_DECLINED,
           EstimateStatus.STALE_ESTIMATE,
         ];
 
