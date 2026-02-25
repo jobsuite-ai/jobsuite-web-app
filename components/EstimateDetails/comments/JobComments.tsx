@@ -39,6 +39,18 @@ const COMMON_EMOJIS = [
     '💪', '🚀', '⭐', '✨', '💯', '🎯', '🙏', '😎',
 ];
 
+export type ActivityFilter = 'all' | 'comments' | 'events';
+
+const ACTIVITY_FILTER_DATA: { label: string; value: ActivityFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Comments', value: 'comments' },
+    { label: 'Events', value: 'events' },
+];
+
+function isSystemComment(comment: SingleComment): boolean {
+    return comment.commenter === 'System';
+}
+
 interface JobCommentsProps {
     estimateID: string;
     onLoadingChange?: (loading: boolean) => void;
@@ -79,8 +91,17 @@ export default function JobComments({
     } | null>(null);
     const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
 
     const showQuickReplies = !commentContents || commentContents.trim().length === 0;
+
+    // Filter by Activity tab: All, Comments (non-system), or Events (system only)
+    const filteredComments = (() => {
+        if (!jobComments) return undefined;
+        if (activityFilter === 'comments') return jobComments.filter((c) => !isSystemComment(c));
+        if (activityFilter === 'events') return jobComments.filter((c) => isSystemComment(c));
+        return jobComments;
+    })();
 
     const getJobComments = useCallback(async () => {
         try {
@@ -453,14 +474,30 @@ export default function JobComments({
     // The actual user info will come from the backend when the comment is created
     const userInitials = 'U';
 
-    // Determine which comments to display
+    // Determine which comments to display (after filter)
     const displayedComments = showAllComments
-        ? jobComments
-        : jobComments?.slice(0, 3);
-    const hasMoreComments = (jobComments?.length || 0) > 3;
+        ? filteredComments
+        : filteredComments?.slice(0, 3);
+    const hasMoreComments = (filteredComments?.length || 0) > 3;
 
     return (
         <Stack gap="md" className={classes.commentsContainer}>
+            <Group justify="space-between" align="center" wrap="nowrap">
+                <Text fw={600} size="sm">Activity</Text>
+                <Button.Group>
+                    {ACTIVITY_FILTER_DATA.map(({ label, value }, index) => (
+                        <Button
+                          key={value}
+                          size="xs"
+                          variant={activityFilter === value ? 'filled' : 'default'}
+                          onClick={() => setActivityFilter(value)}
+                          style={index > 0 ? { marginLeft: -1 } : undefined}
+                        >
+                            {label}
+                        </Button>
+                    ))}
+                </Button.Group>
+            </Group>
             <Divider label="Add a comment" labelPosition="left" />
 
             <Card shadow="xs" padding="md" radius="md" withBorder style={{ overflow: 'visible' }}>
@@ -670,8 +707,8 @@ export default function JobComments({
                     </Stack>
                 ) : (
                     <>
-                        {/* Show existing comments (newest first) */}
-                        {jobComments && jobComments.length > 0 ? (
+                        {/* Comments list or empty state when filter has no results */}
+                        {filteredComments && filteredComments.length > 0 ? (
                             <>
                                 {displayedComments?.map((comment) => (
                                     <JobComment
@@ -679,6 +716,7 @@ export default function JobComments({
                                       commentDetails={comment}
                                       estimateId={estimateID}
                                       onCommentUpdated={getJobComments}
+                                      showEventBadge={activityFilter === 'all' && isSystemComment(comment)}
                                     />
                                 ))}
                                 {hasMoreComments && !showAllComments && (
@@ -697,7 +735,11 @@ export default function JobComments({
                             <Paper p="xl" radius="md" withBorder style={{ textAlign: 'center' }}>
                                 <IconMessage size={48} style={{ opacity: 0.3, margin: '0 auto' }} />
                                 <Text c="dimmed" mt="md" size="sm">
-                                    No comments yet. Be the first to add a comment!
+                                    {activityFilter === 'events'
+                                        ? 'No events yet.'
+                                        : activityFilter === 'comments'
+                                          ? 'No comments yet. Be the first to add a comment!'
+                                          : 'No comments yet. Be the first to add a comment!'}
                                 </Text>
                             </Paper>
                         ) : null}
