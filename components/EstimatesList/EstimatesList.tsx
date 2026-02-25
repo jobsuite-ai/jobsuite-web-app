@@ -49,10 +49,10 @@ const PROPOSAL_PIPELINE_STATUSES = [
     EstimateStatus.ESTIMATE_IN_PROGRESS,
 ];
 
+// NEEDS_FOLLOW_UP excluded: hidden until lambda resurfaces them to ESTIMATE_SENT
 const SENT_PROPOSAL_STATUSES = [
     EstimateStatus.ESTIMATE_SENT,
     EstimateStatus.ESTIMATE_OPENED,
-    EstimateStatus.NEEDS_FOLLOW_UP,
 ];
 
 const ACCEPTED_STATUSES = [
@@ -417,6 +417,7 @@ export default function EstimatesList() {
         const isStale = showDaysBadge && daysInCol > 20;
         const isTerminal = estimate.is_terminal === true;
         const canMarkFollowUp = !isTerminal && showDaysBadge && daysInCol > 20;
+        const isResurfaced = Boolean(estimate.resurfaced_at);
         return (
         <Card
           key={estimate.id}
@@ -426,7 +427,11 @@ export default function EstimatesList() {
           w="100%"
           withBorder
           className={classes.estimateCard}
-          style={{ cursor: 'pointer', minHeight: 44 }}
+          style={{
+              cursor: 'pointer',
+              minHeight: 44,
+              ...(isResurfaced ? { borderLeft: '4px solid var(--mantine-color-teal-5)' } : {}),
+          }}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey) {
               window.open(`/proposals/${estimate.id}`, '_blank');
@@ -435,6 +440,17 @@ export default function EstimatesList() {
             }
           }}
         >
+            {isResurfaced && (
+                <Badge
+                  size="sm"
+                  variant="filled"
+                  color="teal"
+                  mb="xs"
+                  title="Resurfaced from follow-up; back on your list"
+                >
+                    Back on your list
+                </Badge>
+            )}
             {canMarkFollowUp && (
                 <Box mb="xs" onClick={(e) => e.stopPropagation()}>
                     <Button
@@ -804,12 +820,21 @@ export default function EstimatesList() {
                                                 </Text>
                                             </Table.Td>
                                             <Table.Td>
-                                                <Badge
-                                                  color={getEstimateBadgeColor(estimate.status)}
-                                                  style={{ color: '#ffffff' }}
-                                                >
-                                                    {getFormattedEstimateStatus(estimate.status)}
-                                                </Badge>
+                                                <Group gap="xs">
+                                                    {estimate.resurfaced_at && (
+                                                        <Badge size="sm" variant="filled" color="teal" title="Back on your list">
+                                                            Resurfaced
+                                                        </Badge>
+                                                    )}
+                                                    <Badge
+                                                      color={getEstimateBadgeColor(estimate.status)}
+                                                      style={{ color: '#ffffff' }}
+                                                    >
+                                                        {getFormattedEstimateStatus(
+                                                            estimate.status
+                                                        )}
+                                                    </Badge>
+                                                </Group>
                                             </Table.Td>
                                             <Table.Td>
                                                 {showDays ? (

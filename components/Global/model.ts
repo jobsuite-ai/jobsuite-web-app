@@ -232,6 +232,8 @@ export type Estimate = {
     next_follow_up_at?: string;
     needs_follow_up?: boolean;
     needs_follow_up_at?: string;
+    /** Set when follow-up scheduler resurfaces estimate (NEEDS_FOLLOW_UP -> ESTIMATE_SENT) */
+    resurfaced_at?: string | null;
     days_in_column?: number | null;
     is_terminal?: boolean;
 };
