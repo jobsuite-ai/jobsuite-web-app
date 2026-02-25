@@ -140,7 +140,8 @@
     "webpack": "^5.96.1"
   },
   "overrides": {
-    "string-width": "4.2.2"
+    "string-width": "4.2.2",
+    "@smithy/querystring-builder": "4.0.2"
   },
   "lint-staged": {
     "**/*.{js,ts,jsx,tsx}": "eslint --fix"
