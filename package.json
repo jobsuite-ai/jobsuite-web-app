@@ -56,7 +56,6 @@
     "aws-amplify": "^6.8.2",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.7.7",
-    "c": "^1.1.1",
     "cloudconvert": "^3.0.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
@@ -139,6 +138,9 @@
     "tsx": "^4.19.2",
     "typescript": "^5.8.3",
     "webpack": "^5.96.1"
+  },
+  "overrides": {
+    "string-width": "4.2.2"
   },
   "lint-staged": {
     "**/*.{js,ts,jsx,tsx}": "eslint --fix"
