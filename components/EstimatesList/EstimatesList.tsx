@@ -28,7 +28,7 @@ import {
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
-import { IconX, IconChevronDown, IconSearch, IconRefresh, IconMessageCircle } from '@tabler/icons-react';
+import { IconX, IconChevronDown, IconSearch, IconRefresh, IconMessageCircle, IconArchive, IconThumbDown } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './EstimatesList.module.css';
@@ -104,6 +104,8 @@ export default function EstimatesList() {
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
     const [clientNameFilter, setClientNameFilter] = useState('');
     const [markingFollowUpId, setMarkingFollowUpId] = useState<string | null>(null);
+    const [markingCancelledId, setMarkingCancelledId] = useState<string | null>(null);
+    const [markingDeclinedId, setMarkingDeclinedId] = useState<string | null>(null);
     const [followUpModalEstimate, setFollowUpModalEstimate] = useState<Estimate | null>(null);
     const [followUpDate, setFollowUpDate] = useState<Date | null>(null);
     const lastFetched = useAppSelector(selectEstimatesLastFetched);
@@ -408,6 +410,40 @@ export default function EstimatesList() {
         );
     };
 
+    const handleUpdateStatus = async (
+        estimateId: string,
+        status: EstimateStatus,
+        setLoadingId: (id: string | null) => void
+    ) => {
+        const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
+        if (!accessToken) return;
+        setLoadingId(estimateId);
+        try {
+            const res = await fetch(`/api/estimates/${estimateId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: JSON.stringify({ status }),
+            });
+            if (res.ok) {
+                invalidateCache('estimates');
+                await refreshData('estimates', true);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                notifications.show({
+                    title: status === EstimateStatus.ARCHIVED ? 'Failed to mark as cancelled' : 'Failed to mark as declined',
+                    message: err?.detail || err?.message || res.statusText,
+                    color: 'red',
+                    position: 'bottom-right',
+                });
+            }
+        } finally {
+            setLoadingId(null);
+        }
+    };
+
     // Helper function to render a job card
     const renderEstimateCard = (estimate: Estimate) => {
         const resolvedClientName =
@@ -416,7 +452,7 @@ export default function EstimatesList() {
         const showDaysBadge = typeof daysInCol === 'number';
         const isStale = showDaysBadge && daysInCol > 20;
         const isTerminal = estimate.is_terminal === true;
-        const canMarkFollowUp = !isTerminal && showDaysBadge && daysInCol > 20;
+        const canMarkFollowUpCancelOrDecline = !isTerminal && showDaysBadge && daysInCol > 20;
         const isResurfaced = Boolean(estimate.resurfaced_at);
         return (
         <Card
@@ -451,8 +487,8 @@ export default function EstimatesList() {
                     Back on your list
                 </Badge>
             )}
-            {canMarkFollowUp && (
-                <Box mb="xs" onClick={(e) => e.stopPropagation()}>
+            {canMarkFollowUpCancelOrDecline && (
+                <Box mb="md" onClick={(e) => e.stopPropagation()}>
                     <Button
                       size="sm"
                       variant="light"
@@ -546,6 +582,46 @@ export default function EstimatesList() {
                     <Text size="sm" c="dimmed">Next follow-up: {new Date(estimate.next_follow_up_at).toLocaleDateString()}</Text>
                 )}
             </Flex>
+            {canMarkFollowUpCancelOrDecline && (
+                <Group gap="xs" mt="md" w="100%" onClick={(e) => e.stopPropagation()}>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      color="gray"
+                      style={{ flex: 1 }}
+                      leftSection={<IconArchive size={16} />}
+                      loading={markingCancelledId === estimate.id}
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateStatus(
+                              estimate.id,
+                              EstimateStatus.ARCHIVED,
+                              setMarkingCancelledId
+                          );
+                      }}
+                    >
+                        Cancelled
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="light"
+                      color="red"
+                      style={{ flex: 1 }}
+                      leftSection={<IconThumbDown size={16} />}
+                      loading={markingDeclinedId === estimate.id}
+                      onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateStatus(
+                              estimate.id,
+                              EstimateStatus.ESTIMATE_DECLINED,
+                              setMarkingDeclinedId
+                          );
+                      }}
+                    >
+                        Declined
+                    </Button>
+                </Group>
+            )}
         </Card>
         );
     };
