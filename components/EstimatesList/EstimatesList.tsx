@@ -23,6 +23,7 @@ import {
     TextInput,
     Title,
     SegmentedControl,
+    Tooltip,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
@@ -62,6 +63,21 @@ const ACCEPTED_STATUSES = [
 
 // All statuses for filter dropdown
 const ALL_STATUSES = Object.values(EstimateStatus);
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+function countOver30DaysInColumn(columnEstimates: Estimate[]): number {
+    const now = Date.now();
+    return columnEstimates.filter((e) => {
+        if (e.days_in_column != null && typeof e.days_in_column === 'number') {
+            return e.days_in_column > 30;
+        }
+        if (e.column_entered_at) {
+            return (now - new Date(e.column_entered_at).getTime()) > THIRTY_DAYS_MS;
+        }
+        return false;
+    }).length;
+}
 
 export default function EstimatesList() {
     const {
@@ -444,6 +460,7 @@ export default function EstimatesList() {
                       color={isStale ? 'red' : 'gray'}
                       size="sm"
                       title="Days in current status"
+                      variant="light"
                     >
                         {daysInCol} days in column
                     </Badge>
@@ -522,7 +539,9 @@ export default function EstimatesList() {
         columnEstimates: Estimate[],
         title: string,
         isLoading: boolean
-    ) => (
+    ) => {
+        const over30Count = countOver30DaysInColumn(columnEstimates);
+        return (
         <Paper
           bg="gray.0"
           p="md"
@@ -535,6 +554,17 @@ export default function EstimatesList() {
             <Group gap="xs" w="100%" justify="center" mb="md">
                 <Title order={5}>{title}</Title>
                 <Badge size="lg" variant="light">{columnEstimates.length}</Badge>
+                {over30Count > 0 && (
+                    <Tooltip
+                      label="Number of estimates that have been in this column for over 30 days"
+                      withArrow
+                      withinPortal
+                    >
+                        <Badge size="lg" color="red" variant="light" style={{ cursor: 'pointer' }}>
+                            {over30Count}
+                        </Badge>
+                    </Tooltip>
+                )}
             </Group>
             <ScrollArea style={{ flex: 1 }}>
                 <Flex
@@ -561,7 +591,8 @@ export default function EstimatesList() {
                 </Flex>
             </ScrollArea>
         </Paper>
-    );
+        );
+    };
 
     // Render list view with table
     const renderListView = () => (
