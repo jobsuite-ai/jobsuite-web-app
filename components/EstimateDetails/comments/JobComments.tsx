@@ -11,7 +11,6 @@ import {
     Group,
     Paper,
     Popover,
-    Radio,
     Skeleton,
     Stack,
     Text,
@@ -41,6 +40,12 @@ const COMMON_EMOJIS = [
 ];
 
 export type ActivityFilter = 'all' | 'comments' | 'events';
+
+const ACTIVITY_FILTER_DATA: { label: string; value: ActivityFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Comments', value: 'comments' },
+    { label: 'Events', value: 'events' },
+];
 
 function isSystemComment(comment: SingleComment): boolean {
     return comment.commenter === 'System';
@@ -477,18 +482,22 @@ export default function JobComments({
 
     return (
         <Stack gap="md" className={classes.commentsContainer}>
-            <Radio.Group
-              value={activityFilter}
-              onChange={(v) => setActivityFilter(v as ActivityFilter)}
-              label="Activity"
-              description="Filter by type"
-            >
-              <Group mt="xs">
-                <Radio value="all" label="All" />
-                <Radio value="comments" label="Comments" />
-                <Radio value="events" label="Events" />
-              </Group>
-            </Radio.Group>
+            <Group justify="space-between" align="center" wrap="nowrap">
+                <Text fw={600} size="sm">Activity</Text>
+                <Button.Group>
+                    {ACTIVITY_FILTER_DATA.map(({ label, value }, index) => (
+                        <Button
+                          key={value}
+                          size="xs"
+                          variant={activityFilter === value ? 'filled' : 'default'}
+                          onClick={() => setActivityFilter(value)}
+                          style={index > 0 ? { marginLeft: -1 } : undefined}
+                        >
+                            {label}
+                        </Button>
+                    ))}
+                </Button.Group>
+            </Group>
             <Divider label="Add a comment" labelPosition="left" />
 
             <Card shadow="xs" padding="md" radius="md" withBorder style={{ overflow: 'visible' }}>
