@@ -27,6 +27,7 @@ export interface NotificationSettingsConfig {
     comments: NotificationSettingsBucket;
     job_status: NotificationSettingsBucket;
     general: boolean;
+    outreach_messages: boolean;
 }
 
 interface ContractorConfiguration {
@@ -45,6 +46,7 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
         comments: { owner: true, non_owner: true },
         job_status: { owner: true, non_owner: true },
         general: true,
+        outreach_messages: true,
     };
     const [notificationConfigId, setNotificationConfigId] = useState<string | null>(null);
     const [notificationLoading, setNotificationLoading] = useState(false);
@@ -87,6 +89,9 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                 defaultNotificationSettings.job_status.non_owner,
         },
         general: overrides?.general ?? defaultNotificationSettings.general,
+        outreach_messages:
+            overrides?.outreach_messages ??
+            defaultNotificationSettings.outreach_messages,
     });
 
     const loadNotificationSettings = async (userId: string) => {
@@ -141,12 +146,15 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
 
     const handleNotificationSettingChange = (
         bucket: keyof NotificationSettingsConfig,
-        field: 'owner' | 'non_owner' | 'general',
+        field: 'owner' | 'non_owner' | 'general' | 'outreach_messages',
         value: boolean
     ) => {
         setNotificationSettings((prev) => {
             if (field === 'general') {
                 return { ...prev, general: value };
+            }
+            if (field === 'outreach_messages') {
+                return { ...prev, outreach_messages: value };
             }
             return {
                 ...prev,
@@ -346,7 +354,8 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                                 <Stack gap="xs">
                                     <Text fw={500}>General notifications</Text>
                                     <Text size="sm" c="dimmed">
-                                        Non-estimate updates such as outreach reminders.
+                                        Non-estimate updates such as system
+                                        reminders.
                                     </Text>
                                     <Checkbox
                                       label="Receive general notifications"
@@ -355,6 +364,26 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                                             handleNotificationSettingChange(
                                                 'general',
                                                 'general',
+                                                event.currentTarget.checked
+                                            )
+                                        }
+                                    />
+                                </Stack>
+
+                                <Stack gap="xs">
+                                    <Text fw={500}>Outreach messages</Text>
+                                    <Text size="sm" c="dimmed">
+                                        Notifications when an outreach message
+                                        is assigned to you or due in the
+                                        Messaging Center.
+                                    </Text>
+                                    <Checkbox
+                                      label="Receive outreach message notifications"
+                                      checked={notificationSettings.outreach_messages}
+                                      onChange={(event) =>
+                                            handleNotificationSettingChange(
+                                                'outreach_messages',
+                                                'outreach_messages',
                                                 event.currentTarget.checked
                                             )
                                         }
