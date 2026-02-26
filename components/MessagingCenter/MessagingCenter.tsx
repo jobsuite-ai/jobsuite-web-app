@@ -52,6 +52,7 @@ interface OutreachMessage {
     updated_at: string;
     from_email?: string;
     to_emails?: string[];
+    owner_id?: string;
     owner_name?: string;
 }
 

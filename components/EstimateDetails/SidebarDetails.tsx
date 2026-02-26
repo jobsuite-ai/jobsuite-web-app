@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Badge, Button, Flex, Menu, Modal, Paper, Select, Skeleton, Text } from '@mantine/core';
+import { ActionIcon, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
-import { IconCheck, IconChevronDown, IconX } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { IconCheck, IconChevronDown, IconMessageCircle, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import EditableField from './EditableField';
@@ -23,6 +24,9 @@ interface SidebarDetailsProps {
   estimateID: string;
   onUpdate: () => void;
   detailsLoaded?: boolean;
+  /** Called with the function to open the check-in date modal
+   * (for use by parent when no date is set) */
+  registerCheckInDateOpener?: (open: (() => void) | null) => void;
 }
 
 export default function SidebarDetails({
@@ -30,6 +34,7 @@ export default function SidebarDetails({
   estimateID,
   onUpdate,
   detailsLoaded = false,
+  registerCheckInDateOpener,
 }: SidebarDetailsProps) {
   const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
@@ -62,6 +67,9 @@ export default function SidebarDetails({
     estimate.quickbooks_customer_id || null);
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [syncingMainStatus, setSyncingMainStatus] = useState(false);
+  const [showCheckInDateModal, setShowCheckInDateModal] = useState(false);
+  const [checkInDate, setCheckInDate] = useState<Date | null>(null);
+  const [savingCheckInDate, setSavingCheckInDate] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const { refreshData, updateEstimate, updateProject } = useDataCache();
@@ -412,6 +420,59 @@ export default function SidebarDetails({
       logToCloudWatch(`Failed to sync change order status: ${error}`);
     } finally {
       setSyncingMainStatus(false);
+    }
+  };
+
+  const openCheckInDateModal = useCallback(() => {
+    const defaultDate = new Date();
+    defaultDate.setDate(defaultDate.getDate() + 3);
+    setCheckInDate(estimate.needs_follow_up_at
+      ? new Date(estimate.needs_follow_up_at)
+      : defaultDate);
+    setShowCheckInDateModal(true);
+  }, [estimate.needs_follow_up_at]);
+
+  useEffect(() => {
+    registerCheckInDateOpener?.(openCheckInDateModal);
+    return () => registerCheckInDateOpener?.(null);
+  }, [registerCheckInDateOpener, openCheckInDateModal]);
+
+  const handleSetCheckInDate = async () => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) return;
+    setSavingCheckInDate(true);
+    try {
+      const body: { needs_follow_up_at?: string } = {};
+      if (checkInDate) {
+        body.needs_follow_up_at = checkInDate.toISOString();
+      }
+      const res = await fetch(
+        `/api/estimates/${estimateID}/mark-needs-follow-up`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(body),
+        }
+      );
+      if (res.ok) {
+        setShowCheckInDateModal(false);
+        setCheckInDate(null);
+        refreshData('estimates').catch(() => {});
+        onUpdate();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        notifications.show({
+          title: 'Failed to set check-in date',
+          message: err?.detail || res.statusText,
+          color: 'red',
+          position: 'bottom-right',
+        });
+      }
+    } finally {
+      setSavingCheckInDate(false);
     }
   };
 
@@ -1071,16 +1132,32 @@ export default function SidebarDetails({
           </Flex>
         )}
 
-        {estimate.needs_follow_up && estimate.needs_follow_up_at && (
-            <Flex justify="space-between" align="center" gap="sm" mb="md">
-                <Text size="sm" fw={500} c="dimmed">
-                Check-in date:
-                </Text>
-                <Text size="sm" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }} c="dark">
-                {new Date(estimate.needs_follow_up_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                </Text>
-            </Flex>
-        )}
+        {/* Check-in date - clickable to open modal */}
+        <Flex
+          justify="space-between"
+          align="center"
+          gap="sm"
+          mb="md"
+          style={{ cursor: 'pointer' }}
+          onClick={openCheckInDateModal}
+        >
+          <Text size="sm" fw={500} c="dimmed">
+            Check-in date:
+          </Text>
+          <Text
+            size="sm"
+            style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}
+            c={estimate.needs_follow_up && estimate.needs_follow_up_at ? 'dark' : 'dimmed'}
+          >
+            {estimate.needs_follow_up && estimate.needs_follow_up_at
+              ? new Date(estimate.needs_follow_up_at).toLocaleDateString(undefined, {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })
+              : '—'}
+          </Text>
+        </Flex>
 
         {/* Job Type */}
         {editingJobType && canEditJobType ? (
@@ -1493,6 +1570,47 @@ export default function SidebarDetails({
           client={client}
         />
       )}
+
+      {/* Set check-in date modal */}
+      <Modal
+        title="Set check-in date"
+        opened={showCheckInDateModal}
+        centered
+        onClose={() => {
+          setShowCheckInDateModal(false);
+          setCheckInDate(null);
+        }}
+      >
+        <Stack gap="md">
+          <DatePickerInput
+            label="Check-in date"
+            placeholder="Pick date"
+            value={checkInDate}
+            onChange={setCheckInDate}
+            minDate={new Date()}
+          />
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => {
+                setShowCheckInDateModal(false);
+                setCheckInDate(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="filled"
+              leftSection={<IconMessageCircle size={14} />}
+              loading={savingCheckInDate}
+              onClick={handleSetCheckInDate}
+              disabled={!checkInDate}
+            >
+              Set check-in date
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       {/* QuickBooks Customer Selection Modal */}
       <Modal
