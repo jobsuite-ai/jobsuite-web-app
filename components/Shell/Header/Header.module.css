@@ -40,6 +40,14 @@
     gap: rem(16);
 }
 
+.leftGroup {
+    flex-shrink: 0;
+}
+
+.iconsGroup {
+    flex-shrink: 0;
+}
+
 .centerSection {
     flex: 1;
     display: flex;
@@ -136,10 +144,27 @@
         gap: rem(8);
     }
 
+    .burger {
+        margin-top: rem(12);
+    }
+
+    .leftGroup {
+        flex-shrink: 0;
+    }
+
+    .iconsGroup {
+        margin-left: auto;
+        align-self: center;
+        margin-bottom: -16px;
+    }
+
+    /* Force center section to full width so it wraps to second row; first row = logo + icons only */
     .centerSection {
         order: 3;
+        flex: 0 0 100%;
         width: 100%;
-        margin-top: rem(8);
+        max-width: 100%;
+        margin-top: rem(1);
     }
 
     .search {
@@ -149,7 +174,6 @@
     .header {
         height: auto;
         min-height: rem(84px);
-        padding-bottom: rem(10);
     }
 }
 

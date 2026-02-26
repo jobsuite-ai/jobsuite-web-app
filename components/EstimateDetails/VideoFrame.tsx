@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button, Center, Flex, Modal, Text } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { IconDownload } from '@tabler/icons-react';
 import ReactPlayer from 'react-player';
 
 import classes from './styles/EstimateDetails.module.css';
@@ -14,12 +16,8 @@ export function VideoFrame({ resource, estimateID, refresh }: {
     estimateID: string,
     refresh: Function
 }) {
-    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const isMobile = useMediaQuery('(max-width: 768px)');
     const [isModalOpen, setIsModalOpen] = useState(false);
-
-    useEffect(() => {
-        setIsMobile(window.innerWidth <= 768);
-    }, []);
 
     /**
      * Determines if the environment is production based on env variables or
@@ -98,6 +96,38 @@ export function VideoFrame({ resource, estimateID, refresh }: {
         }
     };
 
+    const downloadVideo = useCallback(async () => {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) return;
+
+        try {
+            const response = await fetch(
+                `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error('Failed to get download URL');
+            }
+
+            const data = await response.json();
+            const presignedUrl = data.presigned_url || data.url;
+
+            if (presignedUrl) {
+                window.open(presignedUrl, '_blank');
+            }
+        } catch (error) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to download video:', error);
+        }
+    }, [estimateID, resource.id]);
+
     return (
         <>
             <div className={classes.videoContainer}>
@@ -110,10 +140,19 @@ export function VideoFrame({ resource, estimateID, refresh }: {
                                 <ReactPlayer url={videoUrl} controls width="640px" height="360px" />
                             ))}
                         </div>
-                        <Flex direction="column" align="center" p="md">
+                        <Flex direction="column" align="center" p="md" gap="sm">
                             <Center>
                                 <Button onClick={() => setIsModalOpen(true)}>Delete Video</Button>
                             </Center>
+                            {isMobile && (
+                              <Button
+                                variant="light"
+                                leftSection={<IconDownload size={18} />}
+                                onClick={downloadVideo}
+                              >
+                                Download Video
+                              </Button>
+                            )}
                         </Flex>
                     </>
                     :
