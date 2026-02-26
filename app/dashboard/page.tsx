@@ -519,9 +519,9 @@ export default function Dashboard() {
                               onClick={(e) => {
                                 e.preventDefault();
                                 if (e.metaKey || e.ctrlKey) {
-                                  window.open(`/jobs/${job.id}`, '_blank');
+                                  window.open(`/proposals/${job.id}`, '_blank');
                                 } else {
-                                  router.push(`/jobs/${job.id}`);
+                                  router.push(`/proposals/${job.id}`);
                                 }
                               }}
                             >
