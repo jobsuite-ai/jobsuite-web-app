@@ -29,6 +29,8 @@ interface QuickBooksStatus {
     token_expires_at?: string;
     token_expired?: boolean;
     token_needs_refresh?: boolean;
+    /** True when QuickBooks returned 403 ApplicationAuthorizationFailed; user should reconnect. */
+    authorization_failed?: boolean;
     company_info?: {
         company_name: string;
         realm_id: string;
@@ -497,10 +499,30 @@ export default function IntegrationsTab() {
                     {status?.connected ? (
                         <>
                         <Stack gap="md">
+                            {status.authorization_failed && (
+                                <Alert color="orange" title="Reconnection needed">
+                                    QuickBooks authorization has been revoked or expired. Time
+                                    entry syncing has been paused. Please reconnect your
+                                    QuickBooks account to continue.
+                                </Alert>
+                            )}
                             <Group justify="space-between" align="center">
-                                <Badge color="green" size="lg">
-                                    Connected
+                                <Badge
+                                  color={status.authorization_failed ? 'orange' : 'green'}
+                                  size="lg"
+                                >
+                                    {status.authorization_failed ? 'Needs reconnection' : 'Connected'}
                                 </Badge>
+                                <Group gap="xs">
+                                    {status.authorization_failed && (
+                                        <Button
+                                          onClick={handleConnect}
+                                          loading={connecting}
+                                          leftSection={<IconExternalLink size={16} />}
+                                        >
+                                            Reconnect
+                                        </Button>
+                                    )}
                                 <Button
                                   color="red"
                                   variant="outline"
@@ -509,6 +531,7 @@ export default function IntegrationsTab() {
                                 >
                                 Disconnect
                                 </Button>
+                                </Group>
                             </Group>
 
                             {status.company_info && (

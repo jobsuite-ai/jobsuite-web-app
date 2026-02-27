@@ -21,6 +21,7 @@ import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 const links = [
   { link: '/', label: 'Home' },
   { link: '/dashboard', label: 'Dashboard' },
+  { link: '/search', label: 'Search' },
   { link: '/clients', label: 'Clients' },
   { link: '/add-proposal', label: 'Add Proposal' },
   { link: '/projects', label: 'Projects' },
@@ -102,6 +103,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         return <IconHome size={18} />;
       case '/dashboard':
         return <IconLayoutDashboard size={18} />;
+      case '/search':
+        return <IconSearch size={18} />;
       case '/clients':
         return <IconUsers size={18} />;
       case '/add-proposal':
@@ -119,34 +122,34 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }
   };
 
-  const navItems = links.map((link) => {
-    // Check if the current pathname matches the link exactly or is a subroute
-    const isActive =
-      pathname === link.link ||
-      (link.link !== '/' && pathname?.startsWith(`${link.link}/`));
+  const navItems = useMemo(() => {
+    const linksToShow = isMobile ? links : links.filter((l) => l.link !== '/search');
+    return linksToShow.map((link) => {
+      const isActive =
+        pathname === link.link ||
+        (link.link !== '/' && pathname?.startsWith(`${link.link}/`));
+      const showBadge = link.link === '/messaging-center' && messageCount > 0;
 
-    // Add badge for Messaging Center if there are messages due today
-    const showBadge = link.link === '/messaging-center' && messageCount > 0;
-
-    return (
-      <NavLink
-        key={link.label}
-        component={Link}
-        href={link.link}
-        label={link.label}
-        active={isActive}
-        leftSection={getLinkIcon(link.link)}
-        rightSection={showBadge ? (
-          <Badge size="xs" color="red" variant="filled">
-            {messageCount > 99 ? '99+' : messageCount}
-          </Badge>
-        ) : undefined}
-        onClick={(event) => {
-          handleNavLinkClick(event as any, link.link);
-        }}
-      />
-    );
-  });
+      return (
+        <NavLink
+          key={link.label}
+          component={Link}
+          href={link.link}
+          label={link.label}
+          active={isActive}
+          leftSection={getLinkIcon(link.link)}
+          rightSection={showBadge ? (
+            <Badge size="xs" color="red" variant="filled">
+              {messageCount > 99 ? '99+' : messageCount}
+            </Badge>
+          ) : undefined}
+          onClick={(event) => {
+            handleNavLinkClick(event as any, link.link);
+          }}
+        />
+      );
+    });
+  }, [isMobile, pathname, messageCount]);
 
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {
@@ -771,7 +774,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       </aside>
       <header className={classes.header}>
         <div className={classes.inner}>
-          <Group gap="md">
+          <Group gap="md" className={classes.leftGroup}>
             <UnstyledButton
               onClick={() => setSidebarOpened(!sidebarOpened)}
               className={classes.burger}
@@ -848,7 +851,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
             )}
           </Group>
 
-          <Group gap="sm">
+          <Group gap="sm" className={classes.iconsGroup}>
             {isAuthenticated && !isLoading && (
               <>
                 <Link

@@ -12,6 +12,7 @@ import {
     IconFile,
     IconFileText,
     IconList,
+    IconMessageCircle,
     IconPencil,
     IconPhoto,
     IconPlus,
@@ -113,6 +114,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const lineItemsRef = useRef<LineItemsRef>(null);
     const isMountedRef = useRef(true);
     const mainColumnRef = useRef<HTMLDivElement>(null);
+    const openCheckInDateModalRef = useRef<(() => void) | null>(null);
     const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
 
@@ -2093,6 +2095,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                       estimateID={estimateID}
                                       onUpdate={getEstimate}
                                       detailsLoaded={detailsLoaded}
+                                      registerCheckInDateOpener={(fn) => {
+                                          openCheckInDateModalRef.current = fn ?? null;
+                                      }}
                                     />
 
                                     {/* Resource Links */}
@@ -2123,6 +2128,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             </Flex>
                                         </div>
                                     }
+
+                                    {/* Set check-in date button when none set */}
+                                    {(!estimate.needs_follow_up
+                                        || !estimate.needs_follow_up_at) && (
+                                    <Flex direction="row" justify="center">
+                                        <Button
+                                          leftSection={<IconMessageCircle size={18} />}
+                                          variant="light"
+                                          onClick={() => openCheckInDateModalRef.current?.()}
+                                          fullWidth
+                                        >
+                                            Set check-in date
+                                        </Button>
+                                    </Flex>
+                                    )}
 
                                     {/* Archive Button */}
                                     <Flex direction="row" justify="center">

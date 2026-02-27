@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Badge, Card, Center, Group, Loader, Stack, Text, Title } from '@mantine/core';
+import { Badge, Card, Center, Group, Loader, Stack, Text, TextInput, Title } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
+import { IconSearch } from '@tabler/icons-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
@@ -43,20 +45,33 @@ export default function SearchPage() {
     const [error, setError] = useState<string | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
     const [reloadToken, setReloadToken] = useState(0);
+    const [searchInputValue, setSearchInputValue] = useState(query);
+    const isMobile = useMediaQuery('(max-width: 768px)');
+
+    // Keep search input in sync with URL
+    useEffect(() => {
+        setSearchInputValue(query);
+    }, [query]);
+
+    const handleSearchSubmit = useCallback(() => {
+        const q = searchInputValue.trim();
+        if (!q) return;
+        router.push(`/search?q=${encodeURIComponent(q)}`);
+    }, [searchInputValue, router]);
 
     useEffect(() => {
-        const handleSearchSubmit = (event: Event) => {
+        const onSearchSubmit = (event: Event) => {
             const customEvent = event as CustomEvent<{ query?: string }>;
             if (customEvent.detail?.query && customEvent.detail.query === query) {
                 setReloadToken((prev) => prev + 1);
             }
         };
         if (typeof window !== 'undefined') {
-            window.addEventListener('search-submit', handleSearchSubmit);
+            window.addEventListener('search-submit', onSearchSubmit);
         }
         return () => {
             if (typeof window !== 'undefined') {
-                window.removeEventListener('search-submit', handleSearchSubmit);
+                window.removeEventListener('search-submit', onSearchSubmit);
             }
         };
     }, [query]);
@@ -121,6 +136,23 @@ export default function SearchPage() {
 
     return (
         <Stack p="md" gap="lg" style={{ maxWidth: 1200, margin: '0 auto' }}>
+            {/* Search bar on mobile (header search hidden on small screens) */}
+            {isMobile && (
+                <TextInput
+                  placeholder="Search by client name, email, or estimate address"
+                  leftSection={<IconSearch size={18} />}
+                  value={searchInputValue}
+                  onChange={(e) => setSearchInputValue(e.currentTarget.value)}
+                  onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                          handleSearchSubmit();
+                      }
+                  }}
+                  size="md"
+                  mt="xl"
+                  styles={{ root: { width: '100%' } }}
+                />
+            )}
             <Title order={3} c="gray.0">Search Results</Title>
             {!query && (
                 <Text c="gray.0">Enter a search term to see results.</Text>
