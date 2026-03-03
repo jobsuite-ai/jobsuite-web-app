@@ -22,8 +22,10 @@ export function Shell({ children }: { children: any }) {
   const lastAuthCheckRef = useRef(0);
   const FOCUS_REVALIDATE_MS = 5 * 60 * 1000;
 
-  // Don't show header/navigation for signature pages
+  // Don't show header/navigation for signature pages or public static pages (privacy, support)
   const isSignaturePage = pathname?.startsWith('/sign/');
+  const isPublicStaticPage =
+    pathname === '/privacy' || pathname === '/support';
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -204,15 +206,17 @@ export function Shell({ children }: { children: any }) {
       pathname.startsWith('/forgot-password') ||
       pathname.startsWith('/reset-password') ||
       pathname.startsWith('/ios-app-redirect') ||
-      pathname.startsWith('/sign/');
+      pathname.startsWith('/sign/') ||
+      pathname === '/privacy' ||
+      pathname === '/support';
 
     if (hasCheckedAuth && !isAuthenticated && !isPublicRoute) {
       router.replace('/');
     }
   }, [hasCheckedAuth, isAuthenticated, pathname, router]);
 
-  // For signature pages, don't wrap with Shell/Header
-  if (isSignaturePage) {
+  // For signature pages and public static pages, don't wrap with Shell/Header
+  if (isSignaturePage || isPublicStaticPage) {
     return <>{children}</>;
   }
 
