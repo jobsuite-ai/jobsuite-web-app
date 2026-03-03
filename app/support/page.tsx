@@ -1,0 +1,90 @@
+'use client';
+
+import { Anchor, Container, List, Stack, Text, Title } from '@mantine/core';
+import Link from 'next/link';
+
+export default function SupportPage() {
+  return (
+    <Container size="md" py="xl">
+      <Anchor component={Link} href="/" size="sm" c="dimmed" mb="md">
+        ← Back to JobSuite
+      </Anchor>
+
+      <Title order={1} c="white" mb="xl">
+        Support
+      </Title>
+
+      <Stack gap="lg" c="gray.3">
+        <Text size="sm">
+          We&apos;re here to help you get the most out of JobSuite. Use the resources below for
+          product help, account questions, and technical support.
+        </Text>
+
+        <section>
+          <Title order={2} size="h4" c="white" mb="xs">
+            Getting help
+          </Title>
+          <List size="sm" spacing="xs">
+            <List.Item>
+              <strong>In-app help:</strong> From the web app, open Settings for
+              configuration options, message templates, and integrations. Use the
+              Profile and navigation to access estimates, clients, and jobs.
+            </List.Item>
+            <List.Item>
+              <strong>Mobile app:</strong> In the JobSuite mobile app, go to
+              Profile → Support &amp; Legal for links to this Support page and
+              our Privacy Policy.
+            </List.Item>
+            <List.Item>
+              <strong>Contact us:</strong> For account, billing, or technical
+              issues, email our support team. We typically respond within one
+              business day. Include your account email and a brief description of
+              the issue.
+            </List.Item>
+          </List>
+        </section>
+
+        <section>
+          <Title order={2} size="h4" c="white" mb="xs">
+            Common topics
+          </Title>
+          <Text size="sm" mb="xs">
+            Estimates and proposals, client management, signatures, email and
+            messaging, integrations (e.g. QuickBooks), and mobile app usage. If
+            you don&apos;t see your topic here, reach out and we&apos;ll point
+            you in the right direction.
+          </Text>
+        </section>
+
+        <section>
+          <Title order={2} size="h4" c="white" mb="xs">
+            Privacy and legal
+          </Title>
+          <Text size="sm">
+            For our privacy practices and how we handle your data, see our{' '}
+            <Anchor component={Link} href="/privacy">
+              Privacy Policy
+            </Anchor>
+            .
+          </Text>
+        </section>
+
+        <section>
+          <Title order={2} size="h4" c="white" mb="xs">
+            Contact support
+          </Title>
+          <Text size="sm">
+            Email:{' '}
+            <Anchor href="mailto:support@jobsuite.com">
+              support@jobsuite.com
+            </Anchor>
+          </Text>
+          <Text size="sm" c="dimmed" mt="xs">
+            Please include your registered email and, if relevant, the estimate
+            or job ID you&apos;re asking about.
+          </Text>
+        </section>
+      </Stack>
+    </Container>
+  );
+}

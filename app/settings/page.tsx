@@ -18,9 +18,11 @@ import {
     Box,
     Badge,
     NumberInput,
+    Anchor,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
+import Link from 'next/link';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import ActionsTab from '@/components/Settings/ActionsTab';
@@ -637,6 +639,20 @@ export default function SettingsPage() {
                     <NotificationsTab user={user} />
                 </Tabs.Panel>
             </Tabs>
+
+            <Stack gap="xs" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-dark-4)' }}>
+                <Text size="sm" c="dimmed">
+                    Support &amp; Legal
+                </Text>
+                <Group gap="lg">
+                    <Anchor component={Link} href="/privacy" size="sm">
+                        Privacy Policy
+                    </Anchor>
+                    <Anchor component={Link} href="/support" size="sm">
+                        Support
+                    </Anchor>
+                </Group>
+            </Stack>
         </div>
     );
 }
