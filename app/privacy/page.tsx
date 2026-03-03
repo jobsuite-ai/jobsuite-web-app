@@ -6,21 +6,21 @@ import Link from 'next/link';
 export default function PrivacyPage() {
   return (
     <Container size="md" py="xl">
-      <Anchor component={Link} href="/" size="sm" c="dimmed" mb="md">
+      <Anchor component={Link} href="/" size="sm" c="gray.7" mb="md">
         ← Back to JobSuite
       </Anchor>
 
-      <Title order={1} c="white" mb="xl">
+      <Title order={1} c="dark.7" mb="xl">
         Privacy Policy
       </Title>
 
-      <Stack gap="lg" c="gray.3">
-        <Text size="sm" c="dimmed">
+      <Stack gap="lg" c="gray.8">
+        <Text size="sm" c="gray.7">
           Last updated: March 2025
         </Text>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             1. Introduction
           </Title>
           <Text size="sm">
@@ -33,7 +33,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             2. Information We Collect
           </Title>
           <Text size="sm" mb="xs">
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             3. How We Use Your Information
           </Title>
           <Text size="sm">
@@ -71,7 +71,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             4. Data Storage and Security
           </Title>
           <Text size="sm">
@@ -82,7 +82,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             5. Data Retention
           </Title>
           <Text size="sm">
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             6. Your Rights
           </Title>
           <Text size="sm">
@@ -105,7 +105,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             7. Cookies and Similar Technologies
           </Title>
           <Text size="sm">
@@ -115,7 +115,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             8. Changes to This Policy
           </Title>
           <Text size="sm">
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             9. Contact Us
           </Title>
           <Text size="sm">

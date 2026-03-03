@@ -6,22 +6,22 @@ import Link from 'next/link';
 export default function SupportPage() {
   return (
     <Container size="md" py="xl">
-      <Anchor component={Link} href="/" size="sm" c="dimmed" mb="md">
+      <Anchor component={Link} href="/" size="sm" c="gray.7" mb="md">
         ← Back to JobSuite
       </Anchor>
 
-      <Title order={1} c="white" mb="xl">
+      <Title order={1} c="dark.7" mb="xl">
         Support
       </Title>
 
-      <Stack gap="lg" c="gray.3">
+      <Stack gap="lg" c="gray.8">
         <Text size="sm">
           We&apos;re here to help you get the most out of JobSuite. Use the resources below for
           product help, account questions, and technical support.
         </Text>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             Getting help
           </Title>
           <List size="sm" spacing="xs">
@@ -45,7 +45,7 @@ export default function SupportPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             Common topics
           </Title>
           <Text size="sm" mb="xs">
@@ -57,7 +57,7 @@ export default function SupportPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             Privacy and legal
           </Title>
           <Text size="sm">
@@ -70,7 +70,7 @@ export default function SupportPage() {
         </section>
 
         <section>
-          <Title order={2} size="h4" c="white" mb="xs">
+          <Title order={2} size="h4" c="dark.7" mb="xs">
             Contact support
           </Title>
           <Text size="sm">
@@ -79,7 +79,7 @@ export default function SupportPage() {
               info@jobsuite.app
             </Anchor>
           </Text>
-          <Text size="sm" c="dimmed" mt="xs">
+          <Text size="sm" c="gray.7" mt="xs">
             Please include your registered email and, if relevant, the estimate
             or job ID you&apos;re asking about.
           </Text>

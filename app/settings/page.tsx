@@ -489,83 +489,6 @@ export default function SettingsPage() {
                                     </Alert>
                                 )}
 
-                                <TextInput
-                                  label="Review Link"
-                                  placeholder="https://..."
-                                  description="Review link to include in post-completion thank you messages"
-                                  value={reviewLink}
-                                  onChange={(e) => handleReviewLinkChange(e.target.value)}
-                                />
-
-                                <Stack gap="xs">
-                                    <TextInput
-                                      label="Display Email"
-                                      placeholder="email@example.com"
-                                      description="This email will be used for sending estimate signature emails and outreach messages to clients. This email must be verified in AWS SES."
-                                      value={clientCommunicationEmail}
-                                      onChange={(e) =>
-                                        handleClientCommunicationEmailChange(e.target.value)
-                                      }
-                                    />
-                                    <Group>
-                                        <Button
-                                          onClick={verifySesIdentity}
-                                          loading={sesVerifying}
-                                          leftSection={<IconMail size={16} />}
-                                          disabled={!clientCommunicationEmail}
-                                        >
-                                            Verify Email
-                                        </Button>
-                                        {sesVerificationStatus && (
-                                            <Badge
-                                              color={
-                                                    sesVerificationStatus === 'Success'
-                                                        ? 'green'
-                                                        : sesVerificationStatus === 'Pending'
-                                                          ? 'yellow'
-                                                          : 'red'
-                                                }
-                                            >
-                                                Status: {sesVerificationStatus}
-                                            </Badge>
-                                        )}
-                                    </Group>
-                                </Stack>
-
-                                <TextInput
-                                  label="Display Name"
-                                  placeholder="Your Company Name"
-                                  description="This name will appear as the sender in client emails (e.g., 'Your Company Name Team')"
-                                  value={clientCommunicationName}
-                                  onChange={(e) =>
-                                    handleClientCommunicationNameChange(e.target.value)
-                                  }
-                                />
-
-                                <TextInput
-                                  label="Sales person phone"
-                                  placeholder="+1 555 123 4567"
-                                  description="When a new estimate is created, this number will be called so the sales person or office manager can press 1 to connect to the customer. E.164 format (e.g. +15551234567) is recommended."
-                                  value={salesPersonPhone}
-                                  onChange={(e) =>
-                                    handleSalesPersonPhoneChange(e.target.value)
-                                  }
-                                />
-
-                                <NumberInput
-                                  label="Base Hourly Rate"
-                                  placeholder="0.00"
-                                  description="Default hourly rate that will be used to auto-populate line item rates"
-                                  prefix="$"
-                                  min={0}
-                                  decimalScale={2}
-                                  allowNegative={false}
-                                  value={baseHourlyRate ? parseFloat(baseHourlyRate) : undefined}
-                                  onChange={(value) =>
-                                    handleBaseHourlyRateChange(value?.toString() || '')
-                                  }
-                                />
-
                                 {/* Logo Upload */}
                                 <Box>
                                     <Text size="sm" fw={500} mb="xs">
@@ -604,6 +527,83 @@ export default function SettingsPage() {
                                         </FileButton>
                                     </Group>
                                 </Box>
+
+                                <TextInput
+                                  label="Display Name"
+                                  placeholder="Your Company Name"
+                                  description="This name will appear as the sender in client emails (e.g., 'Your Company Name Team')"
+                                  value={clientCommunicationName}
+                                  onChange={(e) =>
+                                    handleClientCommunicationNameChange(e.target.value)
+                                  }
+                                />
+
+                                <Stack gap="xs">
+                                    <TextInput
+                                      label="Display Email"
+                                      placeholder="email@example.com"
+                                      description="This email will be used for sending estimate signature emails and outreach messages to clients. This email must be verified in AWS SES."
+                                      value={clientCommunicationEmail}
+                                      onChange={(e) =>
+                                        handleClientCommunicationEmailChange(e.target.value)
+                                      }
+                                    />
+                                    <Group>
+                                        <Button
+                                          onClick={verifySesIdentity}
+                                          loading={sesVerifying}
+                                          leftSection={<IconMail size={16} />}
+                                          disabled={!clientCommunicationEmail}
+                                        >
+                                            Verify Email
+                                        </Button>
+                                        {sesVerificationStatus && (
+                                            <Badge
+                                              color={
+                                                    sesVerificationStatus === 'Success'
+                                                        ? 'green'
+                                                        : sesVerificationStatus === 'Pending'
+                                                          ? 'yellow'
+                                                          : 'red'
+                                                }
+                                            >
+                                                Status: {sesVerificationStatus}
+                                            </Badge>
+                                        )}
+                                    </Group>
+                                </Stack>
+
+                                <TextInput
+                                  label="Review Link"
+                                  placeholder="https://..."
+                                  description="Review link to include in post-completion thank you messages"
+                                  value={reviewLink}
+                                  onChange={(e) => handleReviewLinkChange(e.target.value)}
+                                />
+
+                                <TextInput
+                                  label="Sales person phone"
+                                  placeholder="+1 555 123 4567"
+                                  description="When a new estimate is created, this number will be called so the sales person or office manager can press 1 to connect to the customer. E.164 format (e.g. +15551234567) is recommended."
+                                  value={salesPersonPhone}
+                                  onChange={(e) =>
+                                    handleSalesPersonPhoneChange(e.target.value)
+                                  }
+                                />
+
+                                <NumberInput
+                                  label="Base Hourly Rate"
+                                  placeholder="0.00"
+                                  description="Default hourly rate that will be used to auto-populate line item rates"
+                                  prefix="$"
+                                  min={0}
+                                  decimalScale={2}
+                                  allowNegative={false}
+                                  value={baseHourlyRate ? parseFloat(baseHourlyRate) : undefined}
+                                  onChange={(value) =>
+                                    handleBaseHourlyRateChange(value?.toString() || '')
+                                  }
+                                />
 
                                 <Group justify="flex-end" mt="md">
                                     <Button
