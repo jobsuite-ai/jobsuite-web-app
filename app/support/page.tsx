@@ -75,8 +75,8 @@ export default function SupportPage() {
           </Title>
           <Text size="sm">
             Email:{' '}
-            <Anchor href="mailto:support@jobsuite.com">
-              support@jobsuite.com
+            <Anchor href="mailto:info@jobsuite.app">
+              info@jobsuite.app
             </Anchor>
           </Text>
           <Text size="sm" c="dimmed" mt="xs">
