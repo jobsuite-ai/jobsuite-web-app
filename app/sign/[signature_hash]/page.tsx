@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Text, Title, Tabs, useMantineTheme } from '@mantine/core';
+import { Alert, AppShell, Box, Center, Container, Loader, NavLink, Paper, Stack, Tabs, Text, Title, useMantineTheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconAlertCircle, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield, IconBuilding, IconFileInvoice } from '@tabler/icons-react';
+import { IconAlertCircle, IconBuilding, IconFileInvoice, IconFileText, IconHistory, IconInfoCircle, IconLicense, IconShield } from '@tabler/icons-react';
 import { useParams } from 'next/navigation';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
@@ -96,14 +96,22 @@ export default function SignaturePage() {
                 );
 
                 if (!response.ok) {
-                    if (response.status === 404) {
+                    const errBody = await response.json().catch(() => ({}));
+                    const detail = errBody?.detail || errBody?.error;
+                    if (response.status === 400 && detail) {
+                        setError(detail);
+                        await logToCloudWatch(
+                            '[SIGNATURE_FLOW_ALERT] Invalid signature link format (e.g. truncated/corrupted). ' +
+                            `hash=${signatureHash}, status=400`
+                        );
+                    } else if (response.status === 404) {
                         setError('This signature link is invalid or has expired.');
                         await logToCloudWatch(
                             '[SIGNATURE_FLOW_ALERT] Signature link not found or expired. ' +
                             `hash=${signatureHash}, status=404`
                         );
                     } else {
-                        setError('Failed to load signature page. Please try again later.');
+                        setError(detail || 'Failed to load signature page. Please try again later.');
                         await logToCloudWatch(
                             '[SIGNATURE_FLOW_ALERT] Failed to load signature page. ' +
                             `hash=${signatureHash}, status=${response.status}`
@@ -415,7 +423,11 @@ export default function SignaturePage() {
                               };
 
                               // Refresh linkInfo in the background to get authoritative data.
-                              const refreshLinkInfo = async () => {
+                              // Best-effort: if this fails
+                              // (e.g. user navigated away, network blip),
+                              // UI already shows the optimistic signed state.
+                              const refreshLinkInfo = async (attempt = 1) => {
+                                const maxAttempts = 2;
                                 try {
                                   const accessToken = localStorage.getItem('access_token');
                                   const headers: Record<string, string> = {
@@ -436,10 +448,23 @@ export default function SignaturePage() {
                                     setLinkInfo(data);
                                   }
                                 } catch (err) {
-                                  await logToCloudWatch(
-                                    '[SIGNATURE_FLOW_ALERT] Error refreshing signature link info after signing. ' +
-                                    `hash=${signatureHash}, error=${(err as Error)?.message || err}`
-                                  );
+                                  const msg = (err as Error)?.message || String(err);
+                                  const isAbortOrLoadFailed =
+                                    msg === 'Load failed' ||
+                                    msg === 'Failed to fetch' ||
+                                    msg.includes('abort');
+                                  if (attempt < maxAttempts && isAbortOrLoadFailed) {
+                                    setTimeout(() => refreshLinkInfo(attempt + 1), 1500);
+                                    return;
+                                  }
+                                  if (!isAbortOrLoadFailed) {
+                                    await logToCloudWatch(
+                                      '[SIGNATURE_FLOW_ALERT] Error refreshing signature link info after signing. ' +
+                                        `hash=${signatureHash}, error=${msg}`
+                                    );
+                                  }
+                                  // "Load failed" / abort often means user navigated away;
+                                  // skip alert to avoid noise
                                 }
                               };
                               refreshLinkInfo();
