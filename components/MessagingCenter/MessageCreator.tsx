@@ -1,19 +1,19 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import {
+    Button,
+    Divider,
+    Group,
+    Loader,
     Modal,
+    NumberInput,
+    Radio,
+    Select,
     Stack,
     TextInput,
     Textarea,
-    Button,
-    Group,
-    Select,
-    Loader,
-    NumberInput,
-    Radio,
-    Divider,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
@@ -21,9 +21,11 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { Estimate } from '@/components/Global/model';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllClients } from '@/store/slices/clientsSlice';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
+import { selectAllProjects } from '@/store/slices/projectsSlice';
 
 interface User {
     id: string;
@@ -117,9 +119,21 @@ export default function MessageCreator({
     onClose,
     onSuccess,
 }: MessageCreatorProps) {
-    // Use Redux selectors for estimates and clients
+    // Use Redux selectors for estimates, projects, and clients
     const estimates = useAppSelector(selectAllEstimates);
+    const projects = useAppSelector(selectAllProjects);
     const clients = useAppSelector(selectAllClients);
+
+    // Merge estimates and projects for exhaustive dropdown
+    // (dedupe by id; estimates first, then projects)
+    const estimatesAndProjects = useMemo(() => {
+        const byId = new Map<string, Estimate>();
+        estimates.forEach((e) => byId.set(e.id, e));
+        projects.forEach((p) => {
+            if (!byId.has(p.id)) byId.set(p.id, p);
+        });
+        return Array.from(byId.values());
+    }, [estimates, projects]);
 
     const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState<User[]>([]);
@@ -150,14 +164,14 @@ export default function MessageCreator({
         [clients]
     );
 
-    // Filter estimates based on search query (matches title, client name, email, address)
+    // Filter estimates/projects based on search query (matches title, client name, email, address)
     const filteredEstimates = useMemo(() => {
         if (!estimateSearchValue || estimateSearchValue.trim().length < 1) {
-            return estimates;
+            return estimatesAndProjects;
         }
 
         const searchTerm = estimateSearchValue.trim();
-        return estimates.filter((estimate) => {
+        return estimatesAndProjects.filter((estimate) => {
             // Match on estimate title
             const titleText = estimate.title || '';
             const titleMatch = titleText ? fuzzyMatch(titleText, searchTerm) : false;
@@ -211,7 +225,7 @@ export default function MessageCreator({
                 fullAddressMatch
             );
         });
-    }, [estimates, estimateSearchValue, clientMap]);
+    }, [estimatesAndProjects, estimateSearchValue, clientMap]);
 
     // Create estimate options for Select component
     const estimateOptions = useMemo(() => filteredEstimates.map((estimate) => {
@@ -309,7 +323,7 @@ export default function MessageCreator({
     const loadSubClients = async () => {
         if (!selectedEstimateId) return;
 
-        const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
+        const selectedEstimate = estimatesAndProjects.find((e) => e.id === selectedEstimateId);
         if (!selectedEstimate) return;
 
         try {
@@ -435,9 +449,10 @@ export default function MessageCreator({
             let estimateId: string | null = null;
 
             if (selectedEstimateId) {
-                const selectedEstimate = estimates.find((e) => e.id === selectedEstimateId);
+                const selectedEstimate = estimatesAndProjects.find(
+                    (e) => e.id === selectedEstimateId);
                 if (!selectedEstimate) {
-                    throw new Error('Selected estimate not found');
+                    throw new Error('Selected estimate or project not found');
                 }
 
                 clientId = selectedEstimate.client_id;
@@ -580,8 +595,8 @@ export default function MessageCreator({
             ) : (
                 <Stack gap="md">
                     <Select
-                      label="Estimate (Optional)"
-                      placeholder="Select an estimate (or select a client below)"
+                      label="Estimate or Project (Optional)"
+                      placeholder="Select an estimate or project (or select a client below for client-only message)"
                       data={estimateOptions}
                       value={selectedEstimateId}
                       onChange={(value) => {
