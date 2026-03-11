@@ -60,7 +60,13 @@ export interface SignatureLinkInfo {
         insurance_pdf_url?: string;
         w9_pdf_url?: string;
         about_text: string;
-        about_blocks?: Array<{ type: 'text' | 'image'; content?: string; image_url?: string }>;
+        about_blocks?: Array<{
+            type: 'text' | 'image';
+            content?: string;
+            image_url?: string;
+            size?: 'small' | 'medium' | 'large' | 'full';
+            wrap?: 'none' | 'left' | 'right';
+        }>;
         about_heading?: string;
         about_subheading?: string;
         past_projects_count: number;
