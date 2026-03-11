@@ -16,6 +16,7 @@ import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, g
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useTeamConfig } from '@/hooks/useTeamConfig';
 import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
 
@@ -39,6 +40,7 @@ export default function SidebarDetails({
   const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
+  const { teamConfig, loading: loadingTeamConfig } = useTeamConfig();
   const [editingOwner, setEditingOwner] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(
     estimate.owned_by || estimate.created_by || null
@@ -70,8 +72,24 @@ export default function SidebarDetails({
   const [showCheckInDateModal, setShowCheckInDateModal] = useState(false);
   const [checkInDate, setCheckInDate] = useState<Date | null>(null);
   const [savingCheckInDate, setSavingCheckInDate] = useState(false);
+  const [editingCrewLead, setEditingCrewLead] = useState(false);
+  const [selectedCrewLead, setSelectedCrewLead] = useState<string | null>(
+    estimate.project_crew_lead || null
+  );
+  const [savingCrewLead, setSavingCrewLead] = useState(false);
+  const [editingProductionManager, setEditingProductionManager] = useState(false);
+  const [selectedProductionManager, setSelectedProductionManager] = useState<string | null>(
+    estimate.production_manager || null
+  );
+  const [savingProductionManager, setSavingProductionManager] = useState(false);
+  const [editingSalesPerson, setEditingSalesPerson] = useState(false);
+  const [selectedSalesPerson, setSelectedSalesPerson] = useState<string | null>(
+    estimate.sales_person || null
+  );
+  const [savingSalesPerson, setSavingSalesPerson] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
+  const singleOptionDefaultsAppliedRef = useRef<string | null>(null);
   const { refreshData, updateEstimate, updateProject } = useDataCache();
 
   // Check QuickBooks connection status
@@ -313,6 +331,30 @@ export default function SidebarDetails({
       setSelectedCustomerId(estimate.quickbooks_customer_id || null);
     }
   }, [estimate.quickbooks_customer_id, showCustomerModal]);
+
+  // Sync crew lead / production manager / sales person when estimate changes (but not when editing)
+  useEffect(() => {
+    if (!editingCrewLead) {
+      setSelectedCrewLead(estimate.project_crew_lead || null);
+    }
+  }, [estimate.project_crew_lead, editingCrewLead]);
+
+  useEffect(() => {
+    if (!editingProductionManager) {
+      setSelectedProductionManager(estimate.production_manager || null);
+    }
+  }, [estimate.production_manager, editingProductionManager]);
+
+  useEffect(() => {
+    if (!editingSalesPerson) {
+      setSelectedSalesPerson(estimate.sales_person || null);
+    }
+  }, [estimate.sales_person, editingSalesPerson]);
+
+  // When estimate changes, allow applying single-option defaults again for the new estimate
+  useEffect(() => {
+    singleOptionDefaultsAppliedRef.current = null;
+  }, [estimateID]);
 
   const updateEstimateStatus = async (status: EstimateStatus) => {
     await logToCloudWatch(`Attempting to update estimate: ${estimate.id} to status: ${status}`);
@@ -683,6 +725,76 @@ export default function SidebarDetails({
 
     onUpdate();
   };
+
+  const updateProductionManager = async (value: string | null) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    await fetch(`/api/estimates/${estimateID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ production_manager: value ?? '' }),
+    });
+
+    onUpdate();
+  };
+
+  const updateSalesPerson = async (value: string | null) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    await fetch(`/api/estimates/${estimateID}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ sales_person: value ?? '' }),
+    });
+
+    onUpdate();
+  };
+
+  // Set default crew lead / production manager / sales person when only one option is configured
+  useEffect(() => {
+    if (loadingTeamConfig || singleOptionDefaultsAppliedRef.current === estimateID) {
+      return;
+    }
+    const toApply: Array<() => Promise<void>> = [];
+    if (teamConfig.leadPainters.length === 1 && !estimate.project_crew_lead?.trim()) {
+      toApply.push(() => updateCrewLead(teamConfig.leadPainters[0]));
+    }
+    if (teamConfig.productionManagers.length === 1 && !estimate.production_manager?.trim()) {
+      toApply.push(() => updateProductionManager(teamConfig.productionManagers[0]));
+    }
+    if (teamConfig.salesPeople.length === 1 && !estimate.sales_person?.trim()) {
+      toApply.push(() => updateSalesPerson(teamConfig.salesPeople[0]));
+    }
+    if (toApply.length > 0) {
+      singleOptionDefaultsAppliedRef.current = estimateID;
+      toApply.forEach((fn) => { fn(); });
+    }
+  }, [
+    loadingTeamConfig,
+    estimateID,
+    estimate.project_crew_lead,
+    estimate.production_manager,
+    estimate.sales_person,
+    teamConfig.leadPainters,
+    teamConfig.productionManagers,
+    teamConfig.salesPeople,
+  ]);
 
   const updateActualHours = async (value: string) => {
     const accessToken = localStorage.getItem('access_token');
@@ -1466,13 +1578,215 @@ export default function SidebarDetails({
           placeholder="Enter paint details"
         />
 
-        {/* Crew Lead */}
-        <EditableField
-          label="Crew Lead"
-          value={estimate.project_crew_lead}
-          onSave={updateCrewLead}
-          placeholder="Enter crew lead name"
-        />
+        {/* Job Crew Lead (dropdown from lead painters) */}
+        {editingCrewLead ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Job Crew Lead:
+              </Text>
+              <Select
+                data={[
+                  ...teamConfig.leadPainters.map((name) => ({ value: name, label: name })),
+                  ...(selectedCrewLead && !teamConfig.leadPainters.includes(selectedCrewLead)
+                    ? [{ value: selectedCrewLead, label: selectedCrewLead }]
+                    : []),
+                ]}
+                value={selectedCrewLead}
+                onChange={async (value) => {
+                  setSelectedCrewLead(value);
+                  if (savingCrewLead) return;
+                  setSavingCrewLead(true);
+                  try {
+                    await updateCrewLead(value || '');
+                    setEditingCrewLead(false);
+                  } finally {
+                    setSavingCrewLead(false);
+                  }
+                }}
+                placeholder="Select crew lead"
+                clearable
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={loadingTeamConfig || savingCrewLead}
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={() => {
+                  setSelectedCrewLead(estimate.project_crew_lead || null);
+                  setEditingCrewLead(false);
+                }}
+                disabled={savingCrewLead}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Job Crew Lead:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => {
+                setSelectedCrewLead(estimate.project_crew_lead || null);
+                setEditingCrewLead(true);
+              }}
+              c={estimate.project_crew_lead ? 'dark' : 'dimmed'}
+            >
+              {estimate.project_crew_lead || '—'}
+            </Text>
+          </Flex>
+        )}
+
+        {/* Production Manager (dropdown from settings) */}
+        {editingProductionManager ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Production Manager:
+              </Text>
+              <Select
+                data={[
+                  ...teamConfig.productionManagers.map((name) => ({
+                    value: name,
+                    label: name,
+                  })),
+                  ...(selectedProductionManager &&
+                  !teamConfig.productionManagers.includes(selectedProductionManager)
+                    ? [
+                        {
+                            value: selectedProductionManager,
+                            label: selectedProductionManager,
+                        },
+                      ]
+                    : []),
+                ]}
+                value={selectedProductionManager}
+                onChange={async (value) => {
+                  setSelectedProductionManager(value);
+                  if (savingProductionManager) return;
+                  setSavingProductionManager(true);
+                  try {
+                    await updateProductionManager(value);
+                    setEditingProductionManager(false);
+                  } finally {
+                    setSavingProductionManager(false);
+                  }
+                }}
+                placeholder="Select production manager"
+                clearable
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={loadingTeamConfig || savingProductionManager}
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={() => {
+                  setSelectedProductionManager(estimate.production_manager || null);
+                  setEditingProductionManager(false);
+                }}
+                disabled={savingProductionManager}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Production Manager:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => {
+                setSelectedProductionManager(estimate.production_manager || null);
+                setEditingProductionManager(true);
+              }}
+              c={estimate.production_manager ? 'dark' : 'dimmed'}
+            >
+              {estimate.production_manager || '—'}
+            </Text>
+          </Flex>
+        )}
+
+        {/* Sales Person (dropdown from settings) */}
+        {editingSalesPerson ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Sales Person:
+              </Text>
+              <Select
+                data={[
+                  ...teamConfig.salesPeople.map((name) => ({ value: name, label: name })),
+                  ...(selectedSalesPerson && !teamConfig.salesPeople.includes(selectedSalesPerson)
+                    ? [{ value: selectedSalesPerson, label: selectedSalesPerson }]
+                    : []),
+                ]}
+                value={selectedSalesPerson}
+                onChange={async (value) => {
+                  setSelectedSalesPerson(value);
+                  if (savingSalesPerson) return;
+                  setSavingSalesPerson(true);
+                  try {
+                    await updateSalesPerson(value);
+                    setEditingSalesPerson(false);
+                  } finally {
+                    setSavingSalesPerson(false);
+                  }
+                }}
+                placeholder="Select sales person"
+                clearable
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={loadingTeamConfig || savingSalesPerson}
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={() => {
+                  setSelectedSalesPerson(estimate.sales_person || null);
+                  setEditingSalesPerson(false);
+                }}
+                disabled={savingSalesPerson}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Sales Person:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => {
+                setSelectedSalesPerson(estimate.sales_person || null);
+                setEditingSalesPerson(true);
+              }}
+              c={estimate.sales_person ? 'dark' : 'dimmed'}
+            >
+              {estimate.sales_person || '—'}
+            </Text>
+          </Flex>
+        )}
 
         {/* Actual Hours */}
         <EditableField

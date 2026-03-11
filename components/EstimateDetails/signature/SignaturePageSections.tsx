@@ -4,6 +4,12 @@ import { useEffect, useState } from 'react';
 
 import { Card, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 
+export interface AboutBlock {
+    type: 'text' | 'image';
+    content?: string;
+    image_url?: string;
+}
+
 interface SignaturePageSectionsProps {
     contractor: any;
     signaturePageConfig: {
@@ -18,35 +24,49 @@ interface SignaturePageSectionsProps {
         insurance_pdf_url?: string;
         w9_pdf_url?: string;
         about_text: string;
+        about_blocks?: AboutBlock[];
         past_projects_count: number;
+        use_curated_past_projects?: boolean;
+        past_projects_curated?: PastProject[];
     };
     signatureHash: string;
+    /**
+     * When provided (e.g. from main signature payload for curated portfolio),
+     * skip contractor-info fetch.
+     */
+    pastProjectsOverride?: PastProject[] | null;
 }
 
-interface PastProject {
+export interface PastProject {
     id: string;
     title?: string;
+    description?: string;
     address_street?: string;
     address_city?: string;
     address_state?: string;
     status?: string;
     updated_at?: string;
+    completed_at?: string;
+    image_urls?: string[];
 }
 
 export default function SignaturePageSections({
     contractor,
     signaturePageConfig,
     signatureHash,
+    pastProjectsOverride,
 }: SignaturePageSectionsProps) {
     const [pastProjects, setPastProjects] = useState<PastProject[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
 
     useEffect(() => {
-        if (signaturePageConfig.show_past_projects) {
+        if (
+            signaturePageConfig.show_past_projects &&
+            pastProjectsOverride === undefined
+        ) {
             const fetchPastProjects = async () => {
                 try {
                     setLoadingProjects(true);
-                    // Use Next.js API route as proxy
                     const response = await fetch(
                         `/api/signature/${signatureHash}/contractor-info`,
                         {
@@ -71,7 +91,16 @@ export default function SignaturePageSections({
 
             fetchPastProjects();
         }
-    }, [signaturePageConfig.show_past_projects, signatureHash]);
+    }, [
+        signaturePageConfig.show_past_projects,
+        signatureHash,
+        pastProjectsOverride,
+    ]);
+
+    const displayedPastProjects =
+        pastProjectsOverride !== undefined && pastProjectsOverride !== null
+            ? pastProjectsOverride
+            : pastProjects;
 
     return (
         <Stack gap="md">
@@ -175,57 +204,187 @@ export default function SignaturePageSections({
             )}
 
             {/* About Section */}
-            {signaturePageConfig.show_about && signaturePageConfig.about_text && (
-                <Paper shadow="xs" p="md" radius="md" withBorder>
-                    <Title order={4} mb="sm">
-                        About {contractor?.name || 'Us'}
-                    </Title>
-                    <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
-                        {signaturePageConfig.about_text}
-                    </Text>
-                </Paper>
-            )}
+            {signaturePageConfig.show_about &&
+                (() => {
+                    const blocks = signaturePageConfig.about_blocks;
+                    const hasBlocks = Array.isArray(blocks) && blocks.length > 0;
+                    if (!hasBlocks && !signaturePageConfig.about_text) return null;
+                    return (
+                        <Paper shadow="xs" p="md" radius="md" withBorder>
+                            <Title order={4} mb="sm">
+                                About {contractor?.name || 'Us'}
+                            </Title>
+                            {hasBlocks ? (
+                                <Stack gap="md">
+                                    {blocks.map((block, index) =>
+                                        block.type === 'text' ? (
+                                            block.content ? (
+                                                block.content.trim().startsWith('<') ? (
+                                                    <div
+                                                      key={index}
+                                                      className="signature-about-block-content"
+                                                      style={{
+                                                          fontSize: 'var(--mantine-font-size-sm)',
+                                                          lineHeight: 1.6,
+                                                      }}
+                                                      dangerouslySetInnerHTML={{
+                                                          __html: block.content,
+                                                      }}
+                                                    />
+                                                ) : (
+                                                    <Text
+                                                      key={index}
+                                                      size="sm"
+                                                      style={{ whiteSpace: 'pre-line' }}
+                                                    >
+                                                        {block.content}
+                                                    </Text>
+                                                )
+                                            ) : null
+                                        ) : (
+                                            block.image_url && (
+                                                <div
+                                                  key={index}
+                                                  style={{
+                                                      width: '100%',
+                                                      maxWidth: '100%',
+                                                      overflow: 'hidden',
+                                                      borderRadius: '4px',
+                                                  }}
+                                                >
+                                                    <img
+                                                      src={block.image_url}
+                                                      alt=""
+                                                      style={{
+                                                          maxWidth: '100%',
+                                                          height: 'auto',
+                                                          display: 'block',
+                                                      }}
+                                                    />
+                                                </div>
+                                            )
+                                        )
+                                    )}
+                                </Stack>
+                            ) : (
+                                <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
+                                    {signaturePageConfig.about_text}
+                                </Text>
+                            )}
+                        </Paper>
+                    );
+                })()}
 
             {/* Past Projects Section */}
             {signaturePageConfig.show_past_projects && (
                 <Paper shadow="xs" p="md" radius="md" withBorder>
-                    <Title order={4} mb="md">
-                        Recent Completed Projects
+                    <Title order={4} mb="xs">
+                        Latest Projects
                     </Title>
-                    {loadingProjects ? (
+                    <Text size="sm" c="dimmed" mb="md">
+                        Check out the most recent photos and completed projects.
+                    </Text>
+                    {pastProjectsOverride === undefined && loadingProjects ? (
                         <Text c="dimmed" size="sm">
                             Loading projects...
                         </Text>
-                    ) : pastProjects.length > 0 ? (
-                        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="md">
-                            {pastProjects.map((project) => (
-                                <Card key={project.id} shadow="xs" padding="sm" radius="md" withBorder>
-                                    <Stack gap="xs">
-                                        {project.title && (
-                                            <Text fw={500} size="sm">
-                                                {project.title}
-                                            </Text>
-                                        )}
-                                        {(project.address_street || project.address_city) && (
-                                            <Text size="xs" c="dimmed">
-                                                {[
-                                                    project.address_street,
-                                                    project.address_city,
-                                                    project.address_state,
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(', ')}
-                                            </Text>
-                                        )}
-                                        {project.updated_at && (
-                                            <Text size="xs" c="dimmed">
-                                                Completed:{' '}
-                                                {new Date(project.updated_at).toLocaleDateString()}
-                                            </Text>
-                                        )}
-                                    </Stack>
-                                </Card>
-                            ))}
+                    ) : displayedPastProjects.length > 0 ? (
+                        <SimpleGrid
+                          cols={{ base: 1, sm: 2, md: 3 }}
+                          spacing="lg"
+                          verticalSpacing="lg"
+                        >
+                            {displayedPastProjects.map((project) => {
+                                const imageUrl =
+                                    Array.isArray(project.image_urls) &&
+                                    project.image_urls.length > 0
+                                        ? project.image_urls[0]
+                                        : null;
+                                return (
+                                    <Card
+                                      key={project.id}
+                                      shadow="sm"
+                                      padding={0}
+                                      radius="md"
+                                      withBorder
+                                      style={{
+                                            overflow: 'hidden',
+                                        }}
+                                    >
+                                        <div
+                                          style={{
+                                                aspectRatio: '4/3',
+                                                backgroundColor: 'var(--mantine-color-gray-2)',
+                                                overflow: 'hidden',
+                                            }}
+                                        >
+                                            {imageUrl ? (
+                                                <img
+                                                  src={imageUrl}
+                                                  alt=""
+                                                  style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        display: 'block',
+                                                    }}
+                                                />
+                                            ) : (
+                                                <div
+                                                  style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                    }}
+                                                >
+                                                    <Text size="xs" c="dimmed">
+                                                        No image
+                                                    </Text>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <Stack gap={4} p="sm">
+                                            {project.title && (
+                                                <Text fw={600} size="sm" lineClamp={2}>
+                                                    {project.title}
+                                                </Text>
+                                            )}
+                                            {project.description &&
+                                                typeof project.description === 'string' &&
+                                                !project.description.trim().startsWith('<') && (
+                                                <Text
+                                                  size="xs"
+                                                  c="dimmed"
+                                                  lineClamp={2}
+                                                  style={{ whiteSpace: 'pre-line' }}
+                                                >
+                                                    {project.description}
+                                                </Text>
+                                            )}
+                                            {project.description &&
+                                                typeof project.description === 'string' &&
+                                                project.description.trim().startsWith('<') && (
+                                                <div
+                                                  style={{
+                                                        fontSize: 'var(--mantine-font-size-xs)',
+                                                        color: 'var(--mantine-color-dimmed)',
+                                                        lineHeight: 1.4,
+                                                        overflow: 'hidden',
+                                                        display: '-webkit-box',
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: 'vertical',
+                                                    }}
+                                                  dangerouslySetInnerHTML={{
+                                                        __html: project.description,
+                                                    }}
+                                                />
+                                            )}
+                                        </Stack>
+                                    </Card>
+                                );
+                            })}
                         </SimpleGrid>
                     ) : (
                         <Text c="dimmed" size="sm">

@@ -23,6 +23,8 @@ export type UpdateJobContent = {
     update_calendar_event?: UpdateCalendarEventInput,
     update_paint_details?: UpdatePaintDetailsInput,
     project_crew_lead?: string,
+    production_manager?: string,
+    sales_person?: string,
 };
 
 export type UpdateCalendarEventInput = {

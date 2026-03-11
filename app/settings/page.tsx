@@ -29,6 +29,7 @@ import ActionsTab from '@/components/Settings/ActionsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import NotificationsTab from '@/components/Settings/NotificationsTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
+import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
@@ -225,6 +226,17 @@ export default function SettingsPage() {
                     // Preserve signature page config if it exists
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
+                    }),
+                    // Preserve team config if it exists (edited in Settings > Team)
+                    ...(existingConfig?.configuration?.team_lead_painters != null && {
+                        team_lead_painters: existingConfig.configuration.team_lead_painters,
+                    }),
+                    ...(existingConfig?.configuration?.team_production_managers != null && {
+                        team_production_managers:
+                            existingConfig.configuration.team_production_managers,
+                    }),
+                    ...(existingConfig?.configuration?.team_sales_people != null && {
+                        team_sales_people: existingConfig.configuration.team_sales_people,
                     }),
                     // Preserve estimate-received email body
                     // (edited in Settings > Message Templates)
@@ -467,6 +479,7 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
+                    <Tabs.Tab value="team">Team</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                     <Tabs.Tab value="actions">Actions</Tabs.Tab>
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
@@ -617,6 +630,10 @@ export default function SettingsPage() {
                             </Stack>
                         )}
                     </Card>
+                </Tabs.Panel>
+
+                <Tabs.Panel value="team" pt="md">
+                    <TeamTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="signature-page" pt="md">
