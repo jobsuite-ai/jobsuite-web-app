@@ -208,6 +208,9 @@ export default function SignaturePageLayout({
     const renderHeader = () => (
         <Box
           style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 100,
                 borderBottom: '1px solid var(--mantine-color-gray-3)',
                 backgroundColor: 'var(--mantine-color-body)',
                 height: 56,
@@ -245,13 +248,15 @@ export default function SignaturePageLayout({
                     >
                         {showQuickSignCta ? (
                             <Button
-                              size="sm"
-                              leftSection={<IconSignature size={16} />}
+                              size={isMobile ? 'sm' : 'md'}
+                              leftSection={<IconSignature size={isMobile ? 16 : 18} />}
                               onClick={handleSignatureClick}
                               variant="filled"
                               radius="md"
                               fw={600}
-                              style={{ minWidth: 140 }}
+                              style={{
+                                  minWidth: isMobile ? 140 : 440,
+                              }}
                             >
                                 Quick Sign
                             </Button>
