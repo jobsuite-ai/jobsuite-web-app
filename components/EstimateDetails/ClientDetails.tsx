@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Badge, Button, Card, Center, Flex, Menu, Modal, NumberInput, Text, Textarea, TextInput } from '@mantine/core';
+import { Badge, Button, Card, Center, Flex, Menu, Modal, NumberInput, Text, Textarea, TextInput, Select } from '@mantine/core';
 import '@mantine/core/styles.css';
 import '@mantine/dates/styles.css';
 import { useForm } from '@mantine/form';
@@ -16,6 +16,7 @@ import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/uti
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useTeamConfig } from '@/hooks/useTeamConfig';
 import { logToCloudWatch } from '@/public/logger';
 
 export default function ClientDetails({ initialEstimate }: { initialEstimate: Estimate }) {
@@ -25,6 +26,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const [showFollowUpModal, setShowFollowUpModal] = useState(false);
     const [client, setClient] = useState<ContractorClient>();
     const [menuOpened, setMenuOpened] = useState(false);
+    const { teamConfig } = useTeamConfig();
     const router = useRouter();
     const { updateEstimate } = useDataCache();
 
@@ -99,6 +101,13 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             job_crew_lead: (value: string) => (value === '' ? 'Must enter crew lead name' : null),
         },
     });
+
+    // When completion modal opens and there's only one lead painter, default job_crew_lead
+    useEffect(() => {
+        if (isCompletionModalOpen && teamConfig.leadPainters.length === 1) {
+            completionForm.setFieldValue('job_crew_lead', teamConfig.leadPainters[0]);
+        }
+    }, [isCompletionModalOpen, teamConfig.leadPainters]);
 
     const updateJob = async () => {
         const formValues = form.getValues();
@@ -477,13 +486,27 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                             {...completionForm.getInputProps('add_on_description')}
                           />
                         )}
-                        <TextInput
-                          withAsterisk
-                          label="Crew Lead"
-                          placeholder="Enter crew lead name"
-                          key={completionForm.key('job_crew_lead')}
-                          {...completionForm.getInputProps('job_crew_lead')}
-                        />
+                        {teamConfig.leadPainters.length > 0 ? (
+                          <Select
+                            withAsterisk
+                            label="Job Crew Lead"
+                            placeholder="Select crew lead"
+                            data={teamConfig.leadPainters.map((name) => ({
+                                value: name,
+                                label: name,
+                            }))}
+                            key={completionForm.key('job_crew_lead')}
+                            {...completionForm.getInputProps('job_crew_lead')}
+                          />
+                        ) : (
+                          <TextInput
+                            withAsterisk
+                            label="Job Crew Lead"
+                            placeholder="Enter crew lead name"
+                            key={completionForm.key('job_crew_lead')}
+                            {...completionForm.getInputProps('job_crew_lead')}
+                          />
+                        )}
                         <Center mt="md">
                             <Button type="submit" onClick={handleJobCompletion}>Submit</Button>
                         </Center>

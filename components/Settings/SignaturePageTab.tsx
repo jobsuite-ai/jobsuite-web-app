@@ -3,32 +3,53 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+    ActionIcon,
+    Alert,
+    Accordion,
+    Box,
     Button,
     Card,
-    Group,
-    Stack,
-    Text,
-    Switch,
-    Textarea,
-    NumberInput,
-    FileButton,
-    Box,
     Divider,
-    Alert,
+    FileButton,
+    Group,
     Loader,
+    NumberInput,
     Paper,
-    Title,
-    Container,
     Progress,
+    Select,
+    SimpleGrid,
+    Stack,
+    Switch,
+    Text,
+    Textarea,
+    TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconUpload, IconEye, IconFile } from '@tabler/icons-react';
+import '@mantine/tiptap/styles.css';
+import {
+    IconCheck,
+    IconChevronDown,
+    IconChevronUp,
+    IconEye,
+    IconFile,
+    IconGripVertical,
+    IconPhotoPlus,
+    IconPlus,
+    IconTrash,
+    IconUpload,
+    IconX,
+} from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
-import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
-import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
+import type {
+    AboutBlockImageSize,
+    AboutBlockImageWrap,
+    PastProject,
+} from '@/components/EstimateDetails/signature/SignaturePageSections';
+import { AboutBlock } from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { Estimate, EstimateResource, EstimateStatus } from '@/components/Global/model';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 
 interface SignaturePageConfig {
     show_license: boolean;
@@ -43,7 +64,12 @@ interface SignaturePageConfig {
     w9_pdf_url?: string;
     w9_pdf_s3_key?: string;
     about_text: string;
+    about_heading?: string;
+    about_subheading?: string;
+    about_blocks?: AboutBlock[];
     past_projects_count: number;
+    use_curated_past_projects?: boolean;
+    past_projects_curated?: PastProject[];
 }
 
 interface ContractorConfiguration {
@@ -60,7 +86,6 @@ export default function SignaturePageTab() {
     const [error, setError] = useState<string | null>(null);
     const [configId, setConfigId] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
 
     // Signature page configuration state
     const [showLicense, setShowLicense] = useState(false);
@@ -72,12 +97,19 @@ export default function SignaturePageTab() {
     const [insurancePdfUrl, setInsurancePdfUrl] = useState<string | null>(null);
     const [w9PdfUrl, setW9PdfUrl] = useState<string | null>(null);
     const [aboutText, setAboutText] = useState('');
+    const [aboutHeading, setAboutHeading] = useState('');
+    const [aboutSubheading, setAboutSubheading] = useState('');
+    const [aboutBlocks, setAboutBlocks] = useState<AboutBlock[]>([]);
     const [pastProjectsCount, setPastProjectsCount] = useState(5);
+    const [useCuratedPastProjects, setUseCuratedPastProjects] = useState(false);
+    const [pastProjectsCurated, setPastProjectsCurated] = useState<PastProject[]>([]);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingInsurance, setUploadingInsurance] = useState(false);
     const [uploadingW9, setUploadingW9] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [openingPreview, setOpeningPreview] = useState(false);
     const isMountedRef = useRef(true);
+    const [draggingAboutIndex, setDraggingAboutIndex] = useState<number | null>(null);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -138,7 +170,15 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(sigConfig.insurance_pdf_url || null);
                 setW9PdfUrl(sigConfig.w9_pdf_url || null);
                 setAboutText(sigConfig.about_text || '');
+                setAboutHeading(sigConfig.about_heading || '');
+                setAboutSubheading(sigConfig.about_subheading || '');
+                setAboutBlocks(Array.isArray(sigConfig.about_blocks) ? sigConfig.about_blocks : []);
                 setPastProjectsCount(sigConfig.past_projects_count || 5);
+                setUseCuratedPastProjects(sigConfig.use_curated_past_projects || false);
+                setPastProjectsCurated(
+                    Array.isArray(sigConfig.past_projects_curated) ?
+                    sigConfig.past_projects_curated : []
+                );
             } else {
                 setConfigId(null);
                 // Reset to defaults
@@ -151,7 +191,12 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(null);
                 setW9PdfUrl(null);
                 setAboutText('');
+                setAboutHeading('');
+                setAboutSubheading('');
+                setAboutBlocks([]);
                 setPastProjectsCount(5);
+                setUseCuratedPastProjects(false);
+                setPastProjectsCurated([]);
             }
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -206,7 +251,15 @@ export default function SignaturePageTab() {
                         insurance_pdf_url: insurancePdfUrl,
                         w9_pdf_url: w9PdfUrl,
                         about_text: aboutText,
+                        about_heading: aboutHeading || undefined,
+                        about_subheading: aboutSubheading || undefined,
+                        about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
                         past_projects_count: pastProjectsCount,
+                        use_curated_past_projects: useCuratedPastProjects,
+                        past_projects_curated:
+                            useCuratedPastProjects && pastProjectsCurated.length > 0
+                                ? pastProjectsCurated
+                                : undefined,
                     },
                 },
             };
@@ -629,6 +682,164 @@ export default function SignaturePageTab() {
         }
     };
 
+    async function uploadSignatureImage(file: File): Promise<string> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) throw new Error('No access token found');
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/configurations/signature-image', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: formData,
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || err.detail || 'Failed to upload image');
+        }
+        const data = await response.json();
+        if (!data.url) throw new Error('No URL returned');
+        return data.url;
+    }
+
+    const handleAddAboutTextBlock = () => {
+        setAboutBlocks((prev) => [...prev, { type: 'text', content: '' }]);
+        setHasChanges(true);
+    };
+
+    const handleAddAboutImageBlock = async (file: File | null) => {
+        if (!file || !file.type.startsWith('image/')) {
+            notifications.show({ title: 'Error', message: 'Please select an image', color: 'red', icon: <IconX size={16} /> });
+            return;
+        }
+        try {
+            const url = await uploadSignatureImage(file);
+            setAboutBlocks((prev) => [...prev, { type: 'image', image_url: url, size: 'full', wrap: 'none' }]);
+            setHasChanges(true);
+            notifications.show({ title: 'Success', message: 'Image added', color: 'green', icon: <IconCheck size={16} /> });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to upload image',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const handleRemoveAboutBlock = (index: number) => {
+        setAboutBlocks((prev) => prev.filter((_, i) => i !== index));
+        setHasChanges(true);
+    };
+
+    const moveAboutBlock = (fromIndex: number, toIndex: number) => {
+        setAboutBlocks((prev) => {
+            if (
+                fromIndex < 0 ||
+                toIndex < 0 ||
+                fromIndex >= prev.length ||
+                toIndex >= prev.length ||
+                fromIndex === toIndex
+            ) {
+                return prev;
+            }
+            const next = [...prev];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const moveAboutBlockUp = (index: number) => {
+        moveAboutBlock(index, index - 1);
+    };
+
+    const moveAboutBlockDown = (index: number) => {
+        moveAboutBlock(index, index + 1);
+    };
+
+    const handleAboutBlockContentChange = (index: number, content: string) => {
+        setAboutBlocks((prev) => {
+            const next = [...prev];
+            if (next[index].type === 'text') next[index] = { ...next[index], content };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleAboutImageBlockOptionsChange = (
+        index: number,
+        options: { size?: AboutBlockImageSize; wrap?: AboutBlockImageWrap }
+    ) => {
+        setAboutBlocks((prev) => {
+            const next = [...prev];
+            if (next[index].type === 'image') {
+                next[index] = { ...next[index], ...options };
+            }
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleAddCuratedProject = () => {
+        setPastProjectsCurated((prev) => [
+            ...prev,
+            { id: `temp-${Date.now()}`, title: '', description: '', image_urls: [] },
+        ]);
+        setHasChanges(true);
+    };
+
+    const handleRemoveCuratedProject = (index: number) => {
+        setPastProjectsCurated((prev) => prev.filter((_, i) => i !== index));
+        setHasChanges(true);
+    };
+
+    const handleCuratedProjectChange = (
+        index: number,
+        field: keyof PastProject,
+        value: string | string[]
+    ) => {
+        setPastProjectsCurated((prev) => {
+            const next = [...prev];
+            next[index] = { ...next[index], [field]: value };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleCuratedProjectImageUpload = async (projectIndex: number, file: File | null) => {
+        if (!file || !file.type.startsWith('image/')) return;
+        try {
+            const url = await uploadSignatureImage(file);
+            setPastProjectsCurated((prev) => {
+                const next = [...prev];
+                const urls = next[projectIndex].image_urls || [];
+                next[projectIndex] = { ...next[projectIndex], image_urls: [...urls, url] };
+                return next;
+            });
+            setHasChanges(true);
+            notifications.show({ title: 'Success', message: 'Image added', color: 'green', icon: <IconCheck size={16} /> });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to upload image',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const handleRemoveCuratedProjectImage = (projectIndex: number, imageIndex: number) => {
+        setPastProjectsCurated((prev) => {
+            const next = [...prev];
+            const urls = [...(next[projectIndex].image_urls || [])];
+            urls.splice(imageIndex, 1);
+            next[projectIndex] = { ...next[projectIndex], image_urls: urls };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
     // Mock data for preview
     const previewData = {
         contractor: {
@@ -645,7 +856,15 @@ export default function SignaturePageTab() {
             insurance_pdf_url: insurancePdfUrl || undefined,
             w9_pdf_url: w9PdfUrl || undefined,
             about_text: aboutText,
+            about_heading: aboutHeading || undefined,
+            about_subheading: aboutSubheading || undefined,
+            about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
             past_projects_count: pastProjectsCount,
+            use_curated_past_projects: useCuratedPastProjects,
+            past_projects_curated:
+                useCuratedPastProjects && pastProjectsCurated.length > 0
+                    ? pastProjectsCurated
+                    : undefined,
         },
         estimate: {
             id: 'preview',
@@ -666,6 +885,42 @@ export default function SignaturePageTab() {
         imageResources: [] as EstimateResource[],
         videoResources: [] as EstimateResource[],
     };
+
+    async function openPreviewInNewTab() {
+        setOpeningPreview(true);
+        try {
+            const response = await fetch('/api/signature/ensure-preview-link', {
+                method: 'POST',
+                headers: getApiHeaders(),
+                body: JSON.stringify({
+                    signature_page_config: previewData.signaturePageConfig,
+                }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Preview failed',
+                    message: err.error || 'Could not open preview',
+                    color: 'red',
+                });
+                return;
+            }
+            const data = (await response.json()) as { signature_url: string };
+            if (data?.signature_url) {
+                window.open(data.signature_url, '_blank');
+            }
+        } catch (e) {
+            notifications.show({
+                title: 'Preview failed',
+                message: e instanceof Error ? e.message : 'Could not open preview',
+                color: 'red',
+            });
+        } finally {
+            if (isMountedRef.current) {
+                setOpeningPreview(false);
+            }
+        }
+    }
 
     if (loading) {
         return (
@@ -704,58 +959,85 @@ export default function SignaturePageTab() {
 
                     {showLicense && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                License PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your license information.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {licensePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="license-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 License PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {licensePdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={licensePdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: licensePdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'license')}
-                                      accept="application/pdf"
-                                      disabled={uploadingLicense}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingLicense}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {licensePdfUrl ? 'Change License PDF' : 'Upload License PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingLicense && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your{' '}
+                                                license information.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {licensePdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="License PDF preview"
+                                                      src={`${licensePdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={licensePdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'license')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingLicense}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingLicense}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {licensePdfUrl
+                                                                ? 'Change License PDF'
+                                                                : 'Upload License PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingLicense && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -770,58 +1052,85 @@ export default function SignaturePageTab() {
 
                     {showInsurance && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                Insurance PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your insurance information.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {insurancePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="insurance-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 Insurance PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {insurancePdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={insurancePdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: insurancePdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'insurance')}
-                                      accept="application/pdf"
-                                      disabled={uploadingInsurance}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingInsurance}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {insurancePdfUrl ? 'Change Insurance PDF' : 'Upload Insurance PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingInsurance && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your{' '}
+                                                insurance information.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {insurancePdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="Insurance PDF preview"
+                                                      src={`${insurancePdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={insurancePdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'insurance')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingInsurance}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingInsurance}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {insurancePdfUrl
+                                                                ? 'Change Insurance PDF'
+                                                                : 'Upload Insurance PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingInsurance && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -836,58 +1145,82 @@ export default function SignaturePageTab() {
 
                     {showW9 && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                W9 PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your W9 form.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {w9PdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="w9-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 W9 PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {w9PdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={w9PdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: w9PdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'w9')}
-                                      accept="application/pdf"
-                                      disabled={uploadingW9}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingW9}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {w9PdfUrl ? 'Change W9 PDF' : 'Upload W9 PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingW9 && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your W9 form.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {w9PdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="W9 PDF preview"
+                                                      src={`${w9PdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={w9PdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'w9')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingW9}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingW9}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {w9PdfUrl ? 'Change W9 PDF' : 'Upload W9 PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingW9 && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -901,16 +1234,301 @@ export default function SignaturePageTab() {
                     />
 
                     {showAbout && (
-                        <Textarea
-                          label="About Text"
-                          placeholder="Enter information about your company..."
-                          value={aboutText}
-                          onChange={(e) => {
-                                setAboutText(e.target.value);
-                                setHasChanges(true);
-                            }}
-                          minRows={4}
-                        />
+                        <Box>
+                            <TextInput
+                              label="About heading"
+                              placeholder="e.g. About RL Peek Painting"
+                              description="Main title shown at the top of the About section. Leave blank to use “About [Company Name]”."
+                              value={aboutHeading}
+                              onChange={(e) => {
+                                    setAboutHeading(e.target.value);
+                                    setHasChanges(true);
+                                }}
+                              mb="md"
+                            />
+                            <TextInput
+                              label="About subheading"
+                              placeholder="e.g. Summit and Wasatch County painting contractor..."
+                              description="Optional tagline or short description under the heading."
+                              value={aboutSubheading}
+                              onChange={(e) => {
+                                    setAboutSubheading(e.target.value);
+                                    setHasChanges(true);
+                                }}
+                              mb="md"
+                            />
+                            <Text size="sm" fw={500} mb="xs">
+                                About content (text and images)
+                            </Text>
+                            <Text size="xs" c="dimmed" mb="sm">
+                                Add text blocks and images in order.
+                                You can also keep simple text below for backward compatibility.
+                            </Text>
+                            <Stack gap="sm">
+                                {aboutBlocks.map((block, index) => (
+                                    <Paper
+                                      key={index}
+                                      p="md"
+                                      withBorder
+                                      onDragOver={(e) => {
+                                            e.preventDefault();
+                                        }}
+                                      onDrop={() => {
+                                            if (draggingAboutIndex === null) return;
+                                            moveAboutBlock(draggingAboutIndex, index);
+                                            setDraggingAboutIndex(null);
+                                        }}
+                                      style={{
+                                            outline:
+                                                draggingAboutIndex === index
+                                                    ? '2px solid var(--mantine-color-blue-5)'
+                                                    : undefined,
+                                        }}
+                                    >
+                                        <Stack gap="xs">
+                                            {block.type === 'text' ? (
+                                                <>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap="xs" wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Drag to reorder"
+                                                              draggable
+                                                              onDragStart={() => {
+                                                                    setDraggingAboutIndex(index);
+                                                                }}
+                                                              onDragEnd={() => {
+                                                                    setDraggingAboutIndex(null);
+                                                                }}
+                                                              style={{ cursor: 'grab' }}
+                                                            >
+                                                                <IconGripVertical
+                                                                  size={16}
+                                                                  style={{ opacity: 0.7 }}
+                                                                />
+                                                            </ActionIcon>
+                                                            <Text fw={500} size="sm">
+                                                                Text block
+                                                            </Text>
+                                                        </Group>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={
+                                                            () => handleRemoveAboutBlock(index)
+                                                          }
+                                                        >
+                                                            <IconTrash size={14} />
+                                                        </Button>
+                                                    </Group>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap={6} wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move up"
+                                                              disabled={index === 0}
+                                                              onClick={() => {
+                                                                    moveAboutBlockUp(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronUp size={16} />
+                                                            </ActionIcon>
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move down"
+                                                              disabled={
+                                                                    index === aboutBlocks.length - 1
+                                                                }
+                                                              onClick={() => {
+                                                                    moveAboutBlockDown(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronDown size={16} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                        <Text size="xs" c="dimmed">
+                                                            Drag to reorder
+                                                        </Text>
+                                                    </Group>
+                                                    <Text c="dimmed" size="xs">
+                                                        Use the toolbar to format text.
+                                                        Line breaks are preserved.
+                                                    </Text>
+                                                    <RichTextBodyEditor
+                                                      value={block.content || ''}
+                                                      onChange={(nextValue) =>
+                                                          handleAboutBlockContentChange(
+                                                            index,
+                                                            nextValue,
+                                                        )
+                                                      }
+                                                    />
+                                                </>
+                                            ) : (
+                                                <Stack gap="xs">
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap="xs" wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Drag to reorder"
+                                                              draggable
+                                                              onDragStart={() => {
+                                                                    setDraggingAboutIndex(index);
+                                                                }}
+                                                              onDragEnd={() => {
+                                                                    setDraggingAboutIndex(null);
+                                                                }}
+                                                              style={{ cursor: 'grab' }}
+                                                            >
+                                                                <IconGripVertical
+                                                                  size={16}
+                                                                  style={{ opacity: 0.7 }}
+                                                                />
+                                                            </ActionIcon>
+                                                            <Text fw={500} size="sm">
+                                                                Image block
+                                                            </Text>
+                                                        </Group>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={() => {
+                                                                handleRemoveAboutBlock(index);
+                                                            }}
+                                                        >
+                                                            <IconTrash size={14} />
+                                                        </Button>
+                                                    </Group>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap={6} wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move up"
+                                                              disabled={index === 0}
+                                                              onClick={() => {
+                                                                    moveAboutBlockUp(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronUp size={16} />
+                                                            </ActionIcon>
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move down"
+                                                              disabled={
+                                                                    index === aboutBlocks.length - 1
+                                                                }
+                                                              onClick={() => {
+                                                                    moveAboutBlockDown(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronDown size={16} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                        <Text size="xs" c="dimmed">
+                                                            Drag to reorder
+                                                        </Text>
+                                                    </Group>
+                                                    <Group gap="md">
+                                                        <Select
+                                                          label="Image size"
+                                                          size="xs"
+                                                          data={[
+                                                              { value: 'small', label: 'Small (200px)' },
+                                                              { value: 'medium', label: 'Medium (360px)' },
+                                                              { value: 'large', label: 'Large (520px)' },
+                                                              { value: 'full', label: 'Full width' },
+                                                          ]}
+                                                          value={block.size ?? 'full'}
+                                                          onChange={(value) => {
+                                                                handleAboutImageBlockOptionsChange(
+                                                                    index,
+                                                                    { size: (value as AboutBlockImageSize) ?? 'full' }
+                                                                );
+                                                          }}
+                                                          style={{ minWidth: 140 }}
+                                                        />
+                                                        <Select
+                                                          label="Text wrap"
+                                                          size="xs"
+                                                          data={[
+                                                              { value: 'none', label: 'No wrap (block)' },
+                                                              { value: 'left', label: 'Text wraps left' },
+                                                              { value: 'right', label: 'Text wraps right' },
+                                                          ]}
+                                                          value={block.wrap ?? 'none'}
+                                                          onChange={(value) => {
+                                                                handleAboutImageBlockOptionsChange(
+                                                                    index,
+                                                                    { wrap: (value as AboutBlockImageWrap) ?? 'none' }
+                                                                );
+                                                          }}
+                                                          style={{ minWidth: 160 }}
+                                                        />
+                                                    </Group>
+                                                    {block.image_url && (
+                                                        <img
+                                                          src={block.image_url}
+                                                          alt=""
+                                                          style={{
+                                                                maxWidth: 240,
+                                                                maxHeight: 160,
+                                                                objectFit: 'contain',
+                                                                borderRadius: 6,
+                                                            }}
+                                                        />
+                                                    )}
+                                                </Stack>
+                                            )}
+                                        </Stack>
+                                    </Paper>
+                                ))}
+                                <Group gap="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="light"
+                                      leftSection={<IconPlus size={14} />}
+                                      onClick={handleAddAboutTextBlock}
+                                    >
+                                        Add text block
+                                    </Button>
+                                    <FileButton
+                                      onChange={handleAddAboutImageBlock}
+                                      accept="image/*"
+                                    >
+                                        {(props) => (
+                                            <Button
+                                              {...props}
+                                              size="xs"
+                                              variant="light"
+                                              leftSection={<IconPhotoPlus size={14} />}
+                                            >
+                                                Add image
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                </Group>
+                            </Stack>
+                            <Stack gap="xs" mt="md">
+                                <Text fw={500} size="sm">
+                                    Simple about text (fallback if no blocks)
+                                </Text>
+                                <Text c="dimmed" size="xs">
+                                    Or enter a single block of text.
+                                    Leave empty if using blocks above.
+                                </Text>
+                                <Textarea
+                                  placeholder="Enter a single block of text..."
+                                  value={aboutText}
+                                  onChange={(e) => {
+                                        setAboutText(e.target.value);
+                                        setHasChanges(true);
+                                    }}
+                                  minRows={6}
+                                />
+                            </Stack>
+                        </Box>
                     )}
 
                     <Switch
@@ -923,17 +1541,190 @@ export default function SignaturePageTab() {
                     />
 
                     {showPastProjects && (
-                        <NumberInput
-                          label="Number of Past Projects to Display"
-                          description="How many completed projects to show on the signature page"
-                          value={pastProjectsCount}
-                          onChange={(value) => {
-                                setPastProjectsCount(typeof value === 'number' ? value : 5);
-                                setHasChanges(true);
-                            }}
-                          min={1}
-                          max={20}
-                        />
+                        <>
+                            <Switch
+                              label="Use curated portfolio"
+                              description="Show hand-picked projects with images and descriptions instead of auto-pulled completed estimates"
+                              checked={useCuratedPastProjects}
+                              onChange={(e) => {
+                                    setUseCuratedPastProjects(e.currentTarget.checked);
+                                    setHasChanges(true);
+                                }}
+                            />
+                            {useCuratedPastProjects ? (
+                                <Box>
+                                    <Text size="sm" fw={500} mb="xs">
+                                        Curated projects
+                                    </Text>
+                                    <Stack gap="md">
+                                        {pastProjectsCurated.map((project, index) => (
+                                            <Paper key={project.id} p="md" withBorder>
+                                                <Stack gap="xs">
+                                                    <Group justify="space-between">
+                                                        <Text size="sm" fw={500}>
+                                                            Project {index + 1}
+                                                        </Text>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={() =>
+                                                            handleRemoveCuratedProject(index)
+                                                          }
+                                                        >
+                                                            <IconTrash size={14} /> Remove
+                                                        </Button>
+                                                    </Group>
+                                                    <TextInput
+                                                      label="Title"
+                                                      placeholder="Project title"
+                                                      value={project.title || ''}
+                                                      onChange={(e) =>
+                                                          handleCuratedProjectChange(
+                                                              index,
+                                                              'title',
+                                                              e.currentTarget.value
+                                                          )
+                                                      }
+                                                    />
+                                                    <Stack gap="xs">
+                                                        <Text fw={500} size="sm">
+                                                            Description
+                                                        </Text>
+                                                        <Text c="dimmed" size="xs">
+                                                            Use the toolbar to format text.
+                                                            Line breaks are preserved.
+                                                        </Text>
+                                                        <RichTextBodyEditor
+                                                          value={project.description || ''}
+                                                          onChange={(nextValue) =>
+                                                              handleCuratedProjectChange(
+                                                                  index,
+                                                                  'description',
+                                                                  nextValue
+                                                              )
+                                                          }
+                                                        />
+                                                    </Stack>
+                                                    <Stack gap="xs">
+                                                        <Text size="sm" fw={500}>
+                                                            Image gallery
+                                                        </Text>
+                                                        <Text size="xs" c="dimmed">
+                                                            Add multiple images to showcase this
+                                                            project. Shown as a gallery to clients.
+                                                        </Text>
+                                                        {Array.isArray(project.image_urls) &&
+                                                            project.image_urls.length > 0 && (
+                                                            <SimpleGrid
+                                                              cols={{ base: 3, sm: 4, md: 5 }}
+                                                              spacing="sm"
+                                                              verticalSpacing="sm"
+                                                            >
+                                                                {project.image_urls.map(
+                                                                    (url, i) => {
+                                                                        /* eslint-disable max-len */
+                                                                        const removeImage = () => {
+                                                                            handleRemoveCuratedProjectImage(
+                                                                                index,
+                                                                                i
+                                                                            );
+                                                                        };
+                                                                        /* eslint-enable max-len */
+                                                                        return (
+                                                                    <Box
+                                                                      key={i}
+                                                                      pos="relative"
+                                                                      style={{
+                                                                          borderRadius: 8,
+                                                                          overflow: 'hidden',
+                                                                          aspectRatio: '1',
+                                                                      }}
+                                                                    >
+                                                                        <img
+                                                                          src={url}
+                                                                          alt=""
+                                                                          style={{
+                                                                              width: '100%',
+                                                                              height: '100%',
+                                                                              objectFit: 'cover',
+                                                                              display: 'block',
+                                                                          }}
+                                                                        />
+                                                                        <ActionIcon
+                                                                          size="sm"
+                                                                          color="red"
+                                                                          variant="filled"
+                                                                          pos="absolute"
+                                                                          top={4}
+                                                                          right={4}
+                                                                          onClick={removeImage}
+                                                                          aria-label="Remove"
+                                                                        >
+                                                                            <IconTrash size={12} />
+                                                                        </ActionIcon>
+                                                                    </Box>
+                                                                        );
+                                                                    }
+                                                                )}
+                                                            </SimpleGrid>
+                                                        )}
+                                                        <FileButton
+                                                          onChange={(file) =>
+                                                              handleCuratedProjectImageUpload(
+                                                                  index,
+                                                                  file,
+                                                              )
+                                                          }
+                                                          accept="image/*"
+                                                        >
+                                                            {(props) => (
+                                                                <Button
+                                                                  {...props}
+                                                                  size="xs"
+                                                                  variant="light"
+                                                                  leftSection={
+                                                                      <IconPhotoPlus size={14} />
+                                                                  }
+                                                                >
+                                                                    {Array.isArray(
+                                                                        project.image_urls
+                                                                    ) &&
+                                                                    project.image_urls
+                                                                        .length > 0
+                                                                        ? 'Add another image'
+                                                                        : 'Add images to gallery'}
+                                                                </Button>
+                                                            )}
+                                                        </FileButton>
+                                                    </Stack>
+                                                </Stack>
+                                            </Paper>
+                                        ))}
+                                        <Button
+                                          size="sm"
+                                          variant="light"
+                                          leftSection={<IconPlus size={16} />}
+                                          onClick={handleAddCuratedProject}
+                                        >
+                                            Add project
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            ) : (
+                                <NumberInput
+                                  label="Number of Past Projects to Display"
+                                  description="How many completed projects to show on the signature page"
+                                  value={pastProjectsCount}
+                                  onChange={(value) => {
+                                        setPastProjectsCount(typeof value === 'number' ? value : 5);
+                                        setHasChanges(true);
+                                    }}
+                                  min={1}
+                                  max={20}
+                                />
+                            )}
+                        </>
                     )}
 
                     <Divider my="md" />
@@ -942,9 +1733,11 @@ export default function SignaturePageTab() {
                         <Button
                           leftSection={<IconEye size={16} />}
                           variant="light"
-                          onClick={() => setShowPreview(!showPreview)}
+                          onClick={openPreviewInNewTab}
+                          loading={openingPreview}
+                          disabled={openingPreview}
                         >
-                            {showPreview ? 'Hide Preview' : 'Show Preview'}
+                            Preview in new tab
                         </Button>
                         <Button
                           onClick={handleSave}
@@ -956,37 +1749,6 @@ export default function SignaturePageTab() {
                     </Group>
                 </Stack>
             </Card>
-
-            {showPreview && (
-                <Card shadow="sm" padding="lg" withBorder>
-                    <Title order={3} mb="md">
-                        Signature Page Preview
-                    </Title>
-                    <Container size="lg" py="xl" style={{ border: '1px solid #dee2e6', borderRadius: '4px' }}>
-                        <Stack gap="xl">
-                            <Paper shadow="xs" p="md" radius="md" withBorder>
-                                <Title order={3}>{previewData.contractor.name}</Title>
-                                <Text c="dimmed" size="sm">
-                                    {previewData.contractor.email}
-                                </Text>
-                            </Paper>
-
-                            <EstimateSignaturePreview
-                              estimate={previewData.estimate}
-                              imageResources={previewData.imageResources}
-                              videoResources={previewData.videoResources}
-                              lineItems={previewData.lineItems}
-                            />
-
-                            <SignaturePageSections
-                              contractor={previewData.contractor}
-                              signaturePageConfig={previewData.signaturePageConfig}
-                              signatureHash="preview"
-                            />
-                        </Stack>
-                    </Container>
-                </Card>
-            )}
         </Stack>
     );
 }

@@ -29,6 +29,7 @@ import ActionsTab from '@/components/Settings/ActionsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import NotificationsTab from '@/components/Settings/NotificationsTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
+import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
@@ -225,6 +226,17 @@ export default function SettingsPage() {
                     // Preserve signature page config if it exists
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
+                    }),
+                    // Preserve team config if it exists (edited in Settings > Team)
+                    ...(existingConfig?.configuration?.team_lead_painters != null && {
+                        team_lead_painters: existingConfig.configuration.team_lead_painters,
+                    }),
+                    ...(existingConfig?.configuration?.team_production_managers != null && {
+                        team_production_managers:
+                            existingConfig.configuration.team_production_managers,
+                    }),
+                    ...(existingConfig?.configuration?.team_sales_people != null && {
+                        team_sales_people: existingConfig.configuration.team_sales_people,
                     }),
                     // Preserve estimate-received email body
                     // (edited in Settings > Message Templates)
@@ -604,6 +616,8 @@ export default function SettingsPage() {
                                     handleBaseHourlyRateChange(value?.toString() || '')
                                   }
                                 />
+
+                                <TeamTab embedded />
 
                                 <Group justify="flex-end" mt="md">
                                     <Button
