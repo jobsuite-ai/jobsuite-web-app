@@ -67,5 +67,3 @@ export default function SignaturePreviewPage() {
         />
     );
 }
-
-export { SIGNATURE_PREVIEW_STORAGE_KEY };
