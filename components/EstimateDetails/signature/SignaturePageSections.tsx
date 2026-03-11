@@ -16,10 +16,17 @@ import {
     Badge,
 } from '@mantine/core';
 
+export type AboutBlockImageSize = 'small' | 'medium' | 'large' | 'full';
+export type AboutBlockImageWrap = 'none' | 'left' | 'right';
+
 export interface AboutBlock {
     type: 'text' | 'image';
     content?: string;
     image_url?: string;
+    /** Image block: display size. Default 'full' for backward compat. */
+    size?: AboutBlockImageSize;
+    /** Image block: text wrap. Default 'none' for backward compat. */
+    wrap?: AboutBlockImageWrap;
 }
 
 interface SignaturePageSectionsProps {
@@ -249,7 +256,7 @@ export default function SignaturePageSections({
                                 )}
                             </Stack>
                             {hasBlocks ? (
-                                <Stack gap="lg">
+                                <Stack gap="lg" style={{ overflow: 'auto' }}>
                                     {blocks.map((block, index) =>
                                         block.type === 'text' ? (
                                             block.content ? (
@@ -279,25 +286,53 @@ export default function SignaturePageSections({
                                             ) : null
                                         ) : (
                                             block.image_url && (
-                                                <div
-                                                  key={index}
-                                                  style={{
-                                                      width: '100%',
-                                                      maxWidth: '100%',
-                                                      overflow: 'hidden',
-                                                      borderRadius: '8px',
-                                                  }}
-                                                >
-                                                    <img
-                                                      src={block.image_url}
-                                                      alt=""
-                                                      style={{
-                                                          maxWidth: '100%',
-                                                          height: 'auto',
-                                                          display: 'block',
-                                                      }}
-                                                    />
-                                                </div>
+                                                (() => {
+                                                    const size = block.size ?? 'full';
+                                                    const wrap = block.wrap ?? 'none';
+                                                    const maxWidth =
+                                                        size === 'small'
+                                                            ? 200
+                                                            : size === 'medium'
+                                                                ? 360
+                                                                : size === 'large'
+                                                                    ? 520
+                                                                    : undefined;
+                                                    const float =
+                                                        wrap === 'left'
+                                                            ? ('left' as const)
+                                                            : wrap === 'right'
+                                                                ? ('right' as const)
+                                                                : undefined;
+                                                    const margin =
+                                                        wrap === 'left'
+                                                            ? '0 1rem 0.5rem 0'
+                                                            : wrap === 'right'
+                                                                ? '0 0 0.5rem 1rem'
+                                                                : undefined;
+                                                    return (
+                                                        <div
+                                                          key={index}
+                                                          style={{
+                                                              width: float ? undefined : '100%',
+                                                              maxWidth: maxWidth ?? '100%',
+                                                              overflow: 'hidden',
+                                                              borderRadius: '8px',
+                                                              float,
+                                                              margin,
+                                                          }}
+                                                        >
+                                                            <img
+                                                              src={block.image_url}
+                                                              alt=""
+                                                              style={{
+                                                                  maxWidth: '100%',
+                                                                  height: 'auto',
+                                                                  display: 'block',
+                                                              }}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })()
                                             )
                                         )
                                     )}

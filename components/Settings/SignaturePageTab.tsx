@@ -16,6 +16,7 @@ import {
     NumberInput,
     Paper,
     Progress,
+    Select,
     SimpleGrid,
     Stack,
     Switch,
@@ -41,7 +42,11 @@ import {
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
-import type { PastProject } from '@/components/EstimateDetails/signature/SignaturePageSections';
+import type {
+    AboutBlockImageSize,
+    AboutBlockImageWrap,
+    PastProject,
+} from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { AboutBlock } from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { Estimate, EstimateResource, EstimateStatus } from '@/components/Global/model';
 import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
@@ -708,7 +713,7 @@ export default function SignaturePageTab() {
         }
         try {
             const url = await uploadSignatureImage(file);
-            setAboutBlocks((prev) => [...prev, { type: 'image', image_url: url }]);
+            setAboutBlocks((prev) => [...prev, { type: 'image', image_url: url, size: 'full', wrap: 'none' }]);
             setHasChanges(true);
             notifications.show({ title: 'Success', message: 'Image added', color: 'green', icon: <IconCheck size={16} /> });
         } catch (err) {
@@ -757,6 +762,20 @@ export default function SignaturePageTab() {
         setAboutBlocks((prev) => {
             const next = [...prev];
             if (next[index].type === 'text') next[index] = { ...next[index], content };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleAboutImageBlockOptionsChange = (
+        index: number,
+        options: { size?: AboutBlockImageSize; wrap?: AboutBlockImageWrap }
+    ) => {
+        setAboutBlocks((prev) => {
+            const next = [...prev];
+            if (next[index].type === 'image') {
+                next[index] = { ...next[index], ...options };
+            }
             return next;
         });
         setHasChanges(true);
@@ -1410,6 +1429,43 @@ export default function SignaturePageTab() {
                                                         <Text size="xs" c="dimmed">
                                                             Drag to reorder
                                                         </Text>
+                                                    </Group>
+                                                    <Group gap="md">
+                                                        <Select
+                                                          label="Image size"
+                                                          size="xs"
+                                                          data={[
+                                                              { value: 'small', label: 'Small (200px)' },
+                                                              { value: 'medium', label: 'Medium (360px)' },
+                                                              { value: 'large', label: 'Large (520px)' },
+                                                              { value: 'full', label: 'Full width' },
+                                                          ]}
+                                                          value={block.size ?? 'full'}
+                                                          onChange={(value) => {
+                                                                handleAboutImageBlockOptionsChange(
+                                                                    index,
+                                                                    { size: (value as AboutBlockImageSize) ?? 'full' }
+                                                                );
+                                                          }}
+                                                          style={{ minWidth: 140 }}
+                                                        />
+                                                        <Select
+                                                          label="Text wrap"
+                                                          size="xs"
+                                                          data={[
+                                                              { value: 'none', label: 'No wrap (block)' },
+                                                              { value: 'left', label: 'Text wraps left' },
+                                                              { value: 'right', label: 'Text wraps right' },
+                                                          ]}
+                                                          value={block.wrap ?? 'none'}
+                                                          onChange={(value) => {
+                                                                handleAboutImageBlockOptionsChange(
+                                                                    index,
+                                                                    { wrap: (value as AboutBlockImageWrap) ?? 'none' }
+                                                                );
+                                                          }}
+                                                          style={{ minWidth: 160 }}
+                                                        />
                                                     </Group>
                                                     {block.image_url && (
                                                         <img
