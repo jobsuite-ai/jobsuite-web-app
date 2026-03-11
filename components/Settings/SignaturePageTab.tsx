@@ -3,32 +3,44 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+    ActionIcon,
+    Alert,
+    Box,
     Button,
     Card,
-    Group,
-    Stack,
-    Text,
-    Switch,
-    Textarea,
-    NumberInput,
-    FileButton,
-    Box,
     Divider,
-    Alert,
+    FileButton,
+    Group,
     Loader,
+    NumberInput,
     Paper,
-    Title,
-    Container,
     Progress,
+    SimpleGrid,
+    Stack,
+    Switch,
+    Text,
+    Textarea,
+    TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconUpload, IconEye, IconFile } from '@tabler/icons-react';
+import '@mantine/tiptap/styles.css';
+import {
+    IconCheck,
+    IconEye,
+    IconFile,
+    IconPhotoPlus,
+    IconPlus,
+    IconTrash,
+    IconUpload,
+    IconX,
+} from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
-import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
-import SignaturePageSections from '@/components/EstimateDetails/signature/SignaturePageSections';
+import type { PastProject } from '@/components/EstimateDetails/signature/SignaturePageSections';
+import { AboutBlock } from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { Estimate, EstimateResource, EstimateStatus } from '@/components/Global/model';
+import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
 
 interface SignaturePageConfig {
     show_license: boolean;
@@ -43,7 +55,10 @@ interface SignaturePageConfig {
     w9_pdf_url?: string;
     w9_pdf_s3_key?: string;
     about_text: string;
+    about_blocks?: AboutBlock[];
     past_projects_count: number;
+    use_curated_past_projects?: boolean;
+    past_projects_curated?: PastProject[];
 }
 
 interface ContractorConfiguration {
@@ -60,7 +75,6 @@ export default function SignaturePageTab() {
     const [error, setError] = useState<string | null>(null);
     const [configId, setConfigId] = useState<string | null>(null);
     const [hasChanges, setHasChanges] = useState(false);
-    const [showPreview, setShowPreview] = useState(false);
 
     // Signature page configuration state
     const [showLicense, setShowLicense] = useState(false);
@@ -72,7 +86,10 @@ export default function SignaturePageTab() {
     const [insurancePdfUrl, setInsurancePdfUrl] = useState<string | null>(null);
     const [w9PdfUrl, setW9PdfUrl] = useState<string | null>(null);
     const [aboutText, setAboutText] = useState('');
+    const [aboutBlocks, setAboutBlocks] = useState<AboutBlock[]>([]);
     const [pastProjectsCount, setPastProjectsCount] = useState(5);
+    const [useCuratedPastProjects, setUseCuratedPastProjects] = useState(false);
+    const [pastProjectsCurated, setPastProjectsCurated] = useState<PastProject[]>([]);
     const [uploadingLicense, setUploadingLicense] = useState(false);
     const [uploadingInsurance, setUploadingInsurance] = useState(false);
     const [uploadingW9, setUploadingW9] = useState(false);
@@ -138,7 +155,13 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(sigConfig.insurance_pdf_url || null);
                 setW9PdfUrl(sigConfig.w9_pdf_url || null);
                 setAboutText(sigConfig.about_text || '');
+                setAboutBlocks(Array.isArray(sigConfig.about_blocks) ? sigConfig.about_blocks : []);
                 setPastProjectsCount(sigConfig.past_projects_count || 5);
+                setUseCuratedPastProjects(sigConfig.use_curated_past_projects || false);
+                setPastProjectsCurated(
+                    Array.isArray(sigConfig.past_projects_curated) ?
+                    sigConfig.past_projects_curated : []
+                );
             } else {
                 setConfigId(null);
                 // Reset to defaults
@@ -151,7 +174,10 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(null);
                 setW9PdfUrl(null);
                 setAboutText('');
+                setAboutBlocks([]);
                 setPastProjectsCount(5);
+                setUseCuratedPastProjects(false);
+                setPastProjectsCurated([]);
             }
         } catch (err) {
             // eslint-disable-next-line no-console
@@ -206,7 +232,13 @@ export default function SignaturePageTab() {
                         insurance_pdf_url: insurancePdfUrl,
                         w9_pdf_url: w9PdfUrl,
                         about_text: aboutText,
+                        about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
                         past_projects_count: pastProjectsCount,
+                        use_curated_past_projects: useCuratedPastProjects,
+                        past_projects_curated:
+                            useCuratedPastProjects && pastProjectsCurated.length > 0
+                                ? pastProjectsCurated
+                                : undefined,
                     },
                 },
             };
@@ -629,6 +661,123 @@ export default function SignaturePageTab() {
         }
     };
 
+    async function uploadSignatureImage(file: File): Promise<string> {
+        const accessToken = localStorage.getItem('access_token');
+        if (!accessToken) throw new Error('No access token found');
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch('/api/configurations/signature-image', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: formData,
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.message || err.detail || 'Failed to upload image');
+        }
+        const data = await response.json();
+        if (!data.url) throw new Error('No URL returned');
+        return data.url;
+    }
+
+    const handleAddAboutTextBlock = () => {
+        setAboutBlocks((prev) => [...prev, { type: 'text', content: '' }]);
+        setHasChanges(true);
+    };
+
+    const handleAddAboutImageBlock = async (file: File | null) => {
+        if (!file || !file.type.startsWith('image/')) {
+            notifications.show({ title: 'Error', message: 'Please select an image', color: 'red', icon: <IconX size={16} /> });
+            return;
+        }
+        try {
+            const url = await uploadSignatureImage(file);
+            setAboutBlocks((prev) => [...prev, { type: 'image', image_url: url }]);
+            setHasChanges(true);
+            notifications.show({ title: 'Success', message: 'Image added', color: 'green', icon: <IconCheck size={16} /> });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to upload image',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const handleRemoveAboutBlock = (index: number) => {
+        setAboutBlocks((prev) => prev.filter((_, i) => i !== index));
+        setHasChanges(true);
+    };
+
+    const handleAboutBlockContentChange = (index: number, content: string) => {
+        setAboutBlocks((prev) => {
+            const next = [...prev];
+            if (next[index].type === 'text') next[index] = { ...next[index], content };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleAddCuratedProject = () => {
+        setPastProjectsCurated((prev) => [
+            ...prev,
+            { id: `temp-${Date.now()}`, title: '', description: '', image_urls: [] },
+        ]);
+        setHasChanges(true);
+    };
+
+    const handleRemoveCuratedProject = (index: number) => {
+        setPastProjectsCurated((prev) => prev.filter((_, i) => i !== index));
+        setHasChanges(true);
+    };
+
+    const handleCuratedProjectChange = (
+        index: number,
+        field: keyof PastProject,
+        value: string | string[]
+    ) => {
+        setPastProjectsCurated((prev) => {
+            const next = [...prev];
+            next[index] = { ...next[index], [field]: value };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const handleCuratedProjectImageUpload = async (projectIndex: number, file: File | null) => {
+        if (!file || !file.type.startsWith('image/')) return;
+        try {
+            const url = await uploadSignatureImage(file);
+            setPastProjectsCurated((prev) => {
+                const next = [...prev];
+                const urls = next[projectIndex].image_urls || [];
+                next[projectIndex] = { ...next[projectIndex], image_urls: [...urls, url] };
+                return next;
+            });
+            setHasChanges(true);
+            notifications.show({ title: 'Success', message: 'Image added', color: 'green', icon: <IconCheck size={16} /> });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message: err instanceof Error ? err.message : 'Failed to upload image',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
+    };
+
+    const handleRemoveCuratedProjectImage = (projectIndex: number, imageIndex: number) => {
+        setPastProjectsCurated((prev) => {
+            const next = [...prev];
+            const urls = [...(next[projectIndex].image_urls || [])];
+            urls.splice(imageIndex, 1);
+            next[projectIndex] = { ...next[projectIndex], image_urls: urls };
+            return next;
+        });
+        setHasChanges(true);
+    };
+
     // Mock data for preview
     const previewData = {
         contractor: {
@@ -645,7 +794,13 @@ export default function SignaturePageTab() {
             insurance_pdf_url: insurancePdfUrl || undefined,
             w9_pdf_url: w9PdfUrl || undefined,
             about_text: aboutText,
+            about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
             past_projects_count: pastProjectsCount,
+            use_curated_past_projects: useCuratedPastProjects,
+            past_projects_curated:
+                useCuratedPastProjects && pastProjectsCurated.length > 0
+                    ? pastProjectsCurated
+                    : undefined,
         },
         estimate: {
             id: 'preview',
@@ -666,6 +821,40 @@ export default function SignaturePageTab() {
         imageResources: [] as EstimateResource[],
         videoResources: [] as EstimateResource[],
     };
+
+    const SIGNATURE_PREVIEW_STORAGE_KEY = 'signature-page-preview';
+
+    function openPreviewInNewTab() {
+        const linkInfo = {
+            signature_hash: 'preview',
+            estimate_id: 'preview',
+            status: 'PENDING',
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            estimate: previewData.estimate,
+            line_items: previewData.lineItems,
+            resources: [
+                ...previewData.imageResources,
+                ...previewData.videoResources,
+            ],
+            contractor: previewData.contractor,
+            client: null,
+            signature_page_config: previewData.signaturePageConfig,
+            past_projects:
+                previewData.signaturePageConfig.use_curated_past_projects &&
+                previewData.signaturePageConfig.past_projects_curated
+                    ? previewData.signaturePageConfig.past_projects_curated
+                    : undefined,
+            viewer_type: 'client' as const,
+            signatures: [],
+        };
+        if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(
+                SIGNATURE_PREVIEW_STORAGE_KEY,
+                JSON.stringify(linkInfo)
+            );
+            window.open('/sign/preview', '_blank');
+        }
+    }
 
     if (loading) {
         return (
@@ -901,16 +1090,123 @@ export default function SignaturePageTab() {
                     />
 
                     {showAbout && (
-                        <Textarea
-                          label="About Text"
-                          placeholder="Enter information about your company..."
-                          value={aboutText}
-                          onChange={(e) => {
-                                setAboutText(e.target.value);
-                                setHasChanges(true);
-                            }}
-                          minRows={4}
-                        />
+                        <Box>
+                            <Text size="sm" fw={500} mb="xs">
+                                About content (text and images)
+                            </Text>
+                            <Text size="xs" c="dimmed" mb="sm">
+                                Add text blocks and images in order.
+                                You can also keep simple text below for backward compatibility.
+                            </Text>
+                            <Stack gap="sm">
+                                {aboutBlocks.map((block, index) => (
+                                    <Paper key={index} p="md" withBorder>
+                                        <Stack gap="xs">
+                                            {block.type === 'text' ? (
+                                                <>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Text fw={500} size="sm">
+                                                            Text block
+                                                        </Text>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={
+                                                            () => handleRemoveAboutBlock(index)
+                                                          }
+                                                        >
+                                                            <IconTrash size={14} />
+                                                        </Button>
+                                                    </Group>
+                                                    <Text c="dimmed" size="xs">
+                                                        Use the toolbar to format text.
+                                                        Line breaks are preserved.
+                                                    </Text>
+                                                    <RichTextBodyEditor
+                                                      value={block.content || ''}
+                                                      onChange={(nextValue) =>
+                                                          handleAboutBlockContentChange(
+                                                            index,
+                                                            nextValue,
+                                                        )
+                                                      }
+                                                    />
+                                                </>
+                                            ) : (
+                                                <Group justify="space-between" wrap="nowrap">
+                                                    <Stack gap="xs" style={{ flex: 1 }}>
+                                                        {block.image_url && (
+                                                            <img
+                                                              src={block.image_url}
+                                                              alt=""
+                                                              style={{
+                                                                  maxWidth: 200,
+                                                                  maxHeight: 120,
+                                                                  objectFit: 'contain',
+                                                                  borderRadius: 4,
+                                                              }}
+                                                            />
+                                                        )}
+                                                    </Stack>
+                                                    <Button
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      color="red"
+                                                      onClick={() => handleRemoveAboutBlock(index)}
+                                                    >
+                                                        <IconTrash size={14} />
+                                                    </Button>
+                                                </Group>
+                                            )}
+                                        </Stack>
+                                    </Paper>
+                                ))}
+                                <Group gap="xs">
+                                    <Button
+                                      size="xs"
+                                      variant="light"
+                                      leftSection={<IconPlus size={14} />}
+                                      onClick={handleAddAboutTextBlock}
+                                    >
+                                        Add text block
+                                    </Button>
+                                    <FileButton
+                                      onChange={handleAddAboutImageBlock}
+                                      accept="image/*"
+                                    >
+                                        {(props) => (
+                                            <Button
+                                              {...props}
+                                              size="xs"
+                                              variant="light"
+                                              leftSection={<IconPhotoPlus size={14} />}
+                                            >
+                                                Add image
+                                            </Button>
+                                        )}
+                                    </FileButton>
+                                </Group>
+                            </Stack>
+                            <Stack gap="xs" mt="md">
+                                <Text fw={500} size="sm">
+                                    Simple about text (fallback if no blocks)
+                                </Text>
+                                <Text c="dimmed" size="xs">
+                                    Or enter a single block of text.
+                                    Leave empty if using blocks above.
+                                </Text>
+                                <Textarea
+                                  placeholder="Enter a single block of text..."
+                                  value={aboutText}
+                                  onChange={(e) => {
+                                        setAboutText(e.target.value);
+                                        setHasChanges(true);
+                                    }}
+                                  minRows={6}
+                                />
+                            </Stack>
+                        </Box>
                     )}
 
                     <Switch
@@ -923,17 +1219,190 @@ export default function SignaturePageTab() {
                     />
 
                     {showPastProjects && (
-                        <NumberInput
-                          label="Number of Past Projects to Display"
-                          description="How many completed projects to show on the signature page"
-                          value={pastProjectsCount}
-                          onChange={(value) => {
-                                setPastProjectsCount(typeof value === 'number' ? value : 5);
-                                setHasChanges(true);
-                            }}
-                          min={1}
-                          max={20}
-                        />
+                        <>
+                            <Switch
+                              label="Use curated portfolio"
+                              description="Show hand-picked projects with images and descriptions instead of auto-pulled completed estimates"
+                              checked={useCuratedPastProjects}
+                              onChange={(e) => {
+                                    setUseCuratedPastProjects(e.currentTarget.checked);
+                                    setHasChanges(true);
+                                }}
+                            />
+                            {useCuratedPastProjects ? (
+                                <Box>
+                                    <Text size="sm" fw={500} mb="xs">
+                                        Curated projects
+                                    </Text>
+                                    <Stack gap="md">
+                                        {pastProjectsCurated.map((project, index) => (
+                                            <Paper key={project.id} p="md" withBorder>
+                                                <Stack gap="xs">
+                                                    <Group justify="space-between">
+                                                        <Text size="sm" fw={500}>
+                                                            Project {index + 1}
+                                                        </Text>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={() =>
+                                                            handleRemoveCuratedProject(index)
+                                                          }
+                                                        >
+                                                            <IconTrash size={14} /> Remove
+                                                        </Button>
+                                                    </Group>
+                                                    <TextInput
+                                                      label="Title"
+                                                      placeholder="Project title"
+                                                      value={project.title || ''}
+                                                      onChange={(e) =>
+                                                          handleCuratedProjectChange(
+                                                              index,
+                                                              'title',
+                                                              e.currentTarget.value
+                                                          )
+                                                      }
+                                                    />
+                                                    <Stack gap="xs">
+                                                        <Text fw={500} size="sm">
+                                                            Description
+                                                        </Text>
+                                                        <Text c="dimmed" size="xs">
+                                                            Use the toolbar to format text.
+                                                            Line breaks are preserved.
+                                                        </Text>
+                                                        <RichTextBodyEditor
+                                                          value={project.description || ''}
+                                                          onChange={(nextValue) =>
+                                                              handleCuratedProjectChange(
+                                                                  index,
+                                                                  'description',
+                                                                  nextValue
+                                                              )
+                                                          }
+                                                        />
+                                                    </Stack>
+                                                    <Stack gap="xs">
+                                                        <Text size="sm" fw={500}>
+                                                            Image gallery
+                                                        </Text>
+                                                        <Text size="xs" c="dimmed">
+                                                            Add multiple images to showcase this
+                                                            project. Shown as a gallery to clients.
+                                                        </Text>
+                                                        {Array.isArray(project.image_urls) &&
+                                                            project.image_urls.length > 0 && (
+                                                            <SimpleGrid
+                                                              cols={{ base: 3, sm: 4, md: 5 }}
+                                                              spacing="sm"
+                                                              verticalSpacing="sm"
+                                                            >
+                                                                {project.image_urls.map(
+                                                                    (url, i) => {
+                                                                        /* eslint-disable max-len */
+                                                                        const removeImage = () => {
+                                                                            handleRemoveCuratedProjectImage(
+                                                                                index,
+                                                                                i
+                                                                            );
+                                                                        };
+                                                                        /* eslint-enable max-len */
+                                                                        return (
+                                                                    <Box
+                                                                      key={i}
+                                                                      pos="relative"
+                                                                      style={{
+                                                                          borderRadius: 8,
+                                                                          overflow: 'hidden',
+                                                                          aspectRatio: '1',
+                                                                      }}
+                                                                    >
+                                                                        <img
+                                                                          src={url}
+                                                                          alt=""
+                                                                          style={{
+                                                                              width: '100%',
+                                                                              height: '100%',
+                                                                              objectFit: 'cover',
+                                                                              display: 'block',
+                                                                          }}
+                                                                        />
+                                                                        <ActionIcon
+                                                                          size="sm"
+                                                                          color="red"
+                                                                          variant="filled"
+                                                                          pos="absolute"
+                                                                          top={4}
+                                                                          right={4}
+                                                                          onClick={removeImage}
+                                                                          aria-label="Remove"
+                                                                        >
+                                                                            <IconTrash size={12} />
+                                                                        </ActionIcon>
+                                                                    </Box>
+                                                                        );
+                                                                    }
+                                                                )}
+                                                            </SimpleGrid>
+                                                        )}
+                                                        <FileButton
+                                                          onChange={(file) =>
+                                                              handleCuratedProjectImageUpload(
+                                                                  index,
+                                                                  file,
+                                                              )
+                                                          }
+                                                          accept="image/*"
+                                                        >
+                                                            {(props) => (
+                                                                <Button
+                                                                  {...props}
+                                                                  size="xs"
+                                                                  variant="light"
+                                                                  leftSection={
+                                                                      <IconPhotoPlus size={14} />
+                                                                  }
+                                                                >
+                                                                    {Array.isArray(
+                                                                        project.image_urls
+                                                                    ) &&
+                                                                    project.image_urls
+                                                                        .length > 0
+                                                                        ? 'Add another image'
+                                                                        : 'Add images to gallery'}
+                                                                </Button>
+                                                            )}
+                                                        </FileButton>
+                                                    </Stack>
+                                                </Stack>
+                                            </Paper>
+                                        ))}
+                                        <Button
+                                          size="sm"
+                                          variant="light"
+                                          leftSection={<IconPlus size={16} />}
+                                          onClick={handleAddCuratedProject}
+                                        >
+                                            Add project
+                                        </Button>
+                                    </Stack>
+                                </Box>
+                            ) : (
+                                <NumberInput
+                                  label="Number of Past Projects to Display"
+                                  description="How many completed projects to show on the signature page"
+                                  value={pastProjectsCount}
+                                  onChange={(value) => {
+                                        setPastProjectsCount(typeof value === 'number' ? value : 5);
+                                        setHasChanges(true);
+                                    }}
+                                  min={1}
+                                  max={20}
+                                />
+                            )}
+                        </>
                     )}
 
                     <Divider my="md" />
@@ -942,9 +1411,9 @@ export default function SignaturePageTab() {
                         <Button
                           leftSection={<IconEye size={16} />}
                           variant="light"
-                          onClick={() => setShowPreview(!showPreview)}
+                          onClick={openPreviewInNewTab}
                         >
-                            {showPreview ? 'Hide Preview' : 'Show Preview'}
+                            Preview in new tab
                         </Button>
                         <Button
                           onClick={handleSave}
@@ -956,37 +1425,6 @@ export default function SignaturePageTab() {
                     </Group>
                 </Stack>
             </Card>
-
-            {showPreview && (
-                <Card shadow="sm" padding="lg" withBorder>
-                    <Title order={3} mb="md">
-                        Signature Page Preview
-                    </Title>
-                    <Container size="lg" py="xl" style={{ border: '1px solid #dee2e6', borderRadius: '4px' }}>
-                        <Stack gap="xl">
-                            <Paper shadow="xs" p="md" radius="md" withBorder>
-                                <Title order={3}>{previewData.contractor.name}</Title>
-                                <Text c="dimmed" size="sm">
-                                    {previewData.contractor.email}
-                                </Text>
-                            </Paper>
-
-                            <EstimateSignaturePreview
-                              estimate={previewData.estimate}
-                              imageResources={previewData.imageResources}
-                              videoResources={previewData.videoResources}
-                              lineItems={previewData.lineItems}
-                            />
-
-                            <SignaturePageSections
-                              contractor={previewData.contractor}
-                              signaturePageConfig={previewData.signaturePageConfig}
-                              signatureHash="preview"
-                            />
-                        </Stack>
-                    </Container>
-                </Card>
-            )}
         </Stack>
     );
 }
