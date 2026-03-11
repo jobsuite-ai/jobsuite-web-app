@@ -254,7 +254,14 @@ export default function SignaturePageSections({
                                 )}
                             </Stack>
                             {hasBlocks ? (
-                                <Stack gap="lg" style={{ overflow: 'auto' }}>
+                                <Box
+                                  style={{
+                                      overflow: 'auto',
+                                      lineHeight: 1.7,
+                                      color: 'var(--mantine-color-dark-6)',
+                                      fontSize: 'var(--mantine-font-size-md)',
+                                  }}
+                                >
                                     {blocks.map((block, index) =>
                                         block.type === 'text' ? (
                                             block.content ? (
@@ -263,23 +270,22 @@ export default function SignaturePageSections({
                                                       key={index}
                                                       className="signature-about-block-content"
                                                       style={{
-                                                          fontSize: 'var(--mantine-font-size-md)',
-                                                          lineHeight: 1.7,
-                                                          color: 'var(--mantine-color-dark-6)',
+                                                          marginBottom: '1rem',
                                                       }}
                                                       dangerouslySetInnerHTML={{
                                                           __html: block.content,
                                                       }}
                                                     />
                                                 ) : (
-                                                    <Text
+                                                    <div
                                                       key={index}
-                                                      size="md"
-                                                      style={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}
-                                                      c="dark.6"
+                                                      style={{
+                                                          marginBottom: '1rem',
+                                                          whiteSpace: 'pre-line',
+                                                      }}
                                                     >
                                                         {block.content}
-                                                    </Text>
+                                                    </div>
                                                 )
                                             ) : null
                                         ) : (
@@ -303,10 +309,11 @@ export default function SignaturePageSections({
                                                                 : undefined;
                                                     const margin =
                                                         wrap === 'left'
-                                                            ? '0 1rem 0.5rem 0'
+                                                            ? '0 1rem 1rem 0'
                                                             : wrap === 'right'
-                                                                ? '0 0 0.5rem 1rem'
+                                                                ? '0 0 1rem 1rem'
                                                                 : undefined;
+                                                    const isFullWidth = !float;
                                                     return (
                                                         <div
                                                           key={index}
@@ -317,6 +324,8 @@ export default function SignaturePageSections({
                                                               borderRadius: '8px',
                                                               float,
                                                               margin,
+                                                              marginBottom: '1rem',
+                                                              clear: isFullWidth ? 'both' : undefined,
                                                           }}
                                                         >
                                                             <img
@@ -334,7 +343,8 @@ export default function SignaturePageSections({
                                             )
                                         )
                                     )}
-                                </Stack>
+                                    <div style={{ clear: 'both' }} />
+                                </Box>
                             ) : (
                                 <Text
                                   size="md"
