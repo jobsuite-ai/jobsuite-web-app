@@ -60,6 +60,8 @@ export interface SignatureLinkInfo {
         w9_pdf_url?: string;
         about_text: string;
         about_blocks?: Array<{ type: 'text' | 'image'; content?: string; image_url?: string }>;
+        about_heading?: string;
+        about_subheading?: string;
         past_projects_count: number;
         use_curated_past_projects?: boolean;
         past_projects_curated?: PastProject[];

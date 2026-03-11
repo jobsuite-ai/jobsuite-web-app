@@ -59,6 +59,8 @@ interface SignaturePageConfig {
     w9_pdf_url?: string;
     w9_pdf_s3_key?: string;
     about_text: string;
+    about_heading?: string;
+    about_subheading?: string;
     about_blocks?: AboutBlock[];
     past_projects_count: number;
     use_curated_past_projects?: boolean;
@@ -90,6 +92,8 @@ export default function SignaturePageTab() {
     const [insurancePdfUrl, setInsurancePdfUrl] = useState<string | null>(null);
     const [w9PdfUrl, setW9PdfUrl] = useState<string | null>(null);
     const [aboutText, setAboutText] = useState('');
+    const [aboutHeading, setAboutHeading] = useState('');
+    const [aboutSubheading, setAboutSubheading] = useState('');
     const [aboutBlocks, setAboutBlocks] = useState<AboutBlock[]>([]);
     const [pastProjectsCount, setPastProjectsCount] = useState(5);
     const [useCuratedPastProjects, setUseCuratedPastProjects] = useState(false);
@@ -161,6 +165,8 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(sigConfig.insurance_pdf_url || null);
                 setW9PdfUrl(sigConfig.w9_pdf_url || null);
                 setAboutText(sigConfig.about_text || '');
+                setAboutHeading(sigConfig.about_heading || '');
+                setAboutSubheading(sigConfig.about_subheading || '');
                 setAboutBlocks(Array.isArray(sigConfig.about_blocks) ? sigConfig.about_blocks : []);
                 setPastProjectsCount(sigConfig.past_projects_count || 5);
                 setUseCuratedPastProjects(sigConfig.use_curated_past_projects || false);
@@ -180,6 +186,8 @@ export default function SignaturePageTab() {
                 setInsurancePdfUrl(null);
                 setW9PdfUrl(null);
                 setAboutText('');
+                setAboutHeading('');
+                setAboutSubheading('');
                 setAboutBlocks([]);
                 setPastProjectsCount(5);
                 setUseCuratedPastProjects(false);
@@ -238,6 +246,8 @@ export default function SignaturePageTab() {
                         insurance_pdf_url: insurancePdfUrl,
                         w9_pdf_url: w9PdfUrl,
                         about_text: aboutText,
+                        about_heading: aboutHeading || undefined,
+                        about_subheading: aboutSubheading || undefined,
                         about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
                         past_projects_count: pastProjectsCount,
                         use_curated_past_projects: useCuratedPastProjects,
@@ -827,6 +837,8 @@ export default function SignaturePageTab() {
             insurance_pdf_url: insurancePdfUrl || undefined,
             w9_pdf_url: w9PdfUrl || undefined,
             about_text: aboutText,
+            about_heading: aboutHeading || undefined,
+            about_subheading: aboutSubheading || undefined,
             about_blocks: aboutBlocks.length > 0 ? aboutBlocks : undefined,
             past_projects_count: pastProjectsCount,
             use_curated_past_projects: useCuratedPastProjects,
@@ -1204,6 +1216,28 @@ export default function SignaturePageTab() {
 
                     {showAbout && (
                         <Box>
+                            <TextInput
+                              label="About heading"
+                              placeholder="e.g. About RL Peek Painting"
+                              description="Main title shown at the top of the About section. Leave blank to use “About [Company Name]”."
+                              value={aboutHeading}
+                              onChange={(e) => {
+                                    setAboutHeading(e.target.value);
+                                    setHasChanges(true);
+                                }}
+                              mb="md"
+                            />
+                            <TextInput
+                              label="About subheading"
+                              placeholder="e.g. Summit and Wasatch County painting contractor..."
+                              description="Optional tagline or short description under the heading."
+                              value={aboutSubheading}
+                              onChange={(e) => {
+                                    setAboutSubheading(e.target.value);
+                                    setHasChanges(true);
+                                }}
+                              mb="md"
+                            />
                             <Text size="sm" fw={500} mb="xs">
                                 About content (text and images)
                             </Text>
