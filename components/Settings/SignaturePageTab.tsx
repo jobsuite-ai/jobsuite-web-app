@@ -94,6 +94,7 @@ export default function SignaturePageTab() {
     const [uploadingInsurance, setUploadingInsurance] = useState(false);
     const [uploadingW9, setUploadingW9] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [openingPreview, setOpeningPreview] = useState(false);
     const isMountedRef = useRef(true);
 
     useEffect(() => {
@@ -822,37 +823,39 @@ export default function SignaturePageTab() {
         videoResources: [] as EstimateResource[],
     };
 
-    const SIGNATURE_PREVIEW_STORAGE_KEY = 'signature-page-preview';
-
-    function openPreviewInNewTab() {
-        const linkInfo = {
-            signature_hash: 'preview',
-            estimate_id: 'preview',
-            status: 'PENDING',
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-            estimate: previewData.estimate,
-            line_items: previewData.lineItems,
-            resources: [
-                ...previewData.imageResources,
-                ...previewData.videoResources,
-            ],
-            contractor: previewData.contractor,
-            client: null,
-            signature_page_config: previewData.signaturePageConfig,
-            past_projects:
-                previewData.signaturePageConfig.use_curated_past_projects &&
-                previewData.signaturePageConfig.past_projects_curated
-                    ? previewData.signaturePageConfig.past_projects_curated
-                    : undefined,
-            viewer_type: 'client' as const,
-            signatures: [],
-        };
-        if (typeof window !== 'undefined') {
-            window.sessionStorage.setItem(
-                SIGNATURE_PREVIEW_STORAGE_KEY,
-                JSON.stringify(linkInfo)
-            );
-            window.open('/sign/preview', '_blank');
+    async function openPreviewInNewTab() {
+        setOpeningPreview(true);
+        try {
+            const response = await fetch('/api/signature/ensure-preview-link', {
+                method: 'POST',
+                headers: getApiHeaders(),
+                body: JSON.stringify({
+                    signature_page_config: previewData.signaturePageConfig,
+                }),
+            });
+            if (!response.ok) {
+                const err = await response.json().catch(() => ({}));
+                notifications.show({
+                    title: 'Preview failed',
+                    message: err.error || 'Could not open preview',
+                    color: 'red',
+                });
+                return;
+            }
+            const data = (await response.json()) as { signature_url: string };
+            if (data?.signature_url) {
+                window.open(data.signature_url, '_blank');
+            }
+        } catch (e) {
+            notifications.show({
+                title: 'Preview failed',
+                message: e instanceof Error ? e.message : 'Could not open preview',
+                color: 'red',
+            });
+        } finally {
+            if (isMountedRef.current) {
+                setOpeningPreview(false);
+            }
         }
     }
 
@@ -1412,6 +1415,8 @@ export default function SignaturePageTab() {
                           leftSection={<IconEye size={16} />}
                           variant="light"
                           onClick={openPreviewInNewTab}
+                          loading={openingPreview}
+                          disabled={openingPreview}
                         >
                             Preview in new tab
                         </Button>
