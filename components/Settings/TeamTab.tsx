@@ -12,6 +12,7 @@ import {
     TextInput,
     Loader,
     Alert,
+    Divider,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
@@ -65,10 +66,10 @@ function ListEditor({
     };
 
     return (
-        <Card padding="md" withBorder style={{ backgroundColor: '#2a3a54' }} radius="md">
+        <Card padding="md" withBorder radius="md">
             <Stack gap="sm">
                 <div>
-                    <Text fw={600} c="gray.0">
+                    <Text fw={600}>
                         {label}
                     </Text>
                     <Text c="dimmed" size="sm">
@@ -78,7 +79,7 @@ function ListEditor({
                 <Group gap="xs" wrap="wrap">
                     {items.map((name, index) => (
                         <Group key={`${name}-${index}`} gap={4} className="badge-like">
-                            <Text size="sm" c="gray.0">
+                            <Text size="sm">
                                 {name}
                             </Text>
                             <ActionIcon
@@ -101,7 +102,6 @@ function ListEditor({
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
                       size="sm"
                       style={{ flex: 1, maxWidth: 240 }}
-                      styles={{ input: { backgroundColor: '#1a2a44', color: '#fff' } }}
                     />
                     <Button size="sm" leftSection={<IconPlus size={14} />} onClick={add} variant="light">
                         Add
@@ -112,7 +112,7 @@ function ListEditor({
     );
 }
 
-export default function TeamTab() {
+export default function TeamTab({ embedded = false }: { embedded?: boolean }) {
     const [configId, setConfigId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -263,53 +263,66 @@ export default function TeamTab() {
         );
     }
 
+    const content = (
+        <Stack gap="md">
+            <div>
+                <Text fw={600} size="lg" mb="xs">
+                    Team Configuration
+                </Text>
+                <Text c="dimmed" size="sm">
+                    Configure lead painters, production managers, and sales people.
+                    These options will appear as dropdowns when editing estimate details.
+                </Text>
+            </div>
+
+            {error && (
+                <Alert color="red" title="Error">
+                    {error}
+                </Alert>
+            )}
+
+            <ListEditor
+              label="Lead painters"
+              description="Crew leads / job crew leads shown in estimate sidebar and completion forms."
+              items={leadPainters}
+              onChange={setLeadPainters}
+              placeholder="e.g. John Smith"
+            />
+            <ListEditor
+              label="Production managers"
+              description="Production managers available in the estimate details sidebar."
+              items={productionManagers}
+              onChange={setProductionManagers}
+              placeholder="e.g. Jane Doe"
+            />
+            <ListEditor
+              label="Sales people"
+              description="Sales people available in the estimate details sidebar."
+              items={salesPeople}
+              onChange={setSalesPeople}
+              placeholder="e.g. Bob Wilson"
+            />
+
+            <Group justify="flex-end" mt="md">
+                <Button onClick={handleSave} loading={saving} disabled={saving} variant={embedded ? 'outline' : 'filled'}>
+                    Save team configuration
+                </Button>
+            </Group>
+        </Stack>
+    );
+
+    if (embedded) {
+        return (
+            <>
+                <Divider my="md" />
+                {content}
+            </>
+        );
+    }
+
     return (
         <Card shadow="sm" padding="lg" withBorder>
-            <Stack gap="md">
-                <div>
-                    <Text fw={600} size="lg" mb="xs">
-                        Team Configuration
-                    </Text>
-                    <Text c="dimmed" size="sm">
-                        Configure lead painters, production managers, and sales people.
-                        These options will appear as dropdowns when editing estimate details.
-                    </Text>
-                </div>
-
-                {error && (
-                    <Alert color="red" title="Error">
-                        {error}
-                    </Alert>
-                )}
-
-                <ListEditor
-                  label="Lead painters"
-                  description="Crew leads / job crew leads shown in estimate sidebar and completion forms."
-                  items={leadPainters}
-                  onChange={setLeadPainters}
-                  placeholder="e.g. John Smith"
-                />
-                <ListEditor
-                  label="Production managers"
-                  description="Production managers available in the estimate details sidebar."
-                  items={productionManagers}
-                  onChange={setProductionManagers}
-                  placeholder="e.g. Jane Doe"
-                />
-                <ListEditor
-                  label="Sales people"
-                  description="Sales people available in the estimate details sidebar."
-                  items={salesPeople}
-                  onChange={setSalesPeople}
-                  placeholder="e.g. Bob Wilson"
-                />
-
-                <Group justify="flex-end" mt="md">
-                    <Button onClick={handleSave} loading={saving} disabled={saving}>
-                        Save team configuration
-                    </Button>
-                </Group>
-            </Stack>
+            {content}
         </Card>
     );
 }
