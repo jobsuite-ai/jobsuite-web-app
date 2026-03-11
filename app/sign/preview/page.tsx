@@ -21,7 +21,9 @@ export default function SignaturePreviewPage() {
                 ? window.sessionStorage.getItem(SIGNATURE_PREVIEW_STORAGE_KEY)
                 : null;
             if (!raw) {
-                setError('No preview data found. Go to Settings > Signature page and click "Preview in new tab".');
+                setError(
+                    'Preview is opened from Settings. Go to Settings → Signature page and click "Preview in new tab".'
+                );
                 return;
             }
             const data = JSON.parse(raw) as SignatureLinkInfo;
