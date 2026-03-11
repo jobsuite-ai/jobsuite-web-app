@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { Card, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import { Card, Box, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
 
 export interface AboutBlock {
     type: 'text' | 'image';
@@ -217,7 +217,14 @@ export default function SignaturePageSections({
                     const subheading =
                         signaturePageConfig.about_subheading?.trim() || null;
                     return (
-                        <Stack gap="lg" style={{ maxWidth: '720px' }}>
+                        <Box
+                          style={{
+                                display: 'flex',
+                                justifyContent: 'center',
+                                width: '100%',
+                            }}
+                        >
+                            <Stack gap="lg" style={{ maxWidth: '720px', width: '100%' }}>
                             <Stack gap="xs">
                                 <Title order={2} fw={700} size="h3" style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                                     {heading}
@@ -291,7 +298,8 @@ export default function SignaturePageSections({
                                     {signaturePageConfig.about_text}
                                 </Text>
                             )}
-                        </Stack>
+                            </Stack>
+                        </Box>
                     );
                 })()}
 
