@@ -479,7 +479,6 @@ export default function SettingsPage() {
             >
                 <Tabs.List>
                     <Tabs.Tab value="contractor-config">Contractor Configuration</Tabs.Tab>
-                    <Tabs.Tab value="team">Team</Tabs.Tab>
                     <Tabs.Tab value="notifications">Notifications</Tabs.Tab>
                     <Tabs.Tab value="actions">Actions</Tabs.Tab>
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
@@ -618,6 +617,8 @@ export default function SettingsPage() {
                                   }
                                 />
 
+                                <TeamTab embedded />
+
                                 <Group justify="flex-end" mt="md">
                                     <Button
                                       onClick={handleSave}
@@ -630,10 +631,6 @@ export default function SettingsPage() {
                             </Stack>
                         )}
                     </Card>
-                </Tabs.Panel>
-
-                <Tabs.Panel value="team" pt="md">
-                    <TeamTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="signature-page" pt="md">

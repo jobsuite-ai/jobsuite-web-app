@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
     ActionIcon,
     Alert,
+    Accordion,
     Box,
     Button,
     Card,
@@ -26,8 +27,11 @@ import { notifications } from '@mantine/notifications';
 import '@mantine/tiptap/styles.css';
 import {
     IconCheck,
+    IconChevronDown,
+    IconChevronUp,
     IconEye,
     IconFile,
+    IconGripVertical,
     IconPhotoPlus,
     IconPlus,
     IconTrash,
@@ -96,6 +100,7 @@ export default function SignaturePageTab() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [openingPreview, setOpeningPreview] = useState(false);
     const isMountedRef = useRef(true);
+    const [draggingAboutIndex, setDraggingAboutIndex] = useState<number | null>(null);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -711,6 +716,33 @@ export default function SignaturePageTab() {
         setHasChanges(true);
     };
 
+    const moveAboutBlock = (fromIndex: number, toIndex: number) => {
+        setAboutBlocks((prev) => {
+            if (
+                fromIndex < 0 ||
+                toIndex < 0 ||
+                fromIndex >= prev.length ||
+                toIndex >= prev.length ||
+                fromIndex === toIndex
+            ) {
+                return prev;
+            }
+            const next = [...prev];
+            const [moved] = next.splice(fromIndex, 1);
+            next.splice(toIndex, 0, moved);
+            return next;
+        });
+        setHasChanges(true);
+    };
+
+    const moveAboutBlockUp = (index: number) => {
+        moveAboutBlock(index, index - 1);
+    };
+
+    const moveAboutBlockDown = (index: number) => {
+        moveAboutBlock(index, index + 1);
+    };
+
     const handleAboutBlockContentChange = (index: number, content: string) => {
         setAboutBlocks((prev) => {
             const next = [...prev];
@@ -896,58 +928,85 @@ export default function SignaturePageTab() {
 
                     {showLicense && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                License PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your license information.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {licensePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="license-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 License PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {licensePdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={licensePdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: licensePdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'license')}
-                                      accept="application/pdf"
-                                      disabled={uploadingLicense}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingLicense}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {licensePdfUrl ? 'Change License PDF' : 'Upload License PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingLicense && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your{' '}
+                                                license information.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {licensePdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="License PDF preview"
+                                                      src={`${licensePdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={licensePdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'license')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingLicense}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingLicense}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {licensePdfUrl
+                                                                ? 'Change License PDF'
+                                                                : 'Upload License PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingLicense && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -962,58 +1021,85 @@ export default function SignaturePageTab() {
 
                     {showInsurance && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                Insurance PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your insurance information.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {insurancePdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="insurance-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 Insurance PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {insurancePdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={insurancePdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: insurancePdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'insurance')}
-                                      accept="application/pdf"
-                                      disabled={uploadingInsurance}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingInsurance}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {insurancePdfUrl ? 'Change Insurance PDF' : 'Upload Insurance PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingInsurance && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your{' '}
+                                                insurance information.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {insurancePdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="Insurance PDF preview"
+                                                      src={`${insurancePdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={insurancePdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'insurance')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingInsurance}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingInsurance}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {insurancePdfUrl
+                                                                ? 'Change Insurance PDF'
+                                                                : 'Upload Insurance PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingInsurance && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -1028,58 +1114,82 @@ export default function SignaturePageTab() {
 
                     {showW9 && (
                         <Box>
-                            <Text size="sm" fw={500} mb="xs">
-                                W9 PDF
-                            </Text>
-                            <Text size="xs" c="dimmed" mb="md">
-                                Upload a PDF document containing your W9 form.
-                                Max file size: 50MB.
-                            </Text>
-                            <Group gap="md" align="flex-start" wrap="nowrap">
-                                {w9PdfUrl && (
-                                    <Paper p="sm" withBorder style={{ minWidth: 180, maxWidth: 200 }}>
-                                        <Group gap="xs" wrap="nowrap">
-                                            <IconFile size={24} color="red" />
-                                            <Text size="sm" truncate style={{ flex: 1 }}>
+                            <Accordion variant="contained">
+                                <Accordion.Item value="w9-pdf">
+                                    <Accordion.Control icon={<IconFile size={16} />}>
+                                        <Group justify="space-between" wrap="nowrap" style={{ width: '100%' }}>
+                                            <Text size="sm" fw={500}>
                                                 W9 PDF
                                             </Text>
+                                            <Text size="xs" c="dimmed">
+                                                {w9PdfUrl ? 'Uploaded' : 'Not uploaded'}
+                                            </Text>
                                         </Group>
-                                        <Button
-                                          component="a"
-                                          href={w9PdfUrl}
-                                          target="_blank"
-                                          size="xs"
-                                          variant="subtle"
-                                          mt="xs"
-                                          fullWidth
-                                        >
-                                            View PDF
-                                        </Button>
-                                    </Paper>
-                                )}
-                                <Stack gap="xs" style={{ flex: w9PdfUrl ? 0 : 1, minWidth: 200 }}>
-                                    <FileButton
-                                      onChange={(file) => handlePdfUpload(file, 'w9')}
-                                      accept="application/pdf"
-                                      disabled={uploadingW9}
-                                    >
-                                        {(props) => (
-                                            <Button
-                                              {...props}
-                                              leftSection={<IconUpload size={16} />}
-                                              loading={uploadingW9}
-                                              variant="outline"
-                                              fullWidth
-                                            >
-                                                {w9PdfUrl ? 'Change W9 PDF' : 'Upload W9 PDF'}
-                                            </Button>
-                                        )}
-                                    </FileButton>
-                                    {uploadingW9 && uploadProgress > 0 && (
-                                        <Progress value={uploadProgress} size="sm" />
-                                    )}
-                                </Stack>
-                            </Group>
+                                    </Accordion.Control>
+                                    <Accordion.Panel>
+                                        <Stack gap={2} mb="md">
+                                            <Text size="xs" c="dimmed">
+                                                Upload a PDF document containing your W9 form.
+                                            </Text>
+                                            <Text size="xs" c="dimmed">
+                                                Max file size: 50MB.
+                                            </Text>
+                                        </Stack>
+                                        <Stack gap="sm">
+                                            {w9PdfUrl && (
+                                                <Paper p="sm" withBorder>
+                                                    <Text size="xs" c="dimmed" mb="xs">
+                                                        Preview
+                                                    </Text>
+                                                    <iframe
+                                                      title="W9 PDF preview"
+                                                      src={`${w9PdfUrl}#page=1&view=FitH`}
+                                                      style={{
+                                                            width: '100%',
+                                                            height: 240,
+                                                            border: 'none',
+                                                            borderRadius: 6,
+                                                        }}
+                                                    />
+                                                    <Button
+                                                      component="a"
+                                                      href={w9PdfUrl}
+                                                      target="_blank"
+                                                      size="xs"
+                                                      variant="subtle"
+                                                      mt="xs"
+                                                      fullWidth
+                                                    >
+                                                        Open PDF in new tab
+                                                    </Button>
+                                                </Paper>
+                                            )}
+                                            <Stack gap="xs" style={{ minWidth: 200 }}>
+                                                <FileButton
+                                                  onChange={(file) => handlePdfUpload(file, 'w9')}
+                                                  accept="application/pdf"
+                                                  disabled={uploadingW9}
+                                                >
+                                                    {(props) => (
+                                                        <Button
+                                                          {...props}
+                                                          leftSection={<IconUpload size={16} />}
+                                                          loading={uploadingW9}
+                                                          variant="outline"
+                                                          fullWidth
+                                                        >
+                                                            {w9PdfUrl ? 'Change W9 PDF' : 'Upload W9 PDF'}
+                                                        </Button>
+                                                    )}
+                                                </FileButton>
+                                                {uploadingW9 && uploadProgress > 0 && (
+                                                    <Progress value={uploadProgress} size="sm" />
+                                                )}
+                                            </Stack>
+                                        </Stack>
+                                    </Accordion.Panel>
+                                </Accordion.Item>
+                            </Accordion>
                         </Box>
                     )}
 
@@ -1103,14 +1213,51 @@ export default function SignaturePageTab() {
                             </Text>
                             <Stack gap="sm">
                                 {aboutBlocks.map((block, index) => (
-                                    <Paper key={index} p="md" withBorder>
+                                    <Paper
+                                      key={index}
+                                      p="md"
+                                      withBorder
+                                      onDragOver={(e) => {
+                                            e.preventDefault();
+                                        }}
+                                      onDrop={() => {
+                                            if (draggingAboutIndex === null) return;
+                                            moveAboutBlock(draggingAboutIndex, index);
+                                            setDraggingAboutIndex(null);
+                                        }}
+                                      style={{
+                                            outline:
+                                                draggingAboutIndex === index
+                                                    ? '2px solid var(--mantine-color-blue-5)'
+                                                    : undefined,
+                                        }}
+                                    >
                                         <Stack gap="xs">
                                             {block.type === 'text' ? (
                                                 <>
                                                     <Group justify="space-between" wrap="nowrap">
-                                                        <Text fw={500} size="sm">
-                                                            Text block
-                                                        </Text>
+                                                        <Group gap="xs" wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Drag to reorder"
+                                                              draggable
+                                                              onDragStart={() => {
+                                                                    setDraggingAboutIndex(index);
+                                                                }}
+                                                              onDragEnd={() => {
+                                                                    setDraggingAboutIndex(null);
+                                                                }}
+                                                              style={{ cursor: 'grab' }}
+                                                            >
+                                                                <IconGripVertical
+                                                                  size={16}
+                                                                  style={{ opacity: 0.7 }}
+                                                                />
+                                                            </ActionIcon>
+                                                            <Text fw={500} size="sm">
+                                                                Text block
+                                                            </Text>
+                                                        </Group>
                                                         <Button
                                                           size="xs"
                                                           variant="subtle"
@@ -1121,6 +1268,35 @@ export default function SignaturePageTab() {
                                                         >
                                                             <IconTrash size={14} />
                                                         </Button>
+                                                    </Group>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap={6} wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move up"
+                                                              disabled={index === 0}
+                                                              onClick={() => {
+                                                                    moveAboutBlockUp(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronUp size={16} />
+                                                            </ActionIcon>
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move down"
+                                                              disabled={
+                                                                    index === aboutBlocks.length - 1
+                                                                }
+                                                              onClick={() => {
+                                                                    moveAboutBlockDown(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronDown size={16} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                        <Text size="xs" c="dimmed">
+                                                            Drag to reorder
+                                                        </Text>
                                                     </Group>
                                                     <Text c="dimmed" size="xs">
                                                         Use the toolbar to format text.
@@ -1137,30 +1313,83 @@ export default function SignaturePageTab() {
                                                     />
                                                 </>
                                             ) : (
-                                                <Group justify="space-between" wrap="nowrap">
-                                                    <Stack gap="xs" style={{ flex: 1 }}>
-                                                        {block.image_url && (
-                                                            <img
-                                                              src={block.image_url}
-                                                              alt=""
-                                                              style={{
-                                                                  maxWidth: 200,
-                                                                  maxHeight: 120,
-                                                                  objectFit: 'contain',
-                                                                  borderRadius: 4,
-                                                              }}
-                                                            />
-                                                        )}
-                                                    </Stack>
-                                                    <Button
-                                                      size="xs"
-                                                      variant="subtle"
-                                                      color="red"
-                                                      onClick={() => handleRemoveAboutBlock(index)}
-                                                    >
-                                                        <IconTrash size={14} />
-                                                    </Button>
-                                                </Group>
+                                                <Stack gap="xs">
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap="xs" wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Drag to reorder"
+                                                              draggable
+                                                              onDragStart={() => {
+                                                                    setDraggingAboutIndex(index);
+                                                                }}
+                                                              onDragEnd={() => {
+                                                                    setDraggingAboutIndex(null);
+                                                                }}
+                                                              style={{ cursor: 'grab' }}
+                                                            >
+                                                                <IconGripVertical
+                                                                  size={16}
+                                                                  style={{ opacity: 0.7 }}
+                                                                />
+                                                            </ActionIcon>
+                                                            <Text fw={500} size="sm">
+                                                                Image block
+                                                            </Text>
+                                                        </Group>
+                                                        <Button
+                                                          size="xs"
+                                                          variant="subtle"
+                                                          color="red"
+                                                          onClick={() => {
+                                                                handleRemoveAboutBlock(index);
+                                                            }}
+                                                        >
+                                                            <IconTrash size={14} />
+                                                        </Button>
+                                                    </Group>
+                                                    <Group justify="space-between" wrap="nowrap">
+                                                        <Group gap={6} wrap="nowrap">
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move up"
+                                                              disabled={index === 0}
+                                                              onClick={() => {
+                                                                    moveAboutBlockUp(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronUp size={16} />
+                                                            </ActionIcon>
+                                                            <ActionIcon
+                                                              variant="subtle"
+                                                              aria-label="Move down"
+                                                              disabled={
+                                                                    index === aboutBlocks.length - 1
+                                                                }
+                                                              onClick={() => {
+                                                                    moveAboutBlockDown(index);
+                                                                }}
+                                                            >
+                                                                <IconChevronDown size={16} />
+                                                            </ActionIcon>
+                                                        </Group>
+                                                        <Text size="xs" c="dimmed">
+                                                            Drag to reorder
+                                                        </Text>
+                                                    </Group>
+                                                    {block.image_url && (
+                                                        <img
+                                                          src={block.image_url}
+                                                          alt=""
+                                                          style={{
+                                                                maxWidth: 240,
+                                                                maxHeight: 160,
+                                                                objectFit: 'contain',
+                                                                borderRadius: 6,
+                                                            }}
+                                                        />
+                                                    )}
+                                                </Stack>
                                             )}
                                         </Stack>
                                     </Paper>

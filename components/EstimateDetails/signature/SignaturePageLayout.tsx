@@ -6,7 +6,9 @@ import {
     Alert,
     AppShell,
     Box,
+    Button,
     Container,
+    Group,
     NavLink,
     Paper,
     Stack,
@@ -22,6 +24,7 @@ import {
     IconHistory,
     IconInfoCircle,
     IconLicense,
+    IconSignature,
 } from '@tabler/icons-react';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
@@ -148,10 +151,6 @@ export default function SignaturePageLayout({
             : []),
     ];
 
-    if (activeTab === null && availableTabs.length > 0) {
-        setActiveTab(availableTabs[0].value);
-    }
-
     const renderNavigation = () => {
         if (isMobile) {
             return (
@@ -226,15 +225,64 @@ export default function SignaturePageLayout({
         );
     };
 
+    const showQuickSignCta =
+        !isContractorViewer &&
+        !!setSignatureModalOpened &&
+        !signed;
+
+    const renderHeader = () => (
+        <AppShell.Header
+          style={{
+                borderBottom: '1px solid var(--mantine-color-gray-3)',
+                backgroundColor: 'var(--mantine-color-body)',
+            }}
+        >
+            <Container size="xl" px="md" style={{ maxWidth: '1400px', height: '100%' }}>
+                <Group
+                  justify="space-between"
+                  align="center"
+                  h={56}
+                  wrap="nowrap"
+                  gap="md"
+                >
+                    <Title order={5} fw={600} lineClamp={1} style={{ flex: 1 }} c="dark.8">
+                        {linkInfo.contractor?.name || 'Sign your estimate'}
+                    </Title>
+                    {showQuickSignCta ? (
+                        <Button
+                          size="sm"
+                          leftSection={<IconSignature size={16} />}
+                          onClick={handleSignatureClick}
+                          variant="filled"
+                          radius="md"
+                          fw={600}
+                        >
+                            Quick Sign
+                        </Button>
+                    ) : signed && !isContractorViewer ? (
+                        <Group gap="xs" c="dimmed">
+                            <IconSignature size={18} />
+                            <Text size="sm" fw={500}>
+                                Signed
+                            </Text>
+                        </Group>
+                    ) : null}
+                </Group>
+            </Container>
+        </AppShell.Header>
+    );
+
     return (
         <AppShell
           padding={0}
+          header={{ height: 56 }}
           navbar={
                 isMobile
                     ? undefined
                     : { width: 250, breakpoint: 'sm' }
             }
         >
+            {renderHeader()}
             {!isMobile && renderNavigation()}
             <AppShell.Main>
                 {isMobile && renderNavigation()}
