@@ -2,7 +2,19 @@
 
 import { useEffect, useState } from 'react';
 
-import { Card, Box, Paper, SimpleGrid, Stack, Text, Title } from '@mantine/core';
+import {
+    Card,
+    Box,
+    Paper,
+    SimpleGrid,
+    Stack,
+    Text,
+    Title,
+    Modal,
+    Image,
+    Group,
+    Badge,
+} from '@mantine/core';
 
 export interface AboutBlock {
     type: 'text' | 'image';
@@ -60,6 +72,7 @@ export default function SignaturePageSections({
 }: SignaturePageSectionsProps) {
     const [pastProjects, setPastProjects] = useState<PastProject[]>([]);
     const [loadingProjects, setLoadingProjects] = useState(false);
+    const [selectedProject, setSelectedProject] = useState<PastProject | null>(null);
 
     useEffect(() => {
         if (
@@ -305,7 +318,7 @@ export default function SignaturePageSections({
 
             {/* Past Projects Section */}
             {signaturePageConfig.show_past_projects && (
-                <Paper shadow="xs" p="md" radius="md" withBorder>
+                <Stack gap="md">
                     <Title order={4} mb="xs">
                         Latest Projects
                     </Title>
@@ -337,7 +350,9 @@ export default function SignaturePageSections({
                                       withBorder
                                       style={{
                                             overflow: 'hidden',
+                                            cursor: 'pointer',
                                         }}
+                                      onClick={() => setSelectedProject(project)}
                                     >
                                         <div
                                           style={{
@@ -419,8 +434,111 @@ export default function SignaturePageSections({
                             No completed projects to display.
                         </Text>
                     )}
-                </Paper>
+                </Stack>
             )}
+
+            <Modal
+              opened={selectedProject !== null}
+              onClose={() => setSelectedProject(null)}
+              title={selectedProject?.title || 'Project details'}
+              size="lg"
+              radius="md"
+            >
+                {selectedProject && (
+                    <Stack gap="md">
+                        {(selectedProject.image_urls?.length ?? 0) > 0 && (
+                            <Box>
+                                {selectedProject.image_urls!.length === 1 ? (
+                                    <Image
+                                      src={selectedProject.image_urls![0]}
+                                      alt=""
+                                      radius="sm"
+                                      fit="cover"
+                                      style={{ maxHeight: 400 }}
+                                    />
+                                ) : (
+                                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                                        {selectedProject.image_urls!.map((url, i) => (
+                                            <Image
+                                              key={i}
+                                              src={url}
+                                              alt=""
+                                              radius="sm"
+                                              fit="cover"
+                                              style={{ maxHeight: 280 }}
+                                            />
+                                        ))}
+                                    </SimpleGrid>
+                                )}
+                            </Box>
+                        )}
+                        {selectedProject.title && (
+                            <Title order={4}>{selectedProject.title}</Title>
+                        )}
+                        {selectedProject.description &&
+                            typeof selectedProject.description === 'string' &&
+                            !selectedProject.description.trim().startsWith('<') && (
+                            <Text
+                              size="sm"
+                              c="dark.6"
+                              style={{ whiteSpace: 'pre-line', lineHeight: 1.6 }}
+                            >
+                                {selectedProject.description}
+                            </Text>
+                        )}
+                        {selectedProject.description &&
+                            typeof selectedProject.description === 'string' &&
+                            selectedProject.description.trim().startsWith('<') && (
+                            <div
+                              className="signature-about-block-content"
+                              style={{
+                                  fontSize: 'var(--mantine-font-size-sm)',
+                                  color: 'var(--mantine-color-dark-6)',
+                                  lineHeight: 1.6,
+                              }}
+                              dangerouslySetInnerHTML={{
+                                  __html: selectedProject.description,
+                              }}
+                            />
+                        )}
+                        {(selectedProject.address_street ||
+                            selectedProject.address_city ||
+                            selectedProject.address_state) && (
+                            <Group gap="xs" wrap="wrap">
+                                <Text size="xs" c="dimmed">
+                                    Address:
+                                </Text>
+                                <Text size="xs">
+                                    {[
+                                        selectedProject.address_street,
+                                        selectedProject.address_city,
+                                        selectedProject.address_state,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(', ')}
+                                </Text>
+                            </Group>
+                        )}
+                        {(selectedProject.status || selectedProject.updated_at) && (
+                            <Group gap="sm">
+                                {selectedProject.status && (
+                                    <Badge variant="light" size="sm">
+                                        {selectedProject.status}
+                                    </Badge>
+                                )}
+                                {selectedProject.updated_at && (
+                                    <Text size="xs" c="dimmed">
+                                        Updated{' '}
+                                        {new Date(
+                                            selectedProject.updated_at
+                                        ).toLocaleDateString()}
+                                    </Text>
+                                )}
+                            </Group>
+                        )}
+                    </Stack>
+                )}
+            </Modal>
         </Stack>
     );
 }
