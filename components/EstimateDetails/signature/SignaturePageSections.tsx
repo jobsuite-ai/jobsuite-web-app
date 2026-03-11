@@ -242,14 +242,7 @@ export default function SignaturePageSections({
                     const subheading =
                         signaturePageConfig.about_subheading?.trim() || null;
                     return (
-                        <Box
-                          style={{
-                                display: 'flex',
-                                justifyContent: 'center',
-                                width: '100%',
-                            }}
-                        >
-                            <Stack gap="lg" style={{ maxWidth: '720px', width: '100%' }}>
+                        <Stack gap="lg" style={{ width: '100%' }}>
                             <Stack gap="xs">
                                 <Title order={2} fw={700} size="h3" style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                                     {heading}
@@ -351,8 +344,7 @@ export default function SignaturePageSections({
                                     {signaturePageConfig.about_text}
                                 </Text>
                             )}
-                            </Stack>
-                        </Box>
+                        </Stack>
                     );
                 })()}
 
