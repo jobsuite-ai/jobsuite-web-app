@@ -4,17 +4,17 @@ import { useEffect, useState } from 'react';
 
 import { Carousel } from '@mantine/carousel';
 import {
-    Card,
+    Badge,
     Box,
+    Card,
+    Group,
+    Image,
+    Modal,
     Paper,
     SimpleGrid,
     Stack,
     Text,
     Title,
-    Modal,
-    Image,
-    Group,
-    Badge,
 } from '@mantine/core';
 
 import MarkdownRenderer from '@/components/Global/MarkdownRenderer';
@@ -480,7 +480,6 @@ export default function SignaturePageSections({
             <Modal
               opened={selectedProject !== null}
               onClose={() => setSelectedProject(null)}
-              title={selectedProject?.title || 'Project details'}
               size="lg"
               radius="md"
             >
