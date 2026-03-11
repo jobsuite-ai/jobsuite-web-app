@@ -2,19 +2,22 @@
 
 import { useEffect, useState } from 'react';
 
+import { Carousel } from '@mantine/carousel';
 import {
-    Card,
+    Badge,
     Box,
+    Card,
+    Group,
+    Image,
+    Modal,
     Paper,
     SimpleGrid,
     Stack,
     Text,
     Title,
-    Modal,
-    Image,
-    Group,
-    Badge,
 } from '@mantine/core';
+
+import MarkdownRenderer from '@/components/Global/MarkdownRenderer';
 
 export type AboutBlockImageSize = 'small' | 'medium' | 'large' | 'full';
 export type AboutBlockImageWrap = 'none' | 'left' | 'right';
@@ -62,6 +65,8 @@ export interface PastProject {
     id: string;
     title?: string;
     description?: string;
+    /** Markdown body (e.g. from contractor page); shown in modal when present. */
+    body?: string;
     address_street?: string;
     address_city?: string;
     address_state?: string;
@@ -475,42 +480,66 @@ export default function SignaturePageSections({
             <Modal
               opened={selectedProject !== null}
               onClose={() => setSelectedProject(null)}
-              title={selectedProject?.title || 'Project details'}
               size="lg"
               radius="md"
             >
                 {selectedProject && (
                     <Stack gap="md">
                         {(selectedProject.image_urls?.length ?? 0) > 0 && (
-                            <Box>
+                            <Box style={{ margin: '0 -4px' }}>
                                 {selectedProject.image_urls!.length === 1 ? (
                                     <Image
                                       src={selectedProject.image_urls![0]}
                                       alt=""
                                       radius="sm"
                                       fit="cover"
-                                      style={{ maxHeight: 400 }}
+                                      style={{ maxHeight: 360 }}
                                     />
                                 ) : (
-                                    <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+                                    <Carousel
+                                      withIndicators
+                                      height={360}
+                                      slideSize="100%"
+                                      slideGap={0}
+                                      loop
+                                      styles={{
+                                          control: {
+                                              background: 'var(--mantine-color-gray-1)',
+                                              color: 'var(--mantine-color-gray-7)',
+                                              border: '1px solid var(--mantine-color-gray-3)',
+                                          },
+                                      }}
+                                    >
                                         {selectedProject.image_urls!.map((url, i) => (
-                                            <Image
-                                              key={i}
-                                              src={url}
-                                              alt=""
-                                              radius="sm"
-                                              fit="cover"
-                                              style={{ maxHeight: 280 }}
-                                            />
+                                            <Carousel.Slide key={i}>
+                                                <Image
+                                                  src={url}
+                                                  alt=""
+                                                  radius="sm"
+                                                  fit="cover"
+                                                  h={360}
+                                                  style={{ objectPosition: 'center' }}
+                                                />
+                                            </Carousel.Slide>
                                         ))}
-                                    </SimpleGrid>
+                                    </Carousel>
                                 )}
                             </Box>
                         )}
-                        {selectedProject.title && (
-                            <Title order={4}>{selectedProject.title}</Title>
+                        {selectedProject.body && selectedProject.body.trim() && (
+                            <Box
+                              className="signature-about-block-content"
+                              style={{
+                                  fontSize: 'var(--mantine-font-size-sm)',
+                                  color: 'var(--mantine-color-dark-6)',
+                                  lineHeight: 1.6,
+                              }}
+                            >
+                                <MarkdownRenderer markdown={selectedProject.body} />
+                            </Box>
                         )}
-                        {selectedProject.description &&
+                        {!selectedProject.body?.trim() &&
+                            selectedProject.description &&
                             typeof selectedProject.description === 'string' &&
                             !selectedProject.description.trim().startsWith('<') && (
                             <Text
@@ -521,7 +550,8 @@ export default function SignaturePageSections({
                                 {selectedProject.description}
                             </Text>
                         )}
-                        {selectedProject.description &&
+                        {!selectedProject.body?.trim() &&
+                            selectedProject.description &&
                             typeof selectedProject.description === 'string' &&
                             selectedProject.description.trim().startsWith('<') && (
                             <div
