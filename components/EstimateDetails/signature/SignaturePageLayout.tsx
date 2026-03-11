@@ -239,7 +239,15 @@ export default function SignaturePageLayout({
                 backgroundColor: 'var(--mantine-color-body)',
             }}
         >
-            <Container size="xl" px="md" style={{ maxWidth: '1400px', height: '100%' }}>
+            <Container
+              size="xl"
+              px="md"
+              style={{
+                    maxWidth: '1400px',
+                    height: '100%',
+                    marginLeft: isMobile ? 0 : 250,
+                }}
+            >
                 <Group
                   justify="space-between"
                   align="center"
@@ -247,28 +255,30 @@ export default function SignaturePageLayout({
                   wrap="nowrap"
                   gap="md"
                 >
-                    <Title order={5} fw={600} lineClamp={1} style={{ flex: 1 }} c="dark.8">
-                        {linkInfo.contractor?.name || 'Sign your estimate'}
-                    </Title>
-                    {showQuickSignCta ? (
-                        <Button
-                          size="sm"
-                          leftSection={<IconSignature size={16} />}
-                          onClick={handleSignatureClick}
-                          variant="filled"
-                          radius="md"
-                          fw={600}
-                        >
-                            Quick Sign
-                        </Button>
-                    ) : signed && !isContractorViewer ? (
-                        <Group gap="xs" c="dimmed">
-                            <IconSignature size={18} />
-                            <Text size="sm" fw={500}>
-                                Signed
-                            </Text>
-                        </Group>
-                    ) : null}
+                    <Box style={{ flex: 1, minWidth: 0 }} />
+                    <Box style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                        {showQuickSignCta ? (
+                            <Button
+                              size="sm"
+                              leftSection={<IconSignature size={16} />}
+                              onClick={handleSignatureClick}
+                              variant="filled"
+                              radius="md"
+                              fw={600}
+                              style={{ minWidth: 140 }}
+                            >
+                                Quick Sign
+                            </Button>
+                        ) : signed && !isContractorViewer ? (
+                            <Group gap="xs" c="dimmed">
+                                <IconSignature size={18} />
+                                <Text size="sm" fw={500}>
+                                    Signed
+                                </Text>
+                            </Group>
+                        ) : null}
+                    </Box>
+                    <Box style={{ flex: 1, minWidth: 0 }} />
                 </Group>
             </Container>
         </AppShell.Header>
