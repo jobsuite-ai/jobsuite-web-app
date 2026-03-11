@@ -24,6 +24,8 @@ interface SignaturePageSectionsProps {
         insurance_pdf_url?: string;
         w9_pdf_url?: string;
         about_text: string;
+        about_heading?: string;
+        about_subheading?: string;
         about_blocks?: AboutBlock[];
         past_projects_count: number;
         use_curated_past_projects?: boolean;
@@ -209,13 +211,25 @@ export default function SignaturePageSections({
                     const blocks = signaturePageConfig.about_blocks;
                     const hasBlocks = Array.isArray(blocks) && blocks.length > 0;
                     if (!hasBlocks && !signaturePageConfig.about_text) return null;
+                    const heading =
+                        signaturePageConfig.about_heading?.trim() ||
+                        `About ${contractor?.name || 'Us'}`;
+                    const subheading =
+                        signaturePageConfig.about_subheading?.trim() || null;
                     return (
-                        <Paper shadow="xs" p="md" radius="md" withBorder>
-                            <Title order={4} mb="sm">
-                                About {contractor?.name || 'Us'}
-                            </Title>
+                        <Stack gap="lg" style={{ maxWidth: '720px' }}>
+                            <Stack gap="xs">
+                                <Title order={2} fw={700} size="h3" style={{ letterSpacing: '-0.02em', lineHeight: 1.2 }}>
+                                    {heading}
+                                </Title>
+                                {subheading && (
+                                    <Text size="lg" c="dimmed" style={{ lineHeight: 1.5 }}>
+                                        {subheading}
+                                    </Text>
+                                )}
+                            </Stack>
                             {hasBlocks ? (
-                                <Stack gap="md">
+                                <Stack gap="lg">
                                     {blocks.map((block, index) =>
                                         block.type === 'text' ? (
                                             block.content ? (
@@ -224,8 +238,9 @@ export default function SignaturePageSections({
                                                       key={index}
                                                       className="signature-about-block-content"
                                                       style={{
-                                                          fontSize: 'var(--mantine-font-size-sm)',
-                                                          lineHeight: 1.6,
+                                                          fontSize: 'var(--mantine-font-size-md)',
+                                                          lineHeight: 1.7,
+                                                          color: 'var(--mantine-color-dark-6)',
                                                       }}
                                                       dangerouslySetInnerHTML={{
                                                           __html: block.content,
@@ -234,8 +249,9 @@ export default function SignaturePageSections({
                                                 ) : (
                                                     <Text
                                                       key={index}
-                                                      size="sm"
-                                                      style={{ whiteSpace: 'pre-line' }}
+                                                      size="md"
+                                                      style={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}
+                                                      c="dark.6"
                                                     >
                                                         {block.content}
                                                     </Text>
@@ -249,7 +265,7 @@ export default function SignaturePageSections({
                                                       width: '100%',
                                                       maxWidth: '100%',
                                                       overflow: 'hidden',
-                                                      borderRadius: '4px',
+                                                      borderRadius: '8px',
                                                   }}
                                                 >
                                                     <img
@@ -267,11 +283,15 @@ export default function SignaturePageSections({
                                     )}
                                 </Stack>
                             ) : (
-                                <Text size="sm" style={{ whiteSpace: 'pre-line' }}>
+                                <Text
+                                  size="md"
+                                  style={{ whiteSpace: 'pre-line', lineHeight: 1.7 }}
+                                  c="dark.6"
+                                >
                                     {signaturePageConfig.about_text}
                                 </Text>
                             )}
-                        </Paper>
+                        </Stack>
                     );
                 })()}
 
