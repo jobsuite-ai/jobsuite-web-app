@@ -6,18 +6,19 @@ import {
     Alert,
     AppShell,
     Box,
+    Burger,
     Button,
     Container,
+    Drawer,
     Group,
     NavLink,
     Paper,
     Stack,
-    Tabs,
     Text,
     Title,
     useMantineTheme,
 } from '@mantine/core';
-import { useMediaQuery } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import {
     IconBuilding,
     IconFileText,
@@ -103,6 +104,8 @@ export default function SignaturePageLayout({
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
+    const [mobileNavOpened, { open: openMobileNav, close: closeMobileNav }] =
+        useDisclosure(false);
 
     const isContractorViewer = isPreviewMode || linkInfo.viewer_type === 'contractor';
 
@@ -155,43 +158,7 @@ export default function SignaturePageLayout({
 
     const renderNavigation = () => {
         if (isMobile) {
-            return (
-                <Box
-                  style={{
-                        borderBottom: '1px solid var(--mantine-color-gray-3)',
-                        backgroundColor: 'var(--mantine-color-body)',
-                    }}
-                >
-                    <Container size="xl" py="md" style={{ maxWidth: '1400px' }}>
-                        {linkInfo.contractor && (
-                            <Box mb="md">
-                                <Title order={4}>{linkInfo.contractor.name}</Title>
-                                {linkInfo.contractor.email && (
-                                    <Text c="dimmed" size="xs" mt="xs">
-                                        {linkInfo.contractor.email}
-                                    </Text>
-                                )}
-                            </Box>
-                        )}
-                        <Tabs
-                          value={activeTab || undefined}
-                          onChange={(value) => setActiveTab(value)}
-                        >
-                            <Tabs.List style={{ overflowX: 'auto', flexWrap: 'nowrap' }}>
-                                {availableTabs.map((tab) => (
-                                    <Tabs.Tab
-                                      key={tab.value}
-                                      value={tab.value}
-                                      leftSection={<tab.icon size={16} />}
-                                    >
-                                        {tab.label}
-                                    </Tabs.Tab>
-                                ))}
-                            </Tabs.List>
-                        </Tabs>
-                    </Container>
-                </Box>
-            );
+            return null;
         }
         return (
             <AppShell.Navbar p="md">
@@ -233,20 +200,17 @@ export default function SignaturePageLayout({
         !signed;
 
     const renderHeader = () => (
-        <AppShell.Header
+        <Box
           style={{
                 borderBottom: '1px solid var(--mantine-color-gray-3)',
                 backgroundColor: 'var(--mantine-color-body)',
+                height: 56,
             }}
         >
             <Container
               size="xl"
               px="md"
-              style={{
-                    maxWidth: '1400px',
-                    height: '100%',
-                    marginLeft: isMobile ? 0 : 250,
-                }}
+              style={{ maxWidth: '1400px', height: '100%' }}
             >
                 <Group
                   justify="space-between"
@@ -255,8 +219,24 @@ export default function SignaturePageLayout({
                   wrap="nowrap"
                   gap="md"
                 >
-                    <Box style={{ flex: 1, minWidth: 0 }} />
-                    <Box style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+                    {isMobile ? (
+                        <Burger
+                          opened={mobileNavOpened}
+                          onClick={openMobileNav}
+                          size="sm"
+                          aria-label="Open navigation"
+                        />
+                    ) : (
+                        <Box style={{ flex: 1, minWidth: 0 }} />
+                    )}
+                    <Box
+                      style={{
+                            flex: 1,
+                            display: 'flex',
+                            justifyContent: 'center',
+                            minWidth: 0,
+                        }}
+                    >
                         {showQuickSignCta ? (
                             <Button
                               size="sm"
@@ -281,22 +261,66 @@ export default function SignaturePageLayout({
                     <Box style={{ flex: 1, minWidth: 0 }} />
                 </Group>
             </Container>
-        </AppShell.Header>
+        </Box>
     );
 
     return (
+        <>
+            {isMobile && (
+                <Drawer
+                  opened={mobileNavOpened}
+                  onClose={closeMobileNav}
+                  title="Menu"
+                  position="left"
+                  size="sm"
+                >
+                    <Stack gap="xs">
+                        {linkInfo.contractor && (
+                            <Box
+                              pb="md"
+                              style={{
+                                    borderBottom:
+                                        '1px solid var(--mantine-color-gray-3)',
+                                }}
+                            >
+                                <Title order={4}>{linkInfo.contractor.name}</Title>
+                                {linkInfo.contractor.email && (
+                                    <Text c="dimmed" size="xs" mt="xs">
+                                        {linkInfo.contractor.email}
+                                    </Text>
+                                )}
+                            </Box>
+                        )}
+                        {availableTabs.map((tab) => (
+                            <NavLink
+                              key={tab.value}
+                              label={tab.label}
+                              leftSection={<tab.icon size={18} />}
+                              active={activeTab === tab.value}
+                              onClick={() => {
+                                    setActiveTab(tab.value);
+                                    closeMobileNav();
+                                }}
+                              style={{
+                                    borderRadius:
+                                        'var(--mantine-radius-sm)',
+                                }}
+                            />
+                        ))}
+                    </Stack>
+                </Drawer>
+            )}
         <AppShell
           padding={0}
-          header={{ height: 56 }}
           navbar={
                 isMobile
                     ? undefined
                     : { width: 250, breakpoint: 'sm' }
             }
         >
-            {renderHeader()}
             {!isMobile && renderNavigation()}
             <AppShell.Main>
+                {renderHeader()}
                 {isMobile && renderNavigation()}
                 <Container size="xl" py="xl" style={{ maxWidth: '1400px' }}>
                     <Stack gap="xl">
@@ -489,5 +513,6 @@ export default function SignaturePageLayout({
                 </Container>
             </AppShell.Main>
         </AppShell>
+        </>
     );
 }
