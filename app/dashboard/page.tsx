@@ -102,6 +102,7 @@ export default function Dashboard() {
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [editHoursModalOpen, setEditHoursModalOpen] = useState(false);
   const [editingHoursValue, setEditingHoursValue] = useState(0);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -180,6 +181,10 @@ export default function Dashboard() {
 
         if (selectedYear !== null && selectedYear !== undefined) {
           queryParams.append('selected_year', selectedYear.toString());
+        }
+
+        if (selectedTag) {
+          queryParams.append('tag', selectedTag);
         }
 
         const response = await fetch(`/api/dashboard-metrics?${queryParams.toString()}`, {
@@ -262,7 +267,7 @@ export default function Dashboard() {
     if (!isAuthLoading) {
       fetchDashboardMetrics();
     }
-  }, [timeFrame, selectedMonth, selectedYear, isAuthLoading]);
+  }, [timeFrame, selectedMonth, selectedYear, selectedTag, isAuthLoading]);
 
   // Helper function to format labels
   const formatLabel = (label: string): string => label
@@ -283,21 +288,36 @@ export default function Dashboard() {
       <Stack gap="lg">
         <Group justify="space-between">
           <Title order={1} c="gray.0">Dashboard</Title>
-          <Select
-            label="Time Period"
-            c="gray.0"
-            value={timeFrame}
-            onChange={(value) => setTimeFrame(value || '30')}
-            data={[
-              { value: 'ytd', label: 'Year to Date' },
-              { value: '7', label: 'Last 7 Days' },
-              { value: '30', label: 'Last 30 Days' },
-              { value: '90', label: 'Last 90 Days' },
-              { value: '365', label: 'Last Year' },
-              { value: 'all', label: 'All Time' },
-            ]}
-            w={200}
-          />
+          <Group>
+            <Select
+              label="Filter by tag"
+              c="gray.0"
+              value={selectedTag ?? ''}
+              onChange={(value) => setSelectedTag(value || null)}
+              data={[
+                { value: '', label: 'All' },
+                { value: 'New Construction', label: 'New Construction' },
+                { value: 'Repaint', label: 'Repaint' },
+              ]}
+              w={180}
+              clearable
+            />
+            <Select
+              label="Time Period"
+              c="gray.0"
+              value={timeFrame}
+              onChange={(value) => setTimeFrame(value || '30')}
+              data={[
+                { value: 'ytd', label: 'Year to Date' },
+                { value: '7', label: 'Last 7 Days' },
+                { value: '30', label: 'Last 30 Days' },
+                { value: '90', label: 'Last 90 Days' },
+                { value: '365', label: 'Last Year' },
+                { value: 'all', label: 'All Time' },
+              ]}
+              w={200}
+            />
+          </Group>
         </Group>
 
         <div style={{ position: 'relative' }}>

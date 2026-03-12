@@ -35,6 +35,7 @@ export async function GET(request: NextRequest) {
     const timeFrame = searchParams.get('time_frame') || 'ytd';
     const selectedMonth = searchParams.get('selected_month');
     const selectedYear = searchParams.get('selected_year');
+    const tag = searchParams.get('tag');
 
     // Build query parameters for the job engine API
     const queryParams = new URLSearchParams({
@@ -49,7 +50,22 @@ export async function GET(request: NextRequest) {
       queryParams.append('selected_year', selectedYear);
     }
 
-    const response = await fetch(`${apiBaseUrl}/api/v1/contractors/${contractorId}/dashboard/metrics?${queryParams.toString()}`, {
+    // When filtering by tag, use V2 endpoint (live aggregation); otherwise use V1 (snapshot)
+    const dashboardPath = tag
+      ? `/api/v1/contractors/${contractorId}/dashboard/v2/metrics`
+      : `/api/v1/contractors/${contractorId}/dashboard/metrics`;
+    if (tag) {
+      queryParams.append('tag', tag);
+      // V2 expects selected_month 0-11; frontend sends 1-12, so convert when using V2
+      if (selectedMonth !== null && selectedMonth !== undefined) {
+        const monthNum = parseInt(selectedMonth, 10);
+        if (!Number.isNaN(monthNum)) {
+          queryParams.set('selected_month', String(monthNum - 1));
+        }
+      }
+    }
+
+    const response = await fetch(`${apiBaseUrl}${dashboardPath}?${queryParams.toString()}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
