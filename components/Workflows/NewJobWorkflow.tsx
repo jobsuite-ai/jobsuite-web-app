@@ -155,6 +155,7 @@ interface FormValues {
     title: string;
     referral_source: string;
     referral_name: string;
+    job_tag: string;
 }
 
 export function NewJobWorkflow() {
@@ -192,6 +193,7 @@ export function NewJobWorkflow() {
             title: '',
             referral_source: '',
             referral_name: '',
+            job_tag: '',
         },
 
         validate: (values) => {
@@ -556,6 +558,7 @@ export function NewJobWorkflow() {
                     title: formValues.title || null,
                     referral_source: formValues.referral_source || null,
                     referral_name: formValues.referral_name || null,
+                    job_tag: formValues.job_tag || null,
                 }),
             });
 
@@ -958,6 +961,17 @@ export function NewJobWorkflow() {
                                       {...form.getInputProps('referral_name')}
                                     />
                                 )}
+                                <Select
+                                  label="Job Tag"
+                                  placeholder="Filter dashboard by tag (optional)"
+                                  data={[
+                                    { value: '', label: 'None' },
+                                    { value: 'New Construction', label: 'New Construction' },
+                                    { value: 'Repaint', label: 'Repaint' },
+                                  ]}
+                                  key={form.key('job_tag')}
+                                  {...form.getInputProps('job_tag')}
+                                />
                             </Stack>
                         </Stepper.Step>
 
@@ -1041,6 +1055,12 @@ export function NewJobWorkflow() {
                                         <Group justify="space-between">
                                             <Text size="sm" c="dimmed">Referred by:</Text>
                                             <Text size="sm" fw={500}>{form.getValues().referral_name}</Text>
+                                        </Group>
+                                    )}
+                                    {(form.getValues().job_tag || '').trim() && (
+                                        <Group justify="space-between">
+                                            <Text size="sm" c="dimmed">Job Tag:</Text>
+                                            <Text size="sm" fw={500}>{form.getValues().job_tag}</Text>
                                         </Group>
                                     )}
                                 </Stack>

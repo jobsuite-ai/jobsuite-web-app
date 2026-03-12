@@ -87,6 +87,11 @@ export default function SidebarDetails({
     estimate.sales_person || null
   );
   const [savingSalesPerson, setSavingSalesPerson] = useState(false);
+  const [editingJobTag, setEditingJobTag] = useState(false);
+  const [selectedJobTag, setSelectedJobTag] = useState<string | null>(
+    estimate.job_tag || null
+  );
+  const [savingJobTag, setSavingJobTag] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const singleOptionDefaultsAppliedRef = useRef<string | null>(null);
@@ -350,6 +355,12 @@ export default function SidebarDetails({
       setSelectedSalesPerson(estimate.sales_person || null);
     }
   }, [estimate.sales_person, editingSalesPerson]);
+
+  useEffect(() => {
+    if (!editingJobTag) {
+      setSelectedJobTag(estimate.job_tag || null);
+    }
+  }, [estimate.job_tag, editingJobTag]);
 
   // When estimate changes, allow applying single-option defaults again for the new estimate
   useEffect(() => {
@@ -982,6 +993,33 @@ export default function SidebarDetails({
 
   const getJobTypeDisplayName = (): string => getFormattedEstimateType(estimate.estimate_type);
 
+  const updateJobTag = async (value: string | null) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    setSavingJobTag(true);
+    try {
+      await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ job_tag: value || null }),
+      });
+
+      updateEstimate({ ...estimate, job_tag: value || undefined });
+      setEditingJobTag(false);
+      onUpdate();
+    } finally {
+      setSavingJobTag(false);
+    }
+  };
+
   // Function to get valid next statuses based on current status
   const getValidNextStatuses = (status: EstimateStatus): EstimateStatus[] => {
     switch (status) {
@@ -1335,6 +1373,67 @@ export default function SidebarDetails({
               c={estimate.estimate_type ? 'dark' : 'dimmed'}
             >
               {getJobTypeDisplayName()}
+            </Text>
+          </Flex>
+        )}
+
+        {/* Job Tag - for dashboard filtering */}
+        {editingJobTag ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Job Tag:
+              </Text>
+              <Select
+                data={[
+                  { value: '', label: 'None' },
+                  { value: 'New Construction', label: 'New Construction' },
+                  { value: 'Repaint', label: 'Repaint' },
+                ]}
+                value={selectedJobTag ?? (estimate.job_tag || '')}
+                onChange={(value) => setSelectedJobTag(value || null)}
+                placeholder="Select tag"
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={savingJobTag}
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="green"
+                variant="light"
+                onClick={() => updateJobTag(selectedJobTag ?? '')}
+                loading={savingJobTag}
+                size="lg"
+              >
+                <IconCheck size={18} />
+              </ActionIcon>
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={() => {
+                  setSelectedJobTag(estimate.job_tag || null);
+                  setEditingJobTag(false);
+                }}
+                disabled={savingJobTag}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Job Tag:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => setEditingJobTag(true)}
+              c={estimate.job_tag ? 'dark' : 'dimmed'}
+            >
+              {estimate.job_tag || '—'}
             </Text>
           </Flex>
         )}
