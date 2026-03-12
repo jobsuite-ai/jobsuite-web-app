@@ -537,7 +537,15 @@ export default function SignaturePageSections({
                                   lineHeight: 1.6,
                               }}
                             >
-                                <MarkdownRenderer markdown={selectedProject.body} />
+                                {selectedProject.body.trim().startsWith('<') ? (
+                                    <div
+                                      dangerouslySetInnerHTML={{
+                                          __html: selectedProject.body,
+                                      }}
+                                    />
+                                ) : (
+                                    <MarkdownRenderer markdown={selectedProject.body} />
+                                )}
                             </Box>
                         )}
                         {!selectedProject.body?.trim() &&
