@@ -46,18 +46,6 @@ export default function SupportPage() {
 
         <section>
           <Title order={2} size="h4" c="dark.7" mb="xs">
-            Common topics
-          </Title>
-          <Text size="sm" mb="xs">
-            Estimates and proposals, client management, signatures, email and
-            messaging, integrations (e.g. QuickBooks), and mobile app usage. If
-            you don&apos;t see your topic here, reach out and we&apos;ll point
-            you in the right direction.
-          </Text>
-        </section>
-
-        <section>
-          <Title order={2} size="h4" c="dark.7" mb="xs">
             Privacy and legal
           </Title>
           <Text size="sm">
