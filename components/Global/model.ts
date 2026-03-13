@@ -238,6 +238,8 @@ export type Estimate = {
     needs_follow_up_at?: string;
     /** Set when follow-up scheduler resurfaces estimate (NEEDS_FOLLOW_UP -> ESTIMATE_SENT) */
     resurfaced_at?: string | null;
+    /** Optional tag for dashboard filtering (e.g. New Construction, Repaint) */
+    job_tag?: string | null;
     days_in_column?: number | null;
     is_terminal?: boolean;
 };

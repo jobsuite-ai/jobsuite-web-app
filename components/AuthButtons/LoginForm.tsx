@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 
-import { Anchor, Button, Checkbox, Divider, Group, Paper, PasswordInput, Stack, TextInput, Title } from '@mantine/core';
+import { Anchor, Button, Checkbox, Divider, Group, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { setAccessTokenMetadata } from '@/app/utils/authToken';
@@ -149,6 +150,16 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
             </Anchor>
           </Group>
         )}
+
+        <Text size="xs" c="dimmed" ta="center" mt="xl">
+          <Anchor component={Link} href="/privacy" size="xs">
+            Privacy Policy
+          </Anchor>
+          {' · '}
+          <Anchor component={Link} href="/support" size="xs">
+            Support
+          </Anchor>
+        </Text>
       </form>
     </Paper>
   );

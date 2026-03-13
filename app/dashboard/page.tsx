@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Autocomplete, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -10,6 +10,7 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import { BarChart, LineChart, PieChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
 import { useAuth } from '@/hooks/useAuth';
+import { useJobTags } from '@/hooks/useJobTags';
 import { logToCloudWatch } from '@/public/logger';
 
 const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -98,10 +99,13 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
+  const { jobTags } = useJobTags();
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [tagOptionLabels, setTagOptionLabels] = useState<string[]>(['All']);
   const [editHoursModalOpen, setEditHoursModalOpen] = useState(false);
   const [editingHoursValue, setEditingHoursValue] = useState(0);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -164,6 +168,11 @@ export default function Dashboard() {
     }
   }, [availableMonths, selectedMonth]);
 
+  // Tag filter options: All + existing tags from API (user can also type a custom tag)
+  useEffect(() => {
+    setTagOptionLabels(['All', ...jobTags]);
+  }, [jobTags]);
+
   useEffect(() => {
     async function fetchDashboardMetrics() {
       try {
@@ -180,6 +189,10 @@ export default function Dashboard() {
 
         if (selectedYear !== null && selectedYear !== undefined) {
           queryParams.append('selected_year', selectedYear.toString());
+        }
+
+        if (selectedTag) {
+          queryParams.append('tag', selectedTag);
         }
 
         const response = await fetch(`/api/dashboard-metrics?${queryParams.toString()}`, {
@@ -262,7 +275,7 @@ export default function Dashboard() {
     if (!isAuthLoading) {
       fetchDashboardMetrics();
     }
-  }, [timeFrame, selectedMonth, selectedYear, isAuthLoading]);
+  }, [timeFrame, selectedMonth, selectedYear, selectedTag, isAuthLoading]);
 
   // Helper function to format labels
   const formatLabel = (label: string): string => label
@@ -283,21 +296,34 @@ export default function Dashboard() {
       <Stack gap="lg">
         <Group justify="space-between">
           <Title order={1} c="gray.0">Dashboard</Title>
-          <Select
-            label="Time Period"
-            c="gray.0"
-            value={timeFrame}
-            onChange={(value) => setTimeFrame(value || '30')}
-            data={[
-              { value: 'ytd', label: 'Year to Date' },
-              { value: '7', label: 'Last 7 Days' },
-              { value: '30', label: 'Last 30 Days' },
-              { value: '90', label: 'Last 90 Days' },
-              { value: '365', label: 'Last Year' },
-              { value: 'all', label: 'All Time' },
-            ]}
-            w={200}
-          />
+          <Group>
+            <Autocomplete
+              label="Filter by tag"
+              c="gray.0"
+              value={selectedTag ?? 'All'}
+              onChange={(value) =>
+                setSelectedTag(value === 'All' || !value ? null : value)
+              }
+              data={tagOptionLabels}
+              w={180}
+              placeholder="All"
+            />
+            <Select
+              label="Time Period"
+              c="gray.0"
+              value={timeFrame}
+              onChange={(value) => setTimeFrame(value || '30')}
+              data={[
+                { value: 'ytd', label: 'Year to Date' },
+                { value: '7', label: 'Last 7 Days' },
+                { value: '30', label: 'Last 30 Days' },
+                { value: '90', label: 'Last 90 Days' },
+                { value: '365', label: 'Last Year' },
+                { value: 'all', label: 'All Time' },
+              ]}
+              w={200}
+            />
+          </Group>
         </Group>
 
         <div style={{ position: 'relative' }}>

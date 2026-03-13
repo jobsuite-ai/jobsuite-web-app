@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
+import { ActionIcon, Autocomplete, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
@@ -16,6 +16,7 @@ import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, g
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useJobTags } from '@/hooks/useJobTags';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
 import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
@@ -41,6 +42,10 @@ export default function SidebarDetails({
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
   const { teamConfig, loading: loadingTeamConfig } = useTeamConfig();
+  const { jobTags } = useJobTags();
+  const [jobTagOptions, setJobTagOptions] = useState<{ value: string; label: string }[]>([
+    { value: '', label: 'None' },
+  ]);
   const [editingOwner, setEditingOwner] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(
     estimate.owned_by || estimate.created_by || null
@@ -87,6 +92,11 @@ export default function SidebarDetails({
     estimate.sales_person || null
   );
   const [savingSalesPerson, setSavingSalesPerson] = useState(false);
+  const [editingJobTag, setEditingJobTag] = useState(false);
+  const [selectedJobTag, setSelectedJobTag] = useState<string | null>(
+    estimate.job_tag || null
+  );
+  const [savingJobTag, setSavingJobTag] = useState(false);
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const singleOptionDefaultsAppliedRef = useRef<string | null>(null);
@@ -350,6 +360,24 @@ export default function SidebarDetails({
       setSelectedSalesPerson(estimate.sales_person || null);
     }
   }, [estimate.sales_person, editingSalesPerson]);
+
+  useEffect(() => {
+    if (!editingJobTag) {
+      setSelectedJobTag(estimate.job_tag || null);
+    }
+  }, [estimate.job_tag, editingJobTag]);
+
+  // Sync job tag options from API, keeping any custom tag the user added
+  useEffect(() => {
+    setJobTagOptions((prev) => {
+      const custom = prev.filter((p) => p.value && !jobTags.includes(p.value));
+      return [
+        { value: '', label: 'None' },
+        ...jobTags.map((t) => ({ value: t, label: t })),
+        ...custom,
+      ];
+    });
+  }, [jobTags]);
 
   // When estimate changes, allow applying single-option defaults again for the new estimate
   useEffect(() => {
@@ -982,6 +1010,33 @@ export default function SidebarDetails({
 
   const getJobTypeDisplayName = (): string => getFormattedEstimateType(estimate.estimate_type);
 
+  const updateJobTag = async (value: string | null) => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      // eslint-disable-next-line no-console
+      console.error('No access token found');
+      return;
+    }
+
+    setSavingJobTag(true);
+    try {
+      await fetch(`/api/estimates/${estimateID}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ job_tag: value || null }),
+      });
+
+      updateEstimate({ ...estimate, job_tag: value || undefined });
+      setEditingJobTag(false);
+      onUpdate();
+    } finally {
+      setSavingJobTag(false);
+    }
+  };
+
   // Function to get valid next statuses based on current status
   const getValidNextStatuses = (status: EstimateStatus): EstimateStatus[] => {
     switch (status) {
@@ -1335,6 +1390,63 @@ export default function SidebarDetails({
               c={estimate.estimate_type ? 'dark' : 'dimmed'}
             >
               {getJobTypeDisplayName()}
+            </Text>
+          </Flex>
+        )}
+
+        {/* Job Tag - for dashboard filtering */}
+        {editingJobTag ? (
+          <div style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Flex justify="space-between" align="center" gap="sm" mb="xs">
+              <Text size="sm" fw={500} c="dimmed">
+                Job Tag:
+              </Text>
+              <Autocomplete
+                data={jobTagOptions.map((o) => o.label).filter((l) => l !== 'None')}
+                value={selectedJobTag ?? ''}
+                onChange={(value) => setSelectedJobTag(value === '' ? null : value)}
+                placeholder="None"
+                style={{ flex: 1, maxWidth: '200px' }}
+                size="sm"
+                disabled={savingJobTag}
+              />
+            </Flex>
+            <Flex gap="xs" justify="flex-end">
+              <ActionIcon
+                color="green"
+                variant="light"
+                onClick={() => updateJobTag(selectedJobTag ?? '')}
+                loading={savingJobTag}
+                size="lg"
+              >
+                <IconCheck size={18} />
+              </ActionIcon>
+              <ActionIcon
+                color="red"
+                variant="light"
+                onClick={() => {
+                  setSelectedJobTag(estimate.job_tag || null);
+                  setEditingJobTag(false);
+                }}
+                disabled={savingJobTag}
+                size="lg"
+              >
+                <IconX size={18} />
+              </ActionIcon>
+            </Flex>
+          </div>
+        ) : (
+          <Flex justify="space-between" align="center" gap="sm" style={{ marginBottom: 'var(--mantine-spacing-md)' }}>
+            <Text size="sm" fw={500} c="dimmed">
+              Job Tag:
+            </Text>
+            <Text
+              size="sm"
+              style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
+              onClick={() => setEditingJobTag(true)}
+              c={estimate.job_tag ? 'dark' : 'dimmed'}
+            >
+              {estimate.job_tag || '—'}
             </Text>
           </Flex>
         )}
