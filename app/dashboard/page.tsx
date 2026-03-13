@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Autocomplete, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -10,6 +10,7 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import { BarChart, LineChart, PieChart } from '@/components/Dashboard/Charts';
 import { MetricCard } from '@/components/Dashboard/MetricCard';
 import { useAuth } from '@/hooks/useAuth';
+import { useJobTags } from '@/hooks/useJobTags';
 import { logToCloudWatch } from '@/public/logger';
 
 const MONTH_ABBREVIATIONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -98,11 +99,13 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
+  const { jobTags } = useJobTags();
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [tagOptionLabels, setTagOptionLabels] = useState<string[]>(['All']);
   const [editHoursModalOpen, setEditHoursModalOpen] = useState(false);
   const [editingHoursValue, setEditingHoursValue] = useState(0);
   const [metrics, setMetrics] = useState<DashboardMetrics>({
@@ -164,6 +167,11 @@ export default function Dashboard() {
       setSelectedMonth(availableMonths[availableMonths.length - 1]);
     }
   }, [availableMonths, selectedMonth]);
+
+  // Tag filter options: All + existing tags from API (user can also type a custom tag)
+  useEffect(() => {
+    setTagOptionLabels(['All', ...jobTags]);
+  }, [jobTags]);
 
   useEffect(() => {
     async function fetchDashboardMetrics() {
@@ -289,18 +297,16 @@ export default function Dashboard() {
         <Group justify="space-between">
           <Title order={1} c="gray.0">Dashboard</Title>
           <Group>
-            <Select
+            <Autocomplete
               label="Filter by tag"
               c="gray.0"
-              value={selectedTag ?? ''}
-              onChange={(value) => setSelectedTag(value || null)}
-              data={[
-                { value: '', label: 'All' },
-                { value: 'New Construction', label: 'New Construction' },
-                { value: 'Repaint', label: 'Repaint' },
-              ]}
+              value={selectedTag ?? 'All'}
+              onChange={(value) =>
+                setSelectedTag(value === 'All' || !value ? null : value)
+              }
+              data={tagOptionLabels}
               w={180}
-              clearable
+              placeholder="All"
             />
             <Select
               label="Time Period"

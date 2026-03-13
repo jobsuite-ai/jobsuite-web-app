@@ -31,6 +31,7 @@ import { USStatesMap } from '../Global/usStates';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { ContractorClient, EstimateType } from '@/components/Global/model';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useJobTags } from '@/hooks/useJobTags';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllClients } from '@/store/slices/clientsSlice';
 
@@ -169,6 +170,8 @@ export function NewJobWorkflow() {
     const clients = useAppSelector(selectAllClients);
     const router = useRouter();
     const { refreshData, updateEstimate } = useDataCache();
+    const { jobTags } = useJobTags();
+    const jobTagOptionLabels = ['None', ...jobTags];
 
     const form = useForm<FormValues>({
         mode: 'uncontrolled',
@@ -961,16 +964,19 @@ export function NewJobWorkflow() {
                                       {...form.getInputProps('referral_name')}
                                     />
                                 )}
-                                <Select
+                                <Autocomplete
                                   label="Job Tag"
-                                  placeholder="Filter dashboard by tag (optional)"
-                                  data={[
-                                    { value: '', label: 'None' },
-                                    { value: 'New Construction', label: 'New Construction' },
-                                    { value: 'Repaint', label: 'Repaint' },
-                                  ]}
+                                  placeholder="Select or type tag (optional)"
+                                  data={jobTagOptionLabels}
                                   key={form.key('job_tag')}
                                   {...form.getInputProps('job_tag')}
+                                  value={form.getInputProps('job_tag').value || 'None'}
+                                  onChange={(value: string) =>
+                                    form.setFieldValue(
+                                      'job_tag',
+                                      value === 'None' || !value ? '' : value
+                                    )
+                                  }
                                 />
                             </Stack>
                         </Stepper.Step>

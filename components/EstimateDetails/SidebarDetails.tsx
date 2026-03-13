@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { ActionIcon, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
+import { ActionIcon, Autocomplete, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
@@ -16,6 +16,7 @@ import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, g
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { useJobTags } from '@/hooks/useJobTags';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
 import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
@@ -41,6 +42,10 @@ export default function SidebarDetails({
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
   const { teamConfig, loading: loadingTeamConfig } = useTeamConfig();
+  const { jobTags } = useJobTags();
+  const [jobTagOptions, setJobTagOptions] = useState<{ value: string; label: string }[]>([
+    { value: '', label: 'None' },
+  ]);
   const [editingOwner, setEditingOwner] = useState(false);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string | null>(
     estimate.owned_by || estimate.created_by || null
@@ -361,6 +366,18 @@ export default function SidebarDetails({
       setSelectedJobTag(estimate.job_tag || null);
     }
   }, [estimate.job_tag, editingJobTag]);
+
+  // Sync job tag options from API, keeping any custom tag the user added
+  useEffect(() => {
+    setJobTagOptions((prev) => {
+      const custom = prev.filter((p) => p.value && !jobTags.includes(p.value));
+      return [
+        { value: '', label: 'None' },
+        ...jobTags.map((t) => ({ value: t, label: t })),
+        ...custom,
+      ];
+    });
+  }, [jobTags]);
 
   // When estimate changes, allow applying single-option defaults again for the new estimate
   useEffect(() => {
@@ -1384,15 +1401,13 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Job Tag:
               </Text>
-              <Select
-                data={[
-                  { value: '', label: 'None' },
-                  { value: 'New Construction', label: 'New Construction' },
-                  { value: 'Repaint', label: 'Repaint' },
-                ]}
-                value={selectedJobTag ?? (estimate.job_tag || '')}
-                onChange={(value) => setSelectedJobTag(value || null)}
-                placeholder="Select tag"
+              <Autocomplete
+                data={jobTagOptions.map((o) => o.label)}
+                value={selectedJobTag != null ? selectedJobTag : 'None'}
+                onChange={(value) =>
+                  setSelectedJobTag(value === 'None' || !value ? null : value)
+                }
+                placeholder="Select or type tag"
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 disabled={savingJobTag}
