@@ -171,7 +171,7 @@ export function NewJobWorkflow() {
     const router = useRouter();
     const { refreshData, updateEstimate } = useDataCache();
     const { jobTags } = useJobTags();
-    const jobTagOptionLabels = ['None', ...jobTags];
+    const jobTagOptionLabels = jobTags;
 
     const form = useForm<FormValues>({
         mode: 'uncontrolled',
@@ -966,17 +966,10 @@ export function NewJobWorkflow() {
                                 )}
                                 <Autocomplete
                                   label="Job Tag"
-                                  placeholder="Select or type tag (optional)"
+                                  placeholder="Optional"
                                   data={jobTagOptionLabels}
                                   key={form.key('job_tag')}
                                   {...form.getInputProps('job_tag')}
-                                  value={form.getInputProps('job_tag').value || 'None'}
-                                  onChange={(value: string) =>
-                                    form.setFieldValue(
-                                      'job_tag',
-                                      value === 'None' || !value ? '' : value
-                                    )
-                                  }
                                 />
                             </Stack>
                         </Stepper.Step>

@@ -155,6 +155,20 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Failed to submit support request';
+    const isAxiosError =
+      err &&
+      typeof err === 'object' &&
+      'isAxiosError' in err &&
+      (err as { isAxiosError?: boolean }).isAxiosError;
+    const status = isAxiosError && err && typeof err === 'object' && 'response' in err
+      ? (err as { response?: { status?: number } }).response?.status
+      : undefined;
+    const detail =
+      isAxiosError && err && typeof err === 'object' && 'response' in err
+        ? (err as { response?: { data?: unknown } }).response?.data
+        : undefined;
+    // eslint-disable-next-line no-console
+    console.error('POST /api/support failed:', { message, status, detail });
     return NextResponse.json({ message }, { status: 500 });
   }
 }

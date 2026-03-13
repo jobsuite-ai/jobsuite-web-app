@@ -1402,12 +1402,10 @@ export default function SidebarDetails({
                 Job Tag:
               </Text>
               <Autocomplete
-                data={jobTagOptions.map((o) => o.label)}
-                value={selectedJobTag != null ? selectedJobTag : 'None'}
-                onChange={(value) =>
-                  setSelectedJobTag(value === 'None' || !value ? null : value)
-                }
-                placeholder="Select or type tag"
+                data={jobTagOptions.map((o) => o.label).filter((l) => l !== 'None')}
+                value={selectedJobTag ?? ''}
+                onChange={(value) => setSelectedJobTag(value === '' ? null : value)}
+                placeholder="None"
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 disabled={savingJobTag}
