@@ -50,6 +50,12 @@ frontend:
           else
             echo WEBHOOK_EMAIL_CONFIGURED=no
           fi
+
+          # Amplify sets env vars (and resolved secrets) in the build environment, but Next.js
+          # API routes only see vars that are in .env.production at build time. Append any
+          # server-side vars so they are available at runtime.
+          env | grep -E '^JIRA_|^WEBHOOK_|^RESEND_|^SUPPORT_FROM_EMAIL=' || true >> .env.production
+          echo "Jira API Token added to .env.production"
     build:
       commands:
         - npm run build
