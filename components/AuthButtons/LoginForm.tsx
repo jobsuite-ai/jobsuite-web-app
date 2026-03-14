@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { Anchor, Button, Checkbox, Divider, Group, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import { Anchor, Button, Checkbox, Group, Paper, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -10,11 +10,7 @@ import { useRouter } from 'next/navigation';
 import { setAccessTokenMetadata } from '@/app/utils/authToken';
 import { encryptPassword } from '@/app/utils/encryption';
 
-interface LoginFormProps {
-  onShowRegister?: () => void;
-}
-
-export default function LoginForm({ onShowRegister }: LoginFormProps) {
+export default function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -128,28 +124,15 @@ export default function LoginForm({ onShowRegister }: LoginFormProps) {
           Log in to continue
         </Button>
 
-        {onShowRegister && (
-          <Group mt="md" justify="center">
-            <Anchor
-              size="sm"
-              onClick={() => router.push('/forgot-password')}
-              style={{ cursor: 'pointer' }}
-            >
-              Can&apos;t log in?
-            </Anchor>
-            <Divider orientation="vertical" />
-            <Anchor
-              component="button"
-              type="button"
-              size="sm"
-              ta="center"
-              onClick={onShowRegister}
-              style={{ cursor: 'pointer', display: 'block' }}
-            >
-              Create an account
-            </Anchor>
-          </Group>
-        )}
+        <Group mt="md" justify="center">
+          <Anchor
+            size="sm"
+            onClick={() => router.push('/forgot-password')}
+            style={{ cursor: 'pointer' }}
+          >
+            Can&apos;t log in?
+          </Anchor>
+        </Group>
 
         <Text size="xs" c="dimmed" ta="center" mt="xl">
           <Anchor component={Link} href="/privacy" size="xs">
