@@ -99,7 +99,7 @@ interface DashboardMetrics {
 export default function Dashboard() {
   const { isLoading: isAuthLoading } = useAuth({ requireAuth: true });
   const router = useRouter();
-  const { jobTags } = useJobTags();
+  const { jobTags } = useJobTags({ enabled: !isAuthLoading });
   const [loading, setLoading] = useState(true);
   const [timeFrame, setTimeFrame] = useState('ytd'); // Default to year to date
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
