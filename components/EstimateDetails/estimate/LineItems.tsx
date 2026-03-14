@@ -378,12 +378,17 @@ const LineItems = forwardRef<LineItemsRef, {
 
         // Fetch base hourly rate and auto-populate if available
         const baseRate = await fetchBaseHourlyRate();
+        const defaultDescription = 'Please see description above';
         if (baseRate && baseRate > 0) {
             form.setValues({
                 title: '',
-                description: '',
+                description: defaultDescription,
                 hours: 0,
                 rate: baseRate,
+            });
+        } else {
+            form.setValues({
+                description: defaultDescription,
             });
         }
     };
