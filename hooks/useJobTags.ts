@@ -2,17 +2,28 @@ import { useEffect, useState } from 'react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 
-export function useJobTags() {
+export interface UseJobTagsOptions {
+  /** When false, skips fetching (e.g. until auth is ready). Default true. */
+  enabled?: boolean;
+}
+
+export function useJobTags(options: UseJobTagsOptions = {}) {
+  const { enabled = true } = options;
   const [jobTags, setJobTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      return () => {};
+    }
+
     let cancelled = false;
+    setLoading(true);
+    setError(null);
 
     async function fetchTags() {
-      setLoading(true);
-      setError(null);
       try {
         const res = await fetch('/api/job-tags', {
           method: 'GET',
@@ -40,7 +51,7 @@ export function useJobTags() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [enabled]);
 
   return { jobTags, loading, error };
 }
