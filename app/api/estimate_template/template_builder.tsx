@@ -366,7 +366,7 @@ export const generateTemplate = (template: TemplateInput) => `
 
                 <div class="estimate-details">                    
                     <div class="notes">
-                        <p>${template.notes}</p>
+                        ${template.notes}
                     </div>
                 </div>
 
