@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server';
 
 import { getApiBaseUrl } from '../../utils/serviceAuth';
 
+/** New account creation is temporarily disabled. */
+const REGISTRATION_DISABLED = true;
+
 export async function POST(request: Request) {
+  if (REGISTRATION_DISABLED) {
+    return NextResponse.json(
+      { message: 'New account creation is temporarily disabled. Please contact support if you need access.' },
+      { status: 503 }
+    );
+  }
+
   try {
     const body = await request.json();
     const { email, password: encryptedPassword, full_name, role, contractor_id } = body;
