@@ -29,6 +29,7 @@ import {
 } from '@tabler/icons-react';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
+import { DepositSection } from '@/components/EstimateDetails/signature/DepositSection';
 import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
 import SignatureAuditHistory from '@/components/EstimateDetails/signature/SignatureAuditHistory';
 import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/signature/SignatureForm';
@@ -75,6 +76,8 @@ export interface SignatureLinkInfo {
     };
     past_projects?: PastProject[];
     viewer_type?: 'contractor' | 'client';
+    estimate_total?: number;
+    deposit_amount?: number;
     signatures?: Array<{
         id?: string;
         signature_type: string;
@@ -361,6 +364,19 @@ export default function SignaturePageLayout({
                                         This estimate has already been signed.
                                     </Alert>
                                 )}
+                                {signed &&
+                                    !isContractorViewer &&
+                                    (linkInfo.deposit_amount ?? 0) > 0 && (
+                                        <DepositSection
+                                          signatureHash={signatureHash}
+                                          depositAmount={
+                                              linkInfo.deposit_amount ?? 0
+                                          }
+                                          estimateTotal={
+                                              linkInfo.estimate_total ?? 0
+                                          }
+                                        />
+                                    )}
                                 <Box style={{ position: 'relative' }}>
                                     <EstimateSignaturePreview
                                       estimate={linkInfo.estimate}
