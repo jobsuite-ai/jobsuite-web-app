@@ -17,6 +17,7 @@ import { useContractorLogo } from '@/hooks/useContractorLogo';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllClients } from '@/store/slices/clientsSlice';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
+import { selectAllProjects } from '@/store/slices/projectsSlice';
 
 const links = [
   { link: '/', label: 'Home' },
@@ -36,7 +37,7 @@ interface HeaderProps {
 }
 
 interface SearchResult {
-  type: 'estimate' | 'client';
+  type: 'estimate' | 'client' | 'project';
   id: string;
   label: string;
   subtitle?: string;
@@ -73,6 +74,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const pathname = usePathname();
   const clients = useAppSelector(selectAllClients);
   const estimates = useAppSelector(selectAllEstimates);
+  const projects = useAppSelector(selectAllProjects);
   const { isAuthenticated, isLoading } = useAuth();
   const { logoUrl } = useContractorLogo();
   const theme = useMantineTheme();
@@ -322,12 +324,85 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       }
     });
 
-    // Limit results to 10 total (5 estimates + 5 clients, or balanced)
-    const estimateResults = results.filter((r) => r.type === 'estimate').slice(0, 5);
-    const clientResults = results.filter((r) => r.type === 'client').slice(0, 5);
+    // Search projects by title and address (same shape as estimates - Job = Estimate)
+    projects.forEach((project) => {
+      const titleText = project.title || '';
+      const titleMatch = titleText ? fuzzyMatch(titleText, searchTerm) : false;
 
-    setSearchResults([...estimateResults, ...clientResults]);
-  }, [autocompleteValue, clients, estimates]);
+      const addressStrings: string[] = [];
+      const clientAddress = project.client_address;
+      if (clientAddress && String(clientAddress).trim()) {
+        addressStrings.push(String(clientAddress).trim());
+      }
+      const street = project.address_street;
+      if (street && String(street).trim()) {
+        addressStrings.push(String(street).trim());
+      }
+      const city = project.address_city || project.city;
+      if (city && String(city).trim()) {
+        addressStrings.push(String(city).trim());
+      }
+      const state = project.address_state || project.state;
+      if (state && String(state).trim()) {
+        addressStrings.push(String(state).trim());
+      }
+      const zipcode = project.address_zipcode || project.zip_code;
+      if (zipcode && String(zipcode).trim()) {
+        addressStrings.push(String(zipcode).trim());
+      }
+      const country = project.address_country;
+      if (country && String(country).trim()) {
+        addressStrings.push(String(country).trim());
+      }
+      const combinedParts = [
+        street,
+        city,
+        state,
+        zipcode,
+        country,
+      ]
+        .filter((part) => part != null && part !== undefined && String(part).trim())
+        .map((part) => String(part).trim());
+      if (combinedParts.length > 0) {
+        const combinedAddress = combinedParts.join(' ').trim();
+        if (combinedAddress && !addressStrings.includes(combinedAddress)) {
+          addressStrings.push(combinedAddress);
+        }
+      }
+
+      let addressMatch = false;
+      for (const addrStr of addressStrings) {
+        if (addrStr && addrStr.length > 0 && fuzzyMatch(addrStr, searchTerm)) {
+          addressMatch = true;
+          break;
+        }
+      }
+
+      if (titleMatch || addressMatch) {
+        const displayAddressParts = [
+          project.address_street || project.client_address,
+          project.address_city || project.city,
+          project.address_state || project.state,
+          project.address_zipcode || project.zip_code,
+        ].filter((part) => part && part.trim().length > 0);
+        const address = displayAddressParts.length > 0 ? displayAddressParts.join(', ') : 'No address';
+
+        results.push({
+          type: 'project',
+          id: project.id,
+          label: project.title || `Project #${project.id.slice(0, 8)}`,
+          subtitle: address,
+        });
+      }
+    });
+
+    // Limit results: 4 estimates, 3 clients, 3 projects (10 total)
+    const estimateResults = results.filter((r) => r.type === 'estimate').slice(0, 4);
+    const clientResults = results.filter((r) => r.type === 'client').slice(0, 3);
+    const projectResults = results.filter((r) => r.type === 'project').slice(0, 3);
+
+    setSearchResults([...estimateResults, ...clientResults, ...projectResults]);
+  }, [autocompleteValue, clients, estimates, projects]);
 
   // Format search results for Autocomplete
   const autocompleteData = useMemo(() => {
@@ -365,9 +440,12 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       setSearchResults([]);
 
       // Navigate to the selected item
-      const targetPath = selectedResult.type === 'estimate'
-        ? `/proposals/${selectedResult.id}`
-        : `/clients/${selectedResult.id}`;
+      const targetPath =
+        selectedResult.type === 'estimate'
+          ? `/proposals/${selectedResult.id}`
+          : selectedResult.type === 'project'
+            ? `/projects/${selectedResult.id}`
+            : `/clients/${selectedResult.id}`;
       if (event?.metaKey || event?.ctrlKey) {
         window.open(targetPath, '_blank');
       } else {
@@ -395,8 +473,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     if (!result) return null;
 
     const isEstimate = result.type === 'estimate';
-    const Icon = isEstimate ? IconBuilding : IconUserCircle;
-    const iconColor = isEstimate ? 'blue' : 'green';
+    const isProject = result.type === 'project';
+    const Icon = isEstimate ? IconBuilding : isProject ? IconFolder : IconUserCircle;
+    const iconColor = isEstimate ? 'blue' : isProject ? 'orange' : 'green';
 
     return (
       <Group
@@ -801,7 +880,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
               <div className={classes.searchWrapper}>
                 <Autocomplete
                   className={classes.search}
-                  placeholder="Search by client name, email, or estimate address"
+                  placeholder="Search by client name, email, estimate or project"
                   value={autocompleteValue}
                   leftSection={
                     <IconSearch style={{ width: rem(28), height: rem(16) }} stroke={1.5} />
