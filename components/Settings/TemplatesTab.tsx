@@ -3,17 +3,17 @@
 import { useEffect, useState } from 'react';
 
 import {
-    Card,
+    Accordion,
+    Alert,
     Button,
+    Card,
     Group,
+    Loader,
+    Select,
     Stack,
+    Switch,
     Text,
     TextInput,
-    Switch,
-    Select,
-    Loader,
-    Alert,
-    Accordion,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import '@mantine/tiptap/styles.css';
@@ -298,46 +298,6 @@ export default function TemplatesTab() {
                 </Alert>
             )}
 
-            {/* Estimate received email (contractor_config) */}
-            <Card shadow="sm" padding="lg" withBorder>
-                <Stack gap="md">
-                    <Text fw={600} size="lg">
-                        Estimate received email
-                    </Text>
-                    <Text c="dimmed" size="sm">
-                        Email body when a client submits an estimate. Subject is fixed. Leave empty
-                        for the default message.
-                    </Text>
-                    <Stack gap="xs">
-                        <Text fw={500} size="sm">
-                            Body — use {'{client_first}'} for the client&apos;s first name
-                        </Text>
-                        <Text c="dimmed" size="xs">
-                            Format with the toolbar or HTML. Use {'{client_first}'} to insert the
-                            client&apos;s first name (e.g. &quot;Hi {'{client_first}'},&quot;).
-                        </Text>
-                        <RichTextBodyEditor
-                          value={estimateReceivedBody}
-                          disabled={savingEstimateReceived}
-                          onChange={(nextValue) => {
-                            setEstimateReceivedBody(nextValue);
-                            setEstimateReceivedDirty(true);
-                          }}
-                        />
-                    </Stack>
-                    {estimateReceivedDirty && (
-                        <Group justify="flex-end">
-                          <Button
-                            onClick={saveEstimateReceivedEmail}
-                            loading={savingEstimateReceived}
-                          >
-                            Save changes
-                          </Button>
-                        </Group>
-                    )}
-                </Stack>
-            </Card>
-
             {/* Message Templates */}
             <Card shadow="sm" padding="lg" withBorder>
                 <Stack gap="md">
@@ -348,8 +308,118 @@ export default function TemplatesTab() {
                         Configure email templates for each message type. You can enable/disable
                         message types and customize the content.
                     </Text>
+                    <Text c="dimmed" size="sm">
+                        Available variables:{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_name}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_email}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_phone}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_address}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_city}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_state}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{client_zip}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{estimate_title}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{estimate_date}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{estimate_id}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{sub_client_name}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{sub_client_email}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{today_date}}'}
+                        </Text>
+                        ,{' '}
+                        <Text component="span" ff="monospace">
+                            {'{{signature_url}}'}
+                        </Text>
+                        .
+                    </Text>
 
                     <Accordion>
+                        <Accordion.Item value="ESTIMATE_RECEIVED_EMAIL">
+                            <Accordion.Control>
+                                <Group justify="flex-start" style={{ width: '100%' }}>
+                                    <Text fw={500}>Estimate received email</Text>
+                                </Group>
+                            </Accordion.Control>
+                            <Accordion.Panel>
+                                <Stack gap="md" mt="md">
+                                    <Text c="dimmed" size="sm">
+                                        Email body when a client submits an estimate. Subject is
+                                        fixed. Leave empty for the default message.
+                                    </Text>
+                                    <TextInput
+                                      label="Subject"
+                                      value="We received your request"
+                                      disabled
+                                    />
+                                    <Stack gap="xs">
+                                        <Text fw={500} size="sm">
+                                            Body
+                                        </Text>
+                                        <Text c="dimmed" size="xs">
+                                            Use{' '}
+                                            <Text component="span" ff="monospace">
+                                                {'{client_first}'}
+                                            </Text>{' '}
+                                            for the client&apos;s first name.
+                                        </Text>
+                                        <RichTextBodyEditor
+                                          value={estimateReceivedBody}
+                                          disabled={savingEstimateReceived}
+                                          onChange={(nextValue) => {
+                                                setEstimateReceivedBody(nextValue);
+                                                setEstimateReceivedDirty(true);
+                                            }}
+                                        />
+                                    </Stack>
+                                    {estimateReceivedDirty && (
+                                        <Group justify="flex-end">
+                                            <Button
+                                              onClick={saveEstimateReceivedEmail}
+                                              loading={savingEstimateReceived}
+                                            >
+                                                Save Changes
+                                            </Button>
+                                        </Group>
+                                    )}
+                                </Stack>
+                            </Accordion.Panel>
+                        </Accordion.Item>
+
                         {MESSAGE_TYPES.map((type) => {
                             const template = templates[type.value] as Template | undefined;
                             if (!template) return null;
