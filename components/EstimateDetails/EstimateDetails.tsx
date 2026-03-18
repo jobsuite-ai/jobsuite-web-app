@@ -24,19 +24,19 @@ import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
-import ContractorSignatureRequired from './ContractorSignatureRequired';
-import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import LoadingState from '../Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
 import UniversalError from '../Global/UniversalError';
 import { BADGE_COLORS } from '../Global/utils';
 import JobComments from './comments/JobComments';
+import ContractorSignatureRequired from './ContractorSignatureRequired';
 import CreateChangeOrder from './CreateChangeOrder';
 import EstimatePreview from './estimate/EstimatePreview';
 import { EstimateLineItem } from './estimate/LineItem';
 import LineItems, { LineItemsRef } from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
 import TranscriptionSummary, { TranscriptionSummaryRef } from './estimate/TranscriptionSummary';
+import EstimateDetailsSkeleton from './EstimateDetailsSkeleton';
 import FileList from './FileList';
 import FileUpload from './FileUpload';
 import ImageGallery from './ImageGallery';
@@ -53,18 +53,18 @@ import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectClientById } from '@/store/slices/clientsSlice';
 import {
+    selectChangeOrders,
+    selectComments,
     selectEstimateDetails,
     selectLineItems,
-    selectComments,
-    selectChangeOrders,
-    selectTimeEntries,
     selectResources,
     selectSignatures,
+    selectTimeEntries,
     setEstimateDetails,
 } from '@/store/slices/estimateDetailsSlice';
 import {
-    selectEstimateById,
     enrichEstimate,
+    selectEstimateById,
 } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
@@ -2260,7 +2260,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                       refresh={getEstimate}
                       autoEdit
                       showSaveButton={false}
-                      useRichTextEditor
                       onSaveSuccess={() => setShowDescriptionEditor(false)}
                     />
                     <Flex justify="center" mt="lg">

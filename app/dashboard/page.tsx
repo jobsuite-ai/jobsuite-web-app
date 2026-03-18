@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-import { Anchor, Autocomplete, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
+import { Anchor, Button, Center, Container, Grid, Group, Loader, Modal, NumberInput, Paper, Select, Skeleton, Stack, Table, Tabs, Text, Title } from '@mantine/core';
 import { IconEdit } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -297,7 +297,7 @@ export default function Dashboard() {
         <Group justify="space-between">
           <Title order={1} c="gray.0">Dashboard</Title>
           <Group>
-            <Autocomplete
+            <Select
               label="Filter by tag"
               c="gray.0"
               value={selectedTag ?? 'All'}

@@ -4,9 +4,10 @@ import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 
 import { Button, Group, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import '@mantine/tiptap/styles.css';
 import { IconReload } from '@tabler/icons-react';
 
-import MarkdownRenderer from '../../Global/MarkdownRenderer';
+import DescriptionContentView from '../../Global/DescriptionContentView';
 import { Estimate } from '../../Global/model';
 import classes from '../styles/EstimateDetails.module.css';
 
@@ -27,7 +28,6 @@ type TranscriptionSummaryProps = {
     autoEdit?: boolean;
     onSaveSuccess?: () => void;
     showSaveButton?: boolean;
-    useRichTextEditor?: boolean;
 };
 
 const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSummaryProps>(({
@@ -37,7 +37,6 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
     autoEdit = false,
     onSaveSuccess,
     showSaveButton = true,
-    useRichTextEditor = false,
 }, ref) => {
     const [editMarkdown, setEditMarkdown] = useState(false);
     const [markdown, setMarkdown] = useState(estimate.transcription_summary ?? '');
@@ -88,10 +87,6 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
         handleEdit,
         handleSave: handleEditSave,
     }));
-
-    const handleMarkdownChange = (event: any) => {
-        setMarkdown(event.target.value);
-    };
 
     const handleEditSave = async () => {
         const accessToken = localStorage.getItem('access_token');
@@ -172,28 +167,9 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
     const hasTranscription = transcriptionSummary
         && typeof transcriptionSummary === 'string'
         && transcriptionSummary.trim().length > 0;
-    const isHtmlDescription = !!transcriptionSummary
-        && /<\/?[a-z][\s\S]*>/i.test(transcriptionSummary);
 
     const renderEditor = () => (
-        useRichTextEditor ? (
-            <RichTextBodyEditor value={markdown} onChange={setMarkdown} />
-        ) : (
-            <textarea
-              value={markdown}
-              onChange={handleMarkdownChange}
-              style={{
-                    width: '100%',
-                    height: '300px',
-                    padding: '10px',
-                    fontSize: '16px',
-                    fontFamily: 'monospace',
-                    border: '1px solid #ccc',
-                    borderRadius: '5px',
-                }}
-              placeholder={markdown}
-            />
-        )
+        <RichTextBodyEditor value={markdown} onChange={setMarkdown} />
     );
 
     return (
@@ -210,16 +186,10 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
                             )}
                         </>
                     :
-                        (isHtmlDescription ? (
-                            <div
-                              className={classes.transcriptionContainer}
-                              dangerouslySetInnerHTML={{
-                                __html: estimate.transcription_summary || '',
-                              }}
+                        <DescriptionContentView
+                          content={estimate.transcription_summary || ''}
+                          className={classes.transcriptionContainer}
                             />
-                        ) : (
-                            <MarkdownRenderer markdown={estimate.transcription_summary || ''} />
-                        ))
                     }
                 </>
                 :
