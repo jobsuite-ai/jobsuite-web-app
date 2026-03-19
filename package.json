@@ -84,6 +84,7 @@
     "remark-html": "^16.0.1",
     "resend": "^4.8.0",
     "swr": "^2.2.5",
+    "turndown": "^7.2.2",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
@@ -102,6 +103,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.7",
     "@types/react-slick": "^0.23.13",
+    "@types/turndown": "^5.0.6",
     "@typescript-eslint/eslint-plugin": "^7.13.1",
     "@typescript-eslint/parser": "^7.13.1",
     "aws-cdk": "^2.167.2",
