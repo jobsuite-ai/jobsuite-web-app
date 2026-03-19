@@ -15,6 +15,7 @@ import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Glo
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useJobTags } from '@/hooks/useJobTags';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
@@ -75,6 +76,8 @@ export default function SidebarDetails({
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [syncingMainStatus, setSyncingMainStatus] = useState(false);
   const [showCheckInDateModal, setShowCheckInDateModal] = useState(false);
+  const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
+  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
   const [checkInDate, setCheckInDate] = useState<Date | null>(null);
   const [savingCheckInDate, setSavingCheckInDate] = useState(false);
   const [editingCrewLead, setEditingCrewLead] = useState(false);
@@ -450,6 +453,10 @@ export default function SidebarDetails({
       // Optionally refresh in background for consistency (non-blocking)
       refreshData('estimates').catch(() => {});
       refreshData('projects').catch(() => {});
+
+      if (status === EstimateStatus.PROJECT_BILLING_NEEDED) {
+        setShowBillingPaymentModal(true);
+      }
 
       onUpdate();
     } catch (error) {
@@ -2033,6 +2040,63 @@ export default function SidebarDetails({
               disabled={!checkInDate}
             >
               Set check-in date
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
+
+      {/* Billing Needed: Collect payment modal */}
+      <Modal
+        title="Collect payment"
+        opened={showBillingPaymentModal}
+        centered
+        onClose={() => setShowBillingPaymentModal(false)}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            How would you like to collect payment for this project?
+          </Text>
+          <Group justify="flex-end" gap="xs">
+            <Button
+              variant="default"
+              onClick={() => setShowBillingPaymentModal(false)}
+            >
+              Collect in person
+            </Button>
+            <Button
+              variant="filled"
+              loading={sendingInvoiceEmail}
+              onClick={async () => {
+                setSendingInvoiceEmail(true);
+                try {
+                  const res = await fetch(
+                    `/api/estimates/${estimateID}/invoice/send-email`,
+                    {
+                      method: 'POST',
+                      headers: getApiHeaders(),
+                    }
+                  );
+                  if (res.ok) {
+                    notifications.show({
+                      title: 'Invoice sent',
+                      message: 'The client has been emailed a link to pay.',
+                      color: 'green',
+                    });
+                    setShowBillingPaymentModal(false);
+                  } else {
+                    const err = await res.json().catch(() => ({}));
+                    notifications.show({
+                      title: 'Failed to send invoice',
+                      message: err.message || 'Please try again.',
+                      color: 'red',
+                    });
+                  }
+                } finally {
+                  setSendingInvoiceEmail(false);
+                }
+              }}
+            >
+              Send invoice by email
             </Button>
           </Group>
         </Stack>

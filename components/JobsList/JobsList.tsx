@@ -23,10 +23,12 @@ import { CSS } from '@dnd-kit/utilities';
 import {
     ActionIcon,
     Badge,
+    Button,
     Card,
     Center,
     Flex,
     Group,
+    Modal,
     ScrollArea,
     Stack,
     Text,
@@ -476,6 +478,9 @@ export default function JobsList() {
     const [refreshing, setRefreshing] = useState(false);
     // null = loading, true/false = loaded
     const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean | null>(null);
+    const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
+    const [billingModalEstimateId, setBillingModalEstimateId] = useState<string | null>(null);
+    const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -1033,6 +1038,10 @@ export default function JobsList() {
                 updateProject(updatedEstimate);
                 // Optionally refresh in background for consistency (non-blocking)
                 refreshData('projects').catch(() => {});
+                if (newStatus === EstimateStatus.PROJECT_BILLING_NEEDED) {
+                    setBillingModalEstimateId(estimateId);
+                    setShowBillingPaymentModal(true);
+                }
             }
         } catch (error) {
             // Revert on error
@@ -1207,6 +1216,72 @@ export default function JobsList() {
                   </Card>
                 ) : null}
             </DragOverlay>
+
+            {/* Billing Needed: Collect payment modal (when moving to Billing Needed from board) */}
+            <Modal
+              title="Collect payment"
+              opened={showBillingPaymentModal}
+              centered
+              onClose={() => {
+                    setShowBillingPaymentModal(false);
+                    setBillingModalEstimateId(null);
+                }}
+            >
+                <Stack gap="md">
+                    <Text size="sm" c="dimmed">
+                        How would you like to collect payment for this project?
+                    </Text>
+                    <Group justify="flex-end" gap="xs">
+                        <Button
+                          variant="default"
+                          onClick={() => {
+                                setShowBillingPaymentModal(false);
+                                setBillingModalEstimateId(null);
+                            }}
+                        >
+                            Collect in person
+                        </Button>
+                        <Button
+                          variant="filled"
+                          loading={sendingInvoiceEmail}
+                          disabled={!billingModalEstimateId}
+                          onClick={async () => {
+                                if (!billingModalEstimateId) return;
+                                setSendingInvoiceEmail(true);
+                                try {
+                                    const res = await fetch(
+                                        `/api/estimates/${billingModalEstimateId}/invoice/send-email`,
+                                        {
+                                            method: 'POST',
+                                            headers: getApiHeaders(),
+                                        }
+                                    );
+                                    if (res.ok) {
+                                        notifications.show({
+                                            title: 'Invoice sent',
+                                            message: 'The client has been emailed a link to pay.',
+                                            color: 'green',
+                                        });
+                                        setShowBillingPaymentModal(false);
+                                        setBillingModalEstimateId(null);
+                                    } else {
+                                        const err = await res.json().catch(() => ({}));
+                                        notifications.show({
+                                            title: 'Failed to send invoice',
+                                            message: err.message || 'Please try again.',
+                                            color: 'red',
+                                        });
+                                    }
+                                } finally {
+                                    setSendingInvoiceEmail(false);
+                                }
+                            }}
+                        >
+                            Send invoice by email
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
         </DndContext>
     );
 }
