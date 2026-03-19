@@ -78,6 +78,7 @@ export interface SignatureLinkInfo {
     viewer_type?: 'contractor' | 'client';
     estimate_total?: number;
     deposit_amount?: number;
+    helcim_configured?: boolean;
     signatures?: Array<{
         id?: string;
         signature_type: string;
@@ -371,6 +372,9 @@ export default function SignaturePageLayout({
                                           signatureHash={signatureHash}
                                           depositAmount={
                                               linkInfo.deposit_amount ?? 0
+                                          }
+                                          helcimConfigured={
+                                              linkInfo.helcim_configured ?? false
                                           }
                                           estimateTotal={
                                               linkInfo.estimate_total ?? 0

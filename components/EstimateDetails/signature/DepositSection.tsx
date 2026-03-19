@@ -10,6 +10,7 @@ interface DepositSectionProps {
     signatureHash: string;
     depositAmount: number;
     estimateTotal: number;
+    helcimConfigured?: boolean;
 }
 
 const PAYMENT_RECORD_ERROR =
@@ -18,6 +19,7 @@ const PAYMENT_RECORD_ERROR =
 export function DepositSection({
     signatureHash,
     depositAmount,
+    helcimConfigured = false,
 }: DepositSectionProps) {
     const [payLoading, setPayLoading] = useState(false);
     const [payLaterLoading, setPayLaterLoading] = useState(false);
@@ -170,7 +172,7 @@ export function DepositSection({
         <Paper shadow="sm" p="lg" radius="md" withBorder mb="xl">
             <Stack gap="md">
                 <Text fw={600} size="lg">
-                    Pay 30% deposit
+                    {helcimConfigured ? 'Pay 30% deposit' : 'Request 30% deposit'}
                 </Text>
                 <Text c="dimmed" size="sm">
                     {`A 30% deposit of $${depositAmount.toFixed(2)} is due prior to commencement of work.`}
@@ -180,21 +182,29 @@ export function DepositSection({
                         {payError}
                     </Alert>
                 )}
-                <Button
-                  onClick={handlePayNow}
-                  loading={payLoading}
-                  disabled={payLaterLoading}
-                  size="md"
-                >
-                    {payLoading ? (
-                        <>
-                            <Loader size="sm" mr="xs" />
-                            Opening payment…
-                        </>
-                    ) : (
-                        `Pay 30% deposit now ($${depositAmount.toFixed(2)})`
-                    )}
-                </Button>
+                {helcimConfigured ? (
+                    <Button
+                      onClick={handlePayNow}
+                      loading={payLoading}
+                      disabled={payLaterLoading}
+                      size="md"
+                    >
+                        {payLoading ? (
+                            <>
+                                <Loader size="sm" mr="xs" />
+                                Opening payment…
+                            </>
+                        ) : (
+                            `Pay 30% deposit now ($${depositAmount.toFixed(2)})`
+                        )}
+                    </Button>
+                ) : (
+                    <Text size="xs" c="dimmed">
+                        Online payment isn&apos;t set up for this contractor.
+                        We&apos;ll send you a deposit request to complete payment
+                        later.
+                    </Text>
+                )}
                 <Text size="xs" c="dimmed">
                     Or{' '}
                     <button
