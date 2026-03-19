@@ -14,6 +14,11 @@ import classes from '../styles/EstimateDetails.module.css';
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
 import LoadingState from '@/components/Global/LoadingState';
 import RichTextBodyEditor from '@/components/Global/RichTextBodyEditor';
+import {
+    htmlToMarkdown,
+    isHtml,
+    markdownToHtml,
+} from '@/utils/descriptionContent';
 
 export interface TranscriptionSummaryRef {
     copyToClipboard: () => void;
@@ -39,22 +44,32 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
     showSaveButton = true,
 }, ref) => {
     const [editMarkdown, setEditMarkdown] = useState(false);
-    const [markdown, setMarkdown] = useState(estimate.transcription_summary ?? '');
+    /** When editing: HTML for the rich text editor (from markdown when opening) */
+    const [editorHtml, setEditorHtml] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // Update markdown state when estimate changes
+    // In edit mode: set editor to HTML (as-is) or convert markdown to HTML
     useEffect(() => {
         if (!editMarkdown) {
-            setMarkdown(estimate.transcription_summary ?? '');
+            return;
         }
-    }, [estimate.transcription_summary, editMarkdown]);
+        const source = (estimate.transcription_summary ?? '').trim();
+        if (!source) {
+            setEditorHtml('');
+            return;
+        }
+        if (isHtml(source)) {
+            setEditorHtml(source);
+            return;
+        }
+        markdownToHtml(source).then(setEditorHtml);
+    }, [editMarkdown, estimate.transcription_summary]);
 
     useEffect(() => {
         if (autoEdit) {
-            setMarkdown(estimate.transcription_summary ?? '');
             setEditMarkdown(true);
         }
-    }, [autoEdit, estimate.transcription_summary]);
+    }, [autoEdit]);
 
     const copyToClipboard = async () => {
         try {
@@ -78,7 +93,6 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
     };
 
     const handleEdit = async () => {
-        setMarkdown(estimate.transcription_summary ?? '');
         setEditMarkdown(true);
     };
 
@@ -102,7 +116,7 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
         }
 
         const content: UpdateJobContent = {
-            transcription_summary: markdown,
+            transcription_summary: htmlToMarkdown(editorHtml),
         };
 
         try {
@@ -169,7 +183,7 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
         && transcriptionSummary.trim().length > 0;
 
     const renderEditor = () => (
-        <RichTextBodyEditor value={markdown} onChange={setMarkdown} />
+        <RichTextBodyEditor value={editorHtml} onChange={setEditorHtml} />
     );
 
     return (
