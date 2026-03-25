@@ -167,6 +167,10 @@ export function DepositSection({
             if (!token) throw new Error('No checkout token');
             checkoutTokenRef.current = token;
             purposeRef.current = purpose;
+            const amountCharged =
+                typeof data.amount === 'number' && !Number.isNaN(data.amount)
+                    ? data.amount
+                    : chargeAmount;
 
             const helcimPayJsKey = `helcim-pay-js-${token}`;
             const handler = (event: MessageEvent) => {
@@ -183,6 +187,7 @@ export function DepositSection({
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                         purpose: purposeRef.current,
+                                        amount_paid: amountCharged,
                                         transaction_id:
                                             event.data?.eventMessage?.data
                                                 ?.transactionId,
