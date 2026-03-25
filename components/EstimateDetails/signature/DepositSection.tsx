@@ -39,7 +39,8 @@ const PAYMENT_RECORD_ERROR =
 function waitForHelcimPayIframeReady(maxWaitMs = 12000): Promise<void> {
     return new Promise((resolve) => {
         let resolved = false;
-        let intervalId: ReturnType<typeof setInterval> | undefined;
+        /** Browser timer handles are numeric; avoid NodeJS.Timeout vs number clashes in CI. */
+        let intervalId: number | undefined;
         const finish = () => {
             if (resolved) return;
             resolved = true;
@@ -54,13 +55,14 @@ function waitForHelcimPayIframeReady(maxWaitMs = 12000): Promise<void> {
             if (frame instanceof HTMLIFrameElement && intervalId !== undefined) {
                 window.clearInterval(intervalId);
                 intervalId = undefined;
+                let backup = 0;
                 const onReady = () => {
                     window.clearTimeout(overall);
                     window.clearTimeout(backup);
                     finish();
                 };
                 frame.addEventListener('load', onReady, { once: true });
-                const backup = window.setTimeout(onReady, 4000);
+                backup = window.setTimeout(onReady, 4000);
             }
         }, 50);
     });

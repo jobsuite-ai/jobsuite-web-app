@@ -23,6 +23,10 @@ export interface NotificationSettingsBucket {
 }
 
 export interface NotificationSettingsConfig {
+    /** New estimate created — emailed to all users who opt in (not owner-based). */
+    new_estimate: boolean;
+    /** Estimate marked sold (accepted) — emailed to all users who opt in. */
+    sold_estimate: boolean;
     estimate_updates: NotificationSettingsBucket;
     comments: NotificationSettingsBucket;
     job_status: NotificationSettingsBucket;
@@ -42,6 +46,8 @@ interface NotificationsTabProps {
 
 export default function NotificationsTab({ user }: NotificationsTabProps) {
     const defaultNotificationSettings: NotificationSettingsConfig = {
+        new_estimate: true,
+        sold_estimate: true,
         estimate_updates: { owner: true, non_owner: true },
         comments: { owner: true, non_owner: true },
         job_status: { owner: true, non_owner: true },
@@ -66,6 +72,8 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
     const mergeNotificationSettings = (
         overrides?: Partial<NotificationSettingsConfig>
     ): NotificationSettingsConfig => ({
+        new_estimate: overrides?.new_estimate ?? defaultNotificationSettings.new_estimate,
+        sold_estimate: overrides?.sold_estimate ?? defaultNotificationSettings.sold_estimate,
         estimate_updates: {
             owner:
                 overrides?.estimate_updates?.owner ??
@@ -254,9 +262,48 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                         <>
                             <Text size="sm" c="dimmed">
                                 Choose which notifications you receive. Owner settings
-                                apply when you are assigned as the estimate owner.
+                                apply when you are assigned as the estimate owner (where
+                                noted). New and sold estimate emails go to everyone who
+                                opts in below.
                             </Text>
                             <Stack gap="lg">
+                                <Stack gap="xs">
+                                    <Text fw={500}>New estimates</Text>
+                                    <Text size="sm" c="dimmed">
+                                        When someone creates a new estimate for your
+                                        company.
+                                    </Text>
+                                    <Checkbox
+                                      label="Email me when a new estimate is created"
+                                      checked={notificationSettings.new_estimate}
+                                      onChange={(event) => {
+                                            setNotificationSettings((prev) => ({
+                                                ...prev,
+                                                new_estimate: event.currentTarget.checked,
+                                            }));
+                                            setNotificationHasChanges(true);
+                                        }}
+                                    />
+                                </Stack>
+
+                                <Stack gap="xs">
+                                    <Text fw={500}>Sold estimates</Text>
+                                    <Text size="sm" c="dimmed">
+                                        When an estimate is marked sold (accepted).
+                                    </Text>
+                                    <Checkbox
+                                      label="Email me when an estimate is sold"
+                                      checked={notificationSettings.sold_estimate}
+                                      onChange={(event) => {
+                                            setNotificationSettings((prev) => ({
+                                                ...prev,
+                                                sold_estimate: event.currentTarget.checked,
+                                            }));
+                                            setNotificationHasChanges(true);
+                                        }}
+                                    />
+                                </Stack>
+
                                 <Stack gap="xs">
                                     <Text fw={500}>Estimate updates</Text>
                                     <Text size="sm" c="dimmed">
