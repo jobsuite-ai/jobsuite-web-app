@@ -37,33 +37,28 @@ export async function GET(request: NextRequest) {
     const selectedYear = searchParams.get('selected_year');
     const tag = searchParams.get('tag');
 
-    // Build query parameters for the job engine API
+    // Build query parameters for the job engine API (V2 estimate-based metrics, incl. DSO)
     const queryParams = new URLSearchParams({
       time_frame: timeFrame,
     });
 
-    if (selectedMonth !== null) {
-      queryParams.append('selected_month', selectedMonth);
+    // V2 expects selected_month 0-11; frontend sends 1-12
+    if (selectedMonth !== null && selectedMonth !== undefined) {
+      const monthNum = parseInt(selectedMonth, 10);
+      if (!Number.isNaN(monthNum)) {
+        queryParams.append('selected_month', String(monthNum - 1));
+      }
     }
 
     if (selectedYear !== null) {
       queryParams.append('selected_year', selectedYear);
     }
 
-    // When filtering by tag, use V2 endpoint (live aggregation); otherwise use V1 (snapshot)
-    const dashboardPath = tag
-      ? `/api/v1/contractors/${contractorId}/dashboard/v2/metrics`
-      : `/api/v1/contractors/${contractorId}/dashboard/metrics`;
     if (tag) {
       queryParams.append('tag', tag);
-      // V2 expects selected_month 0-11; frontend sends 1-12, so convert when using V2
-      if (selectedMonth !== null && selectedMonth !== undefined) {
-        const monthNum = parseInt(selectedMonth, 10);
-        if (!Number.isNaN(monthNum)) {
-          queryParams.set('selected_month', String(monthNum - 1));
-        }
-      }
     }
+
+    const dashboardPath = `/api/v1/contractors/${contractorId}/dashboard/v2/metrics`;
 
     const response = await fetch(`${apiBaseUrl}${dashboardPath}?${queryParams.toString()}`, {
       method: 'GET',
