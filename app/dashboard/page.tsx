@@ -602,10 +602,10 @@ export default function Dashboard() {
                                 e.preventDefault();
                                 if (e.metaKey || e.ctrlKey) {
                                   // Open in new tab
-                                  window.open(`/jobs/${job.id}`, '_blank');
+                                  window.open(`/proposals/${job.id}`, '_blank');
                                 } else {
                                   // Normal navigation
-                                  router.push(`/jobs/${job.id}`);
+                                  router.push(`/proposals/${job.id}`);
                                 }
                               }}
                             >

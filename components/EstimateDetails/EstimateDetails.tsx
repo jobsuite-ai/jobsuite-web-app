@@ -2079,6 +2079,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                       setSignatureUrl(url);
                                                   }}
                                                   onResourcesRefresh={getResources}
+                                                  onEstimateRefresh={getEstimate}
                                                 />
                                             )}
                                         </CollapsibleSection>
@@ -2235,7 +2236,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                   estimateID={estimateID}
                   setFile={() => {
                     getResources();
-                    setShowFileUploadModal(false);
                   }}
                   setShowModal={setShowFileUploadModal}
                 />

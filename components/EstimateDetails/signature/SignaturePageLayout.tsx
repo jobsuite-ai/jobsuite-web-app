@@ -11,6 +11,7 @@ import {
     Container,
     Drawer,
     Group,
+    Modal,
     NavLink,
     Paper,
     Stack,
@@ -114,6 +115,8 @@ export default function SignaturePageLayout({
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
+    const [depositModalOpened, setDepositModalOpened] = useState(false);
+    const [depositPaidThisSession, setDepositPaidThisSession] = useState(false);
     const [mobileNavOpened, { open: openMobileNav, close: closeMobileNav }] =
         useDisclosure(false);
 
@@ -279,8 +282,39 @@ export default function SignaturePageLayout({
         </Box>
     );
 
+    const depositAmount = linkInfo.deposit_amount ?? 0;
+    const showClientDeposit =
+        signed &&
+        !isContractorViewer &&
+        depositAmount > 0 &&
+        !depositPaidThisSession;
+
     return (
         <>
+            <Modal
+              opened={depositModalOpened && showClientDeposit}
+              onClose={() => setDepositModalOpened(false)}
+              title={null}
+              centered
+              size="md"
+              radius="md"
+              padding="lg"
+            >
+                <Stack gap="lg">
+                    <Title order={3}>Pay 30% deposit now</Title>
+                    <DepositSection
+                      embedded
+                      signatureHash={signatureHash}
+                      depositAmount={depositAmount}
+                      estimateTotal={linkInfo.estimate_total ?? 0}
+                      helcimConfigured={linkInfo.helcim_configured ?? false}
+                      onPaymentSuccess={() => {
+                          setDepositPaidThisSession(true);
+                          setDepositModalOpened(false);
+                      }}
+                    />
+                </Stack>
+            </Modal>
             {isMobile && (
                 <Drawer
                   opened={mobileNavOpened}
@@ -362,25 +396,30 @@ export default function SignaturePageLayout({
                                       variant="light"
                                       mb="xl"
                                     >
-                                        This estimate has already been signed.
+                                        This estimate has been signed.
                                     </Alert>
                                 )}
-                                {signed &&
-                                    !isContractorViewer &&
-                                    (linkInfo.deposit_amount ?? 0) > 0 && (
-                                        <DepositSection
-                                          signatureHash={signatureHash}
-                                          depositAmount={
-                                              linkInfo.deposit_amount ?? 0
-                                          }
-                                          helcimConfigured={
-                                              linkInfo.helcim_configured ?? false
-                                          }
-                                          estimateTotal={
-                                              linkInfo.estimate_total ?? 0
-                                          }
-                                        />
-                                    )}
+                                {depositPaidThisSession && (
+                                    <Alert
+                                      color="green"
+                                      variant="light"
+                                      mb="xl"
+                                    >
+                                        Payment received. Thank you!
+                                    </Alert>
+                                )}
+                                {showClientDeposit && !depositModalOpened && (
+                                    <DepositSection
+                                      signatureHash={signatureHash}
+                                      depositAmount={depositAmount}
+                                      helcimConfigured={
+                                          linkInfo.helcim_configured ?? false
+                                      }
+                                      estimateTotal={
+                                          linkInfo.estimate_total ?? 0
+                                      }
+                                    />
+                                )}
                                 <Box style={{ position: 'relative' }}>
                                     <EstimateSignaturePreview
                                       estimate={linkInfo.estimate}
@@ -418,6 +457,12 @@ export default function SignaturePageLayout({
                                                 };
                                                 setSigned(true);
                                                 setSignatureModalOpened(false);
+                                                if (
+                                                    (linkInfo.deposit_amount ??
+                                                        0) > 0
+                                                ) {
+                                                    setDepositModalOpened(true);
+                                                }
                                                 setLinkInfo((prev) => {
                                                     if (!prev) return prev;
                                                     const s = prev.signatures

@@ -24,6 +24,7 @@ export function UploadNewTemplate({
     loadingSignatureUrl = false,
     onSignatureUrlGenerated,
     onResourcesRefresh,
+    onEstimateRefresh,
 }: {
     estimate: Estimate,
     client?: ContractorClient,
@@ -36,6 +37,7 @@ export function UploadNewTemplate({
     loadingSignatureUrl?: boolean,
     onSignatureUrlGenerated?: (url: string) => void,
     onResourcesRefresh?: () => void,
+    onEstimateRefresh?: () => void,
 }) {
     const [selectedEmails, setSelectedEmails] = useState<string[]>([]);
     const [sendToAll, setSendToAll] = useState(false);
@@ -221,11 +223,19 @@ export function UploadNewTemplate({
             });
 
             if (!statusResponse.ok) {
-                const errorData = await statusResponse.json();
-                throw new Error(errorData.message || 'Failed to update estimate status');
+                const errorData = await statusResponse.json().catch(() => ({}));
+                throw new Error(
+                    (errorData as { message?: string; detail?: string }).message
+                        || (errorData as { detail?: string }).detail
+                        || 'Failed to update estimate status'
+                );
             }
 
+            // Consume body if present (avoids "body already read" / parse issues on some proxies)
+            await statusResponse.json().catch(() => ({}));
+
             setLoading(false);
+            onEstimateRefresh?.();
             notifications.show({
                 title: 'Success!',
                 position: 'top-center',

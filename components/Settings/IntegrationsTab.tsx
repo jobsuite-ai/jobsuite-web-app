@@ -59,6 +59,8 @@ export default function IntegrationsTab() {
         Array<{ id: string; title?: string; client_name?: string }>
     >([]);
     const [syncingEstimates, setSyncingEstimates] = useState<boolean>(false);
+    const [helcimConfigured, setHelcimConfigured] = useState(false);
+    const [helcimError, setHelcimError] = useState<string | null>(null);
 
     useEffect(() => {
         loadStatus();
@@ -91,38 +93,64 @@ export default function IntegrationsTab() {
         try {
             setLoading(true);
             setError(null);
+            setHelcimError(null);
 
-            const response = await fetch('/api/quickbooks/status', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-
-            if (!response.ok) {
-                if (response.status === 404) {
-                    // No connection exists yet, that's okay
-                    setStatus({ connected: false });
-                    return;
-                }
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to load QuickBooks status');
-            }
-
-            const statusData: QuickBooksStatus = await response.json();
-            setStatus(statusData);
-            setAutoCreate(statusData.auto_create_customers_and_estimates || false);
-            if (statusData.service_item_names) {
-                setServiceItemNames({
-                    INTERIOR: statusData.service_item_names.INTERIOR || '',
-                    EXTERIOR: statusData.service_item_names.EXTERIOR || '',
-                    BOTH: statusData.service_item_names.BOTH || '',
+            try {
+                const response = await fetch('/api/quickbooks/status', {
+                    method: 'GET',
+                    headers: getApiHeaders(),
                 });
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        setStatus({ connected: false });
+                    } else {
+                        const errorData = await response.json();
+                        throw new Error(
+                            errorData.message || 'Failed to load QuickBooks status'
+                        );
+                    }
+                } else {
+                    const statusData: QuickBooksStatus = await response.json();
+                    setStatus(statusData);
+                    setAutoCreate(statusData.auto_create_customers_and_estimates || false);
+                    if (statusData.service_item_names) {
+                        setServiceItemNames({
+                            INTERIOR: statusData.service_item_names.INTERIOR || '',
+                            EXTERIOR: statusData.service_item_names.EXTERIOR || '',
+                            BOTH: statusData.service_item_names.BOTH || '',
+                        });
+                    }
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Error loading QuickBooks status:', err);
+                setError(
+                    err instanceof Error ? err.message : 'Failed to load QuickBooks status'
+                );
             }
-        } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error('Error loading QuickBooks status:', err);
-            setError(
-                err instanceof Error ? err.message : 'Failed to load QuickBooks status'
-            );
+
+            try {
+                const helcimRes = await fetch('/api/helcim/status', {
+                    method: 'GET',
+                    headers: getApiHeaders(),
+                });
+                if (!helcimRes.ok) {
+                    const errorData = await helcimRes.json().catch(() => ({}));
+                    throw new Error(
+                        errorData.message || 'Failed to load Helcim status'
+                    );
+                }
+                const helcimData: { configured?: boolean } = await helcimRes.json();
+                setHelcimConfigured(Boolean(helcimData.configured));
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.error('Error loading Helcim status:', err);
+                setHelcimConfigured(false);
+                setHelcimError(
+                    err instanceof Error ? err.message : 'Failed to load Helcim status'
+                );
+            }
         } finally {
             setLoading(false);
         }
@@ -480,6 +508,8 @@ export default function IntegrationsTab() {
     };
 
     return (
+        <>
+        <Stack gap="md">
         <Card shadow="sm" padding="lg" withBorder>
             {loading ? (
                 <Stack align="center" gap="md">
@@ -694,6 +724,35 @@ export default function IntegrationsTab() {
                     )}
                 </Stack>
             )}
+        </Card>
+
+        <Card shadow="sm" padding="lg" withBorder>
+            {loading ? (
+                <Stack align="center" gap="md">
+                    <Loader size="md" />
+                    <Text c="dimmed">Loading Helcim status...</Text>
+                </Stack>
+            ) : (
+                <Stack gap="md">
+                    <Title order={3}>Helcim</Title>
+                    {helcimError && (
+                        <Alert color="red" title="Error">
+                            {helcimError}
+                        </Alert>
+                    )}
+                    <Group justify="space-between" align="center">
+                        <Badge color={helcimConfigured ? 'green' : 'gray'} size="lg">
+                            {helcimConfigured ? 'Connected' : 'Not connected'}
+                        </Badge>
+                    </Group>
+                    <Text size="sm" c="dimmed">
+                        When connected, your Helcim API key is configured for this account
+                        and clients can pay deposits and balances on signed estimates.
+                    </Text>
+                </Stack>
+            )}
+        </Card>
+        </Stack>
 
       {/* Disconnect Confirmation Modal */}
       <Modal
@@ -777,6 +836,6 @@ export default function IntegrationsTab() {
           </Group>
         </Stack>
       </Modal>
-        </Card>
+        </>
     );
 }
