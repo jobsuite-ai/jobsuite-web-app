@@ -23,24 +23,17 @@ import { CSS } from '@dnd-kit/utilities';
 import {
     ActionIcon,
     Badge,
-    Box,
-    Button,
     Card,
     Center,
-    Divider,
     Flex,
     Group,
-    Loader,
-    Modal,
-    Paper,
     ScrollArea,
     Stack,
     Text,
     Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconArrowsMoveHorizontal, IconMail, IconRefresh } from '@tabler/icons-react';
-import Image from 'next/image';
+import { IconArrowsMoveHorizontal, IconRefresh } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './JobsList.module.css';
@@ -49,6 +42,7 @@ import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { CollectPaymentModal } from '@/components/EstimateDetails/CollectPaymentModal';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppSelector } from '@/store/hooks';
 import { selectProjectsLastFetched } from '@/store/slices/projectsSlice';
@@ -485,9 +479,6 @@ export default function JobsList() {
     const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean | null>(null);
     const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
     const [billingModalEstimateId, setBillingModalEstimateId] = useState<string | null>(null);
-    const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
-    /** null = loading Helcim status while modal is open */
-    const [helcimConfigured, setHelcimConfigured] = useState<boolean | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -551,33 +542,6 @@ export default function JobsList() {
             window.removeEventListener('quickbooks-auto-create-changed', handleAutoCreateChange as EventListener);
         };
     }, []);
-
-    // Helcim availability for billing modal (online pay link in client email)
-    useEffect(() => {
-        if (!showBillingPaymentModal) {
-            return undefined;
-        }
-        setHelcimConfigured(null);
-        let cancelled = false;
-        (async () => {
-            try {
-                const res = await fetch('/api/helcim/status', {
-                    method: 'GET',
-                    headers: getApiHeaders(),
-                });
-                if (!res.ok) throw new Error('helcim status failed');
-                const data = (await res.json()) as { configured?: boolean };
-                if (!cancelled) {
-                    setHelcimConfigured(Boolean(data.configured));
-                }
-            } catch {
-                if (!cancelled) setHelcimConfigured(false);
-            }
-        })();
-        return () => {
-            cancelled = true;
-        };
-    }, [showBillingPaymentModal]);
 
     // Update jobs when cache data changes
     // Always keep lanes visible - loading happens in background
@@ -1251,139 +1215,14 @@ export default function JobsList() {
                 ) : null}
             </DragOverlay>
 
-            {/* Billing Needed: Collect payment modal (when moving to Billing Needed from board) */}
-            <Modal
+            <CollectPaymentModal
               opened={showBillingPaymentModal}
               onClose={() => {
                     setShowBillingPaymentModal(false);
                     setBillingModalEstimateId(null);
                 }}
-              centered
-              size="md"
-              radius="md"
-              padding="xl"
-              title={
-                <Stack gap={4}>
-                    <Title order={4}>Collect payment</Title>
-                    <Text size="sm" c="dimmed" fw={400}>
-                        This project is ready to bill. Choose how you want to collect.
-                    </Text>
-                </Stack>
-              }
-            >
-                <Stack gap="lg" pt="xs">
-                    {helcimConfigured === null ? (
-                        <Center py="lg">
-                            <Loader size="sm" />
-                        </Center>
-                    ) : (
-                        <>
-                            <Paper
-                              withBorder
-                              p="md"
-                              radius="md"
-                              bg="var(--mantine-color-body)"
-                            >
-                                <Stack gap="sm">
-                                    <Text size="sm" c="dimmed">
-                                        Email the client a payment link to your signed estimate
-                                        page. They can review the job and pay from any device.
-                                    </Text>
-                                    {helcimConfigured && (
-                                        <Box
-                                          py="xs"
-                                          style={{
-                                                borderTop:
-                                                    '1px solid var(--mantine-color-gray-3)',
-                                            }}
-                                        >
-                                            <Group
-                                              gap="sm"
-                                              align="center"
-                                              wrap="wrap"
-                                              justify="center"
-                                            >
-                                                <Text size="xs" c="dimmed">
-                                                    Collect securely with
-                                                </Text>
-                                                <Image
-                                                  src="/helcim-logo.png"
-                                                  alt="Helcim"
-                                                  width={120}
-                                                  height={32}
-                                                  style={{
-                                                        height: 26,
-                                                        width: 'auto',
-                                                    }}
-                                                />
-                                            </Group>
-                                        </Box>
-                                    )}
-                                    <Button
-                                      fullWidth
-                                      size="md"
-                                      leftSection={<IconMail size={18} />}
-                                      loading={sendingInvoiceEmail}
-                                      disabled={!billingModalEstimateId}
-                                      onClick={async () => {
-                                            if (!billingModalEstimateId) return;
-                                            setSendingInvoiceEmail(true);
-                                            try {
-                                                const res = await fetch(
-                                                    `/api/estimates/${billingModalEstimateId}/invoice/send-email`,
-                                                    {
-                                                        method: 'POST',
-                                                        headers: getApiHeaders(),
-                                                    }
-                                                );
-                                                if (res.ok) {
-                                                    notifications.show({
-                                                        title: 'Invoice sent',
-                                                        message:
-                                                            'The client has been emailed a link to pay.',
-                                                        color: 'green',
-                                                    });
-                                                    setShowBillingPaymentModal(false);
-                                                    setBillingModalEstimateId(null);
-                                                } else {
-                                                    const err = await res
-                                                        .json()
-                                                        .catch(() => ({}));
-                                                    notifications.show({
-                                                        title: 'Failed to send invoice',
-                                                        message:
-                                                            err.message ||
-                                                            'Please try again.',
-                                                        color: 'red',
-                                                    });
-                                                }
-                                            } finally {
-                                                setSendingInvoiceEmail(false);
-                                            }
-                                        }}
-                                    >
-                                        Collect via email
-                                    </Button>
-                                </Stack>
-                            </Paper>
-
-                            <Divider label="or" labelPosition="center" />
-
-                            <Button
-                              fullWidth
-                              variant="light"
-                              color="gray"
-                              onClick={() => {
-                                    setShowBillingPaymentModal(false);
-                                    setBillingModalEstimateId(null);
-                                }}
-                            >
-                                Collect in person
-                            </Button>
-                        </>
-                    )}
-                </Stack>
-            </Modal>
+              estimateId={billingModalEstimateId ?? ''}
+            />
         </DndContext>
     );
 }

@@ -9,13 +9,13 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconChevronDown, IconMessageCircle, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import { CollectPaymentBillingBanner, CollectPaymentModal } from './CollectPaymentModal';
 import EditableField from './EditableField';
 import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
-import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useJobTags } from '@/hooks/useJobTags';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
@@ -77,7 +77,6 @@ export default function SidebarDetails({
   const [syncingMainStatus, setSyncingMainStatus] = useState(false);
   const [showCheckInDateModal, setShowCheckInDateModal] = useState(false);
   const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
-  const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
   const [checkInDate, setCheckInDate] = useState<Date | null>(null);
   const [savingCheckInDate, setSavingCheckInDate] = useState(false);
   const [editingCrewLead, setEditingCrewLead] = useState(false);
@@ -515,6 +514,10 @@ export default function SidebarDetails({
     registerCheckInDateOpener?.(openCheckInDateModal);
     return () => registerCheckInDateOpener?.(null);
   }, [registerCheckInDateOpener, openCheckInDateModal]);
+
+  const openBillingPaymentModal = useCallback(() => {
+    setShowBillingPaymentModal(true);
+  }, []);
 
   const handleSetCheckInDate = async () => {
     const accessToken = localStorage.getItem('access_token');
@@ -1249,6 +1252,12 @@ export default function SidebarDetails({
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
       <Flex direction="column" gap="sm">
+        {currentStatus === EstimateStatus.PROJECT_BILLING_NEEDED && (
+          <CollectPaymentBillingBanner
+            estimateId={estimateID}
+            onOpenModal={openBillingPaymentModal}
+          />
+        )}
         {/* Status */}
         <div>
           <Flex align="center" gap="sm" mb="xs">
@@ -2047,62 +2056,11 @@ export default function SidebarDetails({
         </Stack>
       </Modal>
 
-      {/* Billing Needed: Collect payment modal */}
-      <Modal
-        title="Collect payment"
+      <CollectPaymentModal
         opened={showBillingPaymentModal}
-        centered
         onClose={() => setShowBillingPaymentModal(false)}
-      >
-        <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            How would you like to collect payment for this project?
-          </Text>
-          <Group justify="flex-end" gap="xs">
-            <Button
-              variant="default"
-              onClick={() => setShowBillingPaymentModal(false)}
-            >
-              Collect in person
-            </Button>
-            <Button
-              variant="filled"
-              loading={sendingInvoiceEmail}
-              onClick={async () => {
-                setSendingInvoiceEmail(true);
-                try {
-                  const res = await fetch(
-                    `/api/estimates/${estimateID}/invoice/send-email`,
-                    {
-                      method: 'POST',
-                      headers: getApiHeaders(),
-                    }
-                  );
-                  if (res.ok) {
-                    notifications.show({
-                      title: 'Invoice sent',
-                      message: 'The client has been emailed a link to pay.',
-                      color: 'green',
-                    });
-                    setShowBillingPaymentModal(false);
-                  } else {
-                    const err = await res.json().catch(() => ({}));
-                    notifications.show({
-                      title: 'Failed to send invoice',
-                      message: err.message || 'Please try again.',
-                      color: 'red',
-                    });
-                  }
-                } finally {
-                  setSendingInvoiceEmail(false);
-                }
-              }}
-            >
-              Send invoice by email
-            </Button>
-          </Group>
-        </Stack>
-      </Modal>
+        estimateId={estimateID}
+      />
 
       {/* QuickBooks Customer Selection Modal */}
       <Modal
