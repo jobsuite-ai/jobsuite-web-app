@@ -1,19 +1,24 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 import { Alert, Center, Container, Loader, Stack, Text } from '@mantine/core';
 import { IconAlertCircle } from '@tabler/icons-react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 
 import SignaturePageLayout, {
     SignatureLinkInfo,
 } from '@/components/EstimateDetails/signature/SignaturePageLayout';
 import { logToCloudWatch } from '@/public/logger';
 
-export default function SignaturePage() {
+function SignaturePageContent() {
     const params = useParams();
+    const searchParams = useSearchParams();
     const signatureHash = params.signature_hash as string;
+    const payRaw = searchParams.get('pay');
+    const payIntent =
+        payRaw === 'balance' || payRaw === 'deposit' ? payRaw : null;
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [linkInfo, setLinkInfo] = useState<SignatureLinkInfo | null>(null);
@@ -132,11 +137,29 @@ export default function SignaturePage() {
         <SignaturePageLayout
           linkInfo={linkInfo}
           signatureHash={signatureHash}
+          payIntent={payIntent}
           setLinkInfo={setLinkInfo}
           signed={signed}
           setSigned={setSigned}
           signatureModalOpened={signatureModalOpened}
           setSignatureModalOpened={setSignatureModalOpened}
         />
+    );
+}
+
+export default function SignaturePage() {
+    return (
+        <Suspense
+          fallback={
+            <Center style={{ minHeight: '100vh' }}>
+                <Stack align="center" gap="md">
+                    <Loader size="xl" />
+                    <Text c="dimmed">Loading signature page...</Text>
+                </Stack>
+            </Center>
+            }
+        >
+            <SignaturePageContent />
+        </Suspense>
     );
 }
