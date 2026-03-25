@@ -75,6 +75,55 @@ const validateZipCode = (zipcode: string): string | null => {
     return null;
 };
 
+/** Trim before sending to the API — validation uses trim() but raw values were still submitted. */
+const normalizeZipForApi = (zipcode: string | null | undefined): string | null => {
+    const t = zipcode?.trim();
+    return t || null;
+};
+
+/** Pydantic/FastAPI often return `message` or `detail` as an array of { loc, msg, type }. */
+const formatApiErrorMessage = (errorData: unknown, fallback: string): string => {
+    if (!errorData || typeof errorData !== 'object') {
+        return fallback;
+    }
+    const d = errorData as Record<string, unknown>;
+    const raw = d.message ?? d.detail;
+    if (typeof raw === 'string') {
+        return raw;
+    }
+    if (!Array.isArray(raw)) {
+        return fallback;
+    }
+    const fieldLabel = (key: string): string => {
+        if (key === 'address_zipcode' || key === 'client_address_zipcode') {
+            return 'ZIP code';
+        }
+        return key.replace(/_/g, ' ');
+    };
+    const lines: string[] = [];
+    for (const item of raw) {
+        if (typeof item === 'string') {
+            lines.push(item);
+        } else if (item && typeof item === 'object') {
+            const o = item as { type?: string; msg?: string; loc?: unknown[] };
+            const loc = Array.isArray(o.loc) ? o.loc : [];
+            const lastLoc = loc[loc.length - 1];
+            const fieldKey = typeof lastLoc === 'string' ? lastLoc : '';
+            const label = fieldKey ? fieldLabel(fieldKey) : '';
+            if (fieldKey.includes('zipcode') && o.type === 'string_pattern_mismatch') {
+                lines.push(
+                    `${label || 'ZIP code'}: Use 5 digits or ZIP+4 (e.g. 84049 or 84049-1234). Remove leading or trailing spaces.`
+                );
+            } else if (label && o.msg) {
+                lines.push(`${label}: ${o.msg}`);
+            } else if (o.msg) {
+                lines.push(String(o.msg));
+            }
+        }
+    }
+    return lines.length > 0 ? lines.join(' ') : fallback;
+};
+
 // Fuzzy match function - similar to header search
 const fuzzyMatch = (text: string, searchTerm: string): boolean => {
     if (!text || !searchTerm) {
@@ -265,7 +314,38 @@ export function NewJobWorkflow() {
                 return errors;
             }
 
-            // Step 3 (review) has no validation
+            // Review step: re-validate project fields (they were only checked when leaving step 2)
+            if (active === 2) {
+                const errors: Record<string, string | null> = {};
+
+                if (!values.address_street.trim()) {
+                    errors.address_street = 'Project address is required';
+                }
+                if (!values.address_city.trim()) {
+                    errors.address_city = 'City is required';
+                }
+                if (!values.address_state) {
+                    errors.address_state = 'State is required';
+                }
+
+                const zipError = validateZipCode(values.address_zipcode);
+                if (zipError) {
+                    errors.address_zipcode = zipError;
+                }
+
+                if (!values.estimate_type) {
+                    errors.estimate_type = 'Estimate type is required';
+                }
+                if (!values.referral_source) {
+                    errors.referral_source = 'Referral source is required';
+                }
+                if (values.referral_source === 'Referral' && !values.referral_name.trim()) {
+                    errors.referral_name = 'Referrer name is required when Referral is selected';
+                }
+
+                return errors;
+            }
+
             return {};
         },
     });
@@ -415,6 +495,8 @@ export function NewJobWorkflow() {
 
         try {
             const formValues = form.getValues();
+            const projectZip = normalizeZipForApi(formValues.address_zipcode);
+            const clientZip = normalizeZipForApi(formValues.client_address_zipcode);
 
             // Step 1: Create or get client
             let clientId = formValues.client_id;
@@ -443,14 +525,14 @@ export function NewJobWorkflow() {
                         address_street: formValues.address_street || null,
                         address_city: formValues.address_city || null,
                         address_state: formValues.address_state || null,
-                        address_zipcode: formValues.address_zipcode || null,
+                        address_zipcode: projectZip,
                         address_country: formValues.address_country || null,
                     }
                     : {
                         address_street: formValues.client_address_street || null,
                         address_city: formValues.client_address_city || null,
                         address_state: formValues.client_address_state || null,
-                        address_zipcode: formValues.client_address_zipcode || null,
+                        address_zipcode: clientZip,
                         address_country: formValues.client_address_country || null,
                     };
 
@@ -501,7 +583,9 @@ export function NewJobWorkflow() {
                         }
                     } else {
                         const errorData = await clientResponse.json();
-                        throw new Error(errorData.message || 'Failed to create client');
+                        throw new Error(
+                            formatApiErrorMessage(errorData, 'Failed to create client')
+                        );
                     }
                 } else {
                     const newClient = await clientResponse.json();
@@ -530,7 +614,7 @@ export function NewJobWorkflow() {
                             address_street: formValues.address_street || null,
                             address_city: formValues.address_city || null,
                             address_state: formValues.address_state || null,
-                            address_zipcode: formValues.address_zipcode || null,
+                            address_zipcode: projectZip,
                             address_country: formValues.address_country || null,
                         }),
                     });
@@ -556,7 +640,7 @@ export function NewJobWorkflow() {
                     address_street: formValues.address_street || null,
                     address_city: formValues.address_city || null,
                     address_state: formValues.address_state || null,
-                    address_zipcode: formValues.address_zipcode || null,
+                    address_zipcode: projectZip,
                     address_country: formValues.address_country || null,
                     title: formValues.title || null,
                     referral_source: formValues.referral_source || null,
@@ -567,7 +651,9 @@ export function NewJobWorkflow() {
 
             if (!estimateResponse.ok) {
                 const errorData = await estimateResponse.json();
-                throw new Error(errorData.message || 'Failed to create estimate');
+                throw new Error(
+                    formatApiErrorMessage(errorData, 'Failed to create estimate')
+                );
             }
 
             const estimate = await estimateResponse.json();
@@ -630,6 +716,9 @@ export function NewJobWorkflow() {
     const nextStep = () => {
         const validation = form.validate();
         if (validation.hasErrors) {
+            if (active === 2) {
+                setActive(1);
+            }
             return;
         }
 

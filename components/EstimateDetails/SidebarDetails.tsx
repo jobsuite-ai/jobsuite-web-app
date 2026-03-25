@@ -492,6 +492,8 @@ export default function SidebarDetails({
       const updatedEstimate = await response.json();
       setCurrentStatus(updatedEstimate.status);
       updateEstimate(updatedEstimate);
+      refreshData('estimates').catch(() => {});
+      refreshData('projects').catch(() => {});
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to sync change order status: ${error}`);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Flex, Paper } from '@mantine/core';
 
@@ -12,6 +12,7 @@ import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 import UniversalError from '@/components/Global/UniversalError';
 import { buildEstimateTemplateHtml } from '@/utils/estimatePdfGenerator';
+import { getEstimatePreviewDataKey } from '@/utils/estimatePreviewDataKey';
 
 interface EstimatePreviewProps {
     estimate: Estimate;
@@ -30,6 +31,8 @@ interface EstimatePreviewProps {
     }>; // Signatures passed from parent (already loaded)
     onSignatureUrlGenerated?: (url: string) => void;
     onResourcesRefresh?: () => void;
+    /** After send succeeds; parent may refresh state. Preview rebuild uses a stable data key. */
+    onEstimateRefresh?: () => void;
 }
 
 export default function EstimatePreview({
@@ -44,6 +47,7 @@ export default function EstimatePreview({
     signatures: propSignatures = [],
     onSignatureUrlGenerated,
     onResourcesRefresh,
+    onEstimateRefresh,
 }: EstimatePreviewProps) {
     const [loading, setLoading] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -52,38 +56,65 @@ export default function EstimatePreview({
     // Use signatures from props (already loaded by parent)
     const signatures = propSignatures.filter((sig) => sig.is_valid !== false);
 
-    const buildTemplate = useCallback(async () => {
-        if (!client) {
-            setTemplate('');
-            return;
-        }
-
-        try {
-            const htmlTemplate = await buildEstimateTemplateHtml({
-                estimate,
-                client,
-                lineItems,
-                imageResources,
-            });
-            setTemplate(htmlTemplate);
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Failed to build estimate template:', error);
-            setTemplate('');
-        }
-    }, [
-        client,
+    const previewDataKey = getEstimatePreviewDataKey(
         estimate,
         lineItems,
         imageResources,
-    ]);
+        client
+    );
 
-    // Signatures are now passed as props from parent, no need to fetch independently
+    // Latest objects for the template builder (avoids effect deps on Redux identity churn).
+    const templateBuildRef = useRef({
+        estimate,
+        client,
+        lineItems,
+        imageResources,
+    });
+    templateBuildRef.current = {
+        estimate,
+        client,
+        lineItems,
+        imageResources,
+    };
 
+    // Rebuild when semantic data changes (previewDataKey), using latest props from the same render.
     useEffect(() => {
+        const { estimate: e, client: c, lineItems: lines, imageResources: images } =
+            templateBuildRef.current;
+        let cancelled = false;
+        if (!c) {
+            setTemplate('');
+            setLoading(false);
+            return undefined;
+        }
         setLoading(true);
-        buildTemplate().finally(() => setLoading(false));
-    }, [buildTemplate]);
+        (async () => {
+            try {
+                const htmlTemplate = await buildEstimateTemplateHtml({
+                    estimate: e,
+                    client: c,
+                    lineItems: lines,
+                    imageResources: images,
+                });
+                if (!cancelled) {
+                    setTemplate(htmlTemplate);
+                }
+            } catch (error) {
+                // eslint-disable-next-line no-console
+                console.error('Failed to build estimate template:', error);
+                if (!cancelled) {
+                    setTemplate('');
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [previewDataKey]);
 
     // Place signatures on signature lines after template is rendered
     useEffect(() => {
@@ -213,6 +244,7 @@ export default function EstimatePreview({
                               loadingSignatureUrl={loadingSignatureUrl}
                               onSignatureUrlGenerated={onSignatureUrlGenerated}
                               onResourcesRefresh={onResourcesRefresh}
+                              onEstimateRefresh={onEstimateRefresh}
                             />
                         )}
                     </Flex>

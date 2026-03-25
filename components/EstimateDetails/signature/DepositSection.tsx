@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Alert, Button, Loader, Paper, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Loader, Paper, Stack, Text } from '@mantine/core';
+import Image from 'next/image';
 
 const HELCIM_SCRIPT_URL = 'https://secure.helcim.app/helcim-pay/services/start.js';
 
@@ -11,15 +12,44 @@ interface DepositSectionProps {
     depositAmount: number;
     estimateTotal: number;
     helcimConfigured?: boolean;
+    /** Omit outer Paper + default heading (e.g. when used inside deposit modal). */
+    embedded?: boolean;
+    /** Called after payment is recorded successfully (modal can close, etc.). */
+    onPaymentSuccess?: () => void;
 }
 
 const PAYMENT_RECORD_ERROR =
     'Payment succeeded but we could not record it. Please contact support.';
 
+function PaySecurelyWithHelcim() {
+    return (
+        <Group
+          gap="sm"
+          align="center"
+          wrap="wrap"
+          justify="center"
+          w="100%"
+        >
+            <Text size="sm" c="dimmed">
+                Pay securely with
+            </Text>
+            <Image
+              src="/helcim-logo.png"
+              alt="Helcim"
+              width={120}
+              height={32}
+              style={{ height: 28, width: 'auto' }}
+            />
+        </Group>
+    );
+}
+
 export function DepositSection({
     signatureHash,
     depositAmount,
     helcimConfigured = false,
+    embedded = false,
+    onPaymentSuccess,
 }: DepositSectionProps) {
     const [payLoading, setPayLoading] = useState(false);
     const [payLaterLoading, setPayLaterLoading] = useState(false);
@@ -109,6 +139,7 @@ export function DepositSection({
                             );
                             if (confirmRes.ok) {
                                 setPaySuccess(true);
+                                onPaymentSuccess?.();
                             } else {
                                 setPayError(PAYMENT_RECORD_ERROR);
                             }
@@ -138,7 +169,13 @@ export function DepositSection({
         } finally {
             setPayLoading(false);
         }
-    }, [signatureHash, depositAmount, loadHelcimScript, removeListener]);
+    }, [
+        signatureHash,
+        depositAmount,
+        loadHelcimScript,
+        removeListener,
+        onPaymentSuccess,
+    ]);
 
     const handlePayLater = useCallback(async () => {
         setPayError(null);
@@ -162,18 +199,19 @@ export function DepositSection({
 
     if (paySuccess) {
         return (
-            <Alert color="green" variant="light" mb="xl">
+            <Alert color="green" variant="light" mb={embedded ? 0 : 'xl'}>
                 Payment received. Thank you!
             </Alert>
         );
     }
 
-    return (
-        <Paper shadow="sm" p="lg" radius="md" withBorder mb="xl">
-            <Stack gap="md">
-                <Text fw={600} size="lg">
-                    {helcimConfigured ? 'Pay 30% deposit' : 'Request 30% deposit'}
-                </Text>
+    const body = (
+        <Stack gap="md">
+                {!embedded && (
+                    <Text fw={600} size="lg">
+                        {helcimConfigured ? 'Pay 30% deposit' : 'Request 30% deposit'}
+                    </Text>
+                )}
                 <Text c="dimmed" size="sm">
                     {`A 30% deposit of $${depositAmount.toFixed(2)} is due prior to commencement of work.`}
                 </Text>
@@ -183,21 +221,25 @@ export function DepositSection({
                     </Alert>
                 )}
                 {helcimConfigured ? (
-                    <Button
-                      onClick={handlePayNow}
-                      loading={payLoading}
-                      disabled={payLaterLoading}
-                      size="md"
-                    >
-                        {payLoading ? (
-                            <>
-                                <Loader size="sm" mr="xs" />
-                                Opening payment…
-                            </>
-                        ) : (
-                            `Pay 30% deposit now ($${depositAmount.toFixed(2)})`
-                        )}
-                    </Button>
+                    <>
+                        <Button
+                          onClick={handlePayNow}
+                          loading={payLoading}
+                          disabled={payLaterLoading}
+                          size="md"
+                          fullWidth
+                        >
+                            {payLoading ? (
+                                <>
+                                    <Loader size="sm" mr="xs" />
+                                    Opening payment…
+                                </>
+                            ) : (
+                                `Pay 30% deposit now ($${depositAmount.toFixed(2)})`
+                            )}
+                        </Button>
+                        <PaySecurelyWithHelcim />
+                    </>
                 ) : (
                     <Text size="xs" c="dimmed">
                         Online payment isn&apos;t set up for this contractor.
@@ -227,7 +269,16 @@ export function DepositSection({
                                 : "I'll pay later"}
                     </button>
                 </Text>
-            </Stack>
+        </Stack>
+    );
+
+    if (embedded) {
+        return body;
+    }
+
+    return (
+        <Paper shadow="sm" p="lg" radius="md" withBorder mb="xl">
+            {body}
         </Paper>
     );
 }

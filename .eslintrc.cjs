@@ -3,9 +3,10 @@ module.exports = {
     'plugin:import/errors',
     'plugin:import/warnings',
     'plugin:import/typescript',
-    'mantine'
+    'mantine',
+    'plugin:react-hooks/recommended',
   ],
-  plugins: ['testing-library', 'jest'],
+  plugins: ['react-hooks', 'testing-library', 'jest'],
   overrides: [
     {
       files: ['**/?(*.)+(spec|test).[jt]s?(x)'],
@@ -18,6 +19,8 @@ module.exports = {
   },
   parser: '@typescript-eslint/parser',
   rules: {
+    // Rule exists for inline disables; project not migrated to strict deps yet
+    'react-hooks/exhaustive-deps': 'off',
     'react/react-in-jsx-scope': 'off',
     'import/extensions': 'off',
     'indent': 'off',

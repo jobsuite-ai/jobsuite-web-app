@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
     Button,
@@ -23,6 +23,7 @@ import {
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import ActionsTab from '@/components/Settings/ActionsTab';
@@ -33,6 +34,17 @@ import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
+
+const SETTINGS_TAB_QUERY = 'tab';
+
+const VALID_SETTINGS_TABS = new Set([
+    'contractor-config',
+    'notifications',
+    'actions',
+    'signature-page',
+    'templates',
+    'integrations',
+]);
 
 interface ContractorConfiguration {
     id: string;
@@ -49,7 +61,34 @@ interface ContractorConfiguration {
 
 export default function SettingsPage() {
     const { user } = useAuth({ fetchUser: true });
-    const [activeTab, setActiveTab] = useState<string | null>('contractor-config');
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+
+    const activeTab = useMemo(() => {
+        const raw = searchParams.get(SETTINGS_TAB_QUERY);
+        if (raw && VALID_SETTINGS_TABS.has(raw)) {
+            return raw;
+        }
+        return 'contractor-config';
+    }, [searchParams]);
+
+    const handleTabChange = useCallback(
+        (value: string | null) => {
+            if (value === null || !VALID_SETTINGS_TABS.has(value)) {
+                return;
+            }
+            const params = new URLSearchParams(searchParams.toString());
+            if (value === 'contractor-config') {
+                params.delete(SETTINGS_TAB_QUERY);
+            } else {
+                params.set(SETTINGS_TAB_QUERY, value);
+            }
+            const qs = params.toString();
+            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+        },
+        [pathname, router, searchParams]
+    );
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -466,7 +505,7 @@ export default function SettingsPage() {
 
             <Tabs
               value={activeTab}
-              onChange={setActiveTab}
+              onChange={handleTabChange}
               styles={(theme) => ({
                     tab: {
                         color: theme.colors.gray[0],
