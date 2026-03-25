@@ -112,26 +112,24 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
       radius="md"
       padding="xl"
       title={
-        <Stack gap="sm">
-          <Group gap="md" align="center" wrap="nowrap">
-            {logoUrl ? (
-              <Image
-                src={logoUrl}
-                alt="Company logo"
-                h={40}
-                w="auto"
-                fit="contain"
-                style={{ maxWidth: 160 }}
-              />
-            ) : null}
-            <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
-              <Title order={4}>Collect payment</Title>
-              <Text size="sm" c="dimmed" fw={400}>
-                This project is ready to bill. Send the client a payment link by email when you are
-                ready.
-              </Text>
-            </Stack>
-          </Group>
+        <Stack gap="sm" align="flex-start">
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt="Company logo"
+              h={40}
+              w="auto"
+              fit="contain"
+              style={{ maxWidth: 200 }}
+            />
+          ) : null}
+          <Stack gap={4} style={{ width: '100%' }}>
+            <Title order={4}>Collect payment</Title>
+            <Text size="sm" c="dimmed" fw={400}>
+              This project is ready to bill. Send the client a payment link by email when you are
+              ready.
+            </Text>
+          </Stack>
         </Stack>
       }
     >
@@ -229,18 +227,18 @@ export function CollectPaymentBillingBanner({
 
   const inner = (
     <Stack gap="sm">
-      <Group gap="sm" align="flex-start" wrap="nowrap">
+      <Stack gap="xs" align="flex-start">
         {logoUrl ? (
           <Image
             src={logoUrl}
             alt="Company logo"
-            h={40}
+            h={44}
             w="auto"
             fit="contain"
-            style={{ maxWidth: 160, flexShrink: 0 }}
+            style={{ maxWidth: 200 }}
           />
         ) : null}
-        <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+        <Stack gap={4} style={{ width: '100%' }}>
           <Text size="sm" fw={600}>
             Ready to collect payment
           </Text>
@@ -263,7 +261,7 @@ export function CollectPaymentBillingBanner({
             </Group>
           )}
         </Stack>
-      </Group>
+      </Stack>
 
       <Stack gap="xs">
         <Button
