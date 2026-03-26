@@ -9,6 +9,7 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconChevronDown, IconMessageCircle, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
+import { CollectPaymentBillingBanner, CollectPaymentModal } from './CollectPaymentModal';
 import EditableField from './EditableField';
 import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
@@ -75,6 +76,7 @@ export default function SidebarDetails({
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [syncingMainStatus, setSyncingMainStatus] = useState(false);
   const [showCheckInDateModal, setShowCheckInDateModal] = useState(false);
+  const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
   const [checkInDate, setCheckInDate] = useState<Date | null>(null);
   const [savingCheckInDate, setSavingCheckInDate] = useState(false);
   const [editingCrewLead, setEditingCrewLead] = useState(false);
@@ -451,6 +453,10 @@ export default function SidebarDetails({
       refreshData('estimates').catch(() => {});
       refreshData('projects').catch(() => {});
 
+      if (status === EstimateStatus.PROJECT_BILLING_NEEDED) {
+        setShowBillingPaymentModal(true);
+      }
+
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to update estimate status: ${error}`);
@@ -485,6 +491,8 @@ export default function SidebarDetails({
       const updatedEstimate = await response.json();
       setCurrentStatus(updatedEstimate.status);
       updateEstimate(updatedEstimate);
+      refreshData('estimates').catch(() => {});
+      refreshData('projects').catch(() => {});
       onUpdate();
     } catch (error) {
       logToCloudWatch(`Failed to sync change order status: ${error}`);
@@ -506,6 +514,10 @@ export default function SidebarDetails({
     registerCheckInDateOpener?.(openCheckInDateModal);
     return () => registerCheckInDateOpener?.(null);
   }, [registerCheckInDateOpener, openCheckInDateModal]);
+
+  const openBillingPaymentModal = useCallback(() => {
+    setShowBillingPaymentModal(true);
+  }, []);
 
   const handleSetCheckInDate = async () => {
     const accessToken = localStorage.getItem('access_token');
@@ -1240,6 +1252,12 @@ export default function SidebarDetails({
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
       <Flex direction="column" gap="sm">
+        {currentStatus === EstimateStatus.PROJECT_BILLING_NEEDED && (
+          <CollectPaymentBillingBanner
+            estimateId={estimateID}
+            onOpenModal={openBillingPaymentModal}
+          />
+        )}
         {/* Status */}
         <div>
           <Flex align="center" gap="sm" mb="xs">
@@ -2037,6 +2055,12 @@ export default function SidebarDetails({
           </Group>
         </Stack>
       </Modal>
+
+      <CollectPaymentModal
+        opened={showBillingPaymentModal}
+        onClose={() => setShowBillingPaymentModal(false)}
+        estimateId={estimateID}
+      />
 
       {/* QuickBooks Customer Selection Modal */}
       <Modal

@@ -94,6 +94,8 @@ interface DashboardMetrics {
   hoursLeftToSell: number;
   hoursLeftLastUpdated: string | null;
   upcomingFollowUps: UpcomingFollowUp[];
+  /** Average days jobs spend in AR (V2 dashboard); null if no AR-tracked jobs */
+  daysSalesOutstanding: number | null;
 }
 
 export default function Dashboard() {
@@ -135,6 +137,7 @@ export default function Dashboard() {
     hoursLeftToSell: 0,
     hoursLeftLastUpdated: null,
     upcomingFollowUps: [],
+    daysSalesOutstanding: null,
   });
 
   const availableMonths = useMemo(() => {
@@ -264,6 +267,10 @@ export default function Dashboard() {
             state: job.state,
             zip_code: job.zip_code,
           })),
+          daysSalesOutstanding:
+            typeof data.days_sales_outstanding === 'number'
+              ? data.days_sales_outstanding
+              : null,
         });
         } catch (error) {
         logToCloudWatch(`Error fetching dashboard metrics: ${error}`);
@@ -405,6 +412,18 @@ export default function Dashboard() {
                 title="Dollars Bid to Dollars Sold"
                 value={`${metrics.totalBidValue > 0 ? ((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1) : '0.0'}%`}
                 description="Percentage of dollars bid to dollars sold"
+                loading={loading}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 3 }}>
+              <MetricCard
+                title="Days Sales Outstanding (DSO)"
+                value={
+                  metrics.daysSalesOutstanding != null
+                    ? `${metrics.daysSalesOutstanding.toFixed(1)} days`
+                    : '—'
+                }
+                description="Average days jobs spend in accounts receivable (invoice to payment)"
                 loading={loading}
               />
             </Grid.Col>
@@ -602,10 +621,10 @@ export default function Dashboard() {
                                 e.preventDefault();
                                 if (e.metaKey || e.ctrlKey) {
                                   // Open in new tab
-                                  window.open(`/jobs/${job.id}`, '_blank');
+                                  window.open(`/proposals/${job.id}`, '_blank');
                                 } else {
                                   // Normal navigation
-                                  router.push(`/jobs/${job.id}`);
+                                  router.push(`/proposals/${job.id}`);
                                 }
                               }}
                             >

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
     Alert,
@@ -11,6 +11,7 @@ import {
     Container,
     Drawer,
     Group,
+    Modal,
     NavLink,
     Paper,
     Stack,
@@ -21,6 +22,7 @@ import {
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import {
     IconBuilding,
+    IconCreditCard,
     IconFileText,
     IconHistory,
     IconInfoCircle,
@@ -29,6 +31,7 @@ import {
 } from '@tabler/icons-react';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
+import { DepositSection } from '@/components/EstimateDetails/signature/DepositSection';
 import EstimateSignaturePreview from '@/components/EstimateDetails/signature/EstimateSignaturePreview';
 import SignatureAuditHistory from '@/components/EstimateDetails/signature/SignatureAuditHistory';
 import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/signature/SignatureForm';
@@ -37,6 +40,19 @@ import SignaturePageSections, {
 } from '@/components/EstimateDetails/signature/SignaturePageSections';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
+
+/** Live payment totals from the API (aligned with Helcim checkout-session rules). */
+export interface PaymentSummary {
+    invoice_total: number;
+    deposit_amount: number;
+    balance_amount: number;
+    deposit_paid: boolean;
+    deposit_paid_at?: string | null;
+    fully_paid: boolean;
+    payment_received_at?: string | null;
+    amount_due_now: number;
+    amount_paid_so_far: number;
+}
 
 export interface SignatureLinkInfo {
     signature_hash: string;
@@ -75,6 +91,10 @@ export interface SignatureLinkInfo {
     };
     past_projects?: PastProject[];
     viewer_type?: 'contractor' | 'client';
+    estimate_total?: number;
+    deposit_amount?: number;
+    helcim_configured?: boolean;
+    payment_summary?: PaymentSummary;
     signatures?: Array<{
         id?: string;
         signature_type: string;
@@ -89,6 +109,8 @@ export interface SignatureLinkInfo {
 interface SignaturePageLayoutProps {
     linkInfo: SignatureLinkInfo;
     signatureHash: string;
+    /** From `?pay=balance` or `?pay=deposit` on the sign URL (e.g. invoice email). */
+    payIntent?: 'balance' | 'deposit' | null;
     isPreviewMode?: boolean;
     setLinkInfo?: (fn: (prev: SignatureLinkInfo | null) => SignatureLinkInfo | null) => void;
     signed?: boolean;
@@ -100,6 +122,7 @@ interface SignaturePageLayoutProps {
 export default function SignaturePageLayout({
     linkInfo,
     signatureHash,
+    payIntent = null,
     isPreviewMode = false,
     setLinkInfo,
     signed = false,
@@ -110,6 +133,35 @@ export default function SignaturePageLayout({
     const theme = useMantineTheme();
     const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
+    const [depositModalOpened, setDepositModalOpened] = useState(false);
+    const [depositPaidThisSession, setDepositPaidThisSession] = useState(false);
+    const initialPaidTabRedirectRef = useRef(false);
+
+    const refreshLinkInfo = useCallback(async () => {
+        if (!setLinkInfo) return;
+        try {
+            const token =
+                typeof window !== 'undefined'
+                    ? localStorage.getItem('access_token')
+                    : null;
+            const r = await fetch(`/api/signature/${signatureHash}`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            });
+            if (r.ok) {
+                const data = (await r.json()) as SignatureLinkInfo;
+                setLinkInfo(() => data);
+            }
+        } catch {
+            // ignore
+        }
+    }, [signatureHash, setLinkInfo]);
+
+    /** After a successful payment, refresh totals and show the Payment tab. */
+    const navigateToPaymentAfterRefresh = useCallback(async () => {
+        await refreshLinkInfo();
+        setActiveTab('payment');
+    }, [refreshLinkInfo]);
+
     const [mobileNavOpened, { open: openMobileNav, close: closeMobileNav }] =
         useDisclosure(false);
 
@@ -146,21 +198,42 @@ export default function SignaturePageLayout({
         config.show_license === true ||
         config.show_insurance === true ||
         config.show_w9 === true;
-    const availableTabs = [
-        { value: 'estimate', label: 'Estimate', icon: IconFileText },
-        ...(showDocuments
-            ? [{ value: 'documents', label: 'Documents', icon: IconLicense }]
-            : []),
-        ...(config.show_about === true
-            ? [{ value: 'about', label: 'About', icon: IconInfoCircle }]
-            : []),
-        ...(config.show_past_projects === true
-            ? [{ value: 'projects', label: 'Past Projects', icon: IconBuilding }]
-            : []),
-        ...(isContractorViewer
-            ? [{ value: 'audit', label: 'Audit History', icon: IconHistory }]
-            : []),
-    ];
+
+    const showPaymentTab = signed && !isContractorViewer;
+
+    const availableTabs = useMemo(
+        () => [
+            { value: 'estimate', label: 'Estimate', icon: IconFileText },
+            ...(showPaymentTab
+                ? [{ value: 'payment', label: 'Payment', icon: IconCreditCard }]
+                : []),
+            ...(showDocuments
+                ? [{ value: 'documents', label: 'Documents', icon: IconLicense }]
+                : []),
+            ...(config.show_about === true
+                ? [{ value: 'about', label: 'About', icon: IconInfoCircle }]
+                : []),
+            ...(config.show_past_projects === true
+                ? [
+                      {
+                          value: 'projects',
+                          label: 'Past Projects',
+                          icon: IconBuilding,
+                      },
+                  ]
+                : []),
+            ...(isContractorViewer
+                ? [{ value: 'audit', label: 'Audit History', icon: IconHistory }]
+                : []),
+        ],
+        [
+            showPaymentTab,
+            showDocuments,
+            config.show_about,
+            config.show_past_projects,
+            isContractorViewer,
+        ]
+    );
 
     const renderNavigation = () => {
         if (isMobile) {
@@ -275,8 +348,94 @@ export default function SignaturePageLayout({
         </Box>
     );
 
+    const depositAmount = linkInfo.deposit_amount ?? 0;
+    const paymentSummary = linkInfo.payment_summary;
+    const depositPaidFromServer = paymentSummary?.deposit_paid ?? false;
+    /** Invoice email uses `?pay=balance` — allow full balance checkout even if deposit unpaid. */
+    const invoiceBalanceLink =
+        payIntent === 'balance' && !depositPaidFromServer;
+
+    const showClientDeposit =
+        signed &&
+        !isContractorViewer &&
+        depositAmount > 0 &&
+        !depositPaidThisSession &&
+        !depositPaidFromServer &&
+        !invoiceBalanceLink;
+
+    const showBalancePayment =
+        signed &&
+        !isContractorViewer &&
+        (linkInfo.helcim_configured ?? false) &&
+        !!paymentSummary &&
+        paymentSummary.amount_due_now > 0 &&
+        !paymentSummary.fully_paid &&
+        (paymentSummary.deposit_paid || payIntent === 'balance');
+
+    /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
+    useEffect(() => {
+        if (
+            payIntent !== 'balance' ||
+            !signed ||
+            isContractorViewer ||
+            !showBalancePayment
+        ) {
+            return undefined;
+        }
+        setActiveTab('payment');
+        return undefined;
+    }, [payIntent, signed, isContractorViewer, showBalancePayment]);
+
+    /** Already paid in full: land on Payment once (e.g. returning from email). */
+    useEffect(() => {
+        if (
+            initialPaidTabRedirectRef.current ||
+            !signed ||
+            isContractorViewer ||
+            !paymentSummary?.fully_paid
+        ) {
+            return undefined;
+        }
+        initialPaidTabRedirectRef.current = true;
+        setActiveTab('payment');
+        return undefined;
+    }, [signed, isContractorViewer, paymentSummary?.fully_paid]);
+
+    /** If client unsigned, Payment tab is hidden — avoid a stuck active tab. */
+    useEffect(() => {
+        if (!showPaymentTab && activeTab === 'payment') {
+            setActiveTab('estimate');
+        }
+        return undefined;
+    }, [showPaymentTab, activeTab]);
+
     return (
         <>
+            <Modal
+              opened={depositModalOpened && showClientDeposit}
+              onClose={() => setDepositModalOpened(false)}
+              title={null}
+              centered
+              size="md"
+              radius="md"
+              padding="lg"
+            >
+                <Stack gap="lg">
+                    <Title order={3}>Pay 30% deposit now</Title>
+                    <DepositSection
+                      embedded
+                      signatureHash={signatureHash}
+                      depositAmount={depositAmount}
+                      estimateTotal={linkInfo.estimate_total ?? 0}
+                      helcimConfigured={linkInfo.helcim_configured ?? false}
+                      onPaymentSuccess={async () => {
+                          setDepositPaidThisSession(true);
+                          setDepositModalOpened(false);
+                          await navigateToPaymentAfterRefresh();
+                      }}
+                    />
+                </Stack>
+            </Modal>
             {isMobile && (
                 <Drawer
                   opened={mobileNavOpened}
@@ -358,7 +517,11 @@ export default function SignaturePageLayout({
                                       variant="light"
                                       mb="xl"
                                     >
-                                        This estimate has already been signed.
+                                        {paymentSummary?.fully_paid
+                                            ? 'This estimate is signed and paid in full. Thank you!'
+                                            : depositPaidThisSession
+                                                ? 'This estimate is signed and we received your payment. Thank you!'
+                                                : 'This estimate has been signed.'}
                                     </Alert>
                                 )}
                                 <Box style={{ position: 'relative' }}>
@@ -398,6 +561,14 @@ export default function SignaturePageLayout({
                                                 };
                                                 setSigned(true);
                                                 setSignatureModalOpened(false);
+                                                if (
+                                                    (linkInfo.deposit_amount ??
+                                                        0) > 0 &&
+                                                    !linkInfo.payment_summary
+                                                        ?.deposit_paid
+                                                ) {
+                                                    setDepositModalOpened(true);
+                                                }
                                                 setLinkInfo((prev) => {
                                                     if (!prev) return prev;
                                                     const s = prev.signatures
@@ -462,6 +633,109 @@ export default function SignaturePageLayout({
                                     </Paper>
                                 )}
                             </>
+                        )}
+
+                        {activeTab === 'payment' &&
+                            signed &&
+                            !isContractorViewer && (
+                            <Stack gap="lg">
+                                <div>
+                                    <Title order={3} mb="xs">
+                                        Payment
+                                    </Title>
+                                    <Text size="sm" c="dimmed">
+                                        Review what you owe, pay a deposit or balance, and see
+                                        your payment history for this project.
+                                    </Text>
+                                </div>
+                                {paymentSummary?.fully_paid && (
+                                    <Alert color="green" variant="light">
+                                        This project is paid in full. Thank you!
+                                    </Alert>
+                                )}
+                                {paymentSummary && (
+                                    <Paper
+                                      shadow="sm"
+                                      p="md"
+                                      radius="md"
+                                      withBorder
+                                    >
+                                        <Text fw={600} size="sm" mb="xs">
+                                            Payment summary
+                                        </Text>
+                                        <Stack gap={4}>
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed">
+                                                    Invoice total
+                                                </Text>
+                                                <Text size="sm" fw={500}>
+                                                    $
+                                                    {paymentSummary.invoice_total.toFixed(
+                                                        2
+                                                    )}
+                                                </Text>
+                                            </Group>
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed">
+                                                    Paid to date
+                                                </Text>
+                                                <Text size="sm" fw={500}>
+                                                    $
+                                                    {paymentSummary.amount_paid_so_far.toFixed(
+                                                        2
+                                                    )}
+                                                </Text>
+                                            </Group>
+                                            <Group justify="space-between">
+                                                <Text size="sm" c="dimmed">
+                                                    Amount due upon completion of project
+                                                </Text>
+                                                <Text size="sm" fw={600}>
+                                                    $
+                                                    {paymentSummary.amount_due_now.toFixed(
+                                                        2
+                                                    )}
+                                                </Text>
+                                            </Group>
+                                        </Stack>
+                                    </Paper>
+                                )}
+                                {showBalancePayment && (
+                                    <DepositSection
+                                      signatureHash={signatureHash}
+                                      depositAmount={depositAmount}
+                                      estimateTotal={
+                                          linkInfo.estimate_total ?? 0
+                                      }
+                                      helcimConfigured={
+                                          linkInfo.helcim_configured ?? false
+                                      }
+                                      paymentMode="balance"
+                                      amountToCharge={
+                                          paymentSummary!.amount_due_now
+                                      }
+                                      onPaymentSuccess={
+                                          navigateToPaymentAfterRefresh
+                                      }
+                                    />
+                                )}
+                                {showClientDeposit && !depositModalOpened && (
+                                    <DepositSection
+                                      signatureHash={signatureHash}
+                                      depositAmount={depositAmount}
+                                      helcimConfigured={
+                                          linkInfo.helcim_configured ?? false
+                                      }
+                                      estimateTotal={
+                                          linkInfo.estimate_total ?? 0
+                                      }
+                                      onPaymentSuccess={async () => {
+                                          setDepositPaidThisSession(true);
+                                          await navigateToPaymentAfterRefresh();
+                                      }}
+                                    />
+                                )}
+                            </Stack>
                         )}
 
                         {activeTab === 'documents' && (

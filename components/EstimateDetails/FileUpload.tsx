@@ -45,57 +45,94 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
         };
     }, []);
 
+    // Same drag behavior as ImageUpload so drops work reliably inside modals
+    useEffect(() => {
+        const handleGlobalDragOver = (e: DragEvent) => {
+            if (e.dataTransfer?.types.includes('Files')) {
+                e.preventDefault();
+            }
+        };
+
+        const handleGlobalDrop = (e: DragEvent) => {
+            if (!e.target || !(e.target as Element).closest('[data-mantine-dropzone]')) {
+                e.preventDefault();
+            }
+        };
+
+        window.addEventListener('dragover', handleGlobalDragOver, true);
+        window.addEventListener('drop', handleGlobalDrop, true);
+
+        return () => {
+            window.removeEventListener('dragover', handleGlobalDragOver, true);
+            window.removeEventListener('drop', handleGlobalDrop, true);
+        };
+    }, []);
+
+    const maxImageBytes = 150 * 1024 * 1024; // align with ImageUpload
+    const maxDocumentBytes = 500 * 1024 * 1024;
+
+    const isImageFile = (file: FileWithPath): boolean => {
+        const imageMimeTypes: string[] = [
+            MIME_TYPES.png,
+            MIME_TYPES.jpeg,
+            MIME_TYPES.gif,
+            MIME_TYPES.webp,
+            MIME_TYPES.heic,
+            MIME_TYPES.heif,
+            'image/bmp',
+            'image/tiff',
+            'image/svg+xml',
+        ];
+        const t = file.type?.toLowerCase() ?? '';
+        if (t && (imageMimeTypes.includes(t) || t.startsWith('image/'))) {
+            return true;
+        }
+        const n = file.name.toLowerCase();
+        return ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.heic', '.heif', '.tiff', '.tif', '.ico'].some(
+            (ext) => n.endsWith(ext)
+        );
+    };
+
     const validateFile = (file: FileWithPath): string | null => {
-        // Validate file size
-        const maxSize = 500 * 1024 * 1024; // 500MB
-        if (file.size > maxSize) {
+        if (isImageFile(file)) {
+            if (file.size > maxImageBytes) {
+                return `File size (${formatFileSize(file.size)}) exceeds the 150MB limit for images`;
+            }
+            return null;
+        }
+
+        if (file.size > maxDocumentBytes) {
             return `File size (${formatFileSize(file.size)}) exceeds the 500MB limit`;
         }
 
-        // Explicitly reject image files
-        const imageTypes: string[] = [
-            'image/jpeg',
-            'image/jpg',
-            'image/png',
-            'image/gif',
-            'image/webp',
-            'image/bmp',
-            'image/svg+xml',
-            'image/heic',
-            'image/heif',
-            'image/tiff',
-            'image/x-icon',
-        ];
-        if (file.type && imageTypes.includes(file.type.toLowerCase())) {
-            return 'Images are not allowed. Please use the image upload feature for images. Only PDF, Word, Excel, PowerPoint, or text files are allowed here.';
-        }
-
-        // Validate file type - accept PDFs and common document types
-        const validTypes: string[] = [
+        const validDocTypes: string[] = [
             MIME_TYPES.pdf,
-            'application/msword', // .doc
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-            'application/vnd.ms-excel', // .xls
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-            'application/vnd.ms-powerpoint', // .ppt
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
-            'text/plain', // .txt
-            'text/csv', // .csv
-            'application/rtf', // .rtf
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain',
+            'text/csv',
+            'application/rtf',
         ];
 
-        // Check file extension as fallback if MIME type is missing or incorrect
         const fileName = file.name.toLowerCase();
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic', '.heif', '.tiff', '.ico'];
-        if (imageExtensions.some(ext => fileName.endsWith(ext))) {
-            return 'Images are not allowed. Please use the image upload feature for images. Only PDF, Word, Excel, PowerPoint, or text files are allowed here.';
+        const docExtensions = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf'];
+        const hasKnownDocExt = docExtensions.some((ext) => fileName.endsWith(ext));
+
+        if (file.type && validDocTypes.includes(file.type)) {
+            return null;
+        }
+        if (!file.type && hasKnownDocExt) {
+            return null;
+        }
+        if (hasKnownDocExt) {
+            return null;
         }
 
-        if (!file.type || !validTypes.includes(file.type)) {
-            return 'Invalid file type. Please upload PDF, Word, Excel, PowerPoint, or text files only. Images are not allowed.';
-        }
-
-        return null;
+        return 'Invalid file type. Upload documents (PDF, Office, text) or images (PNG, JPEG, HEIC, etc.).';
     };
 
     const handleFileDrop = async (files: FileWithPath[]) => {
@@ -222,6 +259,7 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
                 color: 'yellow',
                 message: `Uploaded ${successCount} file(s), ${errorCount} failed.`,
             });
+            setFile('');
         }
 
         // Reset state after a delay to show final status
@@ -241,13 +279,15 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
             throw new Error('No access token found');
         }
 
+        const resourceType: 'IMAGE' | 'DOCUMENT' = isImageFile(file) ? 'IMAGE' : 'DOCUMENT';
+
         // Multipart upload helper functions
         async function initiateMultipartUpload(uploadFile: File): Promise<any> {
             const parsedFileName = uploadFile.name.replaceAll(' ', '_');
             const formData = new FormData();
             formData.append('filename', parsedFileName);
-            formData.append('content_type', uploadFile.type);
-            formData.append('resource_type', 'DOCUMENT');
+            formData.append('content_type', uploadFile.type || 'application/octet-stream');
+            formData.append('resource_type', resourceType);
 
             const response = await fetch(
                 `/api/estimates/${estimateID}/resources/multipart/initiate`,
@@ -428,7 +468,7 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
                 // Create form data for resource upload
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('resource_type', 'DOCUMENT');
+                formData.append('resource_type', resourceType);
 
                 const response = await fetch(
                     `/api/estimates/${estimateID}/resources`,
@@ -479,6 +519,15 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
                 'text/plain',
                 'text/csv',
                 'application/rtf',
+                MIME_TYPES.png,
+                MIME_TYPES.jpeg,
+                MIME_TYPES.gif,
+                MIME_TYPES.webp,
+                MIME_TYPES.heic,
+                MIME_TYPES.heif,
+                'image/bmp',
+                'image/tiff',
+                'image/svg+xml',
               ]}
               style={{ width: '100%' }}
               disabled={uploadState !== 'idle'}
@@ -506,13 +555,13 @@ export default function FileUpload({ estimateID, setFile, setShowModal }: FileUp
 
                 <Text ta="center" fz="lg" mt="xl">
                     <Dropzone.Accept>Drop files here</Dropzone.Accept>
-                    <Dropzone.Reject>Files less than 500MB</Dropzone.Reject>
+                    <Dropzone.Reject>Unsupported type or over size limit</Dropzone.Reject>
                     <Dropzone.Idle>Upload files</Dropzone.Idle>
                 </Text>
                 <Text ta="center" fz="sm" mt="xs" c="dimmed">
                     Drag and drop files here to upload. You can upload multiple files at once.
-                    Supported formats: PDF, Word, Excel, PowerPoint, and text files.
-                    Maximum file size: 500MB.
+                    Documents: PDF, Word, Excel, PowerPoint, and text (up to 500MB).
+                    Images: PNG, JPEG, HEIC, and other common formats (up to 150MB each).
                 </Text>
 
                 {uploadState === 'uploading' && fileUploads.length > 0 && (

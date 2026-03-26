@@ -1,6 +1,12 @@
 'use client';
 
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+    useState,
+} from 'react';
 
 import { Button, Group, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -47,22 +53,54 @@ const TranscriptionSummary = forwardRef<TranscriptionSummaryRef, TranscriptionSu
     /** When editing: HTML for the rich text editor (from markdown when opening) */
     const [editorHtml, setEditorHtml] = useState('');
     const [loading, setLoading] = useState(false);
+    /** Avoid re-running markdown→HTML when parent refreshes while user is editing */
+    const prevEditMarkdownRef = useRef(false);
+    /** True once we've loaded non-empty summary into the editor for this edit session */
+    const hadSummaryWhileEditingRef = useRef(false);
 
-    // In edit mode: set editor to HTML (as-is) or convert markdown to HTML
+    // Hydrate editor when entering edit or when summary first loads after opening empty — not on
+    // every parent/Redux refresh while editing.
     useEffect(() => {
+        const wasEditing = prevEditMarkdownRef.current;
+        prevEditMarkdownRef.current = editMarkdown;
         if (!editMarkdown) {
-            return;
+            hadSummaryWhileEditingRef.current = false;
+            return undefined;
         }
         const source = (estimate.transcription_summary ?? '').trim();
+        const justEnteredEdit = !wasEditing && editMarkdown;
+        const summaryArrivedWhileEditing =
+            wasEditing &&
+            editMarkdown &&
+            !hadSummaryWhileEditingRef.current &&
+            source.length > 0;
+
+        if (!justEnteredEdit && !summaryArrivedWhileEditing) {
+            return undefined;
+        }
+
         if (!source) {
             setEditorHtml('');
-            return;
+            return undefined;
+        }
+        if (justEnteredEdit) {
+            hadSummaryWhileEditingRef.current = true;
+        } else if (summaryArrivedWhileEditing) {
+            hadSummaryWhileEditingRef.current = true;
         }
         if (isHtml(source)) {
             setEditorHtml(source);
-            return;
+            return undefined;
         }
-        markdownToHtml(source).then(setEditorHtml);
+        let cancelled = false;
+        markdownToHtml(source).then((html) => {
+            if (!cancelled) {
+                setEditorHtml(html);
+            }
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [editMarkdown, estimate.transcription_summary]);
 
     useEffect(() => {

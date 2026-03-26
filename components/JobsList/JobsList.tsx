@@ -42,6 +42,7 @@ import { ColumnConfig, loadColumnSettings } from '../Global/settings';
 import { getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { CollectPaymentModal } from '@/components/EstimateDetails/CollectPaymentModal';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppSelector } from '@/store/hooks';
 import { selectProjectsLastFetched } from '@/store/slices/projectsSlice';
@@ -476,6 +477,8 @@ export default function JobsList() {
     const [refreshing, setRefreshing] = useState(false);
     // null = loading, true/false = loaded
     const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean | null>(null);
+    const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
+    const [billingModalEstimateId, setBillingModalEstimateId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -1033,6 +1036,10 @@ export default function JobsList() {
                 updateProject(updatedEstimate);
                 // Optionally refresh in background for consistency (non-blocking)
                 refreshData('projects').catch(() => {});
+                if (newStatus === EstimateStatus.PROJECT_BILLING_NEEDED) {
+                    setBillingModalEstimateId(estimateId);
+                    setShowBillingPaymentModal(true);
+                }
             }
         } catch (error) {
             // Revert on error
@@ -1207,6 +1214,15 @@ export default function JobsList() {
                   </Card>
                 ) : null}
             </DragOverlay>
+
+            <CollectPaymentModal
+              opened={showBillingPaymentModal}
+              onClose={() => {
+                    setShowBillingPaymentModal(false);
+                    setBillingModalEstimateId(null);
+                }}
+              estimateId={billingModalEstimateId ?? ''}
+            />
         </DndContext>
     );
 }

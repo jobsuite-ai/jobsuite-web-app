@@ -14,6 +14,8 @@ import { useAuth } from '@/hooks/useAuth';
 function HomePageContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
+  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+
   // If there's a token in the URL, show the accept-invitation page
   if (token) {
     return <AcceptInvitation />;
@@ -21,7 +23,6 @@ function HomePageContent() {
 
   // Check if user is authenticated and show homepage if so
   // Don't block rendering - show content immediately, let auth load in background
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
 
   // Show homepage for authenticated users (even if still loading, show structure)
   if (isAuthenticated) {
