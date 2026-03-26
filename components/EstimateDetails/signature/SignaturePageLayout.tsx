@@ -350,6 +350,10 @@ export default function SignaturePageLayout({
 
     const depositAmount = linkInfo.deposit_amount ?? 0;
     const paymentSummary = linkInfo.payment_summary;
+    const isChangeOrder = Boolean(linkInfo.estimate?.original_estimate_id);
+    const isBillingNeeded =
+        linkInfo.estimate?.status === 'PROJECT_BILLING_NEEDED' ||
+        linkInfo.status === 'PROJECT_BILLING_NEEDED';
     const depositPaidFromServer = paymentSummary?.deposit_paid ?? false;
     /** Invoice email uses `?pay=balance` — allow full balance checkout even if deposit unpaid. */
     const invoiceBalanceLink =
@@ -359,6 +363,7 @@ export default function SignaturePageLayout({
         signed &&
         !isContractorViewer &&
         depositAmount > 0 &&
+        !isChangeOrder &&
         !depositPaidThisSession &&
         !depositPaidFromServer &&
         !invoiceBalanceLink;
@@ -370,7 +375,7 @@ export default function SignaturePageLayout({
         !!paymentSummary &&
         paymentSummary.amount_due_now > 0 &&
         !paymentSummary.fully_paid &&
-        (paymentSummary.deposit_paid || payIntent === 'balance');
+        (payIntent === 'balance' || isBillingNeeded);
 
     /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
     useEffect(() => {
@@ -564,6 +569,7 @@ export default function SignaturePageLayout({
                                                 if (
                                                     (linkInfo.deposit_amount ??
                                                         0) > 0 &&
+                                                    !isChangeOrder &&
                                                     !linkInfo.payment_summary
                                                         ?.deposit_paid
                                                 ) {
@@ -644,8 +650,8 @@ export default function SignaturePageLayout({
                                         Payment
                                     </Title>
                                     <Text size="sm" c="dimmed">
-                                        Review what you owe, pay a deposit or balance, and see
-                                        your payment history for this project.
+                                        Review what you owe and see your payment history for
+                                        this project.
                                     </Text>
                                 </div>
                                 {paymentSummary?.fully_paid && (
@@ -675,6 +681,19 @@ export default function SignaturePageLayout({
                                                     )}
                                                 </Text>
                                             </Group>
+                                            {isChangeOrder && paymentSummary.deposit_amount > 0 && (
+                                                <Group justify="space-between">
+                                                    <Text size="sm" c="dimmed">
+                                                        Deferred deposit (included in amount due)
+                                                    </Text>
+                                                    <Text size="sm" fw={500}>
+                                                        $
+                                                        {paymentSummary.deposit_amount.toFixed(
+                                                            2
+                                                        )}
+                                                    </Text>
+                                                </Group>
+                                            )}
                                             <Group justify="space-between">
                                                 <Text size="sm" c="dimmed">
                                                     Paid to date
