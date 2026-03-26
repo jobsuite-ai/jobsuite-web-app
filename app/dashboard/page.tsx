@@ -337,7 +337,7 @@ export default function Dashboard() {
 
           <Grid gutter="md">
             {/* Top row metrics */}
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Total Proposals"
                 value={metrics.totalJobs.toString()}
@@ -345,7 +345,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Total Proposal Value"
                 value={`$${metrics.totalBidValue.toLocaleString(undefined, {
@@ -356,7 +356,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Total Sold Value"
                 value={`$${metrics.totalSoldValue.toLocaleString(undefined, {
@@ -367,7 +367,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Conversion Rate"
                 value={`${metrics.conversionRate.toFixed(1)}%`}
@@ -377,7 +377,7 @@ export default function Dashboard() {
             </Grid.Col>
 
             {/* Second row metrics */}
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Sent Or Declined Proposals"
                 value={metrics.activeBids.toString()}
@@ -385,7 +385,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Average Project Amount"
                 value={`$${metrics.averageBidAmount.toLocaleString(undefined, {
@@ -396,7 +396,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Pipeline Value"
                 value={`$${(metrics.inProgressValue).toLocaleString(undefined, {
@@ -407,7 +407,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Dollars Bid to Dollars Sold"
                 value={`${metrics.totalBidValue > 0 ? ((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1) : '0.0'}%`}
@@ -415,7 +415,7 @@ export default function Dashboard() {
                 loading={loading}
               />
             </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 3 }}>
+            <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Days Sales Outstanding (DSO)"
                 value={
