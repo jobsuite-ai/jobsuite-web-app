@@ -104,6 +104,8 @@ export interface SignatureLinkInfo {
         signed_at: string;
         is_valid?: boolean;
     }>;
+    /** Live estimate status from the database (not the static signature-link status). */
+    current_status?: string;
 }
 
 interface SignaturePageLayoutProps {
@@ -351,9 +353,7 @@ export default function SignaturePageLayout({
     const depositAmount = linkInfo.deposit_amount ?? 0;
     const paymentSummary = linkInfo.payment_summary;
     const isChangeOrder = Boolean(linkInfo.estimate?.original_estimate_id);
-    const isBillingNeeded =
-        linkInfo.estimate?.status === 'PROJECT_BILLING_NEEDED' ||
-        linkInfo.status === 'PROJECT_BILLING_NEEDED';
+    const isBillingNeeded = linkInfo.current_status === 'PROJECT_BILLING_NEEDED';
     const depositPaidFromServer = paymentSummary?.deposit_paid ?? false;
     /** Invoice email uses `?pay=balance` — allow full balance checkout even if deposit unpaid. */
     const invoiceBalanceLink =
