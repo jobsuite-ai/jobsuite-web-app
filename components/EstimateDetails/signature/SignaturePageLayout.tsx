@@ -364,6 +364,7 @@ export default function SignaturePageLayout({
         !isContractorViewer &&
         depositAmount > 0 &&
         !isChangeOrder &&
+        !isBillingNeeded &&
         !depositPaidThisSession &&
         !depositPaidFromServer &&
         !invoiceBalanceLink;
@@ -570,6 +571,7 @@ export default function SignaturePageLayout({
                                                     (linkInfo.deposit_amount ??
                                                         0) > 0 &&
                                                     !isChangeOrder &&
+                                                    !isBillingNeeded &&
                                                     !linkInfo.payment_summary
                                                         ?.deposit_paid
                                                 ) {
