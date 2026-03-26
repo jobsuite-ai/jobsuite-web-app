@@ -3,15 +3,18 @@
 import { useEffect, useState } from 'react';
 
 import {
+  Alert,
   Box,
   Button,
   Center,
+  Divider,
   Group,
   Image,
   Loader,
   Modal,
   Paper,
   Stack,
+  Table,
   Text,
   Title,
 } from '@mantine/core';
@@ -21,6 +24,36 @@ import NextImage from 'next/image';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useContractorLogo } from '@/hooks/useContractorLogo';
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value);
+}
+
+export interface InvoicePreviewScope {
+  estimate_id: string;
+  label: string;
+  subtotal: number;
+  is_change_order: boolean;
+}
+
+export interface InvoicePreviewResponse {
+  estimate_id: string;
+  subtotal: number;
+  discount_percentage: number;
+  discount_amount: number;
+  tax_rate: number;
+  tax_amount: number;
+  invoice_total: number;
+  deposit_amount: number;
+  balance_amount: number;
+  deposit_paid: boolean;
+  amount_due: number;
+  is_change_order: boolean;
+  scopes: InvoicePreviewScope[];
+}
 
 function useHelcimConfigured(shouldFetch: boolean) {
   const [helcimConfigured, setHelcimConfigured] = useState<boolean | null>(null);
@@ -54,6 +87,21 @@ function useHelcimConfigured(shouldFetch: boolean) {
   return helcimConfigured;
 }
 
+async function fetchInvoicePreview(
+  estimateId: string
+): Promise<{ ok: true; data: InvoicePreviewResponse } | { ok: false; message: string }> {
+  const res = await fetch(`/api/estimates/${estimateId}/invoice/preview`, {
+    method: 'GET',
+    headers: getApiHeaders(),
+  });
+  if (res.ok) {
+    const data = (await res.json()) as InvoicePreviewResponse;
+    return { ok: true, data };
+  }
+  const err = await res.json().catch(() => ({}));
+  return { ok: false, message: (err as { message?: string }).message || 'Failed to load preview' };
+}
+
 async function postSendInvoiceEmail(
   estimateId: string
 ): Promise<{ ok: boolean; message?: string }> {
@@ -68,6 +116,113 @@ async function postSendInvoiceEmail(
   return { ok: false, message: (err as { message?: string }).message };
 }
 
+function InvoiceTotalsSection({
+  preview,
+  helcimConfigured,
+}: {
+  preview: InvoicePreviewResponse;
+  helcimConfigured: boolean | null;
+}) {
+  const scopeRows = preview.scopes.map((s) => (
+    <Table.Tr key={s.estimate_id}>
+      <Table.Td>
+        <Text size="sm">{s.label}</Text>
+        {s.is_change_order ? (
+          <Text size="xs" c="dimmed">
+            Change order
+          </Text>
+        ) : null}
+      </Table.Td>
+      <Table.Td style={{ textAlign: 'right' }}>
+        <Text size="sm" fw={500}>
+          {formatUsd(s.subtotal)}
+        </Text>
+      </Table.Td>
+    </Table.Tr>
+  ));
+
+  return (
+    <Stack gap="md">
+      <Text size="sm" c="dimmed">
+        Totals include this job&apos;s line items and any signed change orders rolled into the
+        invoice.
+      </Text>
+      <Table withTableBorder withColumnBorders verticalSpacing="sm">
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Scope</Table.Th>
+            <Table.Th style={{ textAlign: 'right' }}>Subtotal</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>{scopeRows}</Table.Tbody>
+      </Table>
+
+      <Stack gap={6}>
+        <Group justify="space-between">
+          <Text size="sm">Subtotal (line items)</Text>
+          <Text size="sm" fw={500}>
+            {formatUsd(preview.subtotal)}
+          </Text>
+        </Group>
+        {preview.discount_percentage > 0 ? (
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              Discount ({preview.discount_percentage}%)
+            </Text>
+            <Text size="sm" c="dimmed">
+              −{formatUsd(preview.discount_amount)}
+            </Text>
+          </Group>
+        ) : null}
+        {preview.tax_rate > 0 ? (
+          <Group justify="space-between">
+            <Text size="sm" c="dimmed">
+              Tax ({preview.tax_rate}%)
+            </Text>
+            <Text size="sm" c="dimmed">
+              {formatUsd(preview.tax_amount)}
+            </Text>
+          </Group>
+        ) : null}
+        <Divider />
+        <Group justify="space-between">
+          <Text size="sm" fw={600}>
+            Invoice total
+          </Text>
+          <Text size="sm" fw={700}>
+            {formatUsd(preview.invoice_total)}
+          </Text>
+        </Group>
+        {!preview.is_change_order && preview.deposit_paid ? (
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed">
+              30% deposit (already paid)
+            </Text>
+            <Text size="xs" c="dimmed">
+              {formatUsd(preview.deposit_amount)}
+            </Text>
+          </Group>
+        ) : null}
+        <Group justify="space-between">
+          <Text size="sm" fw={600}>
+            Amount due (this email)
+          </Text>
+          <Text size="sm" fw={700} c="blue">
+            {formatUsd(preview.amount_due)}
+          </Text>
+        </Group>
+      </Stack>
+
+      {helcimConfigured === false ? (
+        <Alert color="yellow" title="Online payments not configured">
+          The client will still get the link to your sign page; configure Helcim in Settings →
+          Integrations to let them pay online.
+        </Alert>
+      ) : null}
+    </Stack>
+  );
+}
+
 export interface CollectPaymentModalProps {
   opened: boolean;
   onClose: () => void;
@@ -78,6 +233,32 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
   const { logoUrl } = useContractorLogo();
   const helcimConfigured = useHelcimConfigured(opened);
   const [sendingInvoiceEmail, setSendingInvoiceEmail] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [preview, setPreview] = useState<InvoicePreviewResponse | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!opened || !estimateId) {
+      return undefined;
+    }
+    let cancelled = false;
+    setPreview(null);
+    setPreviewError(null);
+    setPreviewLoading(true);
+    (async () => {
+      const result = await fetchInvoicePreview(estimateId);
+      if (cancelled) return;
+      setPreviewLoading(false);
+      if (result.ok) {
+        setPreview(result.data);
+      } else {
+        setPreviewError(result.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [opened, estimateId]);
 
   const handleSendEmail = async () => {
     if (!estimateId) return;
@@ -108,7 +289,7 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
       opened={opened}
       onClose={onClose}
       centered
-      size="md"
+      size="lg"
       radius="md"
       padding="xl"
       title={
@@ -124,66 +305,69 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
             />
           ) : null}
           <Stack gap={4} style={{ width: '100%' }}>
-            <Title order={4}>Collect payment</Title>
+            <Title order={4}>Send invoice email</Title>
             <Text size="sm" c="dimmed" fw={400}>
-              This project is ready to bill. Send the client a payment link by email when you are
-              ready.
+              Review amounts, then email the client a payment link to your signed estimate page.
             </Text>
           </Stack>
         </Stack>
       }
     >
       <Stack gap="lg" pt="xs">
-        {helcimConfigured === null ? (
-          <Center py="lg">
+        {previewLoading ? (
+          <Center py="xl">
             <Loader size="sm" />
           </Center>
-        ) : (
-          <>
-            <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
-              <Stack gap="sm">
-                <Text size="sm" c="dimmed">
-                  Email the client a payment link to your signed estimate page. They can review the
-                  job and pay from any device.
-                </Text>
-                {helcimConfigured && (
-                  <Box
-                    py="xs"
+        ) : previewError ? (
+          <Alert color="red" title="Could not load invoice totals">
+            {previewError}
+          </Alert>
+        ) : preview ? (
+          <InvoiceTotalsSection preview={preview} helcimConfigured={helcimConfigured} />
+        ) : null}
+
+        <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">
+          <Stack gap="sm">
+            <Text size="sm" c="dimmed">
+              The email includes a link to your signed estimate page. The client can pay the amount
+              due from any device.
+            </Text>
+            {helcimConfigured === true && (
+              <Box
+                py="xs"
+                style={{
+                  borderTop: '1px solid var(--mantine-color-gray-3)',
+                }}
+              >
+                <Group gap="sm" align="center" wrap="wrap" justify="center">
+                  <Text size="xs" c="dimmed">
+                    Collect securely with
+                  </Text>
+                  <NextImage
+                    src="/helcim-logo.png"
+                    alt="Helcim"
+                    width={120}
+                    height={32}
                     style={{
-                      borderTop: '1px solid var(--mantine-color-gray-3)',
+                      height: 26,
+                      width: 'auto',
                     }}
-                  >
-                    <Group gap="sm" align="center" wrap="wrap" justify="center">
-                      <Text size="xs" c="dimmed">
-                        Collect securely with
-                      </Text>
-                      <NextImage
-                        src="/helcim-logo.png"
-                        alt="Helcim"
-                        width={120}
-                        height={32}
-                        style={{
-                          height: 26,
-                          width: 'auto',
-                        }}
-                      />
-                    </Group>
-                  </Box>
-                )}
-                <Button
-                  fullWidth
-                  size="md"
-                  leftSection={<IconMail size={18} />}
-                  loading={sendingInvoiceEmail}
-                  disabled={!estimateId}
-                  onClick={handleSendEmail}
-                >
-                  Collect via email
-                </Button>
-              </Stack>
-            </Paper>
-          </>
-        )}
+                  />
+                </Group>
+              </Box>
+            )}
+            <Button
+              fullWidth
+              size="md"
+              leftSection={<IconMail size={18} />}
+              loading={sendingInvoiceEmail}
+              disabled={!estimateId || previewLoading || !!previewError || !preview}
+              onClick={handleSendEmail}
+            >
+              Send email with invoice
+            </Button>
+          </Stack>
+        </Paper>
       </Stack>
     </Modal>
   );
@@ -243,8 +427,8 @@ export function CollectPaymentBillingBanner({
             Ready to collect payment
           </Text>
           <Text size="xs" c="dimmed">
-            This job is in Project billing needed. Send the client a payment link by email when you
-            are ready.
+            This job is in Project billing needed. Review invoice totals and send the client a
+            payment link by email when you are ready.
           </Text>
           {helcimConfigured === true && (
             <Group gap={6} align="center" wrap="wrap">
@@ -270,21 +454,16 @@ export function CollectPaymentBillingBanner({
           loading={sendingInvoiceEmail}
           disabled={!estimateId}
           size="sm"
-          onClick={handleSendEmail}
+          onClick={() => {
+            if (onOpenModal) {
+              onOpenModal();
+              return;
+            }
+            handleSendEmail();
+          }}
         >
-          Email payment link
+          {onOpenModal ? 'Review & send invoice' : 'Email payment link'}
         </Button>
-        {onOpenModal ? (
-          <Text
-            size="xs"
-            c="blue"
-            ta="center"
-            style={{ cursor: 'pointer' }}
-            onClick={onOpenModal}
-          >
-            Open full payment dialog…
-          </Text>
-        ) : null}
       </Stack>
     </Stack>
   );

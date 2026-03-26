@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Alert,
     AppShell,
+    Badge,
     Box,
     Burger,
     Button,
@@ -15,6 +16,7 @@ import {
     NavLink,
     Paper,
     Stack,
+    Table,
     Text,
     Title,
     useMantineTheme,
@@ -52,6 +54,13 @@ export interface PaymentSummary {
     payment_received_at?: string | null;
     amount_due_now: number;
     amount_paid_so_far: number;
+}
+
+/** Per-row amounts for Payment tab (live; includes change order lines when applicable). */
+export interface PaymentLineItemRow {
+    title: string;
+    line_total: number;
+    is_change_order: boolean;
 }
 
 export interface SignatureLinkInfo {
@@ -95,6 +104,7 @@ export interface SignatureLinkInfo {
     deposit_amount?: number;
     helcim_configured?: boolean;
     payment_summary?: PaymentSummary;
+    payment_line_items?: PaymentLineItemRow[];
     signatures?: Array<{
         id?: string;
         signature_type: string;
@@ -353,7 +363,10 @@ export default function SignaturePageLayout({
     const depositAmount = linkInfo.deposit_amount ?? 0;
     const paymentSummary = linkInfo.payment_summary;
     const isChangeOrder = Boolean(linkInfo.estimate?.original_estimate_id);
-    const isBillingNeeded = linkInfo.current_status === 'PROJECT_BILLING_NEEDED';
+    /** Billing-needed or A/R: client should pay full balance (not a separate deposit CTA). */
+    const isFullBalancePaymentPhase =
+        linkInfo.current_status === 'PROJECT_BILLING_NEEDED' ||
+        linkInfo.current_status === 'PROJECT_ACCOUNTS_RECEIVABLE';
     const depositPaidFromServer = paymentSummary?.deposit_paid ?? false;
     /** Invoice email uses `?pay=balance` — allow full balance checkout even if deposit unpaid. */
     const invoiceBalanceLink =
@@ -364,7 +377,7 @@ export default function SignaturePageLayout({
         !isContractorViewer &&
         depositAmount > 0 &&
         !isChangeOrder &&
-        !isBillingNeeded &&
+        !isFullBalancePaymentPhase &&
         !depositPaidThisSession &&
         !depositPaidFromServer &&
         !invoiceBalanceLink;
@@ -376,7 +389,7 @@ export default function SignaturePageLayout({
         !!paymentSummary &&
         paymentSummary.amount_due_now > 0 &&
         !paymentSummary.fully_paid &&
-        (payIntent === 'balance' || isBillingNeeded);
+        (payIntent === 'balance' || isFullBalancePaymentPhase);
 
     /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
     useEffect(() => {
@@ -571,7 +584,7 @@ export default function SignaturePageLayout({
                                                     (linkInfo.deposit_amount ??
                                                         0) > 0 &&
                                                     !isChangeOrder &&
-                                                    !isBillingNeeded &&
+                                                    !isFullBalancePaymentPhase &&
                                                     !linkInfo.payment_summary
                                                         ?.deposit_paid
                                                 ) {
@@ -656,6 +669,73 @@ export default function SignaturePageLayout({
                                         this project.
                                     </Text>
                                 </div>
+                                {linkInfo.payment_line_items &&
+                                    linkInfo.payment_line_items.length > 0 && (
+                                    <Paper
+                                      shadow="sm"
+                                      p="md"
+                                      radius="md"
+                                      withBorder
+                                    >
+                                        <Text fw={600} size="sm" mb="sm">
+                                            Invoice line items
+                                        </Text>
+                                        <Table
+                                          verticalSpacing="sm"
+                                          withTableBorder
+                                          withColumnBorders
+                                        >
+                                            <Table.Thead>
+                                                <Table.Tr>
+                                                    <Table.Th>Description</Table.Th>
+                                                    <Table.Th style={{ textAlign: 'right' }}>
+                                                        Amount
+                                                    </Table.Th>
+                                                </Table.Tr>
+                                            </Table.Thead>
+                                            <Table.Tbody>
+                                                {linkInfo.payment_line_items.map(
+                                                    (row, idx) => (
+                                                        <Table.Tr
+                                                          key={`${row.title}-${idx}-${row.line_total}`}
+                                                        >
+                                                            <Table.Td>
+                                                                <Group
+                                                                  gap="xs"
+                                                                  align="flex-start"
+                                                                  wrap="wrap"
+                                                                >
+                                                                    <Text size="sm">
+                                                                        {row.title}
+                                                                    </Text>
+                                                                    {row.is_change_order ? (
+                                                                        <Badge
+                                                                          size="xs"
+                                                                          variant="light"
+                                                                          color="gray"
+                                                                        >
+                                                                            Change order
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                </Group>
+                                                            </Table.Td>
+                                                            <Table.Td
+                                                              style={{ textAlign: 'right' }}
+                                                            >
+                                                                <Text size="sm" fw={500}>
+                                                                    $
+                                                                    {row.line_total.toFixed(
+                                                                        2
+                                                                    )}
+                                                                </Text>
+                                                            </Table.Td>
+                                                        </Table.Tr>
+                                                    )
+                                                )}
+                                            </Table.Tbody>
+                                        </Table>
+                                    </Paper>
+                                )}
                                 {paymentSummary?.fully_paid && (
                                     <Alert color="green" variant="light">
                                         This project is paid in full. Thank you!
