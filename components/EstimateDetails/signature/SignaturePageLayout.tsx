@@ -375,12 +375,7 @@ export default function SignaturePageLayout({
         !!paymentSummary &&
         paymentSummary.amount_due_now > 0 &&
         !paymentSummary.fully_paid &&
-        (
-            paymentSummary.deposit_paid ||
-            payIntent === 'balance' ||
-            isChangeOrder ||
-            isBillingNeeded
-        );
+        (payIntent === 'balance' || isBillingNeeded);
 
     /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
     useEffect(() => {
