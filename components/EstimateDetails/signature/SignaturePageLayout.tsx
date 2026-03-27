@@ -428,6 +428,51 @@ export default function SignaturePageLayout({
         return undefined;
     }, [showPaymentTab, activeTab]);
 
+    /** Reset dedupe key when the sign URL changes so each visit can log activity. */
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        sessionStorage.removeItem(`payment_tab_activity_${signatureHash}`);
+    }, [signatureHash]);
+
+    /** System activity: client opened the invoice (Payment tab). */
+    useEffect(() => {
+        if (
+            isPreviewMode ||
+            isContractorViewer ||
+            !showPaymentTab ||
+            activeTab !== 'payment'
+        ) {
+            return undefined;
+        }
+        const storageKey = `payment_tab_activity_${signatureHash}`;
+        if (sessionStorage.getItem(storageKey)) {
+            return undefined;
+        }
+        sessionStorage.setItem(storageKey, '1');
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+        const token = localStorage.getItem('access_token');
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
+        fetch(`/api/signature/${signatureHash}/payment-opened`, {
+            method: 'POST',
+            headers,
+        }).catch(() => {
+            // non-blocking
+        });
+        return undefined;
+    }, [
+        activeTab,
+        signatureHash,
+        showPaymentTab,
+        isContractorViewer,
+        isPreviewMode,
+    ]);
+
     return (
         <>
             <Modal
