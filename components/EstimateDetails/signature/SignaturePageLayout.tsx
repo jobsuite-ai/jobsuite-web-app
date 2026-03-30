@@ -10,6 +10,7 @@ import {
     Burger,
     Button,
     Container,
+    Divider,
     Drawer,
     Group,
     Modal,
@@ -198,6 +199,19 @@ export default function SignaturePageLayout({
             rate: item.rate || 0,
             created_at: item.created_at || new Date().toISOString(),
         })), [linkInfo]);
+
+    const paymentLineItemsSubtotal = useMemo(() => {
+        const rows = linkInfo.payment_line_items || [];
+        return rows.reduce((sum, row) => sum + row.line_total, 0);
+    }, [linkInfo.payment_line_items]);
+
+    const estimateDiscountPct = linkInfo.estimate?.discount_percentage ?? 0;
+    const estimateDiscountReason = linkInfo.estimate?.discount_reason?.trim();
+    const showPaymentDiscountBreakdown =
+        estimateDiscountPct > 0 && paymentLineItemsSubtotal > 0;
+    const estimateDiscountAmount = showPaymentDiscountBreakdown
+        ? paymentLineItemsSubtotal * (estimateDiscountPct / 100)
+        : 0;
 
     const handleSignatureClick = useCallback(() => {
         if (!isContractorViewer && setSignatureModalOpened) {
@@ -797,6 +811,45 @@ export default function SignaturePageLayout({
                                             Payment summary
                                         </Text>
                                         <Stack gap={4}>
+                                            {showPaymentDiscountBreakdown ? (
+                                                <>
+                                                    <Group justify="space-between">
+                                                        <Text size="sm" c="dimmed">
+                                                            Subtotal (line items)
+                                                        </Text>
+                                                        <Text size="sm" fw={500}>
+                                                            $
+                                                            {paymentLineItemsSubtotal.toFixed(
+                                                                2
+                                                            )}
+                                                        </Text>
+                                                    </Group>
+                                                    <Group
+                                                      justify="space-between"
+                                                      align="flex-start"
+                                                      wrap="nowrap"
+                                                    >
+                                                        <Stack gap={2}>
+                                                            <Text size="sm" c="dimmed">
+                                                                Discount (
+                                                                {estimateDiscountPct}%)
+                                                            </Text>
+                                                            {estimateDiscountReason ? (
+                                                                <Text size="xs" c="dimmed">
+                                                                    {estimateDiscountReason}
+                                                                </Text>
+                                                            ) : null}
+                                                        </Stack>
+                                                        <Text size="sm" c="dimmed" style={{ flexShrink: 0 }}>
+                                                            −$
+                                                            {estimateDiscountAmount.toFixed(
+                                                                2
+                                                            )}
+                                                        </Text>
+                                                    </Group>
+                                                    <Divider my={4} />
+                                                </>
+                                            ) : null}
                                             <Group justify="space-between">
                                                 <Text size="sm" c="dimmed">
                                                     Invoice total
