@@ -95,7 +95,8 @@ interface Estimate {
 const renderTemplate = (
     template: string,
     client?: Client,
-    estimate?: Estimate
+    estimate?: Estimate,
+    signatureUrl?: string
 ): string => {
     if (!template) return template;
 
@@ -158,6 +159,18 @@ const renderTemplate = (
     });
     result = result.replace(/\{\{today_date\}\}/g, today);
 
+    // Signature link (render as clickable link in preview)
+    if (signatureUrl) {
+        const escapedUrl = signatureUrl
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        const signatureLinkHtml = `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">${escapedUrl}</a>`;
+        result = result.replace(/\{\{signature_url\}\}/g, signatureLinkHtml);
+    }
+
     return result;
 };
 
@@ -173,6 +186,9 @@ export default function MessagingCenter() {
     const [sending, setSending] = useState<string | null>(null);
     const [renderedMessages, setRenderedMessages] =
         useState<Record<string, { subject: string; body: string }>>({});
+    const [signatureUrlsByMessageId, setSignatureUrlsByMessageId] = useState<
+        Record<string, string>
+    >({});
     const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
     const { clients, estimates } = useDataCache();
@@ -368,6 +384,45 @@ export default function MessagingCenter() {
             return;
         }
 
+        // Ensure signature URLs are available for previews that reference {{signature_url}}
+        const messagesNeedingSignatureUrl = messages.filter((m) => {
+            if (!m.estimate_id) return false;
+            if (signatureUrlsByMessageId[m.id]) return false;
+            const combined = `${m.subject || ''}\n${m.body || ''}`;
+            return /\{\{signature_url\}\}/.test(combined);
+        });
+
+        if (messagesNeedingSignatureUrl.length > 0) {
+            messagesNeedingSignatureUrl.forEach(async (m) => {
+                const client = clientMap.get(m.client_id);
+                const email = (m.to_emails && m.to_emails.length > 0 ? m.to_emails[0] : null) ||
+                    client?.email ||
+                    null;
+                if (!email || !m.estimate_id) return;
+
+                try {
+                    const r = await fetch(`/api/estimates/${m.estimate_id}/signature-links`, {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                        body: JSON.stringify({
+                            client_email: email,
+                            expires_in_days: 30,
+                        }),
+                    });
+                    if (!r.ok) return;
+                    const data = (await r.json()) as { signature_url?: string };
+                    if (data?.signature_url) {
+                        setSignatureUrlsByMessageId((prev) => ({
+                            ...prev,
+                            [m.id]: data.signature_url as string,
+                        }));
+                    }
+                } catch {
+                    // ignore preview errors
+                }
+            });
+        }
+
         // Render templates from cached clients/estimates (no per-message fetches)
         const renderedRecord: Record<string, { subject: string; body: string }> = {};
         messages.forEach((message) => {
@@ -377,13 +432,23 @@ export default function MessagingCenter() {
                 : undefined;
 
             renderedRecord[message.id] = {
-                subject: renderTemplate(message.subject, client, estimate),
-                body: renderTemplate(message.body, client, estimate),
+                subject: renderTemplate(
+                    message.subject,
+                    client,
+                    estimate,
+                    signatureUrlsByMessageId[message.id]
+                ),
+                body: renderTemplate(
+                    message.body,
+                    client,
+                    estimate,
+                    signatureUrlsByMessageId[message.id]
+                ),
             };
         });
 
         setRenderedMessages(renderedRecord);
-    }, [messages, clientMap, estimateMap]);
+    }, [messages, clientMap, estimateMap, signatureUrlsByMessageId]);
 
     const handleSend = async (message: OutreachMessage) => {
         // Check if SES email identity is configured
