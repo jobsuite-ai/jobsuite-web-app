@@ -158,9 +158,6 @@ const renderTemplate = (
     });
     result = result.replace(/\{\{today_date\}\}/g, today);
 
-    // Remove any remaining unreplaced variables
-    result = result.replace(/\{\{[^}]+\}\}/g, '');
-
     return result;
 };
 
