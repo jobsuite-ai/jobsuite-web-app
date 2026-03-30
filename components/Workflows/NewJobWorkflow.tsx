@@ -1027,12 +1027,14 @@ export function NewJobWorkflow() {
                                   data={[
                                     { value: 'Website', label: 'Website' },
                                     { value: 'Google', label: 'Google' },
+                                    { value: 'Local Service Ads', label: 'Local Service Ads' },
                                     { value: 'Referral', label: 'Referral' },
                                     { value: 'Facebook', label: 'Facebook' },
                                     { value: 'Instagram', label: 'Instagram' },
                                     { value: 'Trucks', label: 'Saw our trucks' },
                                     { value: 'Yard Sign', label: 'Yard Sign' },
                                     { value: 'Postcard', label: 'Postcard' },
+                                    { value: 'Outreach Efforts', label: 'Outreach Efforts' },
                                     { value: 'Past Customer', label: 'Past Customer' },
                                     { value: 'Other', label: 'Other' },
                                   ]}
