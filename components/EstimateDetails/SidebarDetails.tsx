@@ -1557,7 +1557,18 @@ export default function SidebarDetails({
           {!client ? (
             <Skeleton height={20} width={200} />
           ) : (
-            <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+            <Text
+              size="sm"
+              c="dimmed"
+              style={{
+                textAlign: 'right',
+                flex: 1,
+                maxWidth: '200px',
+                minWidth: 0,
+                overflowWrap: 'anywhere',
+                wordBreak: 'break-word',
+              }}
+            >
               {client?.email || '—'}
             </Text>
           )}
