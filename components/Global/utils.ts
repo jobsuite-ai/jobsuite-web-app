@@ -103,11 +103,11 @@ export const getFormattedEstimateStatus = (estimateStatus: EstimateStatus) => {
         case EstimateStatus.PROJECT_IN_PROGRESS:
             return 'Project In Progress';
         case EstimateStatus.PROJECT_BILLING_NEEDED:
-            return 'Project Billing Needed';
+            return 'Billing Needed';
         case EstimateStatus.PROJECT_ACCOUNTS_RECEIVABLE:
-            return 'Project Accounts Receivable';
+            return 'Accounts Receivable';
         case EstimateStatus.PROJECT_PAYMENTS_RECEIVED:
-            return 'Project Payments Received';
+            return 'Payments Received';
         case EstimateStatus.PROJECT_COMPLETED:
             return 'Project Completed';
         case EstimateStatus.PROJECT_CANCELLED:
