@@ -404,7 +404,7 @@ export const generateTemplate = (template: TemplateInput) => `
                     <div style="margin-bottom: 30px;">
                         <ul>
                             <li>A 30% deposit is due prior to commencement of work. Balance is due upon completion.</li>
-                            <li>Only payment form accepted is check.</li>
+                            <li>Card, ACH or check payments accepted.</li>
                             <li>We do not wash windows upon completion.</li>
                             <li>We do not dispose of any additional paint or stain material.</li>
                             <li>This proposal is valid for completion of the project within 6 months.</li>

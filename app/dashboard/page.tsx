@@ -19,6 +19,10 @@ const MONTH_LABELS = ['January', 'February', 'March', 'April', 'May', 'June', 'J
 interface CategoryValue {
   category: string;
   value: number;
+  /** Sold jobs in period for this source (dashboard v2) */
+  sold?: number;
+  /** Close rate: sold / leads for this source (dashboard v2) */
+  close_rate?: number;
 }
 
 interface TimeDataPoint {
@@ -229,7 +233,12 @@ export default function Dashboard() {
             { category: 'Sent Or Declined Bids', value: data.active_bids || 0 },
           ],
           statusTrend: data.status_trend || [],
-          referralSources: data.referral_sources || [],
+          referralSources: (data.referral_sources || []).map((row: any) => ({
+            category: row.category ?? '',
+            value: Number(row.value) || 0,
+            sold: typeof row.sold === 'number' ? row.sold : undefined,
+            close_rate: typeof row.close_rate === 'number' ? row.close_rate : undefined,
+          })),
           acceptedReferralSources: data.accepted_referral_sources || [],
           totalEstimatedHours: data.total_estimated_hours || 0,
           totalActualHours: data.total_actual_hours || 0,
@@ -284,11 +293,19 @@ export default function Dashboard() {
     }
   }, [timeFrame, selectedMonth, selectedYear, selectedTag, isAuthLoading]);
 
-  // Helper function to format labels
+  // Helper function to format labels (snake_case → words)
   const formatLabel = (label: string): string => label
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
+
+  /** Referral categories from the API are already human-readable; only split legacy snake_case. */
+  const formatReferralCategory = (label: string): string => {
+    if (!label) {
+      return 'Unknown';
+    }
+    return label.includes('_') ? formatLabel(label) : label;
+  };
 
   if (isAuthLoading) {
     return (
@@ -336,15 +353,6 @@ export default function Dashboard() {
         <div style={{ position: 'relative' }}>
 
           <Grid gutter="md">
-            {/* Top row metrics */}
-            <Grid.Col span={{ base: 12, md: 4 }}>
-              <MetricCard
-                title="Total Proposals"
-                value={metrics.totalJobs.toString()}
-                description="Number of proposals populating the dashboard"
-                loading={loading}
-              />
-            </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Total Proposal Value"
@@ -369,14 +377,39 @@ export default function Dashboard() {
             </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
+                title="Pipeline Value"
+                value={`$${(metrics.inProgressValue).toLocaleString(undefined, {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}`}
+                description="Value of projects in pipeline"
+                loading={loading}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 4 }}>
+              <MetricCard
+                title="Total Proposals"
+                value={metrics.totalJobs.toString()}
+                description="Number of proposals populating the dashboard"
+                loading={loading}
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, md: 4 }}>
+              <MetricCard
                 title="Conversion Rate"
                 value={`${metrics.conversionRate.toFixed(1)}%`}
                 description="Percentage of bids that converted to sales"
                 loading={loading}
               />
             </Grid.Col>
-
-            {/* Second row metrics */}
+            <Grid.Col span={{ base: 12, md: 4 }}>
+              <MetricCard
+                title="Dollars Bid to Dollars Sold"
+                value={`${metrics.totalBidValue > 0 ? ((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1) : '0.0'}%`}
+                description="Percentage of dollars bid to dollars sold"
+                loading={loading}
+              />
+            </Grid.Col>
             <Grid.Col span={{ base: 12, md: 4 }}>
               <MetricCard
                 title="Sent Or Declined Proposals"
@@ -393,25 +426,6 @@ export default function Dashboard() {
                   maximumFractionDigits: 0,
                 })}`}
                 description="Average value per sold job"
-                loading={loading}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 4 }}>
-              <MetricCard
-                title="Pipeline Value"
-                value={`$${(metrics.inProgressValue).toLocaleString(undefined, {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 0,
-                })}`}
-                description="Value of projects in pipeline"
-                loading={loading}
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, md: 4 }}>
-              <MetricCard
-                title="Dollars Bid to Dollars Sold"
-                value={`${metrics.totalBidValue > 0 ? ((metrics.totalSoldValue / metrics.totalBidValue) * 100).toFixed(1) : '0.0'}%`}
-                description="Percentage of dollars bid to dollars sold"
                 loading={loading}
               />
             </Grid.Col>
@@ -943,15 +957,58 @@ export default function Dashboard() {
 
                 <Tabs.Panel value="referrals" pt="md">
                   <Grid>
+                    <Grid.Col span={12}>
+                      <Paper withBorder p="md" radius="md">
+                        <Title order={3} mb="sm">Referral source performance</Title>
+                        <Text size="sm" c="dimmed" mb="md">
+                          Close % is sold jobs divided by proposals in this period, per source. Sold
+                          uses the same rule as total sold value (sold date set and project sold
+                          status).
+                        </Text>
+                        {loading ? (
+                          <Skeleton height={200} mt="md" />
+                        ) : (
+                          <Table striped highlightOnHover>
+                            <Table.Thead>
+                              <Table.Tr>
+                                <Table.Th>Source</Table.Th>
+                                <Table.Th style={{ textAlign: 'right' }}>Proposals</Table.Th>
+                                <Table.Th style={{ textAlign: 'right' }}>Sold</Table.Th>
+                                <Table.Th style={{ textAlign: 'right' }}>Close %</Table.Th>
+                              </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                              {metrics.referralSources.map((row) => {
+                                const sold = row.sold ?? 0;
+                                const close =
+                                  typeof row.close_rate === 'number'
+                                    ? row.close_rate
+                                    : row.value > 0
+                                      ? (sold / row.value) * 100
+                                      : 0;
+                                return (
+                                  <Table.Tr key={row.category}>
+                                    <Table.Td>{formatReferralCategory(row.category || 'Unknown')}</Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>{row.value}</Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>{sold}</Table.Td>
+                                    <Table.Td style={{ textAlign: 'right' }}>{close.toFixed(1)}%</Table.Td>
+                                  </Table.Tr>
+                                );
+                              })}
+                            </Table.Tbody>
+                          </Table>
+                        )}
+                      </Paper>
+                    </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
-                        <Title order={3}>All Projects by Referral Source</Title>
+                        <Title order={3}>Proposals by referral source</Title>
                         {loading ? (
                           <Skeleton height={300} mt="md" />
                         ) : (
                           <BarChart
                             data={metrics.referralSources.map(item => ({
-                              category: formatLabel(item.category || 'Unknown'),
+                              category: formatReferralCategory(item.category || 'Unknown'),
                               value: item.value || 0,
                             }))}
                           />
@@ -960,13 +1017,13 @@ export default function Dashboard() {
                     </Grid.Col>
                     <Grid.Col span={{ base: 12, md: 6 }}>
                       <Paper withBorder p="md" radius="md">
-                        <Title order={3}>Accepted Projects by Referral Source</Title>
+                        <Title order={3}>Sold jobs by referral source</Title>
                         {loading ? (
                           <Skeleton height={300} mt="md" />
                         ) : (
                           <BarChart
                             data={metrics.acceptedReferralSources.map(item => ({
-                              category: formatLabel(item.category || 'Unknown'),
+                              category: formatReferralCategory(item.category || 'Unknown'),
                               value: item.value || 0,
                             }))}
                           />

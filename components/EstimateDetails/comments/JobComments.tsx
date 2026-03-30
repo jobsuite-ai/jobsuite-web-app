@@ -91,7 +91,7 @@ export default function JobComments({
     } | null>(null);
     const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
+    const [activityFilter, setActivityFilter] = useState<ActivityFilter>('comments');
 
     const showQuickReplies = !commentContents || commentContents.trim().length === 0;
 
