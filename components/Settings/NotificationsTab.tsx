@@ -8,6 +8,7 @@ import {
     Flex,
     Group,
     Loader,
+    Radio,
     Stack,
     Text,
 } from '@mantine/core';
@@ -23,6 +24,8 @@ export interface NotificationSettingsBucket {
 }
 
 export interface NotificationSettingsConfig {
+    /** Delivery channel preference for notifications (email, push, or both). */
+    delivery_method: 'email' | 'push' | 'email_and_push';
     /** New estimate created — emailed to all users who opt in (not owner-based). */
     new_estimate: boolean;
     /** Estimate marked sold (accepted) — emailed to all users who opt in. */
@@ -46,6 +49,7 @@ interface NotificationsTabProps {
 
 export default function NotificationsTab({ user }: NotificationsTabProps) {
     const defaultNotificationSettings: NotificationSettingsConfig = {
+        delivery_method: 'email_and_push',
         new_estimate: true,
         sold_estimate: true,
         estimate_updates: { owner: true, non_owner: true },
@@ -59,19 +63,23 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
     const [notificationSaving, setNotificationSaving] = useState(false);
     const [notificationError, setNotificationError] = useState<string | null>(null);
     const [notificationHasChanges, setNotificationHasChanges] = useState(false);
+    const [deviceTokenCount, setDeviceTokenCount] = useState<number>(0);
+    const hasPushDevice = deviceTokenCount > 0;
     const [notificationSettings, setNotificationSettings] = useState<NotificationSettingsConfig>(
         defaultNotificationSettings
     );
 
     useEffect(() => {
         if (user?.id) {
-            loadNotificationSettings(user.id);
+            loadDeviceTokenStatus().then(() => loadNotificationSettings(user.id));
         }
     }, [user?.id]);
 
     const mergeNotificationSettings = (
         overrides?: Partial<NotificationSettingsConfig>
     ): NotificationSettingsConfig => ({
+        delivery_method:
+            overrides?.delivery_method ?? defaultNotificationSettings.delivery_method,
         new_estimate: overrides?.new_estimate ?? defaultNotificationSettings.new_estimate,
         sold_estimate: overrides?.sold_estimate ?? defaultNotificationSettings.sold_estimate,
         estimate_updates: {
@@ -101,6 +109,23 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
             overrides?.outreach_messages ??
             defaultNotificationSettings.outreach_messages,
     });
+
+    const loadDeviceTokenStatus = async () => {
+        try {
+            const response = await fetch('/api/notifications/device-token', {
+                method: 'GET',
+                headers: getApiHeaders(),
+            });
+            if (!response.ok) {
+                setDeviceTokenCount(0);
+                return;
+            }
+            const data = await response.json().catch(() => ({ count: 0 }));
+            setDeviceTokenCount(typeof data?.count === 'number' ? data.count : 0);
+        } catch {
+            setDeviceTokenCount(0);
+        }
+    };
 
     const loadNotificationSettings = async (userId: string) => {
         try {
@@ -132,13 +157,22 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
 
             if (config) {
                 setNotificationConfigId(config.id);
-                setNotificationSettings(
-                    mergeNotificationSettings(config.configuration as NotificationSettingsConfig)
+                const merged = mergeNotificationSettings(
+                    config.configuration as NotificationSettingsConfig
                 );
+                // If the user doesn't have a push device registered, coerce away from push options.
+                if (!hasPushDevice && merged.delivery_method !== 'email') {
+                    merged.delivery_method = 'email';
+                }
+                setNotificationSettings(merged);
                 setNotificationHasChanges(false);
             } else {
                 setNotificationConfigId(null);
-                setNotificationSettings(mergeNotificationSettings());
+                const merged = mergeNotificationSettings();
+                if (!hasPushDevice && merged.delivery_method !== 'email') {
+                    merged.delivery_method = 'email';
+                }
+                setNotificationSettings(merged);
                 setNotificationHasChanges(false);
             }
         } catch (err) {
@@ -267,6 +301,41 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                                 opts in below.
                             </Text>
                             <Stack gap="lg">
+                                <Stack gap="xs">
+                                    <Text fw={500}>Delivery method</Text>
+                                    <Text size="sm" c="dimmed">
+                                        Choose how you want to receive notifications.
+                                        Push options only appear when you have a device
+                                        connected.
+                                    </Text>
+                                    <Radio.Group
+                                      value={notificationSettings.delivery_method}
+                                      onChange={(value) => {
+                                            const v = value as NotificationSettingsConfig['delivery_method'];
+                                            setNotificationSettings((prev) => ({
+                                                ...prev,
+                                                delivery_method: v,
+                                            }));
+                                            setNotificationHasChanges(true);
+                                        }}
+                                    >
+                                        <Stack gap="xs">
+                                            <Radio value="email" label="Email only" />
+                                            {hasPushDevice ? (
+                                                <>
+                                                    <Radio value="push" label="Push only" />
+                                                    <Radio value="email_and_push" label="Email + Push" />
+                                                </>
+                                            ) : (
+                                                <Text size="xs" c="dimmed">
+                                                    To enable push notifications, sign in on the
+                                                    Jobsuite mobile app and allow notifications.
+                                                </Text>
+                                            )}
+                                        </Stack>
+                                    </Radio.Group>
+                                </Stack>
+
                                 <Stack gap="xs">
                                     <Text fw={500}>New estimates</Text>
                                     <Text size="sm" c="dimmed">
