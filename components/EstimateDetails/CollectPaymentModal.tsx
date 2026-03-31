@@ -276,7 +276,7 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
     setPreview(null);
     setPreviewError(null);
     setPreviewLoading(true);
-    setManualDepositPaidAmount(null);
+    setManualDepositPaidAmount(undefined);
     (async () => {
       const result = await fetchInvoicePreview(estimateId);
       if (cancelled) return;
