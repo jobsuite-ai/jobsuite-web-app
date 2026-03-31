@@ -34,7 +34,6 @@ function SignaturePageContent() {
                 setError(null);
                 const accessToken = localStorage.getItem('access_token');
                 const headers: Record<string, string> = {
-                    'Content-Type': 'application/json',
                 };
                 if (accessToken) {
                     headers.Authorization = `Bearer ${accessToken}`;
@@ -45,8 +44,15 @@ function SignaturePageContent() {
                 });
 
                 if (!response.ok) {
-                    const errBody = await response.json().catch(() => ({}));
-                    const detail = errBody?.detail || errBody?.error;
+                    const errText = await response.text().catch(() => '');
+                    const errBody = (() => {
+                        try {
+                            return errText ? JSON.parse(errText) : {};
+                        } catch {
+                            return {};
+                        }
+                    })();
+                    const detail = errBody?.detail || errBody?.error || errText;
                     if (response.status === 400 && detail) {
                         setError(detail);
                         await logToCloudWatch(
@@ -71,7 +77,8 @@ function SignaturePageContent() {
                     return;
                 }
 
-                const data = await response.json();
+                const raw = await response.text();
+                const data = raw ? JSON.parse(raw) : null;
                 setLinkInfo(data);
                 await logToCloudWatch(
                     '[SIGNATURE_FLOW_EVENT] Signature page loaded. ' +
