@@ -19,6 +19,7 @@ import {
   setLoading as setEstimatesLoading,
   setError as setEstimatesError,
   cleanupArchived as cleanupArchivedEstimates,
+  mergeEstimatePreservingValues,
   selectAllEstimates,
   selectEstimatesLoading,
   selectEstimatesError,
@@ -169,18 +170,35 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const fetchEstimates = useCallback(async (): Promise<Estimate[]> => {
-    const response = await fetch('/api/estimates', {
-      method: 'GET',
-      headers: getApiHeaders(),
-    });
+    const headers = getApiHeaders();
+    const parseItems = (data: unknown): Estimate[] => {
+      const raw = data && typeof data === 'object' && 'Items' in data ? (data as { Items?: unknown }).Items : data;
+      return Array.isArray(raw) ? (raw as Estimate[]) : [];
+    };
 
-    if (!response.ok) {
+    // Default list API returns proposal-board rows only (is_project=0). Project pipeline jobs
+    // (is_project=1, e.g. PROJECT_SCHEDULED) require a second query — same as /api/projects.
+    const [resProposals, resProjects] = await Promise.all([
+      fetch('/api/estimates', { method: 'GET', headers }),
+      fetch('/api/estimates?is_project=true', { method: 'GET', headers }),
+    ]);
+
+    if (!resProposals.ok) {
       throw new Error('Failed to fetch estimates');
     }
 
-    const data = await response.json();
-    const estimatesList = data.Items || data || [];
-    return Array.isArray(estimatesList) ? estimatesList : [];
+    const proposalsList = parseItems(await resProposals.json());
+    const projectsList = resProjects.ok ? parseItems(await resProjects.json()) : [];
+
+    const byId = new Map<string, Estimate>();
+    for (const e of proposalsList) {
+      byId.set(e.id, e);
+    }
+    for (const e of projectsList) {
+      const existing = byId.get(e.id);
+      byId.set(e.id, mergeEstimatePreservingValues(existing, e));
+    }
+    return Array.from(byId.values());
   }, []);
 
   const fetchProjects = useCallback(async (): Promise<Job[]> => {

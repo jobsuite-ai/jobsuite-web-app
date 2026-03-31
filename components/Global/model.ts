@@ -218,7 +218,8 @@ export type Estimate = {
     referral_name?: string;
     // Date fields
     sent_date?: string;
-    is_project?: number;
+    /** API may send boolean; Dynamo list index uses 0/1 */
+    is_project?: number | boolean;
     sold_date?: string;
     started_date?: string;
     finished_date?: string;
@@ -242,6 +243,12 @@ export type Estimate = {
     job_tag?: string | null;
     days_in_column?: number | null;
     is_terminal?: boolean;
+    /** End of scheduled range (job span on calendar) */
+    scheduled_end_date?: string | null;
+    /** Optional team id when team CRUD exists; used for capacity + colors */
+    schedule_team_id?: string | null;
+    /** When true, auto-span from bid hours must not overwrite scheduled_end_date */
+    schedule_end_locked?: boolean | null;
 };
 
 // Status Actions Configuration Types

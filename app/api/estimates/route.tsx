@@ -31,22 +31,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse query parameters
-    const url = new URL(request.url);
-    const clientId = url.searchParams.get('client_id');
-    const status = url.searchParams.get('status'); // Note: backend only accepts single status
-
-    // Build the API URL
+    // Forward all query params (e.g. client_id, status, is_project) to the job-engine list API
+    const forwardUrl = new URL(request.url);
+    const forwardParams = forwardUrl.searchParams.toString();
     let estimatesUrl = `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates`;
-    const queryParams = new URLSearchParams();
-    if (clientId) {
-      queryParams.append('client_id', clientId);
-    }
-    if (status) {
-      queryParams.append('status', status);
-    }
-    if (queryParams.toString()) {
-      estimatesUrl += `?${queryParams.toString()}`;
+    if (forwardParams) {
+      estimatesUrl += `?${forwardParams}`;
     }
 
     // Fetch estimates from backend

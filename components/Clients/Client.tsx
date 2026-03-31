@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { Badge, Button, Card, Center, Divider, Flex, Group, Modal, Paper, Text, TextInput, Textarea } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
 import { IconCheck, IconClock, IconEdit, IconMail, IconMapPin, IconNotes, IconPhone, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
@@ -70,6 +71,12 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                 email: values.email === '' ? 'Must enter client email' : null,
                 phone_number: values.phone_number === '' ? 'Must enter client phone number' : null,
                 name: values.name === '' ? 'Must enter client name' : null,
+                address_state: (() => {
+                    const raw = (values.address_state || '').trim();
+                    if (!raw) return null;
+                    if (raw.length !== 2) return 'State must be a 2-letter code (e.g. UT)';
+                    return null;
+                })(),
             }),
     });
 
@@ -124,7 +131,32 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
     }
 
     async function updateClient() {
+        const validation = form.validate();
+        if (validation.hasErrors) {
+            notifications.show({
+                title: 'Fix validation errors',
+                message: 'Please correct the highlighted fields and try again.',
+                color: 'red',
+                position: 'bottom-right',
+            });
+            return;
+        }
+
         const formValues = form.getValues();
+        const normalizedState = formValues.address_state
+            ? String(formValues.address_state).trim().toUpperCase()
+            : '';
+
+        if (normalizedState && normalizedState.length !== 2) {
+            form.setFieldError('address_state', 'State must be a 2-letter code (e.g. UT)');
+            notifications.show({
+                title: 'Invalid state',
+                message: 'State must be a 2-letter code (e.g. UT).',
+                color: 'red',
+                position: 'bottom-right',
+            });
+            return;
+        }
 
         const response = await fetch(
             `/api/clients/${client.id}`,
@@ -137,7 +169,7 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                     phone_number: formValues.phone_number,
                     address_street: formValues.address_street || null,
                     address_city: formValues.address_city || null,
-                    address_state: formValues.address_state || null,
+                    address_state: normalizedState || null,
                     address_zipcode: formValues.address_zipcode || null,
                     address_country: formValues.address_country || null,
                     notes: formValues.notes || null,
@@ -145,9 +177,38 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
             }
         );
 
-        const updatedClient = await response.json();
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            // Try to map backend validation errors to form fields
+            let shownAnyFieldError = false;
+            const message = (payload as any)?.message;
+            if (Array.isArray(message)) {
+                message.forEach((err) => {
+                    const loc = Array.isArray(err?.loc) ? err.loc : [];
+                    const field = loc[1];
+                    const msg = err?.msg;
+                    if (typeof field === 'string' && typeof msg === 'string') {
+                        form.setFieldError(field as any, msg);
+                        shownAnyFieldError = true;
+                    }
+                });
+            }
+
+            notifications.show({
+                title: 'Failed to update client',
+                message: shownAnyFieldError
+                    ? 'Please correct the highlighted fields and try again.'
+                    : (typeof message === 'string' ? message : 'Please try again.'),
+                color: 'red',
+                position: 'bottom-right',
+            });
+            return;
+        }
+
+        const updatedClient = payload;
         setClient(updatedClient);
-        setNotesValue(updatedClient.notes || '');
+        setNotesValue(updatedClient?.notes || '');
         closeModals();
     }
 
@@ -619,6 +680,11 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                           placeholder={client?.address_state || 'Enter state'}
                           key={form.key('address_state')}
                           {...form.getInputProps('address_state')}
+                          maxLength={2}
+                          onChange={(e) => {
+                              const next = e.currentTarget.value.toUpperCase();
+                              form.setFieldValue('address_state', next);
+                          }}
                           style={{ width: '100px' }}
                         />
                         <TextInput
@@ -645,7 +711,22 @@ export default function SingleClient({ initialClient }: { initialClient: Contrac
                     />
 
                     <Center mt="md">
-                        <Button type="submit" onClick={() => setIsConfirmationModalOpen(true)}>
+                        <Button
+                          type="submit"
+                          onClick={() => {
+                              const validation = form.validate();
+                              if (validation.hasErrors) {
+                                  notifications.show({
+                                      title: 'Fix validation errors',
+                                      message: 'Please correct the highlighted fields and try again.',
+                                      color: 'red',
+                                      position: 'bottom-right',
+                                  });
+                                  return;
+                              }
+                              setIsConfirmationModalOpen(true);
+                          }}
+                        >
                             Update Client Details
                         </Button>
                     </Center>
