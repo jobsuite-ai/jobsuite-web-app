@@ -130,7 +130,7 @@ function InvoiceTotalsSection({
 }: {
   preview: InvoicePreviewResponse;
   helcimConfigured: boolean | null;
-  manualDepositPaidAmount: number | null;
+  manualDepositPaidAmount?: number;
 }) {
   const manualPaid =
     typeof manualDepositPaidAmount === 'number' && manualDepositPaidAmount > 0
@@ -264,7 +264,9 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<InvoicePreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [manualDepositPaidAmount, setManualDepositPaidAmount] = useState<number | null>(null);
+  const [manualDepositPaidAmount, setManualDepositPaidAmount] = useState<number | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     if (!opened || !estimateId) {
@@ -366,7 +368,7 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
                 max={preview.invoice_total}
                 value={manualDepositPaidAmount}
                 onChange={(v) => {
-                  const n = typeof v === 'number' ? v : null;
+                  const n = typeof v === 'number' ? v : undefined;
                   setManualDepositPaidAmount(n);
                 }}
                 decimalScale={2}

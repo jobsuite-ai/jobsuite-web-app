@@ -2,7 +2,22 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Anchor, Badge, Button, Center, Flex, Menu, Modal, Progress, Stepper, Table, Text } from '@mantine/core';
+import {
+    ActionIcon,
+    Anchor,
+    Badge,
+    Button,
+    Center,
+    Flex,
+    Menu,
+    Modal,
+    NumberInput,
+    Progress,
+    SegmentedControl,
+    Stepper,
+    Table,
+    Text,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import {
     IconArchive,
@@ -117,6 +132,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const openCheckInDateModalRef = useRef<(() => void) | null>(null);
     const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
+    const [manualPaymentModalOpened, setManualPaymentModalOpened] = useState(false);
+    const [manualPaymentPurpose, setManualPaymentPurpose] = useState<'deposit' | 'balance'>(
+        'deposit'
+    );
+    const [manualPaymentAmount, setManualPaymentAmount] = useState<number | undefined>(
+        undefined
+    );
 
     // Single initial loading state - false if we have cached estimate, true otherwise
     // Since we initialize estimate from cachedEstimate synchronously, if cachedEstimate exists,
@@ -247,6 +269,49 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         cachedSignatures,
         cachedEstimate,
     ]);
+
+    const submitManualPayment = useCallback(async () => {
+        if (!estimate?.id) return;
+        if (typeof manualPaymentAmount !== 'number' || manualPaymentAmount <= 0) {
+            notifications.show({
+                title: 'Enter an amount',
+                message: 'Amount must be greater than $0.00.',
+                color: 'red',
+            });
+            return;
+        }
+        try {
+            const res = await fetch(`/api/estimates/${estimate.id}/manual-payment`, {
+                method: 'POST',
+                headers: getApiHeaders(),
+                body: JSON.stringify({
+                    purpose: manualPaymentPurpose,
+                    amount_paid: manualPaymentAmount,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to record manual payment');
+            }
+            notifications.show({
+                title: 'Payment recorded',
+                message:
+                    manualPaymentPurpose === 'deposit'
+                        ? 'Manual deposit recorded.'
+                        : 'Manual balance payment recorded.',
+                color: 'green',
+            });
+            setManualPaymentModalOpened(false);
+            setManualPaymentAmount(undefined);
+            refreshData();
+        } catch (e) {
+            notifications.show({
+                title: 'Failed to record payment',
+                message: e instanceof Error ? e.message : 'Please try again.',
+                color: 'red',
+            });
+        }
+    }, [estimate?.id, manualPaymentAmount, manualPaymentPurpose, refreshData]);
 
     // Update estimate and client when cached data changes (for when navigating between estimates)
     useEffect(() => {
@@ -1722,11 +1787,58 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                             Create Change Order
                                                         </Menu.Item>
                                                     )}
+                                                    <Menu.Item
+                                                      leftSection={<IconReceipt size={16} />}
+                                                      onClick={() => {
+                                                          setManualPaymentPurpose('deposit');
+                                                          setManualPaymentAmount(undefined);
+                                                          setManualPaymentModalOpened(true);
+                                                      }}
+                                                    >
+                                                        Record manual payment
+                                                    </Menu.Item>
                                                 </Menu.Dropdown>
                                             </Menu>
                                         </div>
                                     </Flex>
                                 </div>
+
+                                <Modal
+                                  opened={manualPaymentModalOpened}
+                                  onClose={() => setManualPaymentModalOpened(false)}
+                                  centered
+                                  title="Record manual payment"
+                                >
+                                    <Flex direction="column" gap="md">
+                                        <SegmentedControl
+                                          value={manualPaymentPurpose}
+                                          onChange={(v) =>
+                                                setManualPaymentPurpose(
+                                                    v === 'balance' ? 'balance' : 'deposit'
+                                                )
+                                            }
+                                          data={[
+                                                { label: 'Deposit', value: 'deposit' },
+                                                { label: 'Balance', value: 'balance' },
+                                            ]}
+                                        />
+                                        <NumberInput
+                                          label="Amount received"
+                                          placeholder="0.00"
+                                          min={0}
+                                          value={manualPaymentAmount}
+                                          onChange={(v) =>
+                                                setManualPaymentAmount(
+                                                    typeof v === 'number' ? v : undefined
+                                                )
+                                            }
+                                          decimalScale={2}
+                                          fixedDecimalScale
+                                          hideControls
+                                        />
+                                        <Button onClick={submitManualPayment}>Save</Button>
+                                    </Flex>
+                                </Modal>
 
                                 {/* Timeline/Stepper showing progress - Hide once all steps are
                                 complete and preview is visible. Only show when page is loaded
