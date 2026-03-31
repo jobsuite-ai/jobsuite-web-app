@@ -24,10 +24,11 @@ export async function POST(
                 { status: 400 }
             );
         }
-        const apiBaseUrl = getApiBaseUrl();
+
         const body = await request.json().catch(() => ({}));
+        const apiBaseUrl = getApiBaseUrl();
         const res = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/invoice/send-email`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/manual-payment`,
             {
                 method: 'POST',
                 headers: {
@@ -37,17 +38,20 @@ export async function POST(
                 body: JSON.stringify(body),
             }
         );
+
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             return NextResponse.json(
-                { message: err.detail || 'Failed to send invoice email' },
+                { message: err.detail || 'Failed to record manual payment' },
                 { status: res.status }
             );
         }
+
         const data = await res.json();
         return NextResponse.json(data);
     } catch (error) {
-        console.error('Send invoice email error:', error);
+        // eslint-disable-next-line no-console
+        console.error('Record manual payment error:', error);
         return NextResponse.json(
             { message: 'Internal server error' },
             { status: 500 }
