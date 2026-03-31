@@ -12,6 +12,7 @@ import {
   Image,
   Loader,
   Modal,
+  NumberInput,
   Paper,
   Stack,
   Table,
@@ -103,11 +104,17 @@ async function fetchInvoicePreview(
 }
 
 async function postSendInvoiceEmail(
-  estimateId: string
+  estimateId: string,
+  manualDepositPaidAmount?: number
 ): Promise<{ ok: boolean; message?: string }> {
   const res = await fetch(`/api/estimates/${estimateId}/invoice/send-email`, {
     method: 'POST',
     headers: getApiHeaders(),
+    body: JSON.stringify(
+      typeof manualDepositPaidAmount === 'number'
+        ? { manual_deposit_paid_amount: manualDepositPaidAmount }
+        : {}
+    ),
   });
   if (res.ok) {
     return { ok: true };
@@ -119,10 +126,21 @@ async function postSendInvoiceEmail(
 function InvoiceTotalsSection({
   preview,
   helcimConfigured,
+  manualDepositPaidAmount,
 }: {
   preview: InvoicePreviewResponse;
   helcimConfigured: boolean | null;
+  manualDepositPaidAmount: number | null;
 }) {
+  const manualPaid =
+    typeof manualDepositPaidAmount === 'number' && manualDepositPaidAmount > 0
+      ? manualDepositPaidAmount
+      : 0;
+  const showManualDeposit = !preview.is_change_order && manualPaid > 0;
+  const amountDueThisEmail = showManualDeposit
+    ? Math.max(preview.invoice_total - manualPaid, 0)
+    : preview.amount_due;
+
   const scopeRows = preview.scopes.map((s) => (
     <Table.Tr key={s.estimate_id}>
       <Table.Td>
@@ -193,7 +211,7 @@ function InvoiceTotalsSection({
             {formatUsd(preview.invoice_total)}
           </Text>
         </Group>
-        {!preview.is_change_order && preview.deposit_paid ? (
+        {!preview.is_change_order && preview.deposit_paid && !showManualDeposit ? (
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
               30% deposit (already paid)
@@ -203,12 +221,22 @@ function InvoiceTotalsSection({
             </Text>
           </Group>
         ) : null}
+        {showManualDeposit ? (
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed">
+              Manual deposit (already paid)
+            </Text>
+            <Text size="xs" c="dimmed">
+              {formatUsd(manualPaid)}
+            </Text>
+          </Group>
+        ) : null}
         <Group justify="space-between">
           <Text size="sm" fw={600}>
             Amount due (this email)
           </Text>
           <Text size="sm" fw={700} c="blue">
-            {formatUsd(preview.amount_due)}
+            {formatUsd(amountDueThisEmail)}
           </Text>
         </Group>
       </Stack>
@@ -236,6 +264,7 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<InvoicePreviewResponse | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [manualDepositPaidAmount, setManualDepositPaidAmount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!opened || !estimateId) {
@@ -245,6 +274,7 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
     setPreview(null);
     setPreviewError(null);
     setPreviewLoading(true);
+    setManualDepositPaidAmount(null);
     (async () => {
       const result = await fetchInvoicePreview(estimateId);
       if (cancelled) return;
@@ -264,7 +294,10 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
     if (!estimateId) return;
     setSendingInvoiceEmail(true);
     try {
-      const result = await postSendInvoiceEmail(estimateId);
+      const result = await postSendInvoiceEmail(
+        estimateId,
+        typeof manualDepositPaidAmount === 'number' ? manualDepositPaidAmount : undefined
+      );
       if (result.ok) {
         notifications.show({
           title: 'Invoice sent',
@@ -323,7 +356,30 @@ export function CollectPaymentModal({ opened, onClose, estimateId }: CollectPaym
             {previewError}
           </Alert>
         ) : preview ? (
-          <InvoiceTotalsSection preview={preview} helcimConfigured={helcimConfigured} />
+          <Stack gap="md">
+            {!preview.is_change_order ? (
+              <NumberInput
+                label="Manual deposit already paid (optional)"
+                description="Use this if you already received a deposit by check/cash/etc. This will reduce the amount due shown on the payment page."
+                placeholder="0.00"
+                min={0}
+                max={preview.invoice_total}
+                value={manualDepositPaidAmount}
+                onChange={(v) => {
+                  const n = typeof v === 'number' ? v : null;
+                  setManualDepositPaidAmount(n);
+                }}
+                decimalScale={2}
+                fixedDecimalScale
+                hideControls
+              />
+            ) : null}
+            <InvoiceTotalsSection
+              preview={preview}
+              helcimConfigured={helcimConfigured}
+              manualDepositPaidAmount={manualDepositPaidAmount}
+            />
+          </Stack>
         ) : null}
 
         <Paper withBorder p="md" radius="md" bg="var(--mantine-color-body)">

@@ -25,6 +25,7 @@ export async function POST(
             );
         }
         const apiBaseUrl = getApiBaseUrl();
+        const body = await request.json().catch(() => ({}));
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/invoice/send-email`,
             {
@@ -33,6 +34,7 @@ export async function POST(
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
+                body: JSON.stringify(body),
             }
         );
         if (!res.ok) {
