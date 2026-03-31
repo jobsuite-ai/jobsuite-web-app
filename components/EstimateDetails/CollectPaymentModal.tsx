@@ -136,10 +136,13 @@ function InvoiceTotalsSection({
     typeof manualDepositPaidAmount === 'number' && manualDepositPaidAmount > 0
       ? manualDepositPaidAmount
       : 0;
-  const showManualDeposit = !preview.is_change_order && manualPaid > 0;
-  const amountDueThisEmail = showManualDeposit
+  const useManualPaid = !preview.is_change_order && manualPaid > 0;
+  const amountDue = useManualPaid
     ? Math.max(preview.invoice_total - manualPaid, 0)
     : preview.amount_due;
+  const paidToDate = useManualPaid
+    ? Math.min(manualPaid, preview.invoice_total)
+    : Math.max(preview.invoice_total - preview.amount_due, 0);
 
   const scopeRows = preview.scopes.map((s) => (
     <Table.Tr key={s.estimate_id}>
@@ -211,32 +214,30 @@ function InvoiceTotalsSection({
             {formatUsd(preview.invoice_total)}
           </Text>
         </Group>
-        {!preview.is_change_order && preview.deposit_paid && !showManualDeposit ? (
+        {preview.is_change_order && preview.deposit_amount > 0 ? (
           <Group justify="space-between">
             <Text size="xs" c="dimmed">
-              30% deposit (already paid)
+              Deferred deposit (included in amount due)
             </Text>
             <Text size="xs" c="dimmed">
               {formatUsd(preview.deposit_amount)}
             </Text>
           </Group>
         ) : null}
-        {showManualDeposit ? (
-          <Group justify="space-between">
-            <Text size="xs" c="dimmed">
-              Manual deposit (already paid)
-            </Text>
-            <Text size="xs" c="dimmed">
-              {formatUsd(manualPaid)}
-            </Text>
-          </Group>
-        ) : null}
+        <Group justify="space-between">
+          <Text size="sm" c="dimmed">
+            Paid to date
+          </Text>
+          <Text size="sm" fw={500}>
+            {formatUsd(paidToDate)}
+          </Text>
+        </Group>
         <Group justify="space-between">
           <Text size="sm" fw={600}>
-            Amount due (this email)
+            Amount due upon completion of project
           </Text>
-          <Text size="sm" fw={700} c="blue">
-            {formatUsd(amountDueThisEmail)}
+          <Text size="sm" fw={600}>
+            {formatUsd(amountDue)}
           </Text>
         </Group>
       </Stack>

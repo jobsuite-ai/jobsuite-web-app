@@ -25,7 +25,9 @@ import { IconCheck, IconX, IconUpload, IconMail } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { clearCachedContractorId, getApiHeaders } from '@/app/utils/apiClient';
+import { clearAccessTokenMetadata } from '@/app/utils/authToken';
+import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import ActionsTab from '@/components/Settings/ActionsTab';
 import EmployeeTeamsTab from '@/components/Settings/EmployeeTeamsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
@@ -66,6 +68,16 @@ interface ContractorConfiguration {
 export default function SettingsPage() {
     const { user } = useAuth({ fetchUser: true });
     const router = useRouter();
+
+    const handleLogout = () => {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        clearAccessTokenMetadata();
+        clearCachedAuthMe();
+        clearCachedContractorId();
+        window.dispatchEvent(new Event('localStorageChange'));
+        router.push('/');
+    };
     const pathname = usePathname();
     const searchParams = useSearchParams();
 
@@ -713,6 +725,20 @@ export default function SettingsPage() {
                     <NotificationsTab user={user} />
                 </Tabs.Panel>
             </Tabs>
+
+            <Stack gap="xs" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-dark-4)' }}>
+                <Text size="sm" c="dimmed">
+                    Account
+                </Text>
+                <Group gap="md" align="center">
+                    <Anchor component={Link} href="/profile" size="sm">
+                        Profile
+                    </Anchor>
+                    <Button variant="outline" color="red" size="sm" onClick={handleLogout}>
+                        Log out
+                    </Button>
+                </Group>
+            </Stack>
 
             <Stack gap="xs" mt="xl" pt="md" style={{ borderTop: '1px solid var(--mantine-color-dark-4)' }}>
                 <Text size="sm" c="dimmed">
