@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getContractorId } from '../utils/getContractorId';
+import { getContractorId } from '../../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
