@@ -23,7 +23,6 @@ export async function GET(
         // Forward Authorization header if present (for contractor detection)
         const authHeader = request.headers.get('Authorization');
         const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
         };
         if (authHeader) {
             headers.Authorization = authHeader;
@@ -38,9 +37,10 @@ export async function GET(
         );
 
         if (!response.ok) {
-            let errorData;
+            let errorData: any;
             try {
-                errorData = await response.json();
+                const raw = await response.text();
+                errorData = raw ? JSON.parse(raw) : {};
             } catch {
                 errorData = { detail: `HTTP ${response.status}: ${response.statusText}` };
             }
@@ -52,8 +52,31 @@ export async function GET(
             );
         }
 
-        const data = await response.json();
-        return NextResponse.json(data);
+        // Some upstream errors can return a 200 with non-JSON content (e.g., HTML error pages).
+        // Read as text first so we can return a useful error instead of terminating the request.
+        const raw = await response.text();
+        try {
+            const data = raw ? JSON.parse(raw) : null;
+            return NextResponse.json(data);
+        } catch (parseErr: any) {
+            // eslint-disable-next-line no-console
+            console.error('Upstream returned non-JSON for signature link info', {
+                signature_hash,
+                status: response.status,
+                statusText: response.statusText,
+                contentType: response.headers.get('content-type'),
+                rawPrefix: raw?.slice?.(0, 500),
+                error: parseErr?.message || String(parseErr),
+            });
+            return NextResponse.json(
+                {
+                    error: 'Upstream returned invalid JSON for signature link info',
+                    upstreamStatus: response.status,
+                    upstreamContentType: response.headers.get('content-type'),
+                },
+                { status: 502 }
+            );
+        }
     } catch (error: any) {
         // eslint-disable-next-line no-console
         console.error('Error fetching signature link info:', error);
