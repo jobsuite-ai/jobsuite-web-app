@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import {
+    Autocomplete,
     Button,
     Card,
     Group,
@@ -25,6 +26,7 @@ import {
     StatusActionsConfig,
     StatusActionsConfiguration,
 } from '@/components/Global/model';
+import { useJobTags } from '@/hooks/useJobTags';
 import { useUsers } from '@/hooks/useUsers';
 
 // Get all estimate statuses for selection
@@ -45,12 +47,15 @@ export default function ActionsTab() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { users, loading: usersLoading } = useUsers();
+    const { jobTags, loading: jobTagsLoading } = useJobTags();
     const [newActionStatus, setNewActionStatus] = useState<string>('');
     const [newActionType, setNewActionType] = useState<'SET_OWNER' | 'SEND_NOTIFICATION'>(
         'SET_OWNER'
     );
     const [newActionUserId, setNewActionUserId] = useState<string>('');
     const [newActionUserIds, setNewActionUserIds] = useState<string[]>([]);
+    /** Empty = any job tag; only used for SEND_NOTIFICATION */
+    const [newActionJobTag, setNewActionJobTag] = useState<string>('');
 
     useEffect(() => {
         loadConfiguration();
@@ -234,7 +239,9 @@ export default function ActionsTab() {
                     <Text c="dimmed" size="sm">
                         Configure automated actions that execute when an estimate
                         moves into a specific status. Actions will be executed in
-                        the order they appear.
+                        the order they appear. For &quot;Send Notification&quot;, you
+                        can optionally restrict to a single job tag (e.g. only when
+                        invoicing jobs tagged Kick Back Program).
                     </Text>
                 </div>
 
@@ -244,81 +251,31 @@ export default function ActionsTab() {
                     </Alert>
                 )}
 
-                <Stack gap="sm">
-                    {allActions.length === 0 ? (
-                        <Text c="dimmed">No actions configured yet.</Text>
-                    ) : (
-                        allActions.map(({ status, action, index }) => (
-                            <Card
-                              key={`${status}-${index}`}
-                              padding="md"
-                              withBorder
-                              style={{ backgroundColor: '#2a3a54' }}
-                              radius="md"
-                            >
-                                <Group justify="space-between" align="flex-start">
-                                    <Stack gap={4} style={{ flex: 1 }}>
-                                        <Group gap="xs">
-                                            <Text fw={600} c="gray.0">
-                                                {ACTION_TYPES.find(
-                                                    (type) => type.value === action.type
-                                                )?.label || action.type.replace(/_/g, ' ')}
-                                            </Text>
-                                            <Badge color="blue" size="sm">
-                                                {statusLabelByValue(status)}
-                                            </Badge>
-                                        </Group>
-                                        {action.type === 'SET_OWNER' ? (
-                                            <Text c="dimmed" size="sm">
-                                                Set owner to {userLabelById(action.user_id)}
-                                            </Text>
-                                        ) : (
-                                            <Text c="dimmed" size="sm">
-                                                Notify {action.user_ids.map(userLabelById).join(', ')}
-                                            </Text>
-                                        )}
-                                    </Stack>
-                                    <ActionIcon
-                                      color="red"
-                                      variant="subtle"
-                                      onClick={() => {
-                                          const nextConfig = buildConfigWithRemovedAction(
-                                              status,
-                                              index
-                                          );
-                                          applyConfigAndSave(nextConfig);
-                                      }}
-                                      mt="xs"
-                                    >
-                                        <IconTrash size={16} />
-                                    </ActionIcon>
-                                </Group>
-                            </Card>
-                        ))
-                    )}
-                </Stack>
-
-                <Card padding="md" withBorder style={{ backgroundColor: '#2a3a54' }} radius="md">
+                <Card padding="md" withBorder radius="md">
                     <Stack gap="sm">
-                        <Text fw={600} c="gray.0">Create New Action</Text>
+                        <div>
+                            <Text fw={600}>Create new action</Text>
+                            <Text c="dimmed" size="sm" mt={4}>
+                                Add a rule first; your existing actions are listed below.
+                            </Text>
+                        </div>
                         <Group grow align="flex-start">
                             <Select
                               label="Status"
-                              c="gray.0"
                               placeholder="Select status"
                               data={ESTIMATE_STATUSES}
                               value={newActionStatus}
                               onChange={(value) => setNewActionStatus(value || '')}
                             />
                             <Select
-                              label="Action Type"
-                              c="gray.0"
+                              label="Action type"
                               data={ACTION_TYPES}
                               value={newActionType}
                               onChange={(value) => {
                                     if (value === 'SET_OWNER') {
                                         setNewActionType('SET_OWNER');
                                         setNewActionUserIds([]);
+                                        setNewActionJobTag('');
                                     } else if (value === 'SEND_NOTIFICATION') {
                                         setNewActionType('SEND_NOTIFICATION');
                                         setNewActionUserId('');
@@ -328,7 +285,6 @@ export default function ActionsTab() {
                             {newActionType === 'SET_OWNER' ? (
                                 <Select
                                   label="User"
-                                  c="gray.0"
                                   placeholder="Select user"
                                   data={users.map((u) => ({
                                         value: u.id,
@@ -339,17 +295,28 @@ export default function ActionsTab() {
                                   disabled={usersLoading}
                                 />
                             ) : (
-                                <MultiSelect
-                                  label="Users"
-                                  placeholder="Select users"
-                                  data={users.map((u) => ({
-                                        value: u.id,
-                                        label: u.full_name || u.email,
-                                    }))}
-                                  value={newActionUserIds}
-                                  onChange={setNewActionUserIds}
-                                  disabled={usersLoading}
-                                />
+                                <>
+                                    <MultiSelect
+                                      label="Users"
+                                      placeholder="Select users"
+                                      data={users.map((u) => ({
+                                            value: u.id,
+                                            label: u.full_name || u.email,
+                                        }))}
+                                      value={newActionUserIds}
+                                      onChange={setNewActionUserIds}
+                                      disabled={usersLoading}
+                                    />
+                                    <Autocomplete
+                                      label="Job tag (optional)"
+                                      description="Exact match on the estimate job tag; leave empty for all jobs."
+                                      placeholder="Any job tag"
+                                      data={jobTags}
+                                      value={newActionJobTag}
+                                      onChange={setNewActionJobTag}
+                                      disabled={jobTagsLoading}
+                                    />
+                                </>
                             )}
                         </Group>
                         <Group justify="flex-end">
@@ -378,11 +345,15 @@ export default function ActionsTab() {
                                             setError('Please select at least one user.');
                                             return;
                                         }
+                                        const tagFilter = newActionJobTag.trim();
                                         const nextConfig = buildConfigWithAddedAction(
                                             newActionStatus,
                                             {
                                                 type: 'SEND_NOTIFICATION',
                                                 user_ids: newActionUserIds,
+                                                ...(tagFilter
+                                                    ? { job_tag: tagFilter }
+                                                    : {}),
                                             }
                                         );
                                         applyConfigAndSave(nextConfig);
@@ -392,6 +363,7 @@ export default function ActionsTab() {
                                     setNewActionType('SET_OWNER');
                                     setNewActionUserId('');
                                     setNewActionUserIds([]);
+                                    setNewActionJobTag('');
                                 }}
                             >
                                 Create Action
@@ -399,6 +371,78 @@ export default function ActionsTab() {
                         </Group>
                     </Stack>
                 </Card>
+
+                <Stack gap="xs">
+                    <Text fw={500} size="sm">
+                        Configured actions
+                    </Text>
+                    {allActions.length === 0 ? (
+                        <Text c="dimmed" size="sm">
+                            No actions configured yet.
+                        </Text>
+                    ) : (
+                        <Stack gap="sm">
+                            {allActions.map(({ status, action, index }) => (
+                                <Card
+                                  key={`${status}-${index}`}
+                                  padding="md"
+                                  withBorder
+                                  style={{ backgroundColor: '#2a3a54' }}
+                                  radius="md"
+                                >
+                                    <Group justify="space-between" align="flex-start">
+                                        <Stack gap={4} style={{ flex: 1 }}>
+                                            <Group gap="xs">
+                                                <Text fw={600} c="gray.0">
+                                                    {ACTION_TYPES.find(
+                                                        (type) => type.value === action.type
+                                                    )?.label || action.type.replace(/_/g, ' ')}
+                                                </Text>
+                                                <Badge color="blue" size="sm">
+                                                    {statusLabelByValue(status)}
+                                                </Badge>
+                                            </Group>
+                                            {action.type === 'SET_OWNER' ? (
+                                                <Text c="dimmed" size="sm">
+                                                    Set owner to {userLabelById(action.user_id)}
+                                                </Text>
+                                            ) : (
+                                                <Stack gap={2}>
+                                                    <Text c="dimmed" size="sm">
+                                                        Notify{' '}
+                                                        {action.user_ids.map(userLabelById).join(', ')}
+                                                    </Text>
+                                                    {action.job_tag ? (
+                                                        <Text c="dimmed" size="sm">
+                                                            Only when job tag:{' '}
+                                                            <Text span fw={500} c="gray.3">
+                                                                {action.job_tag}
+                                                            </Text>
+                                                        </Text>
+                                                    ) : null}
+                                                </Stack>
+                                            )}
+                                        </Stack>
+                                        <ActionIcon
+                                          color="red"
+                                          variant="subtle"
+                                          onClick={() => {
+                                              const nextConfig = buildConfigWithRemovedAction(
+                                                  status,
+                                                  index
+                                              );
+                                              applyConfigAndSave(nextConfig);
+                                          }}
+                                          mt="xs"
+                                        >
+                                            <IconTrash size={16} />
+                                        </ActionIcon>
+                                    </Group>
+                                </Card>
+                            ))}
+                        </Stack>
+                    )}
+                </Stack>
 
                 {saving && (
                     <Group justify="flex-end" mt="md">
