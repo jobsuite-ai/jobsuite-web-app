@@ -28,7 +28,7 @@ import {
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
-import { IconX, IconChevronDown, IconSearch, IconRefresh, IconMessageCircle, IconArchive, IconThumbDown } from '@tabler/icons-react';
+import { IconX, IconChevronDown, IconSearch, IconRefresh, IconMessageCircle, IconArchive, IconThumbDown, IconCopy } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
 import classes from './EstimatesList.module.css';
@@ -346,6 +346,93 @@ export default function EstimatesList() {
             await refreshData('estimates', true);
         } finally {
             setRefreshing(false);
+        }
+    };
+
+    const formatEstimatesAsBullets = (items: Estimate[]) => {
+        const lines: string[] = [];
+        items.forEach((estimate) => {
+            const title = (estimate.title || '').trim() || `Estimate ${estimate.id.slice(0, 8)}`;
+            const jobType = (estimate.estimate_type || '').toString().trim() || 'Unknown';
+            const rawHours = estimate.estimate_hours ?? estimate.hours_bid;
+            const hoursValue = typeof rawHours === 'string' ? Number(rawHours) : rawHours;
+            const hours =
+                typeof hoursValue === 'number' && Number.isFinite(hoursValue)
+                    ? hoursValue
+                    : null;
+            const hoursLabel = hours != null ? `${hours}` : '0';
+
+            lines.push(`- ${title} (${jobType}) - ${hoursLabel} Hours.`);
+
+            const lineItems = Array.isArray(estimate.line_items) ? estimate.line_items : [];
+            lineItems.forEach((li: any) => {
+                const liTitle = (li?.title || li?.header || '').toString().trim() || 'Line item';
+                const liHoursRaw = li?.hours;
+                const liHoursValue = typeof liHoursRaw === 'string' ? Number(liHoursRaw) : liHoursRaw;
+                const liHours =
+                    typeof liHoursValue === 'number' && Number.isFinite(liHoursValue)
+                        ? liHoursValue
+                        : null;
+                const liHoursSuffix = liHours != null ? ` - ${liHours} Hours.` : '';
+                lines.push(`  - ${liTitle}${liHoursSuffix}`);
+            });
+        });
+
+        return lines.join('\n');
+    };
+
+    const copyBulletedEstimates = async () => {
+        const itemsToCopy = viewMode === 'list' ? filteredEstimates : estimates;
+        const text = formatEstimatesAsBullets(itemsToCopy);
+        if (!text.trim()) {
+            notifications.show({
+                title: 'Nothing to copy',
+                message: 'No estimates are currently loaded.',
+                color: 'gray',
+                position: 'bottom-right',
+                autoClose: 2500,
+            });
+            return;
+        }
+
+        try {
+            await navigator.clipboard.writeText(text);
+            notifications.show({
+                title: 'Copied',
+                message: `Copied ${itemsToCopy.length} item${itemsToCopy.length === 1 ? '' : 's'} to clipboard.`,
+                color: 'green',
+                position: 'bottom-right',
+                autoClose: 2500,
+            });
+        } catch {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                if (!ok) throw new Error('Copy failed');
+
+                notifications.show({
+                    title: 'Copied',
+                    message: `Copied ${itemsToCopy.length} item${itemsToCopy.length === 1 ? '' : 's'} to clipboard.`,
+                    color: 'green',
+                    position: 'bottom-right',
+                    autoClose: 2500,
+                });
+            } catch (err: any) {
+                notifications.show({
+                    title: 'Copy failed',
+                    message: err?.message || 'Unable to copy to clipboard.',
+                    color: 'red',
+                    position: 'bottom-right',
+                });
+            }
         }
     };
 
@@ -984,6 +1071,14 @@ export default function EstimatesList() {
                                   { label: 'List', value: 'list' },
                               ]}
                             />
+                            <Button
+                              variant="light"
+                              onClick={copyBulletedEstimates}
+                              leftSection={<IconCopy size={16} />}
+                              size="sm"
+                            >
+                                Copy bullets
+                            </Button>
                             <ActionIcon
                               variant="light"
                               onClick={handleRefresh}

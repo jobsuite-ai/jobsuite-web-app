@@ -543,7 +543,7 @@ export default function Homepage() {
               <MetricCard
                 title="Conversion Rate"
                 value={`${(data.metrics.conversion_rate ?? 0).toFixed(1)}%`}
-                description="Percentage of estimates signed this month"
+                description="Percentage of new leads signed year-to-date"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
@@ -553,7 +553,7 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Average revenue per signed estimate this month"
+                description="Average revenue per signed estimate year-to-date"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>

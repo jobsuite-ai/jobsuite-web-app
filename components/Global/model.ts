@@ -255,6 +255,8 @@ export interface SetOwnerAction {
 export interface SendNotificationAction {
     type: 'SEND_NOTIFICATION';
     user_ids: string[];
+    /** When set, only run when the estimate's job_tag matches (after trim). */
+    job_tag?: string | null;
 }
 
 export type StatusAction = SetOwnerAction | SendNotificationAction;

@@ -62,15 +62,6 @@ interface RecentlySoldJob {
   soldDate: string;
 }
 
-interface UpcomingFollowUp {
-  id: string;
-  name: string;
-  follow_up_date: string;
-  client_address: string;
-  city: string;
-  state: string;
-  zip_code: string;
-}
 interface DashboardMetrics {
   totalJobs: number;
   currentMonthLeads: number;
@@ -97,7 +88,6 @@ interface DashboardMetrics {
   currentMonthHours: number;
   hoursLeftToSell: number;
   hoursLeftLastUpdated: string | null;
-  upcomingFollowUps: UpcomingFollowUp[];
   /** Average days jobs spend in AR (V2 dashboard); null if no AR-tracked jobs */
   daysSalesOutstanding: number | null;
 }
@@ -140,7 +130,6 @@ export default function Dashboard() {
     currentMonthHours: 0,
     hoursLeftToSell: 0,
     hoursLeftLastUpdated: null,
-    upcomingFollowUps: [],
     daysSalesOutstanding: null,
   });
 
@@ -249,7 +238,7 @@ export default function Dashboard() {
           })),
           jobsWithHourDifferences: (data.jobs_with_hour_differences || []).map((job: any) => ({
             id: job.id,
-            name: job.name,
+            name: projectDisplayName(job),
             estimatedHours: Number(job.estimated_hours) || 0,
             actualHours: Number(job.actual_hours) || 0,
             difference: Number(job.difference) || 0,
@@ -259,7 +248,7 @@ export default function Dashboard() {
           })),
           recentlySoldJobs: (data.recently_sold_jobs || []).map((job: any) => ({
             id: job.id,
-            name: job.name,
+            name: projectDisplayName(job),
             estimatedHours: Number(job.hours) || 0,
             soldDate: job.sold_date,
           })),
@@ -267,15 +256,6 @@ export default function Dashboard() {
           currentMonthHours: data.current_month_hours || 0,
           hoursLeftToSell: data.hours_left_to_sell || 0,
           hoursLeftLastUpdated: data.hours_left_last_updated || null,
-          upcomingFollowUps: (data.upcoming_follow_ups || []).map((job: any) => ({
-            id: job.id,
-            name: job.name,
-            follow_up_date: job.follow_up_date,
-            client_address: job.client_address,
-            city: job.city,
-            state: job.state,
-            zip_code: job.zip_code,
-          })),
           daysSalesOutstanding:
             typeof data.days_sales_outstanding === 'number'
               ? data.days_sales_outstanding
@@ -305,6 +285,16 @@ export default function Dashboard() {
       return 'Unknown';
     }
     return label.includes('_') ? formatLabel(label) : label;
+  };
+
+  /** Prefer title, then client name, then API `name` (V2 metrics use a single `name` field). */
+  const projectDisplayName = (row: { title?: string; client_name?: string; name?: string }) => {
+    const title = (row.title ?? '').toString().trim();
+    if (title) return title;
+    const client = (row.client_name ?? '').toString().trim();
+    if (client) return client;
+    const fallback = (row.name ?? '').toString().trim();
+    return fallback || 'Unnamed Estimate';
   };
 
   if (isAuthLoading) {
@@ -547,63 +537,6 @@ export default function Dashboard() {
                     )}
                   </div>
                 </Group>
-              </Paper>
-
-              <Paper withBorder p="md" radius="md" mt="md">
-                <Title order={3}>
-                  Follow-Ups
-                </Title>
-                {loading ? (
-                  <Stack mt="md" gap="xs">
-                    {[1, 2, 3].map((i) => (
-                      <Skeleton key={i} height={40} />
-                    ))}
-                  </Stack>
-                ) : metrics.upcomingFollowUps.length > 0 ? (
-                  <Table>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th>Client Name</Table.Th>
-                        <Table.Th>Address</Table.Th>
-                        <Table.Th>Follow-Up Date</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {metrics.upcomingFollowUps.map((job) => (
-                        <Table.Tr key={job.id}>
-                          <Table.Td>
-                            <Anchor
-                              c="blue"
-                              style={{ cursor: 'pointer' }}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                if (e.metaKey || e.ctrlKey) {
-                                  window.open(`/proposals/${job.id}`, '_blank');
-                                } else {
-                                  router.push(`/proposals/${job.id}`);
-                                }
-                              }}
-                            >
-                              {job.name}
-                            </Anchor>
-                          </Table.Td>
-                          <Table.Td>
-                            <div>
-                              {job.client_address && <div>{job.client_address}</div>}
-                            </div>
-                          </Table.Td>
-                          <Table.Td>
-                            {new Date(job.follow_up_date).toLocaleDateString()}
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                ) : (
-                  <Text size="sm" c="dimmed" mt="md">
-                    No upcoming follow-ups
-                  </Text>
-                )}
               </Paper>
 
               <Paper withBorder p="md" radius="md" mt="md">
