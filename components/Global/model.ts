@@ -242,13 +242,37 @@ export type Estimate = {
     /** Optional tag for dashboard filtering (e.g. New Construction, Repaint) */
     job_tag?: string | null;
     days_in_column?: number | null;
+    /** Optional team id when team CRUD exists; used for capacity + colors */
+    schedule_team_id?: string | null;
+    schedule_labor_hours?: number | null;
+    schedule_start_date?: string | null;
+    schedule_work_days?: number | string | null;
+    schedule_work_dates?: string[] | null;
+    schedule_end_date?: string | null;
+    schedule_tentative?: boolean | null;
+    schedule_confirmed_at?: string | null;
     is_terminal?: boolean;
     /** End of scheduled range (job span on calendar) */
     scheduled_end_date?: string | null;
-    /** Optional team id when team CRUD exists; used for capacity + colors */
-    schedule_team_id?: string | null;
     /** When true, auto-span from bid hours must not overwrite scheduled_end_date */
     schedule_end_locked?: boolean | null;
+};
+
+export type ScheduleEvent = {
+    id: string;
+    contractor_id: string;
+    estimate_id: string;
+    team_id: string;
+    labor_hours: number;
+    work_days?: number | string | null;
+    work_dates: string[];
+    start_date: string;
+    end_date: string;
+    tentative: boolean;
+    is_current: boolean;
+    created_at: string;
+    updated_at: string;
+    deleted_at?: string | null;
 };
 
 // Status Actions Configuration Types
@@ -331,4 +355,5 @@ export type User = {
     id: string;
     email: string;
     full_name?: string;
+    role?: string;
 };

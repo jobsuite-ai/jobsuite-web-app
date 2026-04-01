@@ -29,8 +29,10 @@ import { clearCachedContractorId, getApiHeaders } from '@/app/utils/apiClient';
 import { clearAccessTokenMetadata } from '@/app/utils/authToken';
 import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import ActionsTab from '@/components/Settings/ActionsTab';
+import EmployeeTeamsTab from '@/components/Settings/EmployeeTeamsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import NotificationsTab from '@/components/Settings/NotificationsTab';
+import SchedulingSeasonTab from '@/components/Settings/SchedulingSeasonTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
 import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
@@ -46,6 +48,8 @@ const VALID_SETTINGS_TABS = new Set([
     'signature-page',
     'templates',
     'integrations',
+    'employee-teams',
+    'scheduling-season',
 ]);
 
 interface ContractorConfiguration {
@@ -511,9 +515,16 @@ export default function SettingsPage() {
             <Title c="white" order={1} mb="xl">
                 Settings
             </Title>
-            <Text c="dimmed" mb="xl">
-                Manage your contractor configuration and notification preferences.
-            </Text>
+            <Stack gap="xs" mb="xl">
+                <Text c="dimmed">
+                    Manage your contractor configuration, notification preferences, and
+                    scheduling crews.
+                </Text>
+                <Text c="dimmed">
+                    To put work dates on a job, open a proposal and use Team schedule in the
+                    sidebar: Preview, then Save schedule.
+                </Text>
+            </Stack>
 
             <Tabs
               value={activeTab}
@@ -535,6 +546,8 @@ export default function SettingsPage() {
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Message Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
+                    <Tabs.Tab value="employee-teams">Employee teams</Tabs.Tab>
+                    <Tabs.Tab value="scheduling-season">Scheduling</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="contractor-config" pt="md">
@@ -694,6 +707,14 @@ export default function SettingsPage() {
 
                 <Tabs.Panel value="integrations" pt="md">
                     <IntegrationsTab />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="employee-teams" pt="md">
+                    <EmployeeTeamsTab />
+                </Tabs.Panel>
+
+                <Tabs.Panel value="scheduling-season" pt="md">
+                    <SchedulingSeasonTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="actions" pt="md">
