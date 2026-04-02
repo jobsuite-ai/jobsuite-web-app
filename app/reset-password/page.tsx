@@ -4,29 +4,14 @@ import { Suspense, useEffect, useState } from 'react';
 
 import { Button, Container, Paper, PasswordInput, Text, TextInput, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { importSPKI, jwtVerify } from 'jose';
 import { useRouter, useSearchParams } from 'next/navigation';
+
+import { verifyRs256TokenViaApi } from '@/lib/verify-rs256-token-api';
 
 interface TokenPayload {
   exp: number;
   email: string;
   type: string;
-}
-
-const keyBase64 = process.env.NEXT_PUBLIC_JWT_PUBLIC_KEY_BASE64!;
-const JWT_PUBLIC_KEY = Buffer.from(keyBase64, 'base64').toString('utf-8');
-
-async function verifyToken(token: string): Promise<TokenPayload> {
-  try {
-    const publicKey = await importSPKI(JWT_PUBLIC_KEY, 'RS256');
-    const { payload } = await jwtVerify(token, publicKey, {
-      algorithms: ['RS256'],
-    });
-
-    return payload as unknown as TokenPayload;
-  } catch (error) {
-    throw new Error(`Invalid token format: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
 }
 
 function ResetPasswordContent() {
@@ -47,11 +32,10 @@ function ResetPasswordContent() {
 
     const validateToken = async () => {
       try {
-        // Verify the JWT token
-        const decoded = await verifyToken(token);
+        const raw = await verifyRs256TokenViaApi(token);
+        const decoded = raw as unknown as TokenPayload;
 
-        // Check if token is expired
-        const expiryDate = new Date(decoded.exp * 1000); // Convert Unix timestamp to milliseconds
+        const expiryDate = new Date(Number(decoded.exp) * 1000);
         if (expiryDate < new Date()) {
           router.push('/error?message=Password reset token has expired');
           return;
