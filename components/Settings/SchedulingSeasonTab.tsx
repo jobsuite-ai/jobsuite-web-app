@@ -8,7 +8,7 @@ import { IconCheck, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 
-export default function SchedulingSeasonTab() {
+export default function SchedulingSeasonTab({ embedded = false }: { embedded?: boolean }) {
   const [exteriorStart, setExteriorStart] = useState('04-15');
   const [interiorYearRound, setInteriorYearRound] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -72,9 +72,9 @@ export default function SchedulingSeasonTab() {
     );
   }
 
-  return (
-    <Card shadow="sm" padding="lg" withBorder>
-      <Text fw={600} size="lg" mb="xs">
+  const body = (
+    <Stack gap="md">
+      <Text fw={600} size={embedded ? 'md' : 'lg'} mb="xs">
         Scheduling &amp; season rules
       </Text>
       <Text size="sm" c="dimmed" mb="md" component="div">
@@ -83,24 +83,32 @@ export default function SchedulingSeasonTab() {
         </span>{' '}
         <span>Interior follows the toggle below.</span>
       </Text>
-      <Stack gap="md">
-        <TextInput
-          label="Exterior earliest date (MM-DD)"
-          value={exteriorStart}
-          onChange={(e) => setExteriorStart(e.currentTarget.value)}
-          placeholder="04-15"
-        />
-        <Switch
-          label="Interior allowed year-round"
-          checked={interiorYearRound}
-          onChange={(e) => setInteriorYearRound(e.currentTarget.checked)}
-        />
-        <Group justify="flex-end">
-          <Button onClick={save} loading={saving}>
-            Save
-          </Button>
-        </Group>
-      </Stack>
+      <TextInput
+        label="Exterior earliest date (MM-DD)"
+        value={exteriorStart}
+        onChange={(e) => setExteriorStart(e.currentTarget.value)}
+        placeholder="04-15"
+      />
+      <Switch
+        label="Interior allowed year-round"
+        checked={interiorYearRound}
+        onChange={(e) => setInteriorYearRound(e.currentTarget.checked)}
+      />
+      <Group justify="flex-end">
+        <Button onClick={save} loading={saving}>
+          Save scheduling rules
+        </Button>
+      </Group>
+    </Stack>
+  );
+
+  if (embedded) {
+    return body;
+  }
+
+  return (
+    <Card shadow="sm" padding="lg" withBorder>
+      {body}
     </Card>
   );
 }

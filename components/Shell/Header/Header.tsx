@@ -4,7 +4,7 @@ import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'r
 
 import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton, useMantineTheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconBuilding, IconCalendar, IconCheck, IconFilePlus, IconFileText, IconFolder, IconHome, IconLayoutDashboard, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconList, IconMail, IconMenu2, IconNotification, IconSearch, IconSettings, IconUserCircle, IconUsers } from '@tabler/icons-react';
+import { IconBuilding, IconCalendar, IconCheck, IconFilePlus, IconFileText, IconFolder, IconHome, IconLayoutDashboard, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconList, IconMail, IconMenu2, IconNotification, IconSearch, IconSettings, IconUserCircle, IconUsers, IconUsersGroup } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -27,6 +27,7 @@ const links = [
   { link: '/add-proposal', label: 'Add Proposal' },
   { link: '/projects', label: 'Projects' },
   { link: '/calendar', label: 'Calendar' },
+  { link: '/employees-teams', label: 'Employees & Teams' },
   { link: '/proposals', label: 'Proposals' },
   { link: '/messaging-center', label: 'Messaging Center' },
   { link: '/notifications', label: 'Notifications' },
@@ -116,6 +117,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         return <IconFolder size={18} />;
       case '/calendar':
         return <IconCalendar size={18} />;
+      case '/employees-teams':
+        return <IconUsersGroup size={18} />;
       case '/proposals':
         return <IconFileText size={18} />;
       case '/messaging-center':

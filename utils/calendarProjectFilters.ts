@@ -80,3 +80,14 @@ export function isCalendarScheduledProject(estimate: Estimate): boolean {
 export function isUnscheduledPipelineProject(estimate: Estimate): boolean {
   return estimate.status === EstimateStatus.PROJECT_NOT_SCHEDULED;
 }
+
+/**
+ * PROJECT_NOT_SCHEDULED and no production team assigned yet (calendar “Not assigned yet”).
+ */
+export function isUnassignedTeamProject(estimate: Estimate): boolean {
+  if (estimate.status !== EstimateStatus.PROJECT_NOT_SCHEDULED) {
+    return false;
+  }
+  const tid = estimate.schedule_team_id;
+  return tid == null || String(tid).trim() === '';
+}

@@ -90,6 +90,53 @@
   box-shadow: 0 2px 8px rgb(0 0 0 / 22%);
 }
 
+/* Tentative job: dashed edge + diagonal stripes over team color (see ::after) */
+.eventBarTentative {
+  position: relative;
+  border-style: dashed;
+  border-width: 2px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+  overflow: hidden;
+}
+
+.eventBarTentative::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.22) 0,
+    rgba(255, 255, 255, 0.22) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.eventBarTentative .eventBarInner {
+  position: relative;
+  z-index: 1;
+}
+
+.eventBarInner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.eventBarText {
+  min-width: 0;
+  flex: 1;
+}
+
+.eventBarActions {
+  flex-shrink: 0;
+}
+
 .eventTitle {
   font-weight: 600;
   overflow: hidden;
@@ -105,24 +152,30 @@
   white-space: nowrap;
 }
 
-.unscheduledList {
+.unassignedList {
   max-height: 320px;
   overflow-y: auto;
 }
 
-.unscheduledItem {
-  width: 100%;
-  text-align: left;
+.unassignedRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
   padding: var(--mantine-spacing-sm);
   border-radius: var(--mantine-radius-sm);
   border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
   background: light-dark(var(--mantine-color-body), var(--mantine-color-dark-7));
-  cursor: pointer;
-  transition: background 0.12s ease;
 }
 
-.unscheduledItem:hover {
-  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+.unassignedRowMain {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.unassignedRowActions {
+  flex: 0 1 auto;
 }
 
 .legendWrap {
@@ -140,4 +193,26 @@
   flex-shrink: 0;
   border: 1px solid rgb(255 255 255 / 35%);
   box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.legendTeamChip {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: var(--mantine-radius-md);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  text-align: left;
+  background: transparent;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.legendTeamChip:hover {
+  background: light-dark(rgb(0 0 0 / 4%), rgb(255 255 255 / 6%));
+}
+
+.legendTeamChipSelected {
+  border-color: var(--mantine-color-blue-6);
+  background: light-dark(rgb(0 107 229 / 8%), rgb(51 154 240 / 12%));
 }

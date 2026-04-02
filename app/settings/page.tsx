@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Button,
     Card,
+    Divider,
     Group,
     Stack,
     Tabs,
@@ -29,12 +30,10 @@ import { clearCachedContractorId, getApiHeaders } from '@/app/utils/apiClient';
 import { clearAccessTokenMetadata } from '@/app/utils/authToken';
 import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import ActionsTab from '@/components/Settings/ActionsTab';
-import EmployeeTeamsTab from '@/components/Settings/EmployeeTeamsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import NotificationsTab from '@/components/Settings/NotificationsTab';
 import SchedulingSeasonTab from '@/components/Settings/SchedulingSeasonTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
-import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
@@ -48,8 +47,6 @@ const VALID_SETTINGS_TABS = new Set([
     'signature-page',
     'templates',
     'integrations',
-    'employee-teams',
-    'scheduling-season',
 ]);
 
 interface ContractorConfiguration {
@@ -282,7 +279,7 @@ export default function SettingsPage() {
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
-                    // Preserve team config if it exists (edited in Settings > Team)
+                    // Preserve team roster / schedule_teams (edited in Employees & Teams)
                     ...(existingConfig?.configuration?.team_lead_painters != null && {
                         team_lead_painters: existingConfig.configuration.team_lead_painters,
                     }),
@@ -292,6 +289,13 @@ export default function SettingsPage() {
                     }),
                     ...(existingConfig?.configuration?.team_sales_people != null && {
                         team_sales_people: existingConfig.configuration.team_sales_people,
+                    }),
+                    ...(existingConfig?.configuration?.schedule_default_daily_hours != null && {
+                        schedule_default_daily_hours:
+                            existingConfig.configuration.schedule_default_daily_hours,
+                    }),
+                    ...(existingConfig?.configuration?.schedule_teams != null && {
+                        schedule_teams: existingConfig.configuration.schedule_teams,
                     }),
                     // Preserve estimate-received email body
                     // (edited in Settings > Message Templates)
@@ -517,8 +521,9 @@ export default function SettingsPage() {
             </Title>
             <Stack gap="xs" mb="xl">
                 <Text c="dimmed">
-                    Manage your contractor configuration, notification preferences, and
-                    scheduling crews.
+                    Manage your contractor configuration and notification preferences.
+                    Production teams and roster lists live under Employees &amp; Teams in the main
+                    menu.
                 </Text>
                 <Text c="dimmed">
                     To put work dates on a job, open a proposal and use Team schedule in the
@@ -546,8 +551,6 @@ export default function SettingsPage() {
                     <Tabs.Tab value="signature-page">Signature Page</Tabs.Tab>
                     <Tabs.Tab value="templates">Message Templates</Tabs.Tab>
                     <Tabs.Tab value="integrations">Integrations</Tabs.Tab>
-                    <Tabs.Tab value="employee-teams">Employee teams</Tabs.Tab>
-                    <Tabs.Tab value="scheduling-season">Scheduling</Tabs.Tab>
                 </Tabs.List>
 
                 <Tabs.Panel value="contractor-config" pt="md">
@@ -681,7 +684,8 @@ export default function SettingsPage() {
                                   }
                                 />
 
-                                <TeamTab embedded />
+                                <Divider my="lg" label="Scheduling" labelPosition="left" />
+                                <SchedulingSeasonTab embedded />
 
                                 <Group justify="flex-end" mt="md">
                                     <Button
@@ -707,14 +711,6 @@ export default function SettingsPage() {
 
                 <Tabs.Panel value="integrations" pt="md">
                     <IntegrationsTab />
-                </Tabs.Panel>
-
-                <Tabs.Panel value="employee-teams" pt="md">
-                    <EmployeeTeamsTab />
-                </Tabs.Panel>
-
-                <Tabs.Panel value="scheduling-season" pt="md">
-                    <SchedulingSeasonTab />
                 </Tabs.Panel>
 
                 <Tabs.Panel value="actions" pt="md">

@@ -3,6 +3,7 @@
 import { ReactNode, useCallback, useEffect, useRef, createContext, useContext } from 'react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { invalidateSessionAndRedirectToLogin } from '@/app/utils/authSession';
 import { ContractorClient, Estimate, Job } from '@/components/Global/model';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -161,6 +162,10 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      if (invalidateSessionAndRedirectToLogin(response, errBody)) {
+        return [];
+      }
       throw new Error('Failed to fetch clients');
     }
 
@@ -184,11 +189,23 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     ]);
 
     if (!resProposals.ok) {
+      const errBody = await resProposals.json().catch(() => ({}));
+      if (invalidateSessionAndRedirectToLogin(resProposals, errBody)) {
+        return [];
+      }
       throw new Error('Failed to fetch estimates');
     }
 
     const proposalsList = parseItems(await resProposals.json());
-    const projectsList = resProjects.ok ? parseItems(await resProjects.json()) : [];
+    let projectsList: Estimate[] = [];
+    if (resProjects.ok) {
+      projectsList = parseItems(await resProjects.json());
+    } else {
+      const errBody = await resProjects.json().catch(() => ({}));
+      if (invalidateSessionAndRedirectToLogin(resProjects, errBody)) {
+        return [];
+      }
+    }
 
     const byId = new Map<string, Estimate>();
     for (const e of proposalsList) {
@@ -208,6 +225,10 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     });
 
     if (!response.ok) {
+      const errBody = await response.json().catch(() => ({}));
+      if (invalidateSessionAndRedirectToLogin(response, errBody)) {
+        return [];
+      }
       throw new Error('Failed to fetch projects');
     }
 

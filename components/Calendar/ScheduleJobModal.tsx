@@ -1,153 +1,110 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 
-import { Button, Group, Modal, Radio, Select, Stack, Text } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { Button, Group, Modal, Stack, Text } from '@mantine/core';
+import { Calendar } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
+import { isSameDay } from 'date-fns';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
-import { EstimateStatus } from '@/components/Global/model';
-import type { TeamConfig } from '@/hooks/useTeamConfig';
 import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
-import {
-  computeScheduledEndDate,
-  getDailyCapacityHours,
-} from '@/utils/scheduleMath';
+import { apiEstimateType } from '@/utils/scheduleApiTypes';
 
-type EndMode = 'manual' | 'auto';
+/** Subset of team row for display label only */
+export type CalendarTeamOption = {
+  id: string;
+  name: string;
+};
 
-function apiEstimateType(et: string | undefined): string {
-  const u = String(et || '').toUpperCase();
-  if (u.includes('EXTERIOR') && u.includes('INTERIOR')) return 'BOTH';
-  if (u.includes('EXTERIOR')) return 'EXTERIOR';
-  if (u.includes('INTERIOR')) return 'INTERIOR';
-  if (u.includes('FULL')) return 'BOTH';
-  return 'INTERIOR';
+function parseLocalYmd(iso: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso.trim());
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  const d = new Date(y, mo, day);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
-
-export type CalendarTeamOption = { id: string; name: string };
 
 interface ScheduleJobModalProps {
   opened: boolean;
   onClose: () => void;
   estimate: Estimate | null;
-  teamConfig: TeamConfig;
-  /** Teams from GET /api/teams; capacity uses `teamConfig` when ids match. */
   teams: CalendarTeamOption[];
   onSaved: () => void;
+  /** Lock in tentative row: production team for POST (from backlog context) */
+  lockInTeamId: string | null;
+  /** YYYY-MM-DD from implied tentative schedule placement */
+  lockInStartIso?: string | null;
 }
 
 export function ScheduleJobModal({
   opened,
   onClose,
   estimate,
-  teamConfig,
   teams,
   onSaved,
+  lockInTeamId,
+  lockInStartIso = null,
 }: ScheduleJobModalProps) {
   const [start, setStart] = useState<Date | null>(null);
-  const [endMode, setEndMode] = useState<EndMode>('auto');
-  const [endManual, setEndManual] = useState<Date | null>(null);
-  const [teamId, setTeamId] = useState<string | null>(null);
+  /** Which month is shown; `Calendar` uses `date` for visible grid, not the selection day. */
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!estimate || !opened) return;
-    setStart(effectiveProjectStartDate(estimate));
-    setEndManual(
-      estimate.scheduled_end_date ? new Date(estimate.scheduled_end_date) : null
-    );
-    setEndMode(estimate.schedule_end_locked ? 'manual' : 'auto');
-    setTeamId(estimate.schedule_team_id || null);
-  }, [estimate, opened]);
+    if (!estimate || !opened) {
+      return;
+    }
+    const initial = lockInStartIso
+      ? parseLocalYmd(lockInStartIso) ?? effectiveProjectStartDate(estimate)
+      : effectiveProjectStartDate(estimate);
+    const view = initial ?? new Date();
+    setStart(initial ?? view);
+    setCalendarViewDate(view);
+  }, [estimate, opened, lockInStartIso]);
 
   const hoursBid = estimate?.hours_bid ?? 0;
-
-  const computedEnd = useMemo(() => {
-    if (!start || endMode !== 'auto') return null;
-    const daily = getDailyCapacityHours(
-      teamId,
-      teamConfig.scheduleTeams,
-      teamConfig.scheduleDefaultDailyHours
-    );
-    return computeScheduledEndDate({
-      start,
-      hoursBid,
-      dailyCapacityHours: daily,
-    });
-  }, [start, endMode, hoursBid, teamId, teamConfig]);
+  const teamName = teams.find((t) => t.id === lockInTeamId)?.name ?? '—';
 
   const handleSave = async () => {
-    if (!estimate || !start) return;
-    if (teams.length > 0 && !teamId) {
+    if (!estimate || !start) {
+      return;
+    }
+    if (!lockInTeamId?.trim()) {
       notifications.show({
-        title: 'Team required',
-        message: 'Select a team to save the schedule.',
+        title: 'Team missing',
+        message: 'Open this flow from a team backlog so the crew is known.',
         color: 'yellow',
       });
       return;
     }
     setSaving(true);
     try {
-      const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+      const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(
+        2,
+        '0'
+      )}-${String(start.getDate()).padStart(2, '0')}`;
 
-      if (teamId) {
-        const schRes = await fetch(`/api/schedule/estimates/${estimate.id}`, {
-          method: 'POST',
-          headers: getApiHeaders(),
-          body: JSON.stringify({
-            team_id: teamId,
-            labor_hours: hoursBid,
-            start_date: startDay,
-            estimate_type: apiEstimateType(String(estimate.estimate_type)),
-            tentative: true,
-          }),
-        });
-        const schErr = await schRes.json().catch(() => ({}));
-        if (!schRes.ok) {
-          throw new Error(
-            (schErr.detail as string) || schErr.message || 'Failed to save schedule'
-          );
-        }
-      } else {
-        let scheduledEnd: string | null = null;
-        let endLocked = false;
-        if (endMode === 'manual') {
-          if (endManual) {
-            scheduledEnd = endManual.toISOString();
-            endLocked = true;
-          }
-        } else if (computedEnd) {
-          scheduledEnd = computedEnd.toISOString();
-          endLocked = false;
-        }
-        const res = await fetch(`/api/estimates/${estimate.id}`, {
-          method: 'PUT',
-          headers: getApiHeaders(),
-          body: JSON.stringify({
-            scheduled_date: start.toISOString(),
-            scheduled_end_date: scheduledEnd,
-            schedule_end_locked: endLocked,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message || 'Failed to save');
-        }
-      }
-
-      if (estimate.status === EstimateStatus.PROJECT_NOT_SCHEDULED) {
-        const resStatus = await fetch(`/api/estimates/${estimate.id}`, {
-          method: 'PUT',
-          headers: getApiHeaders(),
-          body: JSON.stringify({ status: EstimateStatus.PROJECT_SCHEDULED }),
-        });
-        if (!resStatus.ok) {
-          const err = await resStatus.json().catch(() => ({}));
-          throw new Error(err.message || 'Failed to update project status');
-        }
+      const schRes = await fetch(`/api/schedule/estimates/${estimate.id}`, {
+        method: 'POST',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          team_id: lockInTeamId,
+          labor_hours: hoursBid,
+          start_date: startDay,
+          estimate_type: apiEstimateType(String(estimate.estimate_type)),
+          tentative: false,
+          non_working_dates: [],
+        }),
+      });
+      const schErr = await schRes.json().catch(() => ({}));
+      if (!schRes.ok) {
+        throw new Error(
+          (schErr.detail as string) || schErr.message || 'Failed to save schedule'
+        );
       }
 
       onSaved();
@@ -160,74 +117,45 @@ export function ScheduleJobModal({
     }
   };
 
-  const teamOptions = teams.map((t) => ({
-    value: t.id,
-    label: t.name,
-  }));
-
   return (
     <Modal
       opened={opened}
       onClose={onClose}
-      title={estimate ? `Schedule: ${estimate.title || estimate.address_street || 'Job'}` : 'Schedule'}
+      title={
+        estimate
+          ? `Lock in schedule: ${estimate.title || estimate.address_street || 'Job'}`
+          : 'Schedule'
+      }
       size="md"
     >
       {estimate && (
         <Stack gap="md">
-          <DatePickerInput label="Start date" value={start} onChange={setStart} />
-
-          <Radio.Group
-            label="End date"
-            value={endMode}
-            onChange={(v) => setEndMode(v as EndMode)}
-          >
-            <Stack gap="xs" mt="xs">
-              <Radio value="auto" label="Calculate from bid hours (weekdays)" />
-              <Radio value="manual" label="Set end date manually" />
-            </Stack>
-          </Radio.Group>
-
-          {endMode === 'manual' && (
-            <DatePickerInput
-              label="End date"
-              value={endManual}
-              onChange={setEndManual}
-              clearable
-            />
-          )}
-
-          {endMode === 'auto' && (
-            <Text size="sm" c="dimmed">
-              Bid hours: {hoursBid.toFixed(1)} · Estimated last day:{' '}
-              {computedEnd ? computedEnd.toLocaleDateString() : '—'}
-            </Text>
-          )}
-
-          {teamOptions.length > 0 ? (
-            <Select
-              label="Team"
-              placeholder="Select team"
-              data={teamOptions}
-              value={teamId}
-              onChange={setTeamId}
-              searchable
-              required
-            />
-          ) : (
-            <Text size="sm" c="dimmed">
-              No teams found. Add teams in Settings, or dates will be saved without a crew schedule.
-            </Text>
-          )}
-
+          <Text size="sm" fw={600}>
+            Team: {teamName}
+          </Text>
+          <Text size="sm" c="dimmed">
+            End date is calculated from bid hours ({hoursBid.toFixed(1)} hrs) and team capacity
+            when you save.
+          </Text>
+          <Calendar
+            firstDayOfWeek={1}
+            date={calendarViewDate}
+            onDateChange={setCalendarViewDate}
+            getDayProps={(dayDate) => ({
+              selected: start != null && isSameDay(dayDate, start),
+            })}
+            __onDayClick={(_event, dayDate) => {
+              setStart(dayDate);
+            }}
+            minLevel="month"
+            maxLevel="month"
+            size="md"
+          />
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={onClose}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSave}
-              loading={saving}
-              disabled={!start || (teams.length > 0 && !teamId)}
-            >
+            <Button onClick={handleSave} loading={saving} disabled={!start || !lockInTeamId}>
               Save
             </Button>
           </Group>
