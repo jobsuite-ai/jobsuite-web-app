@@ -23,6 +23,15 @@ interface ServiceAccountCredentials {
 let tokenCache: TokenCache | null = null;
 let credentialsCache: ServiceAccountCredentials | null = null;
 
+function logApiBaseResolution(
+  reason: string,
+  baseUrl: string,
+  extra?: Record<string, unknown>
+) {
+  // eslint-disable-next-line no-console
+  console.info('[getApiBaseUrl]', { baseUrl, reason, ...extra });
+}
+
 export const getApiBaseUrl = () => {
   // Client-side: detect environment from current hostname
   if (typeof window !== 'undefined') {
@@ -30,20 +39,32 @@ export const getApiBaseUrl = () => {
 
     // Production domain - use production API
     if (hostname === 'www.jobsuite.app' || hostname === 'jobsuite.app') {
-      return 'https://api.jobsuite.app';
+      const baseUrl = 'https://api.jobsuite.app';
+      logApiBaseResolution('client:hostname:jobsuite.app', baseUrl, { hostname });
+      return baseUrl;
     }
 
     // QA/Staging domains - use QA API
     if (hostname.includes('qa') || hostname.includes('staging') || hostname.includes('amplifyapp.com')) {
-      return 'https://qa.api.jobsuite.app';
+      const baseUrl = 'https://qa.api.jobsuite.app';
+      logApiBaseResolution('client:hostname:qa-or-staging-or-amplify', baseUrl, { hostname });
+      return baseUrl;
     }
 
     // Local development
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      const url = process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL || process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
+      const url =
+        process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL ||
+        process.env.JOB_ENGINE_LOCAL_URL ||
+        'http://localhost:8000';
+      logApiBaseResolution('client:hostname:localhost', url, { hostname });
       return url;
     }
   }
+
+  const clientHostname =
+    typeof window !== 'undefined' ? window.location.hostname : undefined;
+  const serverExtras = clientHostname ? { clientHostname } : undefined;
 
   // Server-side: check environment variables
   // Local development - check if we're running locally
@@ -51,7 +72,11 @@ export const getApiBaseUrl = () => {
   const hasNoBranch = !process.env.AWS_BRANCH && !process.env.AMPLIFY_BRANCH;
 
   if (isLocalEnv && hasNoBranch) {
-    const url = process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL || process.env.JOB_ENGINE_LOCAL_URL || 'http://localhost:8000';
+    const url =
+      process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL ||
+      process.env.JOB_ENGINE_LOCAL_URL ||
+      'http://localhost:8000';
+    logApiBaseResolution('server:local-env-no-branch', url, { isLocalEnv: true, ...serverExtras });
     return url;
   }
 
@@ -61,16 +86,36 @@ export const getApiBaseUrl = () => {
 
   // Production - only if branch is explicitly 'production' or 'prod'
   if (branch === 'production' || branch === 'prod') {
-    return 'https://api.jobsuite.app';
+    const baseUrl = 'https://api.jobsuite.app';
+    logApiBaseResolution('server:branch:production', baseUrl, {
+      AWS_BRANCH: process.env.AWS_BRANCH,
+      AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH,
+      ...serverExtras,
+    });
+    return baseUrl;
   }
 
   // QA/Development - main, qa, staging branches all use QA endpoints
   if (branch === 'qa' || branch === 'main' || branch === 'staging') {
-    return 'https://qa.api.jobsuite.app';
+    const baseUrl = 'https://qa.api.jobsuite.app';
+    logApiBaseResolution('server:branch:qa-tier', baseUrl, {
+      branch,
+      AWS_BRANCH: process.env.AWS_BRANCH,
+      AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH,
+      ...serverExtras,
+    });
+    return baseUrl;
   }
 
-  // Default to QA for unknown branches (safer than defaulting to production)
-  return 'https://qa.api.jobsuite.app';
+  // Default to prod for unknown branches
+  const fallback = 'https://api.jobsuite.app';
+  logApiBaseResolution('server:branch:unknown-default-prod', fallback, {
+    branch: branch ?? '(unset)',
+    AWS_BRANCH: process.env.AWS_BRANCH,
+    AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH,
+    ...serverExtras,
+  });
+  return fallback;
 };
 
 /**
