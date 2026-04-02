@@ -8,7 +8,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { setAccessTokenMetadata } from '@/app/utils/authToken';
-import { encryptPassword } from '@/app/utils/encryption';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -22,14 +21,6 @@ export default function LoginForm() {
     setLoading(true);
 
     try {
-      // Try to encrypt the password, but fall back to plain password if encryption fails
-      let passwordToSend: string;
-      try {
-        passwordToSend = await encryptPassword(password);
-      } catch (encryptError) {
-        passwordToSend = password;
-      }
-
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -37,7 +28,7 @@ export default function LoginForm() {
         },
         body: JSON.stringify({
           email,
-          password: passwordToSend,
+          password,
           remember_me: rememberMe,
         }),
       });
