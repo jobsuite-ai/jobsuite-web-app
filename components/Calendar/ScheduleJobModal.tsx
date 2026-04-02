@@ -18,11 +18,24 @@ import {
 
 type EndMode = 'manual' | 'auto';
 
+function apiEstimateType(et: string | undefined): string {
+  const u = String(et || '').toUpperCase();
+  if (u.includes('EXTERIOR') && u.includes('INTERIOR')) return 'BOTH';
+  if (u.includes('EXTERIOR')) return 'EXTERIOR';
+  if (u.includes('INTERIOR')) return 'INTERIOR';
+  if (u.includes('FULL')) return 'BOTH';
+  return 'INTERIOR';
+}
+
+export type CalendarTeamOption = { id: string; name: string };
+
 interface ScheduleJobModalProps {
   opened: boolean;
   onClose: () => void;
   estimate: Estimate | null;
   teamConfig: TeamConfig;
+  /** Teams from GET /api/teams; capacity uses `teamConfig` when ids match. */
+  teams: CalendarTeamOption[];
   onSaved: () => void;
 }
 
@@ -31,12 +44,12 @@ export function ScheduleJobModal({
   onClose,
   estimate,
   teamConfig,
+  teams,
   onSaved,
 }: ScheduleJobModalProps) {
   const [start, setStart] = useState<Date | null>(null);
   const [endMode, setEndMode] = useState<EndMode>('auto');
   const [endManual, setEndManual] = useState<Date | null>(null);
-  const [crewLead, setCrewLead] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -47,7 +60,6 @@ export function ScheduleJobModal({
       estimate.scheduled_end_date ? new Date(estimate.scheduled_end_date) : null
     );
     setEndMode(estimate.schedule_end_locked ? 'manual' : 'auto');
-    setCrewLead(estimate.project_crew_lead || null);
     setTeamId(estimate.schedule_team_id || null);
   }, [estimate, opened]);
 
@@ -69,41 +81,63 @@ export function ScheduleJobModal({
 
   const handleSave = async () => {
     if (!estimate || !start) return;
+    if (teams.length > 0 && !teamId) {
+      notifications.show({
+        title: 'Team required',
+        message: 'Select a team to save the schedule.',
+        color: 'yellow',
+      });
+      return;
+    }
     setSaving(true);
     try {
-      let scheduledEnd: string | null = null;
-      let endLocked = false;
+      const startDay = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
 
-      if (endMode === 'manual') {
-        if (endManual) {
-          scheduledEnd = endManual.toISOString();
-          endLocked = true;
+      if (teamId) {
+        const schRes = await fetch(`/api/schedule/estimates/${estimate.id}`, {
+          method: 'POST',
+          headers: getApiHeaders(),
+          body: JSON.stringify({
+            team_id: teamId,
+            labor_hours: hoursBid,
+            start_date: startDay,
+            estimate_type: apiEstimateType(String(estimate.estimate_type)),
+            tentative: true,
+          }),
+        });
+        const schErr = await schRes.json().catch(() => ({}));
+        if (!schRes.ok) {
+          throw new Error(
+            (schErr.detail as string) || schErr.message || 'Failed to save schedule'
+          );
         }
-      } else if (computedEnd) {
-        scheduledEnd = computedEnd.toISOString();
-        endLocked = false;
+      } else {
+        let scheduledEnd: string | null = null;
+        let endLocked = false;
+        if (endMode === 'manual') {
+          if (endManual) {
+            scheduledEnd = endManual.toISOString();
+            endLocked = true;
+          }
+        } else if (computedEnd) {
+          scheduledEnd = computedEnd.toISOString();
+          endLocked = false;
+        }
+        const res = await fetch(`/api/estimates/${estimate.id}`, {
+          method: 'PUT',
+          headers: getApiHeaders(),
+          body: JSON.stringify({
+            scheduled_date: start.toISOString(),
+            scheduled_end_date: scheduledEnd,
+            schedule_end_locked: endLocked,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Failed to save');
+        }
       }
 
-      const schedulePayload: Record<string, unknown> = {
-        scheduled_date: start.toISOString(),
-        scheduled_end_date: scheduledEnd,
-        schedule_end_locked: endLocked,
-        project_crew_lead: crewLead || null,
-        schedule_team_id: teamId || null,
-      };
-
-      const res = await fetch(`/api/estimates/${estimate.id}`, {
-        method: 'PUT',
-        headers: getApiHeaders(),
-        body: JSON.stringify(schedulePayload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Failed to save');
-      }
-
-      // Second request: status alone — update_estimate drops other fields when status is included.
       if (estimate.status === EstimateStatus.PROJECT_NOT_SCHEDULED) {
         const resStatus = await fetch(`/api/estimates/${estimate.id}`, {
           method: 'PUT',
@@ -126,8 +160,7 @@ export function ScheduleJobModal({
     }
   };
 
-  const crewOptions = teamConfig.leadPainters.map((n) => ({ value: n, label: n }));
-  const teamOptions = teamConfig.scheduleTeams.map((t) => ({
+  const teamOptions = teams.map((t) => ({
     value: t.id,
     label: t.name,
   }));
@@ -170,32 +203,31 @@ export function ScheduleJobModal({
             </Text>
           )}
 
-          <Select
-            label="Crew lead"
-            placeholder="Optional"
-            data={crewOptions}
-            value={crewLead}
-            onChange={setCrewLead}
-            clearable
-            searchable
-          />
-
-          {teamOptions.length > 0 && (
+          {teamOptions.length > 0 ? (
             <Select
               label="Team"
-              placeholder="Optional (uses team capacity when calculating)"
+              placeholder="Select team"
               data={teamOptions}
               value={teamId}
               onChange={setTeamId}
-              clearable
+              searchable
+              required
             />
+          ) : (
+            <Text size="sm" c="dimmed">
+              No teams found. Add teams in Settings, or dates will be saved without a crew schedule.
+            </Text>
           )}
 
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={onClose}>
               Cancel
             </Button>
-            <Button onClick={handleSave} loading={saving} disabled={!start}>
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              disabled={!start || (teams.length > 0 && !teamId)}
+            >
               Save
             </Button>
           </Group>

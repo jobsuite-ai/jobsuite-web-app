@@ -1,5 +1,6 @@
 'use client';
 
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -46,27 +47,55 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import classes from './CalendarPage.module.css';
-import { ScheduleJobModal } from './ScheduleJobModal';
+import { ScheduleJobModal, type CalendarTeamOption } from './ScheduleJobModal';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
 import { useDataCache } from '@/contexts/DataCacheContext';
-import { type TeamConfig, useTeamConfig } from '@/hooks/useTeamConfig';
-import {
-  isCalendarScheduledProject,
-  isUnscheduledPipelineProject,
-} from '@/utils/calendarProjectFilters';
+import { useTeamConfig } from '@/hooks/useTeamConfig';
+import { isUnscheduledPipelineProject } from '@/utils/calendarProjectFilters';
 import { splitRangeIntoWeekdaySegments } from '@/utils/calendarWorkingDays';
 import { mantineColorToCss, colorForScheduleKey } from '@/utils/scheduleColors';
-import {
-  computeScheduledEndDate,
-  getDailyCapacityHours,
-} from '@/utils/scheduleMath';
 
 /** Vertical stride for stacked bars (must be ≥ bar min-height + top margin). */
 const CAL_EVENT_ROW_PX = 56;
 const CAL_WEEK_BODY_MIN_PX = 112;
 
 const SHOW_WEEKENDS_STORAGE_KEY = 'jobsuite-calendar-show-weekends';
+
+type BacklogByTeamPayload = {
+  total_labor_hours: number;
+  items: { schedule_id: string; estimate_id: string; job_name: string }[];
+};
+
+/** Locked jobs + synthetic team backlog bar from GET /schedule/calendar */
+interface CalendarApiEvent {
+  schedule_id: string;
+  estimate_id: string | null;
+  title: string | null;
+  team_id: string | null;
+  team_name: string | null;
+  schedule_start_date: string | null;
+  schedule_end_date: string | null;
+  schedule_tentative: boolean;
+  calendar_kind: 'job' | 'team_backlog';
+}
+
+type WeekCalRow = {
+  rowKey: string;
+  title: string;
+  workRange: { start: Date; end: Date };
+  colorKey: string;
+  href: string | null;
+  isBacklog: boolean;
+  teamName: string | null;
+};
+
+/** Striped fill for tentative team-backlog bars (matches prior inline gradient). */
+const BACKLOG_EVENT_STRIPED_BG =
+  'linear-gradient(135deg, rgba(120,120,120,0.35) 25%, rgba(180,180,180,0.25) 25%, ' +
+  'rgba(180,180,180,0.25) 50%, rgba(120,120,120,0.35) 50%, rgba(120,120,120,0.35) 75%, ' +
+  'rgba(180,180,180,0.25) 75%)';
 
 /** Always four weeks: anchor week plus the following three (Mon-start weeks). */
 function getFourWeekRange(anchor: Date): { start: Date; end: Date } {
@@ -77,32 +106,6 @@ function getFourWeekRange(anchor: Date): { start: Date; end: Date } {
 
 function navigateFourWeekWindow(anchor: Date, dir: -1 | 1): Date {
   return addWeeks(anchor, dir * 4);
-}
-
-function getEffectiveRange(
-  estimate: Estimate,
-  teamConfig: TeamConfig
-): { start: Date; end: Date } | null {
-  if (!estimate.scheduled_date?.trim()) {
-    return null;
-  }
-  const start = startOfDay(parseISO(estimate.scheduled_date));
-  if (estimate.scheduled_end_date?.trim()) {
-    const end = startOfDay(parseISO(estimate.scheduled_end_date));
-    return end < start ? { start: end, end: start } : { start, end };
-  }
-  const hours = estimate.hours_bid ?? 0;
-  const daily = getDailyCapacityHours(
-    estimate.schedule_team_id,
-    teamConfig.scheduleTeams,
-    teamConfig.scheduleDefaultDailyHours
-  );
-  const end = computeScheduledEndDate({
-    start,
-    hoursBid: hours,
-    dailyCapacityHours: daily,
-  });
-  return { start, end };
 }
 
 /**
@@ -246,18 +249,24 @@ export function CalendarPage() {
     [range.start, range.end]
   );
 
-  const scheduled = useMemo(
-    () => estimates.filter((e) => isCalendarScheduledProject(e)),
-    [estimates]
-  );
-
   const unscheduled = useMemo(
     () => estimates.filter((e) => isUnscheduledPipelineProject(e)),
     [estimates]
   );
 
+  const [calendarEvents, setCalendarEvents] = useState<CalendarApiEvent[]>([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [calTick, setCalTick] = useState(0);
+  const [backlogByTeam, setBacklogByTeam] = useState<
+    Record<string, BacklogByTeamPayload>
+  >({});
+
   const [modalOpen, setModalOpen] = useState(false);
   const [modalEstimate, setModalEstimate] = useState<Estimate | null>(null);
+
+  const [teams, setTeams] = useState<CalendarTeamOption[]>([]);
+  const [teamsLoading, setTeamsLoading] = useState(true);
 
   const [showWeekends, setShowWeekends] = useState(false);
 
@@ -287,75 +296,183 @@ export function CalendarPage() {
     setModalOpen(true);
   }, []);
 
-  const eventsByWeek = useMemo(() => {
-    const map = new Map<
-      string,
-      { estimate: Estimate; workRange: { start: Date; end: Date } }[]
-    >();
-    weekStarts.forEach((ws) => {
-      const key = ws.toISOString();
-      const list: { estimate: Estimate; workRange: { start: Date; end: Date } }[] = [];
-      scheduled.forEach((estimate) => {
-        const r = getEffectiveRange(estimate, teamConfig);
-        if (!r) {
+  useEffect(() => {
+    let cancelled = false;
+    setTeamsLoading(true);
+    fetch('/api/teams', { headers: getApiHeaders() })
+      .then(async (res) => {
+        const data = await res.json().catch(() => []);
+        if (!res.ok || cancelled) {
           return;
         }
-        // Bars are always Mon–Fri segments; "Show weekends" only adds Sat/Sun columns to the grid.
+        const list = Array.isArray(data) ? data : [];
+        const mapped: CalendarTeamOption[] = list
+          .filter(
+            (t: unknown): t is Record<string, unknown> =>
+              Boolean(t) && typeof t === 'object' && 'id' in (t as object) && 'name' in (t as object)
+          )
+          .map((t) => ({
+            id: String(t.id).trim(),
+            name: String(t.name).trim() || String(t.id),
+          }))
+          .filter((t) => t.id.length > 0);
+        if (!cancelled) {
+          setTeams(mapped);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTeams([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTeamsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [calTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const from = format(range.start, 'yyyy-MM-dd');
+    const to = format(range.end, 'yyyy-MM-dd');
+    setCalendarLoading(true);
+    setCalendarError(null);
+    fetch(`/api/schedule/calendar?from=${from}&to=${to}`, { headers: getApiHeaders() })
+      .then(async (res) => {
+        const data = await res.json().catch(() => []);
+        if (!res.ok) {
+          throw new Error(data.message || data.detail || 'Failed to load calendar');
+        }
+        if (!cancelled) {
+          setCalendarEvents(Array.isArray(data) ? (data as CalendarApiEvent[]) : []);
+        }
+      })
+      .catch((e: Error) => {
+        if (!cancelled) {
+          setCalendarError(e.message || 'Calendar load failed');
+          setCalendarEvents([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCalendarLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [range.start, range.end, calTick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (teams.length === 0) {
+      setBacklogByTeam({});
+      return () => {
+        cancelled = true;
+      };
+    }
+    Promise.all(
+      teams.map(async (t) => {
+        const res = await fetch(`/api/teams/${t.id}/schedule-backlog`, { headers: getApiHeaders() });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          return [t.id, null] as const;
+        }
+        return [
+          t.id,
+          {
+            total_labor_hours: Number(data.total_labor_hours) || 0,
+            items: Array.isArray(data.items) ? data.items : [],
+          },
+        ] as const;
+      })
+    ).then((entries) => {
+      if (cancelled) {
+        return;
+      }
+      const next: Record<string, BacklogByTeamPayload> = {};
+      for (const row of entries) {
+        const [teamKey, payload] = row;
+        if (payload) {
+          next[teamKey] = payload;
+        }
+      }
+      setBacklogByTeam(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [teams, calTick]);
+
+  const calendarJobEvents = useMemo(
+    () => calendarEvents.filter((e) => e.calendar_kind === 'job'),
+    [calendarEvents]
+  );
+
+  const eventsByWeek = useMemo(() => {
+    const map = new Map<string, WeekCalRow[]>();
+    weekStarts.forEach((ws) => {
+      const key = ws.toISOString();
+      const list: WeekCalRow[] = [];
+      calendarEvents.forEach((ev) => {
+        if (!ev.schedule_start_date?.trim() || !ev.schedule_end_date?.trim()) {
+          return;
+        }
+        const start = startOfDay(parseISO(ev.schedule_start_date));
+        const end = startOfDay(parseISO(ev.schedule_end_date));
+        const r = end < start ? { start: end, end: start } : { start, end };
         const spanParts = splitRangeIntoWeekdaySegments(r.start, r.end);
         const cols: 5 | 7 = showWeekends ? 7 : 5;
         spanParts.forEach((seg) => {
           if (segmentForWeek(ws, seg, cols)) {
-            list.push({ estimate, workRange: seg });
+            const est = ev.estimate_id
+              ? estimates.find((e) => e.id === ev.estimate_id)
+              : undefined;
+            const colorKey = ev.team_id || est?.schedule_team_id || 'default';
+            list.push({
+              rowKey: `${ev.schedule_id}-${seg.start.toISOString()}-${ev.calendar_kind}`,
+              title:
+                ev.title ||
+                est?.title ||
+                est?.address_street ||
+                (ev.calendar_kind === 'team_backlog' ? 'Team backlog' : 'Job'),
+              workRange: seg,
+              colorKey: (colorKey || 'default').trim() || 'default',
+              href:
+                ev.calendar_kind === 'team_backlog'
+                  ? null
+                  : ev.estimate_id
+                    ? `/proposals/${ev.estimate_id}`
+                    : null,
+              isBacklog: ev.calendar_kind === 'team_backlog',
+              teamName: ev.team_name,
+            });
           }
         });
       });
       map.set(key, list);
     });
     return map;
-  }, [scheduled, teamConfig, weekStarts, showWeekends]);
+  }, [calendarEvents, estimates, weekStarts, showWeekends]);
 
   const handleSaved = useCallback(() => {
+    setCalTick((n) => n + 1);
     refreshData('estimates').catch(() => {});
   }, [refreshData]);
 
-  const loadingData = loading.estimates || teamLoading;
+  const loadingData = loading.estimates || teamLoading || calendarLoading || teamsLoading;
   const noPipelineMatches =
-    estimates.length > 0 && scheduled.length === 0 && unscheduled.length === 0;
+    estimates.length > 0 && calendarJobEvents.length === 0 && unscheduled.length === 0;
 
-  const scheduleLegendEntries = useMemo(() => {
-    const seen = new Set<string>();
-    const rows: {
-      key: string;
-      teamName: string | null;
-      crewLead: string;
-      rosterHint: string;
-    }[] = [];
-    scheduled.forEach((e) => {
-      const key = (e.schedule_team_id || e.project_crew_lead || 'default').trim() || 'default';
-      if (seen.has(key)) {
-        return;
-      }
-      seen.add(key);
-      const team = e.schedule_team_id
-        ? teamConfig.scheduleTeams.find((t) => t.id === e.schedule_team_id)
-        : undefined;
-      const crewLead = e.project_crew_lead?.trim() || '—';
-      const parts: string[] = [];
-      if (team?.painterCount != null) {
-        parts.push(`${team.painterCount} painters`);
-      }
-      if (team?.weeklyHours != null) {
-        parts.push(`${team.weeklyHours} hrs/wk`);
-      }
-      rows.push({
-        key,
-        teamName: team?.name ?? null,
-        crewLead,
-        rosterHint: parts.join(' · '),
-      });
-    });
-    return rows.sort((a, b) => (a.teamName || a.crewLead).localeCompare(b.teamName || b.crewLead));
-  }, [scheduled, teamConfig.scheduleTeams]);
+  /** One swatch per team; colors match bars (`colorForScheduleKey`). */
+  const teamLegendEntries = useMemo(
+    () => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
+    [teams]
+  );
 
   return (
     <Container size="xl" className={classes.calendar}>
@@ -407,49 +524,52 @@ export function CalendarPage() {
             </Text>
             <Group gap="xs">
               <Badge variant="light" color="gray">
-                {estimates.length} loaded · {scheduled.length} scheduled · {unscheduled.length}{' '}
+                {estimates.length} loaded · {calendarJobEvents.length} on calendar · {unscheduled.length}{' '}
                 unscheduled
               </Badge>
               <Button
                 variant="light"
                 size="compact-sm"
                 leftSection={<IconRefresh size={14} />}
-                loading={loading.estimates}
-                onClick={() => refreshData('estimates')}
+                loading={loading.estimates || calendarLoading}
+                onClick={() => {
+                  setCalTick((n) => n + 1);
+                  refreshData('estimates').catch(() => {});
+                }}
               >
                 Refresh
               </Button>
             </Group>
           </Group>
 
-          {scheduleLegendEntries.length > 0 && (
+          {teamLegendEntries.length > 0 && (
             <div className={classes.legendWrap}>
               <Text size="xs" fw={600} c="dimmed" mb="xs" tt="uppercase">
-                Schedule colors
+                Team colors
               </Text>
               <Group gap="lg" align="flex-start" wrap="wrap">
-                {scheduleLegendEntries.map((row) => {
-                  const { color, shade } = colorForScheduleKey(row.key);
+                {teamLegendEntries.map((team) => {
+                  const { color, shade } = colorForScheduleKey(team.id);
                   const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
-                  const title = row.teamName || row.crewLead;
+                  const cfg = teamConfig.scheduleTeams.find((t) => t.id === team.id);
+                  const rosterHint = [
+                    cfg?.painterCount != null ? `${cfg.painterCount} painters` : '',
+                    cfg?.weeklyHours != null ? `${cfg.weeklyHours} hrs/wk` : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ');
                   return (
-                    <Group key={row.key} gap="xs" wrap="nowrap" align="flex-start">
+                    <Group key={team.id} gap="xs" wrap="nowrap" align="flex-start">
                       <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
                       <Stack gap={2}>
                         <Text size="sm" fw={600} lh={1.3}>
-                          {title}
+                          {team.name}
                         </Text>
-                        {row.teamName ? (
+                        {rosterHint ? (
                           <Text size="xs" c="dimmed" lh={1.35}>
-                            Crew lead: {row.crewLead}
-                            {row.rosterHint ? ` · ${row.rosterHint}` : ''}
+                            {rosterHint}
                           </Text>
-                        ) : (
-                          <Text size="xs" c="dimmed" lh={1.35}>
-                            Color from crew lead
-                            {row.rosterHint ? ` · ${row.rosterHint}` : ''}
-                          </Text>
-                        )}
+                        ) : null}
                       </Stack>
                     </Group>
                   );
@@ -461,6 +581,11 @@ export function CalendarPage() {
           {errors.estimates && (
             <Alert color="red" title="Could not load estimates" mb="md">
               {errors.estimates}
+            </Alert>
+          )}
+          {calendarError && (
+            <Alert color="orange" title="Could not load schedule calendar" mb="md">
+              {calendarError}
             </Alert>
           )}
 
@@ -496,21 +621,20 @@ export function CalendarPage() {
                 });
                 const weekEvents = eventsByWeek.get(key) || [];
                 const planned = weekEvents
-                  .map(({ estimate, workRange }) => {
-                    const seg = segmentForWeek(weekStart, workRange, weekGridCols);
+                  .map((row) => {
+                    const seg = segmentForWeek(weekStart, row.workRange, weekGridCols);
                     if (!seg) {
                       return null;
                     }
-                    return { estimate, seg, workRange };
+                    return { row, seg };
                   })
                   .filter(
                     (
-                      row
-                    ): row is {
-                      estimate: Estimate;
+                      item
+                    ): item is {
+                      row: WeekCalRow;
                       seg: { colStart: number; colSpan: number };
-                      workRange: { start: Date; end: Date };
-                    } => row !== null
+                    } => item !== null
                   );
 
                 const lanes = assignLanesForWeek(planned.map((p) => p.seg));
@@ -558,43 +682,49 @@ export function CalendarPage() {
                             : {}),
                         }}
                       >
-                        {planned.map(({ estimate, seg, workRange }, idx) => {
+                        {planned.map(({ row, seg }, idx) => {
                           const lane = lanes[idx] ?? 0;
-                          const { color, shade } = colorForScheduleKey(
-                            estimate.schedule_team_id || estimate.project_crew_lead
-                          );
-                          const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
-                          const label =
-                            estimate.title ||
-                            estimate.address_street ||
-                            estimate.client_name ||
-                            'Job';
-                          const teamName =
-                            teamConfig.scheduleTeams.find((t) => t.id === estimate.schedule_team_id)
-                              ?.name || null;
-                          const segmentDates = `${format(workRange.start, 'MMM d')}–${format(
-                            workRange.end,
+                          const { color, shade } = colorForScheduleKey(row.colorKey);
+                          const solidBg = mantineColorToCss(theme.colors, color, shade ?? 6);
+                          const segmentDates = `${format(row.workRange.start, 'MMM d')}–${format(
+                            row.workRange.end,
                             'MMM d'
                           )}`;
-                          return (
-                            <Link
-                              key={`${estimate.id}-${key}-${workRange.start.toISOString()}`}
-                              href={`/proposals/${estimate.id}`}
-                              className={classes.eventBar}
-                              style={{
-                                gridRow: lane + 1,
-                                gridColumn: `${seg.colStart} / span ${seg.colSpan}`,
-                                backgroundColor: bg,
-                              }}
-                            >
-                              <div className={classes.eventTitle}>{label}</div>
+                          const teamLabel =
+                            row.teamName ||
+                            teams.find((t) => t.id === row.colorKey)?.name ||
+                            '—';
+                          const inner = (
+                            <>
+                              <div className={classes.eventTitle}>{row.title}</div>
                               <div className={classes.eventMeta}>
                                 {segmentDates}
-                                {' · '}
-                                {estimate.project_crew_lead || '—'}
-                                {teamName ? ` · ${teamName}` : ''}
+                                {row.isBacklog
+                                  ? ' · tentative backlog'
+                                  : ` · ${teamLabel}`}
                               </div>
+                            </>
+                          );
+                          const barStyle: CSSProperties = {
+                            gridRow: lane + 1,
+                            gridColumn: `${seg.colStart} / span ${seg.colSpan}`,
+                            ...(row.isBacklog
+                              ? { background: BACKLOG_EVENT_STRIPED_BG }
+                              : { backgroundColor: solidBg }),
+                          };
+                          return row.href ? (
+                            <Link
+                              key={row.rowKey}
+                              href={row.href}
+                              className={classes.eventBar}
+                              style={barStyle}
+                            >
+                              {inner}
                             </Link>
+                          ) : (
+                            <div key={row.rowKey} className={classes.eventBar} style={barStyle}>
+                              {inner}
+                            </div>
                           );
                         })}
                       </div>
@@ -605,6 +735,52 @@ export function CalendarPage() {
             </Stack>
           )}
         </Paper>
+
+        {teams.some((t) => (backlogByTeam[t.id]?.total_labor_hours ?? 0) > 0) && (
+          <Paper p="md" withBorder radius="md">
+            <Title order={4} mb="sm">
+              Tentative backlog (by team)
+            </Title>
+            <Text size="sm" c="dimmed" mb="md">
+              Ordered tentative jobs before they are locked in. Updated periodically by the server.
+            </Text>
+            <Stack gap="md">
+              {teams.map((t) => {
+                const bl = backlogByTeam[t.id];
+                if (!bl || bl.total_labor_hours <= 0) {
+                  return null;
+                }
+                return (
+                  <Stack key={t.id} gap="xs">
+                    <Group justify="space-between">
+                      <Text fw={600}>{t.name}</Text>
+                      <Text size="sm" c="dimmed">
+                        {bl.total_labor_hours.toFixed(1)} hrs total
+                      </Text>
+                    </Group>
+                    <Stack gap={4}>
+                      {bl.items.map((item) => (
+                        <Group key={item.schedule_id} justify="space-between" wrap="nowrap" gap="xs">
+                          <Text size="sm" lineClamp={2}>
+                            {item.job_name}
+                          </Text>
+                          <Button
+                            component={Link}
+                            href={`/proposals/${item.estimate_id}`}
+                            size="xs"
+                            variant="light"
+                          >
+                            Open
+                          </Button>
+                        </Group>
+                      ))}
+                    </Stack>
+                  </Stack>
+                );
+              })}
+            </Stack>
+          </Paper>
+        )}
 
         {unscheduled.length > 0 && (
             <Paper p="md" withBorder radius="md">
@@ -646,6 +822,7 @@ export function CalendarPage() {
         }}
         estimate={modalEstimate}
         teamConfig={teamConfig}
+        teams={teams}
         onSaved={handleSaved}
       />
     </Container>

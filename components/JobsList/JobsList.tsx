@@ -23,6 +23,7 @@ import { CSS } from '@dnd-kit/utilities';
 import {
     ActionIcon,
     Badge,
+    Button,
     Card,
     Center,
     Flex,
@@ -46,6 +47,11 @@ import { CollectPaymentModal } from '@/components/EstimateDetails/CollectPayment
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAppSelector } from '@/store/hooks';
 import { selectProjectsLastFetched } from '@/store/slices/projectsSlice';
+
+/** Dev / staging only: never enable in production builds unless explicitly set. */
+const SHOW_DUPLICATE_ESTIMATE =
+    process.env.NODE_ENV === 'development' ||
+    process.env.NEXT_PUBLIC_ALLOW_ESTIMATE_DUPLICATE === 'true';
 
 // Utility functions for dates and hours
 function formatDate(dateString?: string): string {
@@ -178,6 +184,9 @@ interface SortableJobCardProps {
     onClick: (event: React.MouseEvent) => void;
     resolveClientName: (project: Estimate) => string | undefined;
     columnId: string;
+    showDuplicate?: boolean;
+    duplicateLoading?: boolean;
+    onDuplicate?: (event: React.MouseEvent) => void;
 }
 
 function SortableJobCard({
@@ -185,6 +194,9 @@ function SortableJobCard({
     onClick,
     resolveClientName,
     columnId,
+    showDuplicate,
+    duplicateLoading,
+    onDuplicate,
 }: SortableJobCardProps) {
     const {
         attributes,
@@ -264,6 +276,25 @@ function SortableJobCard({
                     </Text>
                 )}
             </Group>
+
+            {showDuplicate && onDuplicate ? (
+                <Button
+                  type="button"
+                  variant="light"
+                  color="gray"
+                  size="xs"
+                  mt="sm"
+                  fullWidth
+                  loading={duplicateLoading}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                        e.stopPropagation();
+                        onDuplicate(e);
+                    }}
+                >
+                    Duplicate
+                </Button>
+            ) : null}
         </Card>
     );
 }
@@ -280,6 +311,9 @@ interface KanbanColumnProps {
     columnRef?: React.RefObject<HTMLDivElement>;
     isOver?: boolean;
     hoursSummary?: { interior: number; exterior: number };
+    showDuplicate?: boolean;
+    duplicatingJobId?: string | null;
+    onDuplicateEstimate?: (job: Job, event: React.MouseEvent) => void;
 }
 
 function KanbanColumn({
@@ -293,6 +327,9 @@ function KanbanColumn({
     columnRef,
     isOver: isOverProp,
     hoursSummary,
+    showDuplicate,
+    duplicatingJobId,
+    onDuplicateEstimate,
 }: KanbanColumnProps) {
     const jobIds = jobs.map((job) => job.id);
     const { setNodeRef, isOver: isOverDroppable } = useDroppable({
@@ -406,6 +443,13 @@ function KanbanColumn({
                                   resolveClientName={resolveClientName}
                                   onClick={(event) => onJobClick(job, event)}
                                   columnId={column.id}
+                                  showDuplicate={showDuplicate}
+                                  duplicateLoading={duplicatingJobId === job.id}
+                                  onDuplicate={
+                                      showDuplicate && onDuplicateEstimate
+                                          ? (e) => onDuplicateEstimate(job, e)
+                                          : undefined
+                                  }
                                 />
                             ))
                         ) : (
@@ -479,6 +523,7 @@ export default function JobsList() {
     const [autoCreateEnabled, setAutoCreateEnabled] = useState<boolean | null>(null);
     const [showBillingPaymentModal, setShowBillingPaymentModal] = useState(false);
     const [billingModalEstimateId, setBillingModalEstimateId] = useState<string | null>(null);
+    const [duplicatingJobId, setDuplicatingJobId] = useState<string | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
     const hasAttemptedAutoRefreshRef = useRef(false);
     const hasEverHadDataRef = useRef(projects.length > 0);
@@ -1070,6 +1115,51 @@ export default function JobsList() {
             }
     }
 
+    const handleDuplicateEstimate = useCallback(
+        async (job: Job, event: React.MouseEvent) => {
+            event.stopPropagation();
+            if (duplicatingJobId) {
+                return;
+            }
+            setDuplicatingJobId(job.id);
+            try {
+                const res = await fetch(
+                    `/api/estimates/${job.id}/duplicate-for-testing`,
+                    {
+                        method: 'POST',
+                        headers: getApiHeaders(),
+                    }
+                );
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    const detail = body?.detail;
+                    const msg =
+                        typeof detail === 'string'
+                            ? detail
+                            : Array.isArray(detail)
+                              ? detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join(', ')
+                              : res.statusText;
+                    throw new Error(msg || 'Duplicate failed');
+                }
+                notifications.show({
+                    title: 'Duplicated',
+                    message: 'A copy of this estimate was created for testing.',
+                    color: 'green',
+                });
+                await refreshData('projects');
+            } catch (err) {
+                notifications.show({
+                    title: 'Duplicate failed',
+                    message: err instanceof Error ? err.message : 'Unknown error',
+                    color: 'red',
+                });
+            } finally {
+                setDuplicatingJobId(null);
+            }
+        },
+        [duplicatingJobId, refreshData]
+    );
+
     // Get active job for drag overlay
     const activeJob = activeId ? jobs.find((job) => job.id === activeId) : null;
     const activeJobDateInfo = activeJob
@@ -1142,6 +1232,9 @@ export default function JobsList() {
                                   columnRef={column.id === 'historical' ? historicalColumnRef : undefined}
                                   isOver={overId === column.id}
                                   hoursSummary={hoursSummary}
+                                  showDuplicate={SHOW_DUPLICATE_ESTIMATE}
+                                  duplicatingJobId={duplicatingJobId}
+                                  onDuplicateEstimate={handleDuplicateEstimate}
                                 />
                             );
                         })}

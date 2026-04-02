@@ -11,7 +11,6 @@ import { useRouter } from 'next/navigation';
 
 import { CollectPaymentBillingBanner, CollectPaymentModal } from './CollectPaymentModal';
 import EditableField from './EditableField';
-import EstimateSchedulePanel from './EstimateSchedulePanel';
 import FollowUpSchedulingModal from './FollowUpSchedulingModal';
 import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Global/model';
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
@@ -1478,8 +1477,6 @@ export default function SidebarDetails({
             </Text>
           </Flex>
         )}
-
-        <EstimateSchedulePanel estimate={estimate} estimateID={estimateID} onUpdate={onUpdate} />
 
         {/* Owned By */}
         {editingOwner ? (
