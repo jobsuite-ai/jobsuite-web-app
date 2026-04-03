@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
-import { clearCachedContractorId, getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
-import { clearAccessTokenMetadata, getAccessTokenExpiresAt } from '@/app/utils/authToken';
+import { getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
+import { clearClientAuthSession } from '@/app/utils/authSession';
+import { getAccessTokenExpiresAt } from '@/app/utils/authToken';
 import { clearCachedAuthMe, getCachedAuthMe, setCachedAuthMe } from '@/app/utils/dataCache';
 
 export interface User {
@@ -50,12 +51,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [error, setError] = useState<string | null>(null);
 
   const clearAuthStorage = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    clearAccessTokenMetadata();
-    clearCachedAuthMe();
-    clearCachedContractorId();
-    window.dispatchEvent(new Event('localStorageChange'));
+    clearClientAuthSession();
   };
 
   useEffect(() => {

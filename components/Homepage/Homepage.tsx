@@ -30,6 +30,10 @@ import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import {
+  getApiErrorMessage,
+  invalidateSessionAndRedirectToLogin,
+} from '@/app/utils/authSession';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
@@ -203,7 +207,10 @@ export default function Homepage() {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to fetch homepage data');
+          if (invalidateSessionAndRedirectToLogin(response, errorData)) {
+            return;
+          }
+          throw new Error(getApiErrorMessage(errorData) || 'Failed to fetch homepage data');
         }
 
         const homepageData = await response.json();

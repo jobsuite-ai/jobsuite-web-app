@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Button,
     Card,
+    Divider,
     Group,
     Stack,
     Tabs,
@@ -31,8 +32,8 @@ import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import ActionsTab from '@/components/Settings/ActionsTab';
 import IntegrationsTab from '@/components/Settings/IntegrationsTab';
 import NotificationsTab from '@/components/Settings/NotificationsTab';
+import SchedulingSeasonTab from '@/components/Settings/SchedulingSeasonTab';
 import SignaturePageTab from '@/components/Settings/SignaturePageTab';
-import TeamTab from '@/components/Settings/TeamTab';
 import TemplatesTab from '@/components/Settings/TemplatesTab';
 import { useAuth } from '@/hooks/useAuth';
 import { clearLogoCache } from '@/hooks/useContractorLogo';
@@ -278,7 +279,7 @@ export default function SettingsPage() {
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
-                    // Preserve team config if it exists (edited in Settings > Team)
+                    // Preserve team roster / schedule_teams (edited in Employees & Teams)
                     ...(existingConfig?.configuration?.team_lead_painters != null && {
                         team_lead_painters: existingConfig.configuration.team_lead_painters,
                     }),
@@ -288,6 +289,13 @@ export default function SettingsPage() {
                     }),
                     ...(existingConfig?.configuration?.team_sales_people != null && {
                         team_sales_people: existingConfig.configuration.team_sales_people,
+                    }),
+                    ...(existingConfig?.configuration?.schedule_default_daily_hours != null && {
+                        schedule_default_daily_hours:
+                            existingConfig.configuration.schedule_default_daily_hours,
+                    }),
+                    ...(existingConfig?.configuration?.schedule_teams != null && {
+                        schedule_teams: existingConfig.configuration.schedule_teams,
                     }),
                     // Preserve estimate-received email body
                     // (edited in Settings > Message Templates)
@@ -511,9 +519,17 @@ export default function SettingsPage() {
             <Title c="white" order={1} mb="xl">
                 Settings
             </Title>
-            <Text c="dimmed" mb="xl">
-                Manage your contractor configuration and notification preferences.
-            </Text>
+            <Stack gap="xs" mb="xl">
+                <Text c="dimmed">
+                    Manage your contractor configuration and notification preferences.
+                    Production teams and roster lists live under Employees &amp; Teams in the main
+                    menu.
+                </Text>
+                <Text c="dimmed">
+                    To put work dates on a job, open a proposal and use Team schedule in the
+                    sidebar: Preview, then Save schedule.
+                </Text>
+            </Stack>
 
             <Tabs
               value={activeTab}
@@ -668,7 +684,8 @@ export default function SettingsPage() {
                                   }
                                 />
 
-                                <TeamTab embedded />
+                                <Divider my="lg" label="Scheduling" labelPosition="left" />
+                                <SchedulingSeasonTab embedded />
 
                                 <Group justify="flex-end" mt="md">
                                     <Button

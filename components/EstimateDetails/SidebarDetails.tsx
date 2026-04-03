@@ -21,6 +21,7 @@ import { useJobTags } from '@/hooks/useJobTags';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
 import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
+import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
 
 interface SidebarDetailsProps {
   estimate: Estimate;
@@ -57,7 +58,7 @@ export default function SidebarDetails({
   const [savingJobType, setSavingJobType] = useState(false);
   const [editingScheduledDate, setEditingScheduledDate] = useState(false);
   const [selectedScheduledDate, setSelectedScheduledDate] = useState<Date | null>(
-    estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
+    effectiveProjectStartDate(estimate)
   );
   const [savingScheduledDate, setSavingScheduledDate] = useState(false);
   // Local state for optimistic status updates
@@ -331,11 +332,9 @@ export default function SidebarDetails({
   // Sync selectedScheduledDate when estimate changes (but not when editing)
   useEffect(() => {
     if (!editingScheduledDate) {
-      setSelectedScheduledDate(
-        estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
-      );
+      setSelectedScheduledDate(effectiveProjectStartDate(estimate));
     }
-  }, [estimate.scheduled_date, editingScheduledDate]);
+  }, [estimate.scheduled_date, estimate.status, editingScheduledDate, estimate.id]);
 
   // Sync selectedCustomerId when estimate changes (but not when modal is open)
   useEffect(() => {
@@ -885,6 +884,18 @@ export default function SidebarDetails({
         }),
       });
 
+      // Separate PUT for status: combined request would drop schedule fields in job-engine.
+      if (date && estimate.status === EstimateStatus.PROJECT_NOT_SCHEDULED) {
+        await fetch(`/api/estimates/${estimateID}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ status: EstimateStatus.PROJECT_SCHEDULED }),
+        });
+      }
+
       setEditingScheduledDate(false);
       onUpdate();
     } catch (error) {
@@ -897,15 +908,11 @@ export default function SidebarDetails({
 
   const handleScheduledDateClick = () => {
     setEditingScheduledDate(true);
-    setSelectedScheduledDate(
-      estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
-    );
+    setSelectedScheduledDate(effectiveProjectStartDate(estimate));
   };
 
   const handleScheduledDateCancel = () => {
-    setSelectedScheduledDate(
-      estimate.scheduled_date ? new Date(estimate.scheduled_date) : null
-    );
+    setSelectedScheduledDate(effectiveProjectStartDate(estimate));
     setEditingScheduledDate(false);
   };
 
@@ -1248,6 +1255,8 @@ export default function SidebarDetails({
       {getFormattedEstimateStatus(status)}
     </Menu.Item>
   ));
+
+  const projectStartDate = effectiveProjectStartDate(estimate);
 
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
@@ -1986,11 +1995,9 @@ export default function SidebarDetails({
                 size="sm"
                 style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
                 onClick={handleScheduledDateClick}
-                c={estimate.scheduled_date ? 'dark' : 'dimmed'}
+                c={projectStartDate ? 'dark' : 'dimmed'}
               >
-                {estimate.scheduled_date
-                  ? new Date(estimate.scheduled_date).toLocaleDateString()
-                  : '—'}
+                {projectStartDate ? projectStartDate.toLocaleDateString() : '—'}
               </Text>
             </Flex>
           )

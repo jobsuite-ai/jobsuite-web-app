@@ -1,0 +1,218 @@
+.calendar {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--mantine-spacing-md);
+}
+
+.weekBlock {
+  margin-bottom: var(--mantine-spacing-xl);
+}
+
+.weekTitle {
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  margin-bottom: var(--mantine-spacing-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.weekHeader {
+  display: grid;
+  /* column count set inline (5 Mon–Fri or 7 Mon–Sun) */
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.dayHeader {
+  text-align: center;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--mantine-color-dimmed);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.weekBody {
+  position: relative;
+  min-height: 112px;
+  border-radius: var(--mantine-radius-md);
+  /* Allow stacked event bars to extend past the default row height */
+  overflow: visible;
+  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+}
+
+.weekDayCells {
+  display: grid;
+  /* grid-template-columns set inline */
+  gap: 0;
+  height: 100%;
+  min-height: 112px; /* Fallback when parent omits inline min-height */
+}
+
+.dayCell {
+  border-right: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7));
+}
+
+.dayCell:last-child {
+  border-right: none;
+}
+
+.weekEvents {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  /* grid-template-columns set inline */
+  pointer-events: none;
+}
+
+.eventBar {
+  pointer-events: auto;
+  margin: 6px 4px 0;
+  padding: 6px 8px;
+  border-radius: var(--mantine-radius-sm);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: #fff;
+  text-decoration: none;
+  display: block;
+  min-height: 46px;
+  box-sizing: border-box;
+  /* Clip long titles horizontally only; vertical space comes from row stride + min-height */
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
+  border: 1px solid rgb(255 255 255 / 22%);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  align-self: start;
+}
+
+.eventBar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 22%);
+}
+
+/* Tentative job: dashed edge + diagonal stripes over team color (see ::after) */
+.eventBarTentative {
+  position: relative;
+  border-style: dashed;
+  border-width: 2px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 12%);
+  overflow: hidden;
+}
+
+.eventBarTentative::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  z-index: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.22) 0,
+    rgba(255, 255, 255, 0.22) 5px,
+    transparent 5px,
+    transparent 10px
+  );
+}
+
+.eventBarTentative .eventBarInner {
+  position: relative;
+  z-index: 1;
+}
+
+.eventBarInner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.eventBarText {
+  min-width: 0;
+  flex: 1;
+}
+
+.eventBarActions {
+  flex-shrink: 0;
+}
+
+.eventTitle {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eventMeta {
+  font-size: 0.65rem;
+  opacity: 0.92;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unassignedList {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.unassignedRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+  padding: var(--mantine-spacing-sm);
+  border-radius: var(--mantine-radius-sm);
+  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+  background: light-dark(var(--mantine-color-body), var(--mantine-color-dark-7));
+}
+
+.unassignedRowMain {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.unassignedRowActions {
+  flex: 0 1 auto;
+}
+
+.legendWrap {
+  margin-bottom: var(--mantine-spacing-md);
+  padding: var(--mantine-spacing-sm) var(--mantine-spacing-md);
+  border-radius: var(--mantine-radius-md);
+  border: 1px solid light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4));
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-7));
+}
+
+.legendSwatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  border: 1px solid rgb(255 255 255 / 35%);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 12%);
+}
+
+.legendTeamChip {
+  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: var(--mantine-radius-md);
+  padding: 4px 8px;
+  margin: -4px -8px;
+  text-align: left;
+  background: transparent;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.legendTeamChip:hover {
+  background: light-dark(rgb(0 0 0 / 4%), rgb(255 255 255 / 6%));
+}
+
+.legendTeamChipSelected {
+  border-color: var(--mantine-color-blue-6);
+  background: light-dark(rgb(0 107 229 / 8%), rgb(51 154 240 / 12%));
+}
