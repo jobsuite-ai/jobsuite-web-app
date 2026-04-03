@@ -98,20 +98,43 @@ export default function NotificationsPage() {
           params.append('since_date', thirtyDaysAgo.toISOString());
         }
 
-        const response = await fetch(`/api/notifications?${params.toString()}`, {
-          method: 'GET',
-          headers: getApiHeaders(),
-        });
+        const [listRes, unackRes] = await Promise.all([
+          fetch(`/api/notifications?${params.toString()}`, {
+            method: 'GET',
+            headers: getApiHeaders(),
+          }),
+          fetch('/api/notifications/unacknowledged/list?limit=100', {
+            method: 'GET',
+            headers: getApiHeaders(),
+          }),
+        ]);
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
+        if (!listRes.ok) {
+          const errorData = await listRes.json().catch(() => ({}));
           throw new Error(errorData.message || 'Failed to fetch notifications');
         }
 
-        const data = await response.json();
-        // Sort by created_at descending (newest first)
-        const sorted = (data || []).sort((a: Notification, b: Notification) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const listData: Notification[] = await listRes.json();
+        // Merge with header’s unack list (per-contractor); avoids missing rows when generic
+        // list is capped at 100 before contractor filter (e.g. multi-contractor accounts).
+        let unackData: Notification[] = [];
+        if (unackRes.ok) {
+          const raw = await unackRes.json();
+          unackData = Array.isArray(raw) ? raw : [];
+        }
+
+        const byId = new Map<string, Notification>();
+        for (const n of listData || []) {
+          byId.set(n.id, n);
+        }
+        for (const n of unackData) {
+          byId.set(n.id, n);
+        }
+        const merged = Array.from(byId.values());
+        const sorted = merged.sort(
+          (a: Notification, b: Notification) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
         setAllNotifications(sorted);
         setHasFetchedAll(includeOlder);
       } catch (err) {

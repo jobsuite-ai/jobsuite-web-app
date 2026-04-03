@@ -10,6 +10,7 @@ export async function GET() {
     branch: branch || 'not set',
     AWS_BRANCH: process.env.AWS_BRANCH || 'not set',
     AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH || 'not set',
+    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV || 'not set',
     NODE_ENV: process.env.NODE_ENV || 'not set',
     resolvedApiUrl: apiBaseUrl,
     hasWebhookEmail: !!process.env.WEBHOOK_EMAIL,

@@ -80,7 +80,8 @@ export const getApiBaseUrl = () => {
     return url;
   }
 
-  // Use AWS_BRANCH or AMPLIFY_BRANCH to determine environment
+  // Use AWS_BRANCH or AMPLIFY_BRANCH (written into .env.production during Amplify preBuild
+  // so Next.js inlines them at build time — same mechanism as other server env).
   // Note: main branch uses QA endpoints, not production
   const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
 
@@ -107,10 +108,34 @@ export const getApiBaseUrl = () => {
     return baseUrl;
   }
 
-  // Default to prod for unknown branches
+  // Fallback: NEXT_PUBLIC_ENV is set per branch in Amplify and is always inlined at build.
+  const publicEnv = process.env.NEXT_PUBLIC_ENV;
+  if (publicEnv === 'production') {
+    const baseUrl = 'https://api.jobsuite.app';
+    logApiBaseResolution('server:next-public-env-fallback:production', baseUrl, {
+      NEXT_PUBLIC_ENV: publicEnv,
+      ...serverExtras,
+    });
+    return baseUrl;
+  }
+  if (
+    publicEnv === 'qa' ||
+    publicEnv === 'staging' ||
+    publicEnv === 'development' ||
+    publicEnv === 'dev'
+  ) {
+    const baseUrl = 'https://qa.api.jobsuite.app';
+    logApiBaseResolution('server:next-public-env-fallback:non-prod', baseUrl, {
+      NEXT_PUBLIC_ENV: publicEnv,
+      ...serverExtras,
+    });
+    return baseUrl;
+  }
+
   const fallback = 'https://api.jobsuite.app';
   logApiBaseResolution('server:branch:unknown-default-prod', fallback, {
     branch: branch ?? '(unset)',
+    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
     AWS_BRANCH: process.env.AWS_BRANCH,
     AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH,
     ...serverExtras,
