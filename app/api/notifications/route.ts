@@ -32,11 +32,15 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get('limit');
+    const sinceDate = searchParams.get('since_date');
 
     // Build query parameters for the job engine API
     const queryParams = new URLSearchParams();
     if (limit) {
       queryParams.append('limit', limit);
+    }
+    if (sinceDate) {
+      queryParams.append('since_date', sinceDate);
     }
 
     const queryString = queryParams.toString();
