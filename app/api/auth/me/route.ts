@@ -18,8 +18,8 @@ export async function GET(request: Request) {
 
     const apiBaseUrl = getApiBaseUrl();
 
-    // Get full user info from /users/me
-    const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
+    // Use /auth/me so employees are not blocked by manager-only /users/me router.
+    const userResponse = await fetch(`${apiBaseUrl}/api/v1/auth/me`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,

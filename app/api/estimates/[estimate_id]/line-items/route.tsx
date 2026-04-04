@@ -1,15 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+
+import { getContractorId } from '../../../utils/getContractorId';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 export async function GET(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
     try {
         const { estimate_id } = await params;
 
-        // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -22,32 +23,8 @@ export async function GET(
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        const contractorId = await getContractorId(request);
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
@@ -56,7 +33,7 @@ export async function GET(
 
         // Get line items for estimate from backend
         const lineItemsResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}/line-items`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/line-items`,
             {
                 method: 'GET',
                 headers: {
@@ -87,13 +64,12 @@ export async function GET(
 }
 
 export async function POST(
-    request: Request,
+    request: NextRequest,
     { params }: { params: Promise<{ estimate_id: string }> }
 ) {
     try {
         const { estimate_id } = await params;
 
-        // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
 
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -106,44 +82,18 @@ export async function POST(
         const token = authHeader.substring(7);
         const apiBaseUrl = getApiBaseUrl();
 
-        // Get user info to obtain contractor_id
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
-            method: 'GET',
-            headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            },
-        });
-
-        if (!userResponse.ok) {
-            if (userResponse.status === 401) {
-                return NextResponse.json(
-                    { message: 'Invalid or expired token' },
-                    { status: 401 }
-                );
-            }
-            const errorData = await userResponse.json();
-            return NextResponse.json(
-                { message: errorData.detail || 'Failed to get user data' },
-                { status: userResponse.status }
-            );
-        }
-
-        const user = await userResponse.json();
-
-        if (!user.contractor_id) {
+        const contractorId = await getContractorId(request);
+        if (!contractorId) {
             return NextResponse.json(
                 { message: 'User does not have a contractor ID' },
                 { status: 400 }
             );
         }
 
-        // Get request body
         const body = await request.json();
 
-        // Create line item via backend API
         const createResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${user.contractor_id}/estimates/${estimate_id}/line-items`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/line-items`,
             {
                 method: 'POST',
                 headers: {

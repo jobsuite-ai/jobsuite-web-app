@@ -7,7 +7,7 @@ function decodeBase64Url(input: string): string {
   return atob(padded);
 }
 
-function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
+export function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
   const parts = accessToken.split('.');
   if (parts.length < 2) {
     return null;
@@ -68,4 +68,40 @@ export function clearAccessTokenMetadata(): void {
   }
   localStorage.removeItem(ACCESS_TOKEN_EXPIRES_AT_KEY);
   localStorage.removeItem(ACCESS_TOKEN_ISSUED_AT_KEY);
+}
+
+/** Role claim from the stored access token (for cache policy; not a security boundary). */
+export function isEmployeeRoleFromToken(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    return false;
+  }
+  const payload = decodeJwtPayload(token);
+  return payload?.role === 'employee';
+}
+
+/**
+ * True when cached /api/auth/me data should not be used for this access token
+ * (different user, or role changed in a new token while localStorage cache is stale).
+ */
+export function isCachedAuthMeStaleForToken(
+  accessToken: string,
+  cached: { id: string; role: string }
+): boolean {
+  const payload = decodeJwtPayload(accessToken);
+  if (!payload) {
+    return true;
+  }
+  const sub = typeof payload.sub === 'string' ? payload.sub : null;
+  if (!sub || cached.id !== sub) {
+    return true;
+  }
+  const tokenRole = typeof payload.role === 'string' ? payload.role : null;
+  if (tokenRole != null && tokenRole !== cached.role) {
+    return true;
+  }
+  return false;
 }

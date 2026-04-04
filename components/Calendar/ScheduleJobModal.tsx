@@ -53,6 +53,7 @@ export function ScheduleJobModal({
   /** Which month is shown; `Calendar` uses `date` for visible grid, not the selection day. */
   const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
   const [saving, setSaving] = useState(false);
+  const [conflictCode, setConflictCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!estimate || !opened) {
@@ -69,7 +70,24 @@ export function ScheduleJobModal({
   const hoursBid = estimate?.hours_bid ?? 0;
   const teamName = teams.find((t) => t.id === lockInTeamId)?.name ?? '—';
 
-  const handleSave = async () => {
+  const scheduleErrorMessage = (body: Record<string, unknown>): string => {
+    const d = body.detail;
+    if (typeof d === 'string') {
+      return d;
+    }
+    if (d && typeof d === 'object' && 'message' in d && typeof (d as { message: string }).message === 'string') {
+      return (d as { message: string }).message;
+    }
+    if (typeof body.message === 'string') {
+      return body.message;
+    }
+    return 'Failed to save schedule';
+  };
+
+  const performSave = async (opts?: {
+    confirm_activate_job?: boolean;
+    confirm_deactivate_job?: boolean;
+  }) => {
     if (!estimate || !start) {
       return;
     }
@@ -88,25 +106,43 @@ export function ScheduleJobModal({
         '0'
       )}-${String(start.getDate()).padStart(2, '0')}`;
 
+      const payload: Record<string, unknown> = {
+        team_id: lockInTeamId,
+        labor_hours: hoursBid,
+        start_date: startDay,
+        estimate_type: apiEstimateType(String(estimate.estimate_type)),
+        tentative: false,
+        non_working_dates: [],
+      };
+      if (opts?.confirm_activate_job !== undefined) {
+        payload.confirm_activate_job = opts.confirm_activate_job;
+      }
+      if (opts?.confirm_deactivate_job !== undefined) {
+        payload.confirm_deactivate_job = opts.confirm_deactivate_job;
+      }
+
       const schRes = await fetch(`/api/schedule/estimates/${estimate.id}`, {
         method: 'POST',
         headers: getApiHeaders(),
-        body: JSON.stringify({
-          team_id: lockInTeamId,
-          labor_hours: hoursBid,
-          start_date: startDay,
-          estimate_type: apiEstimateType(String(estimate.estimate_type)),
-          tentative: false,
-          non_working_dates: [],
-        }),
+        body: JSON.stringify(payload),
       });
-      const schErr = await schRes.json().catch(() => ({}));
+      const schErr = (await schRes.json().catch(() => ({}))) as Record<string, unknown>;
       if (!schRes.ok) {
-        throw new Error(
-          (schErr.detail as string) || schErr.message || 'Failed to save schedule'
-        );
+        if (schRes.status === 409) {
+          const detail = schErr.detail as { code?: string } | undefined;
+          const code =
+            detail && typeof detail === 'object' && typeof detail.code === 'string'
+              ? detail.code
+              : undefined;
+          if (code === 'ACTIVATE_JOB_CONFIRM' || code === 'DEACTIVATE_JOB_CONFIRM') {
+            setConflictCode(code);
+            return;
+          }
+        }
+        throw new Error(scheduleErrorMessage(schErr));
       }
 
+      setConflictCode(null);
       onSaved();
       onClose();
     } catch (e) {
@@ -117,7 +153,12 @@ export function ScheduleJobModal({
     }
   };
 
+  const handleSave = async () => {
+    await performSave();
+  };
+
   return (
+    <>
     <Modal
       opened={opened}
       onClose={onClose}
@@ -162,5 +203,47 @@ export function ScheduleJobModal({
         </Stack>
       )}
     </Modal>
+    <Modal
+      opened={conflictCode != null}
+      onClose={() => setConflictCode(null)}
+      title="Confirm job status"
+      centered
+    >
+      <Text size="sm" mb="md">
+        {conflictCode === 'ACTIVATE_JOB_CONFIRM'
+          ? 'This schedule includes today (or starts today). Mark the job in progress and current on the calendar?'
+          : 'The job is in progress but this schedule no longer includes today. Do you want to return the job to a scheduled status?'}
+      </Text>
+      <Group justify="flex-end" gap="sm">
+        <Button
+          variant="default"
+          onClick={() => {
+            const c = conflictCode;
+            setConflictCode(null);
+            if (c === 'ACTIVATE_JOB_CONFIRM') {
+              performSave({ confirm_activate_job: false }).catch(() => {});
+            } else if (c === 'DEACTIVATE_JOB_CONFIRM') {
+              performSave({ confirm_deactivate_job: false }).catch(() => {});
+            }
+          }}
+        >
+          No, save schedule only
+        </Button>
+        <Button
+          onClick={() => {
+            const c = conflictCode;
+            setConflictCode(null);
+            if (c === 'ACTIVATE_JOB_CONFIRM') {
+              performSave({ confirm_activate_job: true }).catch(() => {});
+            } else if (c === 'DEACTIVATE_JOB_CONFIRM') {
+              performSave({ confirm_deactivate_job: true }).catch(() => {});
+            }
+          }}
+        >
+          Yes
+        </Button>
+      </Group>
+    </Modal>
+    </>
   );
 }

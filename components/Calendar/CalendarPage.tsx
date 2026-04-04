@@ -12,6 +12,7 @@ import {
   Container,
   Group,
   Loader,
+  Modal,
   Paper,
   ScrollArea,
   Stack,
@@ -29,23 +30,7 @@ import {
   IconChevronRight,
   IconRefresh,
 } from '@tabler/icons-react';
-import {
-  addDays,
-  addWeeks,
-  differenceInCalendarDays,
-  eachWeekOfInterval,
-  endOfWeek,
-  format,
-  isAfter,
-  isBefore,
-  isValid,
-  isWeekend,
-  max,
-  min,
-  parse,
-  startOfDay,
-  startOfWeek,
-} from 'date-fns';
+import { addDays, eachWeekOfInterval, format, isValid, parse, startOfDay } from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { CalendarEventBar } from './CalendarEventBar';
@@ -60,6 +45,20 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useTeamConfig } from '@/hooks/useTeamConfig';
+import type { CalendarGridJobEvent, WeekCalRow } from '@/utils/calendarGridMath';
+import {
+  assignLanesForWeek,
+  CALENDAR_LOCKED_FETCH_PADDING_DAYS,
+  CAL_EVENT_ROW_PX,
+  CAL_WEEK_BODY_MIN_PX,
+  explicitWorkDatesInSegment,
+  formatBacklogSpanLabel,
+  getFourWeekRange,
+  navigateFourWeekWindow,
+  pickPrimaryJobCalendarEvent,
+  scheduleEventOverlapsVisibleRange,
+  segmentForWeekOrFallback,
+} from '@/utils/calendarGridMath';
 import { isUnassignedTeamProject } from '@/utils/calendarProjectFilters';
 import {
   parseLocalDateString,
@@ -75,16 +74,8 @@ import {
 import type { TeamCapacityRowInput } from '@/utils/scheduleMath';
 import { buildSyntheticTeamBacklogCalendarEvent } from '@/utils/tentativeBacklogCalendar';
 
-/** Vertical stride for stacked bars (must be ≥ bar min-height + top margin). */
-const CAL_EVENT_ROW_PX = 56;
-const CAL_WEEK_BODY_MIN_PX = 112;
-
 const SHOW_NON_WORKING_DAYS_STORAGE_KEY = 'jobsuite-calendar-show-non-working-days';
 const LEGACY_SHOW_WEEKENDS_STORAGE_KEY = 'jobsuite-calendar-show-weekends';
-// Tentative backlog placement needs the last locked job end for each team.
-// The visible grid is only a 4-week window, so we fetch extra locked events to
-// correctly anchor right before window boundaries (e.g. month transitions).
-const CALENDAR_LOCKED_FETCH_PADDING_DAYS = 60;
 
 type BacklogItem = {
   schedule_id: string;
@@ -99,62 +90,7 @@ type BacklogByTeamPayload = {
 };
 
 /** Locked jobs from API; tentative backlog bars are merged client-side from schedule_backlog. */
-interface CalendarApiEvent {
-  schedule_id: string;
-  estimate_id: string | null;
-  title: string | null;
-  team_id: string | null;
-  team_name: string | null;
-  schedule_start_date: string | null;
-  schedule_end_date: string | null;
-  schedule_tentative: boolean;
-  schedule_work_dates?: string[];
-  schedule_non_working_dates?: string[];
-  calendar_kind: 'job' | 'team_backlog';
-}
-
-/** One bar per estimate when the API still returns duplicate rows (legacy data). */
-function pickPrimaryJobCalendarEvent(candidates: CalendarApiEvent[]): CalendarApiEvent {
-  if (candidates.length <= 1) {
-    return candidates[0];
-  }
-  return [...candidates].sort((a, b) => {
-    const lockA = a.schedule_tentative ? 0 : 1;
-    const lockB = b.schedule_tentative ? 0 : 1;
-    if (lockA !== lockB) {
-      return lockB - lockA;
-    }
-    const sa = (a.schedule_start_date ?? '').slice(0, 10);
-    const sb = (b.schedule_start_date ?? '').slice(0, 10);
-    return sb.localeCompare(sa);
-  })[0];
-}
-
-type WeekCalRow = {
-  rowKey: string;
-  title: string;
-  workRange: { start: Date; end: Date };
-  /** Full job span for bar labels (same on every segment of a split job). */
-  labelRangeStart: Date;
-  labelRangeEnd: Date;
-  colorKey: string;
-  href: string | null;
-  isBacklog: boolean;
-  teamName: string | null;
-  scheduleTentative: boolean;
-  scheduleId: string;
-  estimateId: string | null;
-  calendarKind: 'job' | 'team_backlog';
-  workDatesIso: string[];
-  scheduleNonWorkingIso: string[];
-  scheduleStartIso: string | null;
-  /**
-   * Full-span end (ISO date); backlog bar labels match API, not clipped work dates.
-   */
-  scheduleEndIso: string | null;
-  /** Team-colored backlog fill (calendar bar). */
-  backlogBackgroundCss: string | null;
-};
+type CalendarApiEvent = CalendarGridJobEvent;
 
 type ScheduleEditDraft = {
   scheduleId: string;
@@ -209,214 +145,6 @@ function applySchedulePreviewPatch(
       schedule_non_working_dates: draft.nonWorkingIso.map((s) => s.slice(0, 10)),
     };
   });
-}
-
-/** Always four weeks: anchor week plus the following three (Mon-start weeks). */
-function getFourWeekRange(anchor: Date): { start: Date; end: Date } {
-  const start = startOfWeek(anchor, { weekStartsOn: 1 });
-  const end = endOfWeek(addWeeks(start, 3), { weekStartsOn: 1 });
-  return { start, end };
-}
-
-function navigateFourWeekWindow(anchor: Date, dir: -1 | 1): Date {
-  return addWeeks(anchor, dir * 4);
-}
-
-/**
- * Human-readable backlog range (true end date, including when in a later month).
- */
-function formatBacklogSpanLabel(
-  isoStart: string | null | undefined,
-  isoEnd: string | null | undefined
-): string | null {
-  if (!isoStart?.trim() || !isoEnd?.trim()) {
-    return null;
-  }
-  const a = startOfDay(parseLocalDateString(isoStart));
-  const b = startOfDay(parseLocalDateString(isoEnd));
-  return `${format(a, 'MMM d')}–${format(b, 'MMM d, yyyy')}`;
-}
-
-/**
- * Calendar data flow (see fetch effect below):
- *
- * 1) Estimates from DataCache — used for the "Not scheduled yet" list, title fallbacks on bars, and
- *    team color keys. They are NOT the source of truth for grid bars.
- *
- * 2) GET /api/schedule/calendar?from=&to= — locked jobs only. Tentative backlog bars combine
- *    GET /api/teams/:id/schedule_backlog (order + labor hours), each team’s latest locked job end
- *    from this calendar payload, and team capacity (ceil hours / daily labor capacity per block).
- *
- * 3) If nothing appears but you know a row exists in Dynamo, check contractor_id on the token vs
- *    the schedule row, and that the visible window [from, to] overlaps the job dates.
- *
- * 4) The grid only renders the current four-week `range`; client-side filtering uses the same
- *    overlap rule so bars align with the window.
- */
-function scheduleEventOverlapsVisibleRange(
-  ev: CalendarApiEvent,
-  visibleRange: { start: Date; end: Date }
-): boolean {
-  if (!ev.schedule_start_date?.trim() || !ev.schedule_end_date?.trim()) {
-    return false;
-  }
-  const s = startOfDay(parseLocalDateString(ev.schedule_start_date));
-  const e = startOfDay(parseLocalDateString(ev.schedule_end_date));
-  const rs = startOfDay(visibleRange.start);
-  const re = startOfDay(visibleRange.end);
-  return !(isAfter(s, re) || isBefore(e, rs));
-}
-
-/**
- * Map a date range onto week grid columns. `columnCount` 7 = Mon–Sun; 5 = Mon–Fri only
- * (Sat/Sun columns hidden in the UI).
- */
-function segmentForWeek(
-  weekStart: Date,
-  range: { start: Date; end: Date },
-  columnCount: 5 | 7
-): { colStart: number; colSpan: number } | null {
-  const ws = startOfDay(weekStart);
-  const weekEnd = startOfDay(endOfWeek(weekStart, { weekStartsOn: 1 }));
-  const rs = startOfDay(range.start);
-  const re = startOfDay(range.end);
-  let segStart = max([rs, ws]);
-  let segEnd = min([re, weekEnd]);
-  if (isAfter(segStart, segEnd)) {
-    return null;
-  }
-
-  if (columnCount === 7) {
-    const colStart = differenceInCalendarDays(segStart, ws) + 1;
-    const colSpan = differenceInCalendarDays(segEnd, segStart) + 1;
-    return { colStart, colSpan };
-  }
-
-  while (segStart <= segEnd && isWeekend(segStart)) {
-    segStart = addDays(segStart, 1);
-  }
-  while (segEnd >= segStart && isWeekend(segEnd)) {
-    segEnd = addDays(segEnd, -1);
-  }
-  if (isAfter(segStart, segEnd)) {
-    return null;
-  }
-
-  const colStart = differenceInCalendarDays(segStart, ws) + 1;
-  const colEnd = differenceInCalendarDays(segEnd, ws) + 1;
-  if (colStart > 5 || colEnd < 1) {
-    return null;
-  }
-  const cs = Math.max(1, colStart);
-  const ce = Math.min(5, colEnd);
-  if (cs > ce) {
-    return null;
-  }
-  return { colStart: cs, colSpan: ce - cs + 1 };
-}
-
-/**
- * Like segmentForWeek; when Mon–Fri view hides a weekend-only job, pin one column on Monday.
- */
-/**
- * Work dates that fall inside one visual segment (must match fallback scope in
- * `segmentForWeekOrFallback` — using the full job list per segment pins bars to wrong weeks).
- */
-function explicitWorkDatesInSegment(
-  explicit: string[],
-  seg: { start: Date; end: Date }
-): string[] {
-  if (explicit.length === 0) {
-    return [];
-  }
-  return explicit.filter((iso) => {
-    const d = startOfDay(parseLocalDateString(iso));
-    return !isBefore(d, seg.start) && !isAfter(d, seg.end);
-  });
-}
-
-function segmentForWeekOrFallback(
-  weekStart: Date,
-  range: { start: Date; end: Date },
-  columnCount: 5 | 7,
-  workDatesIso?: string[]
-): { colStart: number; colSpan: number } | null {
-  const seg = segmentForWeek(weekStart, range, columnCount);
-  if (seg) {
-    return seg;
-  }
-  if (columnCount === 5) {
-    const wide = segmentForWeek(weekStart, range, 7);
-    if (wide && (wide.colStart >= 6 || wide.colStart + wide.colSpan - 1 >= 6)) {
-      return { colStart: 1, colSpan: 1 };
-    }
-    if (workDatesIso?.length) {
-      const ws = startOfDay(weekStart);
-      const we = startOfDay(endOfWeek(weekStart, { weekStartsOn: 1 }));
-      const hasInWeek = workDatesIso.some((iso) => {
-        const d = startOfDay(parseLocalDateString(iso));
-        return !isAfter(d, we) && !isBefore(d, ws);
-      });
-      if (hasInWeek) {
-        return { colStart: 1, colSpan: 1 };
-      }
-    }
-  }
-  return null;
-}
-
-function columnRangeInclusive(seg: { colStart: number; colSpan: number }): [number, number] {
-  return [seg.colStart, seg.colStart + seg.colSpan - 1];
-}
-
-function rangesOverlap(a: [number, number], b: [number, number]): boolean {
-  return !(a[1] < b[0] || b[1] < a[0]);
-}
-
-/**
- * Assign each event to a horizontal "lane" (row) so only events that share at least
- * one day column stack vertically. Side-by-side events (e.g. Mon–Wed vs Fri–Sun) share a lane.
- */
-function assignLanesForWeek(
-  segments: { colStart: number; colSpan: number }[]
-): number[] {
-  const n = segments.length;
-  if (n === 0) {
-    return [];
-  }
-  const laneByIndex = new Array<number>(n);
-  const occupied: [number, number][][] = [];
-
-  const order = segments
-    .map((seg, index) => ({ seg, index }))
-    .sort((a, b) => {
-      if (a.seg.colStart !== b.seg.colStart) {
-        return a.seg.colStart - b.seg.colStart;
-      }
-      return b.seg.colSpan - a.seg.colSpan;
-    });
-
-  order.forEach(({ seg, index }) => {
-    const range = columnRangeInclusive(seg);
-    let placed = false;
-    for (let L = 0; L < 64; L += 1) {
-      if (!occupied[L]) {
-        occupied[L] = [];
-      }
-      const conflict = occupied[L].some((r) => rangesOverlap(r, range));
-      if (!conflict) {
-        occupied[L].push(range);
-        laneByIndex[index] = L;
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) {
-      laneByIndex[index] = 0;
-    }
-  });
-
-  return laneByIndex;
 }
 
 export function CalendarPage() {
@@ -486,6 +214,7 @@ export function CalendarPage() {
   const [undoScheduleSnapshot, setUndoScheduleSnapshot] = useState<ScheduleEditDraft | null>(
     null
   );
+  const [scheduleConflictCode, setScheduleConflictCode] = useState<string | null>(null);
 
   const [changeTeamCtx, setChangeTeamCtx] = useState<{
     estimate: Estimate;
@@ -665,51 +394,82 @@ export function CalendarPage() {
     };
   }, [scheduleEditDraft, estimates]);
 
-  const saveScheduleEdit = useCallback(async () => {
-    if (!scheduleEditDraft) {
-      return;
-    }
-    try {
-      const res = await fetch(`/api/schedule/${scheduleEditDraft.scheduleId}`, {
-        method: 'PUT',
-        headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+  const saveScheduleEdit = useCallback(
+    async (flags?: {
+      confirm_activate_job?: boolean;
+      confirm_deactivate_job?: boolean;
+    }) => {
+      if (!scheduleEditDraft) {
+        return;
+      }
+      try {
+        const body: Record<string, unknown> = {
           start_date: scheduleEditDraft.startIso,
           labor_hours: scheduleEditDraft.laborHours,
           non_working_dates: scheduleEditDraft.nonWorkingIso,
-        }),
-      });
-      const errBody = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(
-          (typeof errBody.detail === 'string' ? errBody.detail : null) ||
-            (errBody as { message?: string }).message ||
-            'Failed to update schedule'
-        );
+        };
+        if (flags?.confirm_activate_job !== undefined) {
+          body.confirm_activate_job = flags.confirm_activate_job;
+        }
+        if (flags?.confirm_deactivate_job !== undefined) {
+          body.confirm_deactivate_job = flags.confirm_deactivate_job;
+        }
+        const res = await fetch(`/api/schedule/${scheduleEditDraft.scheduleId}`, {
+          method: 'PUT',
+          headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const errBody = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!res.ok) {
+          if (res.status === 409) {
+            const detail = errBody.detail as { code?: string } | undefined;
+            const code =
+              detail && typeof detail === 'object' && typeof detail.code === 'string'
+                ? detail.code
+                : undefined;
+            if (code === 'ACTIVATE_JOB_CONFIRM' || code === 'DEACTIVATE_JOB_CONFIRM') {
+              setScheduleConflictCode(code);
+              return;
+            }
+          }
+          const d = errBody.detail;
+          const msg =
+            typeof d === 'string'
+              ? d
+              : d &&
+                  typeof d === 'object' &&
+                  'message' in d &&
+                  typeof (d as { message: string }).message === 'string'
+                ? (d as { message: string }).message
+                : typeof errBody.message === 'string'
+                  ? errBody.message
+                  : 'Failed to update schedule';
+          throw new Error(msg);
+        }
+        setScheduleConflictCode(null);
+        notifications.show({
+          title: 'Schedule saved',
+          message: 'Calendar will refresh.',
+          color: 'green',
+        });
+        if (scheduleEditBaseline) {
+          setUndoScheduleSnapshot({ ...scheduleEditBaseline });
+        }
+        setScheduleEditDraft(null);
+        setScheduleEditBaseline(null);
+        setSchedulePreviewPayload(null);
+        setAdjustOpen(false);
+        handleSaved();
+      } catch (e) {
+        notifications.show({
+          title: 'Could not save',
+          message: e instanceof Error ? e.message : 'Error',
+          color: 'red',
+        });
       }
-      notifications.show({
-        title: 'Schedule saved',
-        message: 'Calendar will refresh.',
-        color: 'green',
-      });
-      // Enable one-shot undo back to the last committed state (pre-save snapshot).
-      // Undo must NOT become available for preview-only edits.
-      if (scheduleEditBaseline) {
-        setUndoScheduleSnapshot({ ...scheduleEditBaseline });
-      }
-      setScheduleEditDraft(null);
-      setScheduleEditBaseline(null);
-      setSchedulePreviewPayload(null);
-      setAdjustOpen(false);
-      handleSaved();
-    } catch (e) {
-      notifications.show({
-        title: 'Could not save',
-        message: e instanceof Error ? e.message : 'Error',
-        color: 'red',
-      });
-    }
-  }, [scheduleEditDraft, scheduleEditBaseline, handleSaved]);
+    },
+    [scheduleEditDraft, scheduleEditBaseline, handleSaved]
+  );
 
   const cancelScheduleEdit = useCallback(() => {
     setScheduleEditDraft(null);
@@ -1538,6 +1298,48 @@ export function CalendarPage() {
         currentTeamId={changeTeamCtx?.currentTeamId ?? null}
         onSaved={handleSaved}
       />
+
+      <Modal
+        opened={scheduleConflictCode != null}
+        onClose={() => setScheduleConflictCode(null)}
+        title="Confirm job status"
+        centered
+      >
+        <Text size="sm" mb="md">
+          {scheduleConflictCode === 'ACTIVATE_JOB_CONFIRM'
+            ? 'This schedule includes today (or starts today). Mark the job in progress and current on the calendar?'
+            : 'The job is in progress but this schedule no longer includes today. Do you want to return the job to a scheduled status?'}
+        </Text>
+        <Group justify="flex-end" gap="sm">
+          <Button
+            variant="default"
+            onClick={() => {
+              const c = scheduleConflictCode;
+              setScheduleConflictCode(null);
+              if (c === 'ACTIVATE_JOB_CONFIRM') {
+                saveScheduleEdit({ confirm_activate_job: false }).catch(() => {});
+              } else if (c === 'DEACTIVATE_JOB_CONFIRM') {
+                saveScheduleEdit({ confirm_deactivate_job: false }).catch(() => {});
+              }
+            }}
+          >
+            No, save schedule only
+          </Button>
+          <Button
+            onClick={() => {
+              const c = scheduleConflictCode;
+              setScheduleConflictCode(null);
+              if (c === 'ACTIVATE_JOB_CONFIRM') {
+                saveScheduleEdit({ confirm_activate_job: true }).catch(() => {});
+              } else if (c === 'DEACTIVATE_JOB_CONFIRM') {
+                saveScheduleEdit({ confirm_deactivate_job: true }).catch(() => {});
+              }
+            }}
+          >
+            Yes
+          </Button>
+        </Group>
+      </Modal>
     </Container>
   );
 }

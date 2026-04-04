@@ -40,10 +40,7 @@ export async function POST(
     );
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return NextResponse.json(
-        { message: data.detail || data.message || 'Failed to assign schedule' },
-        { status: res.status }
-      );
+      return NextResponse.json(data, { status: res.status });
     }
     return NextResponse.json(data);
   } catch (error) {

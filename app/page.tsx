@@ -8,13 +8,14 @@ import { useSearchParams } from 'next/navigation';
 import AcceptInvitation from './accept-invitation/page';
 
 import LoginForm from '@/components/AuthButtons/LoginForm';
+import { MySchedulePage } from '@/components/Employee/MySchedulePage';
 import Homepage from '@/components/Homepage/Homepage';
 import { useAuth } from '@/hooks/useAuth';
 
 function HomePageContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const { isLoading: isAuthLoading, isAuthenticated } = useAuth();
+  const { isLoading: isAuthLoading, isAuthenticated, user } = useAuth({ fetchUser: true });
 
   // If there's a token in the URL, show the accept-invitation page
   if (token) {
@@ -26,6 +27,10 @@ function HomePageContent() {
 
   // Show homepage for authenticated users (even if still loading, show structure)
   if (isAuthenticated) {
+    const employeeHome = user?.role === 'employee';
+    if (employeeHome) {
+      return <MySchedulePage />;
+    }
     return <Homepage />;
   }
 
