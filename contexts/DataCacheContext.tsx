@@ -4,6 +4,7 @@ import { ReactNode, useCallback, useEffect, useRef, createContext, useContext } 
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { invalidateSessionAndRedirectToLogin } from '@/app/utils/authSession';
+import { isEmployeeRoleFromToken } from '@/app/utils/authToken';
 import { ContractorClient, Estimate, Job } from '@/components/Global/model';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -247,9 +248,17 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const keysToFetch: Array<'clients' | 'estimates' | 'projects'> = key
-        ? [key]
+      const employeeSession =
+        typeof window !== 'undefined' && isEmployeeRoleFromToken();
+      const defaultKeys: Array<'clients' | 'estimates' | 'projects'> = employeeSession
+        ? ['estimates']
         : ['clients', 'estimates', 'projects'];
+      const keysToFetch: Array<'clients' | 'estimates' | 'projects'> = (
+        key ? [key] : defaultKeys
+      ).filter((k) => !employeeSession || k === 'estimates');
+      if (keysToFetch.length === 0) {
+        return;
+      }
 
       // Check for in-flight requests and reuse them to prevent duplicates
       const existingPromises: Promise<void>[] = [];

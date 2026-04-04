@@ -28,7 +28,7 @@ export async function PUT(
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      return NextResponse.json({ message: data.detail || data.message || 'Failed to update schedule event' }, { status: res.status });
+      return NextResponse.json(data, { status: res.status });
     }
     return NextResponse.json(data);
   } catch (error) {

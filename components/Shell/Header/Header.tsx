@@ -4,7 +4,7 @@ import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'r
 
 import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton, useMantineTheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconBuilding, IconCalendar, IconCheck, IconFilePlus, IconFileText, IconFolder, IconHome, IconLayoutDashboard, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconList, IconMail, IconMenu2, IconNotification, IconSearch, IconSettings, IconUserCircle, IconUsers, IconUsersGroup } from '@tabler/icons-react';
+import { IconBuilding, IconCalendar, IconCheck, IconClock, IconFilePlus, IconFileText, IconFolder, IconHome, IconLayoutDashboard, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconList, IconMail, IconMenu2, IconNotification, IconSearch, IconSettings, IconUserCircle, IconUsers, IconUsersGroup } from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -19,7 +19,7 @@ import { selectAllClients } from '@/store/slices/clientsSlice';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 import { selectAllProjects } from '@/store/slices/projectsSlice';
 
-const links = [
+const fullNavLinks = [
   { link: '/', label: 'Home' },
   { link: '/dashboard', label: 'Dashboard' },
   { link: '/search', label: 'Search' },
@@ -31,6 +31,17 @@ const links = [
   { link: '/proposals', label: 'Proposals' },
   { link: '/messaging-center', label: 'Messaging Center' },
   { link: '/notifications', label: 'Notifications' },
+];
+
+const employeeNavLinks = [
+  { link: '/', label: 'My schedule' },
+  { link: '/my-time', label: 'Time entry' },
+];
+
+/** Under "Employee Options" for admin/manager (distinct from Home at `/`). */
+const managerEmployeeNavLinks = [
+  { link: '/my-schedule', label: 'My schedule' },
+  { link: '/my-time', label: 'Time entry' },
 ];
 
 interface HeaderProps {
@@ -77,7 +88,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const clients = useAppSelector(selectAllClients);
   const estimates = useAppSelector(selectAllEstimates);
   const projects = useAppSelector(selectAllProjects);
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth({ fetchUser: true });
   const { logoUrl } = useContractorLogo();
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
@@ -104,7 +115,11 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const getLinkIcon = (linkPath: string) => {
     switch (linkPath) {
       case '/':
-        return <IconHome size={18} />;
+        return pathname === '/' && user?.role === 'employee' ? (
+          <IconCalendar size={18} />
+        ) : (
+          <IconHome size={18} />
+        );
       case '/dashboard':
         return <IconLayoutDashboard size={18} />;
       case '/search':
@@ -117,6 +132,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
         return <IconFolder size={18} />;
       case '/calendar':
         return <IconCalendar size={18} />;
+      case '/my-schedule':
+        return <IconCalendar size={18} />;
+      case '/my-time':
+        return <IconClock size={18} />;
       case '/employees-teams':
         return <IconUsersGroup size={18} />;
       case '/proposals':
@@ -130,9 +149,18 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }
   };
 
+  const mainNavLinks = useMemo(() => {
+    if (user?.role === 'employee') {
+      return employeeNavLinks;
+    }
+    return fullNavLinks;
+  }, [user?.role]);
+
+  const showManagerEmployeeSection =
+    !!user && (user.role === 'admin' || user.role === 'manager');
+
   const navItems = useMemo(() => {
-    const linksToShow = isMobile ? links : links.filter((l) => l.link !== '/search');
-    return linksToShow.map((link) => {
+    const mapLink = (link: { link: string; label: string }, keySuffix: string) => {
       const isActive =
         pathname === link.link ||
         (link.link !== '/' && pathname?.startsWith(`${link.link}/`));
@@ -140,7 +168,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
       return (
         <NavLink
-          key={link.label}
+          key={`${keySuffix}-${link.label}`}
           component={Link}
           href={link.link}
           label={link.label}
@@ -156,8 +184,24 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           }}
         />
       );
-    });
-  }, [isMobile, pathname, messageCount]);
+    };
+
+    const linksToShow = isMobile ? mainNavLinks : mainNavLinks.filter((l) => l.link !== '/search');
+    const primary = linksToShow.map((link) => mapLink(link, 'main'));
+
+    if (!showManagerEmployeeSection) {
+      return primary;
+    }
+
+    return [
+      ...primary,
+      <Divider key="employee-options-divider" my="sm" />,
+      <Text key="employee-options-label" size="xs" c="dimmed" fw={600} px="xs">
+        Employee Options
+      </Text>,
+      ...managerEmployeeNavLinks.map((link) => mapLink(link, 'emp')),
+    ];
+  }, [isMobile, pathname, messageCount, mainNavLinks, showManagerEmployeeSection, user?.role]);
 
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {

@@ -6,14 +6,17 @@ import {
     ActionIcon,
     Anchor,
     Badge,
+    Box,
     Button,
     Center,
+    Collapse,
     Flex,
     Menu,
     Modal,
     NumberInput,
     Progress,
     SegmentedControl,
+    Stack,
     Stepper,
     Table,
     Text,
@@ -149,6 +152,16 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [comments, setComments] = useState<any[]>(cachedComments);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>(cachedChangeOrders);
     const [timeEntries, setTimeEntries] = useState<any[]>(cachedTimeEntries);
+    const [jobsuiteProgress, setJobsuiteProgress] = useState<
+        Array<{
+            line_item_id: string;
+            title: string;
+            bid_hours: number;
+            logged_hours: number;
+            marked_complete: boolean;
+        }>
+    >([]);
+    const [jobSuiteProgressOpen, setJobSuiteProgressOpen] = useState(false);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
     // Initialize signatures from cached data immediately
@@ -318,7 +331,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         if (cachedEstimate && isMountedRef.current) {
             // Use cached estimate data immediately - this provides instant UI
             // Merge to avoid clobbering detail-only fields (e.g. discount_percentage).
-            setEstimate((prev) => (prev ? { ...prev, ...cachedEstimate } : cachedEstimate));
+            setEstimate((prev) => {
+                if (!prev) {
+                    return cachedEstimate;
+                }
+                const merged = { ...prev, ...cachedEstimate };
+                const cachedHw = cachedEstimate.hours_worked;
+                if (
+                    (cachedHw === undefined || cachedHw === null) &&
+                    prev.hours_worked !== undefined &&
+                    prev.hours_worked !== null
+                ) {
+                    merged.hours_worked = prev.hours_worked;
+                }
+                return merged;
+            });
             // If we have cached estimate and details, show UI immediately
             if (cachedDetails?.lastFetched !== null ||
                 cachedLineItems.length > 0 ||
@@ -427,11 +454,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                         // Enrich estimate in Redux cache with summary data
                         if (summaryData.estimate) {
+                            // Omit null hours_worked so JobSuite hours survive Redux merge.
                             dispatch(enrichEstimate({
                                 estimateId: estimateID,
                                 data: {
                                     ...summaryData.estimate,
-                                    hours_worked: summaryData.hours_worked,
+                                    ...(summaryData.hours_worked !== undefined &&
+                                    summaryData.hours_worked !== null
+                                        ? { hours_worked: summaryData.hours_worked }
+                                        : {}),
                                 },
                             }));
 
@@ -589,6 +620,18 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             );
                         }
 
+                        if (isMountedRef.current) {
+                            if (
+                                detailsData.jobsuite_progress &&
+                                Array.isArray(detailsData.jobsuite_progress)
+                            ) {
+                                setJobsuiteProgress(detailsData.jobsuite_progress);
+                            } else {
+                                setJobsuiteProgress([]);
+                            }
+                            setJobSuiteProgressOpen(false);
+                        }
+
                         // Update estimate with data from details (overwrites summary)
                         if (detailsData.estimate && isMountedRef.current) {
                             const estimateData = { ...detailsData.estimate };
@@ -597,6 +640,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 detailsData.hours_worked !== null
                             ) {
                                 estimateData.hours_worked = detailsData.hours_worked;
+                                dispatch(
+                                    enrichEstimate({
+                                        estimateId: estimateID,
+                                        data: { hours_worked: detailsData.hours_worked },
+                                    })
+                                );
                             }
                             setEstimate(estimateData);
                         }
@@ -1968,6 +2017,76 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     </Table>
                                                 </div>
                                             )}
+                                        </div>
+                                    )}
+
+                                    {jobsuiteProgress.length > 0 && isMountedRef.current && (
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <Button
+                                              variant="subtle"
+                                              size="xs"
+                                              onClick={() =>
+                                                    setJobSuiteProgressOpen((o) => !o)
+                                                }
+                                            >
+                                                {jobSuiteProgressOpen ? 'Hide' : 'Show'} JobSuite
+                                                progress
+                                            </Button>
+                                            <Collapse in={jobSuiteProgressOpen}>
+                                                <Stack gap="sm" mt="sm">
+                                                    {jobsuiteProgress.map((row) => {
+                                                        const progressPct =
+                                                            row.bid_hours > 0
+                                                                ? Math.min(
+                                                                      (row.logged_hours /
+                                                                          row.bid_hours) *
+                                                                          100,
+                                                                      100
+                                                                  )
+                                                                : 0;
+                                                        return (
+                                                            <Box key={row.line_item_id}>
+                                                                <Flex
+                                                                  justify="space-between"
+                                                                  align="center"
+                                                                  gap="sm"
+                                                                  mb={4}
+                                                                >
+                                                                    <Text size="sm" fw={500}>
+                                                                        {row.title}
+                                                                    </Text>
+                                                                    {row.marked_complete ? (
+                                                                        <Badge
+                                                                          size="xs"
+                                                                          color="green"
+                                                                          variant="light"
+                                                                        >
+                                                                            Complete
+                                                                        </Badge>
+                                                                    ) : null}
+                                                                </Flex>
+                                                                <Text size="xs" c="dimmed">
+                                                                    {`${row.logged_hours.toFixed(
+                                                                        2
+                                                                    )} / ${row.bid_hours.toFixed(2)} h`}
+                                                                </Text>
+                                                                <Progress
+                                                                  value={progressPct}
+                                                                  color={
+                                                                        row.logged_hours >
+                                                                        row.bid_hours
+                                                                            ? 'red'
+                                                                            : 'blue'
+                                                                    }
+                                                                  size="sm"
+                                                                  radius="md"
+                                                                  mt={4}
+                                                                />
+                                                            </Box>
+                                                        );
+                                                    })}
+                                                </Stack>
+                                            </Collapse>
                                         </div>
                                     )}
 

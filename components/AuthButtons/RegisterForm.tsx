@@ -7,6 +7,7 @@ import { notifications } from '@mantine/notifications';
 import { useRouter } from 'next/navigation';
 
 import { setAccessTokenMetadata } from '@/app/utils/authToken';
+import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import { encryptPassword } from '@/app/utils/encryption';
 
 interface RegisterFormProps {
@@ -79,6 +80,7 @@ export default function RegisterForm({ onShowLogin }: RegisterFormProps) {
 
       // Store tokens in localStorage if available
       if (data.access_token) {
+        clearCachedAuthMe();
         localStorage.setItem('access_token', data.access_token);
         const expiresInRaw = data.expires_in ?? data.expiresIn;
         const expiresInSeconds = typeof expiresInRaw === 'number' ? expiresInRaw : Number(expiresInRaw);
