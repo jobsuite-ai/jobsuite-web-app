@@ -19,11 +19,15 @@ export async function GET(request: NextRequest) {
         const from = url.searchParams.get('from');
         const to = url.searchParams.get('to');
         const teamId = url.searchParams.get('team_id');
+        const onlyMyTeams = url.searchParams.get('only_my_teams');
         if (!from || !to) {
             return NextResponse.json({ message: 'from and to query params required (YYYY-MM-DD)' }, { status: 400 });
         }
         const qs = new URLSearchParams({ from, to });
         if (teamId) qs.set('team_id', teamId);
+        if (onlyMyTeams === 'true' || onlyMyTeams === '1') {
+            qs.set('only_my_teams', 'true');
+        }
         const apiBaseUrl = getApiBaseUrl();
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/schedule/calendar?${qs.toString()}`,

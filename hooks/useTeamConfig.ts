@@ -10,10 +10,8 @@ export interface ScheduleTeam {
   weeklyHours?: number;
 }
 
+/** Contractor scheduling defaults and calendar teams (from contractor_config). */
 export interface TeamConfig {
-  leadPainters: string[];
-  productionManagers: string[];
-  salesPeople: string[];
   /** Hours per business day when no team-specific capacity applies */
   scheduleDefaultDailyHours: number;
   /** Optional teams for capacity + calendar assignment */
@@ -64,15 +62,6 @@ function parseTeamConfig(configuration: Record<string, unknown> | undefined): Te
   }
 
   return {
-    leadPainters: Array.isArray(configuration?.team_lead_painters)
-      ? (configuration.team_lead_painters as string[])
-      : [],
-    productionManagers: Array.isArray(configuration?.team_production_managers)
-      ? (configuration.team_production_managers as string[])
-      : [],
-    salesPeople: Array.isArray(configuration?.team_sales_people)
-      ? (configuration.team_sales_people as string[])
-      : [],
     scheduleDefaultDailyHours,
     scheduleTeams: parseScheduleTeams(configuration?.schedule_teams),
   };
@@ -81,9 +70,6 @@ function parseTeamConfig(configuration: Record<string, unknown> | undefined): Te
 export function useTeamConfig() {
   const [teamConfig, setTeamConfig] = useState<TeamConfig>(
     teamConfigCache ?? {
-      leadPainters: [],
-      productionManagers: [],
-      salesPeople: [],
       scheduleDefaultDailyHours: DEFAULT_SCHEDULE_DAILY_HOURS,
       scheduleTeams: [],
     }
@@ -135,9 +121,6 @@ export function useTeamConfig() {
         // eslint-disable-next-line no-console
         console.error('Error loading team config:', error);
         const fallback: TeamConfig = {
-          leadPainters: [],
-          productionManagers: [],
-          salesPeople: [],
           scheduleDefaultDailyHours: DEFAULT_SCHEDULE_DAILY_HOURS,
           scheduleTeams: [],
         };

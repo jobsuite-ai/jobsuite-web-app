@@ -43,6 +43,7 @@ import {
 } from '@/utils/scheduleColors';
 import {
   computeTentativeBacklogPlacementClient,
+  type LockedIntervalIso,
   type TeamShapeForBacklogBar,
 } from '@/utils/tentativeBacklogCalendar';
 
@@ -135,7 +136,7 @@ export function TentativeBacklogTeamCard({
   team,
   totalLaborHours,
   serverItems,
-  lastLockedJobEndIso,
+  lockedIntervals,
   estimates,
   onLockSchedule,
   onChangeTeam,
@@ -144,7 +145,7 @@ export function TentativeBacklogTeamCard({
   team: TeamShapeForBacklogBar;
   totalLaborHours: number;
   serverItems: TentativeBacklogItemRow[];
-  lastLockedJobEndIso: string | undefined;
+  lockedIntervals: LockedIntervalIso[] | undefined;
   estimates: Estimate[];
   onLockSchedule: (e: Estimate, impliedStartIso: string) => void;
   onChangeTeam: (e: Estimate) => void;
@@ -165,7 +166,7 @@ export function TentativeBacklogTeamCard({
   const effectiveItems = draftItems ?? serverItems;
 
   const placement = computeTentativeBacklogPlacementClient(team, {
-    lastLockedJobEndDateIso: lastLockedJobEndIso ?? null,
+    lockedIntervals: lockedIntervals ?? null,
     items: effectiveItems,
   });
 

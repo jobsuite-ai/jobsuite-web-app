@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Badge, Button, Card, Center, Flex, Menu, Modal, NumberInput, Text, Textarea, TextInput, Select } from '@mantine/core';
 import '@mantine/core/styles.css';
@@ -16,8 +16,10 @@ import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/uti
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
 import { useDataCache } from '@/contexts/DataCacheContext';
-import { useTeamConfig } from '@/hooks/useTeamConfig';
+import { useTeamAssignmentPools } from '@/hooks/useTeamAssignmentPools';
+import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
+import { crewLeadPoolOptions, crewLeadSelectValue } from '@/utils/teamAssignment';
 
 export default function ClientDetails({ initialEstimate }: { initialEstimate: Estimate }) {
     const [estimate, setEstimate] = useState(initialEstimate);
@@ -26,7 +28,16 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
     const [showFollowUpModal, setShowFollowUpModal] = useState(false);
     const [client, setClient] = useState<ContractorClient>();
     const [menuOpened, setMenuOpened] = useState(false);
-    const { teamConfig } = useTeamConfig();
+    const assignmentPools = useTeamAssignmentPools();
+    const { users } = useUsers();
+    const crewLeadCompletionData = useMemo(() => {
+        const base = crewLeadPoolOptions(assignmentPools, users);
+        const v = crewLeadSelectValue(estimate);
+        if (v && !base.some((o) => o.value === v)) {
+            return [...base, { value: v, label: v }];
+        }
+        return base;
+    }, [assignmentPools, users, estimate]);
     const router = useRouter();
     const { updateEstimate } = useDataCache();
 
@@ -92,7 +103,7 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             actual_hours: estimate.hours_bid || estimate.estimate_hours || 0,
             additional_hours: 0,
             add_on_description: '',
-            job_crew_lead: estimate.project_crew_lead || '',
+            job_crew_lead: crewLeadSelectValue(estimate) || '',
         },
         validate: {
             actual_hours: (value: string | number) => (value === '' ? 'Must enter actual hours' : null),
@@ -104,10 +115,11 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
 
     // When completion modal opens and there's only one lead painter, default job_crew_lead
     useEffect(() => {
-        if (isCompletionModalOpen && teamConfig.leadPainters.length === 1) {
-            completionForm.setFieldValue('job_crew_lead', teamConfig.leadPainters[0]);
+        if (!isCompletionModalOpen) return;
+        if (assignmentPools.leadPainterUserIds.length === 1) {
+            completionForm.setFieldValue('job_crew_lead', assignmentPools.leadPainterUserIds[0]);
         }
-    }, [isCompletionModalOpen, teamConfig.leadPainters]);
+    }, [isCompletionModalOpen, assignmentPools.leadPainterUserIds]);
 
     const updateJob = async () => {
         const formValues = form.getValues();
@@ -154,10 +166,14 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
             discount_reason: '',
         };
 
+        const usesUserIds = assignmentPools.leadPainterUserIds.length > 0;
+        const rawLead = formValues.job_crew_lead;
         const content: UpdateJobContent = {
             update_hours_and_rate: updateHoursAndRateInput,
             actual_hours: formValues.actual_hours.toString(),
-            project_crew_lead: formValues.job_crew_lead.toUpperCase(),
+            ...(usesUserIds
+                ? { project_crew_lead_user_id: rawLead || '' }
+                : { project_crew_lead: rawLead ? rawLead.toUpperCase() : '' }),
         };
 
         try {
@@ -206,7 +222,12 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                 hours_bid: newHoursBid,
                 estimate_hours: newHoursBid,
                 actual_hours: actualHoursValue,
-                project_crew_lead: formValues.job_crew_lead.toUpperCase(),
+                ...(usesUserIds
+                    ? {
+                        project_crew_lead_user_id: rawLead || null,
+                        project_crew_lead: prevEstimate.project_crew_lead,
+                    }
+                    : { project_crew_lead: rawLead ? rawLead.toUpperCase() : '' }),
             }));
 
             setIsCompletionModalOpen(false);
@@ -486,15 +507,12 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
                             {...completionForm.getInputProps('add_on_description')}
                           />
                         )}
-                        {teamConfig.leadPainters.length > 0 ? (
+                        {assignmentPools.leadPainterUserIds.length > 0 ? (
                           <Select
                             withAsterisk
                             label="Job Crew Lead"
                             placeholder="Select crew lead"
-                            data={teamConfig.leadPainters.map((name) => ({
-                                value: name,
-                                label: name,
-                            }))}
+                            data={crewLeadCompletionData}
                             key={completionForm.key('job_crew_lead')}
                             {...completionForm.getInputProps('job_crew_lead')}
                           />

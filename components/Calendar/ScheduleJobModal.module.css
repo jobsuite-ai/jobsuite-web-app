@@ -1,0 +1,16 @@
+/*
+  Mantine’s modal inner is in normal flow; without a fixed full-viewport layer the sheet
+  stays near the top-left. Match overlay stacking (see ModalBase --mb-z-index) and use
+  pointer-events so backdrop clicks still hit the overlay.
+*/
+.modalInner {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: calc(var(--mb-z-index, 200) + 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: max(5dvh, 1rem) max(5vw, 1rem) !important;
+  box-sizing: border-box !important;
+  pointer-events: none !important;
+}
