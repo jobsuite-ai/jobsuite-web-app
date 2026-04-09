@@ -48,6 +48,8 @@ import { useTeamConfig } from '@/hooks/useTeamConfig';
 import type { CalendarGridJobEvent, WeekCalRow } from '@/utils/calendarGridMath';
 import {
   assignLanesForWeek,
+  buildDoubleBookHighlightForWeekBar,
+  buildTeamMultiProjectDayKeyMap,
   CALENDAR_LOCKED_FETCH_PADDING_DAYS,
   CAL_EVENT_ROW_PX,
   CAL_WEEK_BODY_MIN_PX,
@@ -780,6 +782,39 @@ export function CalendarPage() {
     [calendarJobEvents, range]
   );
 
+  const estimateTitleByIdForDoubleBook = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ev of calendarJobEventsInView) {
+      const eid = ev.estimate_id?.trim();
+      if (eid) {
+        const est = estimates.find((e) => e.id === eid);
+        const t =
+          (est?.title || est?.address_street || ev.title || '').trim() || eid;
+        m.set(eid, t);
+      }
+    }
+    return m;
+  }, [calendarJobEventsInView, estimates]);
+
+  const teamMultiProjectDayMap = useMemo(
+    () => buildTeamMultiProjectDayKeyMap(calendarJobEventsInView, range),
+    [calendarJobEventsInView, range]
+  );
+
+  /**
+   * Tentative backlog bars (`team_backlog`) are real calendar content but excluded from
+   * `calendarJobEvents`.
+   */
+  const teamBacklogEventsInView = useMemo(
+    () =>
+      calendarEventsForDisplay.filter(
+        (ev) =>
+          ev.calendar_kind === 'team_backlog' &&
+          scheduleEventOverlapsVisibleRange(ev, range)
+      ),
+    [calendarEventsForDisplay, range]
+  );
+
   const eventsByWeek = useMemo(() => {
     const map = new Map<string, WeekCalRow[]>();
     const eventsInWindow = calendarEventsForDisplay.filter((ev) =>
@@ -867,9 +902,18 @@ export function CalendarPage() {
     return map;
   }, [calendarEventsForDisplay, estimates, weekStarts, showNonWorkingDays, range, theme.colors]);
 
+  const calendarHasVisibleRows = useMemo(() => {
+    for (const rows of eventsByWeek.values()) {
+      if (rows.length > 0) {
+        return true;
+      }
+    }
+    return false;
+  }, [eventsByWeek]);
+
   const loadingData = loading.estimates || teamLoading || calendarLoading || teamsLoading;
   const noPipelineMatches =
-    estimates.length > 0 && calendarJobEvents.length === 0 && unassignedTeam.length === 0;
+    estimates.length > 0 && !calendarHasVisibleRows && unassignedTeam.length === 0;
 
   /** One swatch per team; colors match bars (`colorForScheduleKey`). */
   const teamLegendEntries = useMemo(
@@ -927,7 +971,8 @@ export function CalendarPage() {
             </Text>
             <Group gap="xs">
               <Badge variant="light" color="gray">
-                {estimates.length} loaded · {calendarJobEventsInView.length} in this window ·{' '}
+                {estimates.length} loaded ·{' '}
+                {calendarJobEventsInView.length + teamBacklogEventsInView.length} in this window ·{' '}
                 {calendarJobEvents.length} scheduled · {unassignedTeam.length} not assigned
               </Badge>
               {undoScheduleSnapshot ? (
@@ -967,7 +1012,7 @@ export function CalendarPage() {
                   </Button>
                 ) : null}
               </Group>
-              <Group gap="lg" align="flex-start" wrap="wrap">
+              <Group gap="lg" align="center" wrap="wrap">
                 {teamLegendEntries.map((team) => {
                   const { color, shade } = colorForScheduleKey(team.id);
                   const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
@@ -988,19 +1033,25 @@ export function CalendarPage() {
                       aria-pressed={selected}
                       aria-label={`${selected ? 'Remove' : 'Add'} ${team.name} ${selected ? 'from' : 'to'} calendar filter`}
                     >
-                      <Group gap="xs" wrap="nowrap" align="flex-start">
-                        <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
-                        <Stack gap={2}>
-                          <Text size="sm" fw={600} lh={1.3}>
+                      <Stack gap={rosterHint ? 2 : 0}>
+                        <Group gap="xs" wrap="nowrap" align="center">
+                          <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
+                          <Text size="sm" fw={600} lh={1.2}>
                             {team.name}
                           </Text>
-                          {rosterHint ? (
+                        </Group>
+                        {rosterHint ? (
+                          <Group gap="xs" wrap="nowrap" align="flex-start">
+                            <Box
+                              aria-hidden
+                              style={{ width: 14, flexShrink: 0 }}
+                            />
                             <Text size="xs" c="dimmed" lh={1.35}>
                               {rosterHint}
                             </Text>
-                          ) : null}
-                        </Stack>
-                      </Group>
+                          </Group>
+                        ) : null}
+                      </Stack>
                     </UnstyledButton>
                   );
                 })}
@@ -1140,6 +1191,16 @@ export function CalendarPage() {
                               ? { background: row.backlogBackgroundCss }
                               : {}),
                           };
+                          const doubleBook =
+                            !row.isBacklog && !row.scheduleTentative && row.estimateId
+                              ? buildDoubleBookHighlightForWeekBar(
+                                  row,
+                                  weekStart,
+                                  seg,
+                                  teamMultiProjectDayMap,
+                                  estimateTitleByIdForDoubleBook
+                                )
+                              : null;
                           return (
                             <CalendarEventBar
                               key={row.rowKey}
@@ -1156,6 +1217,8 @@ export function CalendarPage() {
                               solidBg={solidBg}
                               segmentDates={segmentDates}
                               metaSuffix={metaSuffix}
+                              doubleBookDays={doubleBook?.dayFlags}
+                              doubleBookTooltip={doubleBook?.tooltip}
                               isPreview={Boolean(
                                 scheduleEditDirty &&
                                   scheduleEditDraft &&

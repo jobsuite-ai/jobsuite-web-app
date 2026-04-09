@@ -7,10 +7,19 @@ import { Calendar } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import { isSameDay } from 'date-fns';
 
+import classes from './ScheduleJobModal.module.css';
+
 import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
 import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
 import { apiEstimateType } from '@/utils/scheduleApiTypes';
+
+/** Full-viewport fixed inner + clickable sheet (see module CSS). */
+const modalLayoutProps = {
+  centered: true,
+  classNames: { inner: classes.modalInner },
+  styles: { content: { pointerEvents: 'auto' as const } },
+};
 
 /** Subset of team row for display label only */
 export type CalendarTeamOption = {
@@ -160,7 +169,7 @@ export function ScheduleJobModal({
   return (
     <>
     <Modal
-      opened={opened}
+      opened={opened && conflictCode === null}
       onClose={onClose}
       title={
         estimate
@@ -168,6 +177,7 @@ export function ScheduleJobModal({
           : 'Schedule'
       }
       size="md"
+      {...modalLayoutProps}
     >
       {estimate && (
         <Stack gap="md">
@@ -204,10 +214,10 @@ export function ScheduleJobModal({
       )}
     </Modal>
     <Modal
-      opened={conflictCode != null}
+      opened={opened && conflictCode !== null}
       onClose={() => setConflictCode(null)}
       title="Confirm job status"
-      centered
+      {...modalLayoutProps}
     >
       <Text size="sm" mb="md">
         {conflictCode === 'ACTIVATE_JOB_CONFIRM'
@@ -217,9 +227,10 @@ export function ScheduleJobModal({
       <Group justify="flex-end" gap="sm">
         <Button
           variant="default"
+          loading={saving}
+          disabled={saving}
           onClick={() => {
             const c = conflictCode;
-            setConflictCode(null);
             if (c === 'ACTIVATE_JOB_CONFIRM') {
               performSave({ confirm_activate_job: false }).catch(() => {});
             } else if (c === 'DEACTIVATE_JOB_CONFIRM') {
@@ -230,9 +241,10 @@ export function ScheduleJobModal({
           No, save schedule only
         </Button>
         <Button
+          loading={saving}
+          disabled={saving}
           onClick={() => {
             const c = conflictCode;
-            setConflictCode(null);
             if (c === 'ACTIVATE_JOB_CONFIRM') {
               performSave({ confirm_activate_job: true }).catch(() => {});
             } else if (c === 'DEACTIVATE_JOB_CONFIRM') {

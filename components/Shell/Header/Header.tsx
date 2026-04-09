@@ -12,6 +12,7 @@ import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { isPainterRole } from '@/app/utils/roles';
 import { useAuth } from '@/hooks/useAuth';
 import { useContractorLogo } from '@/hooks/useContractorLogo';
 import { useAppSelector } from '@/store/hooks';
@@ -35,12 +36,6 @@ const fullNavLinks = [
 
 const employeeNavLinks = [
   { link: '/', label: 'My schedule' },
-  { link: '/my-time', label: 'Time entry' },
-];
-
-/** Under "Employee Options" for admin/manager (distinct from Home at `/`). */
-const managerEmployeeNavLinks = [
-  { link: '/my-schedule', label: 'My schedule' },
   { link: '/my-time', label: 'Time entry' },
 ];
 
@@ -115,7 +110,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const getLinkIcon = (linkPath: string) => {
     switch (linkPath) {
       case '/':
-        return pathname === '/' && user?.role === 'employee' ? (
+        return pathname === '/' && isPainterRole(user?.role) ? (
           <IconCalendar size={18} />
         ) : (
           <IconHome size={18} />
@@ -149,15 +144,21 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }
   };
 
+  const isLeadOrSupportPainter =
+    user?.role === 'lead-painter' || user?.role === 'support-painter';
+
   const mainNavLinks = useMemo(() => {
-    if (user?.role === 'employee') {
+    if (isLeadOrSupportPainter) {
+      // Lead/support: only the "Employee Options" block (no duplicate links above it).
+      return [];
+    }
+    if (isPainterRole(user?.role)) {
       return employeeNavLinks;
     }
     return fullNavLinks;
-  }, [user?.role]);
+  }, [user?.role, isLeadOrSupportPainter]);
 
-  const showManagerEmployeeSection =
-    !!user && (user.role === 'admin' || user.role === 'manager');
+  const showEmployeeOptionsSection = isLeadOrSupportPainter;
 
   const navItems = useMemo(() => {
     const mapLink = (link: { link: string; label: string }, keySuffix: string) => {
@@ -189,7 +190,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     const linksToShow = isMobile ? mainNavLinks : mainNavLinks.filter((l) => l.link !== '/search');
     const primary = linksToShow.map((link) => mapLink(link, 'main'));
 
-    if (!showManagerEmployeeSection) {
+    if (!showEmployeeOptionsSection) {
       return primary;
     }
 
@@ -199,9 +200,9 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       <Text key="employee-options-label" size="xs" c="dimmed" fw={600} px="xs">
         Employee Options
       </Text>,
-      ...managerEmployeeNavLinks.map((link) => mapLink(link, 'emp')),
+      ...employeeNavLinks.map((link) => mapLink(link, 'emp')),
     ];
-  }, [isMobile, pathname, messageCount, mainNavLinks, showManagerEmployeeSection, user?.role]);
+  }, [isMobile, pathname, messageCount, mainNavLinks, showEmployeeOptionsSection, user?.role]);
 
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {

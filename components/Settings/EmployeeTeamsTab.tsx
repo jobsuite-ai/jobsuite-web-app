@@ -20,7 +20,14 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconEdit, IconPlus, IconTrash, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import type { User } from '@/components/Global/model';
 import { useUsers } from '@/hooks/useUsers';
+
+function userDisplayLabel(u: User): string {
+  const base =
+    (u.full_name && String(u.full_name).trim()) || u.email || u.id;
+  return u.invitation_status === 'pending_invite' ? `${base} (pending)` : base;
+}
 
 type TeamCapacityRow = {
   hours_per_day: number;
@@ -64,7 +71,7 @@ export default function EmployeeTeamsTab() {
         .filter((u: { role?: string }) => (u as { role?: string }).role !== 'client')
         .map((u) => ({
           value: u.id,
-          label: u.full_name || u.email,
+          label: userDisplayLabel(u as User),
         })),
     [users]
   );
@@ -73,6 +80,14 @@ export default function EmployeeTeamsTab() {
     () => memberOptions.filter((o) => memberIds.includes(o.value)),
     [memberOptions, memberIds]
   );
+
+  const userLabelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const u of users) {
+      m.set(u.id, userDisplayLabel(u as User));
+    }
+    return m;
+  }, [users]);
 
   const loadTeams = useCallback(async () => {
     try {
@@ -262,7 +277,7 @@ export default function EmployeeTeamsTab() {
         <Table.Thead>
           <Table.Tr>
             <Table.Th>Name</Table.Th>
-            <Table.Th>Members</Table.Th>
+            <Table.Th style={{ minWidth: 280 }}>Members</Table.Th>
             <Table.Th>Lead</Table.Th>
             <Table.Th style={{ width: 120 }} />
           </Table.Tr>
@@ -270,10 +285,18 @@ export default function EmployeeTeamsTab() {
         <Table.Tbody>
           {teams.map((t) => {
             const leadUser = users.find((u) => u.id === t.team_lead_user_id);
+            const memberNames =
+              t.member_user_ids.length === 0
+                ? '—'
+                : t.member_user_ids.map((id) => userLabelById.get(id) ?? id).join(', ');
             return (
               <Table.Tr key={t.id}>
                 <Table.Td>{t.name}</Table.Td>
-                <Table.Td>{t.member_user_ids.length}</Table.Td>
+                <Table.Td style={{ maxWidth: 480, verticalAlign: 'top' }}>
+                  <Text size="sm" style={{ whiteSpace: 'normal' }}>
+                    {memberNames}
+                  </Text>
+                </Table.Td>
                 <Table.Td>{leadUser?.full_name || leadUser?.email || t.team_lead_user_id}</Table.Td>
                 <Table.Td>
                   <Group gap={4}>

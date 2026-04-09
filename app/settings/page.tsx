@@ -279,17 +279,7 @@ export default function SettingsPage() {
                     ...(existingConfig?.configuration?.signature_page_config && {
                         signature_page_config: existingConfig.configuration.signature_page_config,
                     }),
-                    // Preserve team roster / schedule_teams (edited in Employees & Teams)
-                    ...(existingConfig?.configuration?.team_lead_painters != null && {
-                        team_lead_painters: existingConfig.configuration.team_lead_painters,
-                    }),
-                    ...(existingConfig?.configuration?.team_production_managers != null && {
-                        team_production_managers:
-                            existingConfig.configuration.team_production_managers,
-                    }),
-                    ...(existingConfig?.configuration?.team_sales_people != null && {
-                        team_sales_people: existingConfig.configuration.team_sales_people,
-                    }),
+                    // Preserve scheduling (edited in Employees & Teams)
                     ...(existingConfig?.configuration?.schedule_default_daily_hours != null && {
                         schedule_default_daily_hours:
                             existingConfig.configuration.schedule_default_daily_hours,

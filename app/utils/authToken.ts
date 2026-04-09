@@ -1,3 +1,5 @@
+import { isPainterRole } from '@/app/utils/roles';
+
 const ACCESS_TOKEN_EXPIRES_AT_KEY = 'access_token_expires_at';
 const ACCESS_TOKEN_ISSUED_AT_KEY = 'access_token_issued_at';
 const DEFAULT_ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -71,7 +73,7 @@ export function clearAccessTokenMetadata(): void {
 }
 
 /** Role claim from the stored access token (for cache policy; not a security boundary). */
-export function isEmployeeRoleFromToken(): boolean {
+export function isPainterRoleFromToken(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }
@@ -80,7 +82,15 @@ export function isEmployeeRoleFromToken(): boolean {
     return false;
   }
   const payload = decodeJwtPayload(token);
-  return payload?.role === 'employee';
+  const r = payload?.role;
+  return typeof r === 'string' && isPainterRole(r);
+}
+
+/**
+ * @deprecated Use isPainterRoleFromToken — kept for call sites that still say "employee session".
+ */
+export function isEmployeeRoleFromToken(): boolean {
+  return isPainterRoleFromToken();
 }
 
 /**

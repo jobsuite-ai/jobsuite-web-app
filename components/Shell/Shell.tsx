@@ -233,7 +233,9 @@ export function Shell({ children }: { children: any }) {
       {isAuthenticated ? (
         <Header sidebarOpened={sidebarOpened} setSidebarOpened={setSidebarOpened} />
       ) : null}
-      <div className={`${classes.wrapper} ${sidebarOpened ? classes.wrapperWithSidebar : ''} ${!isAuthenticated ? classes.wrapperNoHeader : ''}`}>
+      <div
+        className={`${classes.wrapper} ${sidebarOpened && isAuthenticated ? classes.wrapperWithSidebar : ''} ${!isAuthenticated ? classes.wrapperNoHeader : ''}`}
+      >
         <div className={classes.main}>
           {children}
         </div>

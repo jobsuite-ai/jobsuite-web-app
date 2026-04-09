@@ -133,6 +133,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const isMountedRef = useRef(true);
     const mainColumnRef = useRef<HTMLDivElement>(null);
     const openCheckInDateModalRef = useRef<(() => void) | null>(null);
+    const registerCheckInDateOpener = useCallback((fn: (() => void) | null) => {
+        openCheckInDateModalRef.current = fn ?? null;
+    }, []);
     const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
     const router = useRouter();
     const [manualPaymentModalOpened, setManualPaymentModalOpened] = useState(false);
@@ -2327,9 +2330,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                       estimateID={estimateID}
                                       onUpdate={getEstimate}
                                       detailsLoaded={detailsLoaded}
-                                      registerCheckInDateOpener={(fn) => {
-                                          openCheckInDateModalRef.current = fn ?? null;
-                                      }}
+                                      registerCheckInDateOpener={registerCheckInDateOpener}
                                     />
 
                                     {/* Resource Links */}

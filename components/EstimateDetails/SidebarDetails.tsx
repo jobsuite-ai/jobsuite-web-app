@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import { ActionIcon, Autocomplete, Badge, Button, Flex, Group, Menu, Modal, Paper, Select, Skeleton, Stack, Text } from '@mantine/core';
+import { ActionIcon, Badge, Button, Flex, Group, Menu, Modal, NativeSelect, Paper, Skeleton, Stack, Text, TextInput } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import '@mantine/dates/styles.css';
 import { notifications } from '@mantine/notifications';
@@ -16,12 +16,31 @@ import { ContractorClient, Estimate, EstimateStatus, EstimateType } from '../Glo
 import { formatPhoneNumber, getEstimateBadgeColor, getFormattedEstimateStatus, getFormattedEstimateType } from '../Global/utils';
 
 import { UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useJobTags } from '@/hooks/useJobTags';
-import { useTeamConfig } from '@/hooks/useTeamConfig';
+import { useTeamAssignmentPools } from '@/hooks/useTeamAssignmentPools';
 import { useUsers } from '@/hooks/useUsers';
 import { logToCloudWatch } from '@/public/logger';
 import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
+import {
+  crewLeadPoolOptions,
+  crewLeadSelectValue,
+  displayCrewLead,
+  displayProductionManager,
+  displaySalesPerson,
+  productionManagerPoolOptions,
+  productionManagerSelectValue,
+  salesPersonPoolOptions,
+  salesPersonSelectValue,
+} from '@/utils/teamAssignment';
+
+function formatUsd(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(value);
+}
 
 interface SidebarDetailsProps {
   estimate: Estimate;
@@ -43,7 +62,35 @@ export default function SidebarDetails({
   const [client, setClient] = useState<ContractorClient>();
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
-  const { teamConfig, loading: loadingTeamConfig } = useTeamConfig();
+  const assignmentPools = useTeamAssignmentPools();
+  const { loading: loadingAssignmentPools } = assignmentPools;
+  const crewLeadSelectData = useMemo(() => {
+    const base = crewLeadPoolOptions(assignmentPools, users);
+    const v = crewLeadSelectValue(estimate);
+    if (v && !base.some((o) => o.value === v)) {
+      return [...base, { value: v, label: v }];
+    }
+    return base;
+  }, [assignmentPools, users, estimate.project_crew_lead, estimate.project_crew_lead_user_id]);
+
+  const productionManagerSelectData = useMemo(() => {
+    const base = productionManagerPoolOptions(assignmentPools, users);
+    const v = productionManagerSelectValue(estimate);
+    if (v && !base.some((o) => o.value === v)) {
+      return [...base, { value: v, label: v }];
+    }
+    return base;
+  }, [assignmentPools, users, estimate.production_manager, estimate.production_manager_user_id]);
+
+  const salesPersonSelectData = useMemo(() => {
+    const base = salesPersonPoolOptions(assignmentPools, users);
+    const v = salesPersonSelectValue(estimate);
+    if (v && !base.some((o) => o.value === v)) {
+      return [...base, { value: v, label: v }];
+    }
+    return base;
+  }, [assignmentPools, users, estimate.sales_person, estimate.sales_person_user_id]);
+
   const { jobTags } = useJobTags();
   const [jobTagOptions, setJobTagOptions] = useState<{ value: string; label: string }[]>([
     { value: '', label: 'None' },
@@ -82,17 +129,17 @@ export default function SidebarDetails({
   const [savingCheckInDate, setSavingCheckInDate] = useState(false);
   const [editingCrewLead, setEditingCrewLead] = useState(false);
   const [selectedCrewLead, setSelectedCrewLead] = useState<string | null>(
-    estimate.project_crew_lead || null
+    crewLeadSelectValue(estimate)
   );
   const [savingCrewLead, setSavingCrewLead] = useState(false);
   const [editingProductionManager, setEditingProductionManager] = useState(false);
   const [selectedProductionManager, setSelectedProductionManager] = useState<string | null>(
-    estimate.production_manager || null
+    productionManagerSelectValue(estimate)
   );
   const [savingProductionManager, setSavingProductionManager] = useState(false);
   const [editingSalesPerson, setEditingSalesPerson] = useState(false);
   const [selectedSalesPerson, setSelectedSalesPerson] = useState<string | null>(
-    estimate.sales_person || null
+    salesPersonSelectValue(estimate)
   );
   const [savingSalesPerson, setSavingSalesPerson] = useState(false);
   const [editingJobTag, setEditingJobTag] = useState(false);
@@ -103,6 +150,7 @@ export default function SidebarDetails({
   const router = useRouter();
   const fetchedClientIdRef = useRef<string | null>(null);
   const singleOptionDefaultsAppliedRef = useRef<string | null>(null);
+  const jobTagDatalistId = useId();
   const { refreshData, updateEstimate, updateProject } = useDataCache();
 
   // Check QuickBooks connection status
@@ -346,21 +394,21 @@ export default function SidebarDetails({
   // Sync crew lead / production manager / sales person when estimate changes (but not when editing)
   useEffect(() => {
     if (!editingCrewLead) {
-      setSelectedCrewLead(estimate.project_crew_lead || null);
+      setSelectedCrewLead(crewLeadSelectValue(estimate));
     }
-  }, [estimate.project_crew_lead, editingCrewLead]);
+  }, [estimate.project_crew_lead, estimate.project_crew_lead_user_id, editingCrewLead]);
 
   useEffect(() => {
     if (!editingProductionManager) {
-      setSelectedProductionManager(estimate.production_manager || null);
+      setSelectedProductionManager(productionManagerSelectValue(estimate));
     }
-  }, [estimate.production_manager, editingProductionManager]);
+  }, [estimate.production_manager, estimate.production_manager_user_id, editingProductionManager]);
 
   useEffect(() => {
     if (!editingSalesPerson) {
-      setSelectedSalesPerson(estimate.sales_person || null);
+      setSelectedSalesPerson(salesPersonSelectValue(estimate));
     }
-  }, [estimate.sales_person, editingSalesPerson]);
+  }, [estimate.sales_person, estimate.sales_person_user_id, editingSalesPerson]);
 
   useEffect(() => {
     if (!editingJobTag) {
@@ -745,7 +793,7 @@ export default function SidebarDetails({
     onUpdate();
   };
 
-  const updateCrewLead = async (value: string) => {
+  const updateCrewLead = async (value: string | null) => {
     const accessToken = localStorage.getItem('access_token');
     if (!accessToken) {
       // eslint-disable-next-line no-console
@@ -753,13 +801,18 @@ export default function SidebarDetails({
       return;
     }
 
+    const usesUserIds = assignmentPools.leadPainterUserIds.length > 0;
+    const body = usesUserIds
+      ? { project_crew_lead_user_id: value || '' }
+      : { project_crew_lead: value || null };
+
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ project_crew_lead: value || null }),
+      body: JSON.stringify(body),
     });
 
     onUpdate();
@@ -773,13 +826,18 @@ export default function SidebarDetails({
       return;
     }
 
+    const usesUserIds = assignmentPools.productionManagerUserIds.length > 0;
+    const body = usesUserIds
+      ? { production_manager_user_id: value || '' }
+      : { production_manager: value ?? '' };
+
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ production_manager: value ?? '' }),
+      body: JSON.stringify(body),
     });
 
     onUpdate();
@@ -793,13 +851,18 @@ export default function SidebarDetails({
       return;
     }
 
+    const usesUserIds = assignmentPools.salesPersonUserIds.length > 0;
+    const body = usesUserIds
+      ? { sales_person_user_id: value || '' }
+      : { sales_person: value ?? '' };
+
     await fetch(`/api/estimates/${estimateID}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ sales_person: value ?? '' }),
+      body: JSON.stringify(body),
     });
 
     onUpdate();
@@ -807,32 +870,41 @@ export default function SidebarDetails({
 
   // Set default crew lead / production manager / sales person when only one option is configured
   useEffect(() => {
-    if (loadingTeamConfig || singleOptionDefaultsAppliedRef.current === estimateID) {
+    if (loadingAssignmentPools || singleOptionDefaultsAppliedRef.current === estimateID) {
       return;
     }
     const toApply: Array<() => Promise<void>> = [];
-    if (teamConfig.leadPainters.length === 1 && !estimate.project_crew_lead?.trim()) {
-      toApply.push(() => updateCrewLead(teamConfig.leadPainters[0]));
+    if (!estimate.project_crew_lead?.trim() && !estimate.project_crew_lead_user_id?.trim()) {
+      if (assignmentPools.leadPainterUserIds.length === 1) {
+        toApply.push(() => updateCrewLead(assignmentPools.leadPainterUserIds[0]));
+      }
     }
-    if (teamConfig.productionManagers.length === 1 && !estimate.production_manager?.trim()) {
-      toApply.push(() => updateProductionManager(teamConfig.productionManagers[0]));
+    if (!estimate.production_manager?.trim() && !estimate.production_manager_user_id?.trim()) {
+      if (assignmentPools.productionManagerUserIds.length === 1) {
+        toApply.push(() => updateProductionManager(assignmentPools.productionManagerUserIds[0]));
+      }
     }
-    if (teamConfig.salesPeople.length === 1 && !estimate.sales_person?.trim()) {
-      toApply.push(() => updateSalesPerson(teamConfig.salesPeople[0]));
+    if (!estimate.sales_person?.trim() && !estimate.sales_person_user_id?.trim()) {
+      if (assignmentPools.salesPersonUserIds.length === 1) {
+        toApply.push(() => updateSalesPerson(assignmentPools.salesPersonUserIds[0]));
+      }
     }
     if (toApply.length > 0) {
       singleOptionDefaultsAppliedRef.current = estimateID;
       toApply.forEach((fn) => { fn(); });
     }
   }, [
-    loadingTeamConfig,
+    loadingAssignmentPools,
     estimateID,
     estimate.project_crew_lead,
+    estimate.project_crew_lead_user_id,
     estimate.production_manager,
+    estimate.production_manager_user_id,
     estimate.sales_person,
-    teamConfig.leadPainters,
-    teamConfig.productionManagers,
-    teamConfig.salesPeople,
+    estimate.sales_person_user_id,
+    assignmentPools.leadPainterUserIds,
+    assignmentPools.productionManagerUserIds,
+    assignmentPools.salesPersonUserIds,
   ]);
 
   const updateActualHours = async (value: string) => {
@@ -1225,6 +1297,7 @@ export default function SidebarDetails({
         return [
           EstimateStatus.ESTIMATE_SCHEDULED,
           EstimateStatus.ESTIMATE_IN_PROGRESS,
+          EstimateStatus.ESTIMATE_DECLINED,
         ];
 
       case EstimateStatus.STALE_ESTIMATE:
@@ -1257,6 +1330,68 @@ export default function SidebarDetails({
   ));
 
   const projectStartDate = effectiveProjectStartDate(estimate);
+
+  const depositPaid =
+    estimate.deposit_paid_date != null ||
+    (typeof estimate.manual_deposit_paid_amount === 'number' &&
+      estimate.manual_deposit_paid_amount > 0);
+
+  const depositPaidOnRaw =
+    estimate.deposit_paid_date || estimate.manual_deposit_paid_at || null;
+
+  const [invoiceDepositAmount, setInvoiceDepositAmount] = useState<number | null>(null);
+  const [loadingInvoiceDeposit, setLoadingInvoiceDeposit] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const manual = estimate.manual_deposit_paid_amount;
+    const hasManualAmount = typeof manual === 'number' && manual > 0;
+    if (hasManualAmount) {
+      setInvoiceDepositAmount(null);
+      setLoadingInvoiceDeposit(false);
+    } else if (!estimate.deposit_paid_date) {
+      setInvoiceDepositAmount(null);
+      setLoadingInvoiceDeposit(false);
+    } else {
+      setLoadingInvoiceDeposit(true);
+      setInvoiceDepositAmount(null);
+      (async () => {
+        try {
+          const res = await fetch(`/api/estimates/${estimateID}/invoice/preview`, {
+            method: 'GET',
+            headers: getApiHeaders(),
+          });
+          if (!res.ok || cancelled) return;
+          const data = (await res.json()) as { deposit_amount?: number };
+          if (!cancelled && typeof data.deposit_amount === 'number') {
+            setInvoiceDepositAmount(data.deposit_amount);
+          }
+        } finally {
+          if (!cancelled) setLoadingInvoiceDeposit(false);
+        }
+      })();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [estimateID, estimate.deposit_paid_date, estimate.manual_deposit_paid_amount]);
+
+  const depositAmountPaidDisplay = (() => {
+    const manual = estimate.manual_deposit_paid_amount;
+    if (typeof manual === 'number' && manual > 0) {
+      return { primary: formatUsd(manual), hint: 'Recorded manually' as string | null };
+    }
+    if (loadingInvoiceDeposit) {
+      return { primary: null as string | null, hint: null as string | null };
+    }
+    if (invoiceDepositAmount != null) {
+      return {
+        primary: formatUsd(invoiceDepositAmount),
+        hint: 'Invoice deposit (30%)' as string | null,
+      };
+    }
+    return { primary: 'Paid online', hint: null as string | null };
+  })();
 
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
@@ -1360,15 +1495,15 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Job Type:
               </Text>
-              <Select
+              <NativeSelect
                 data={[
+                  { value: '', label: 'Select job type' },
                   { value: EstimateType.INTERIOR, label: 'Interior' },
                   { value: EstimateType.EXTERIOR, label: 'Exterior' },
                   { value: 'Full House', label: 'Full House' },
                 ]}
-                value={selectedJobType ?? jobTypeValue}
-                onChange={(value) => setSelectedJobType(value)}
-                placeholder="Select job type"
+                value={selectedJobType ?? jobTypeValue ?? ''}
+                onChange={(e) => setSelectedJobType(e.currentTarget.value || null)}
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 disabled={!canEditJobType || savingJobType}
@@ -1428,15 +1563,24 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Job Tag:
               </Text>
-              <Autocomplete
-                data={jobTagOptions.map((o) => o.label).filter((l) => l !== 'None')}
+              <TextInput
+                list={jobTagDatalistId}
                 value={selectedJobTag ?? ''}
-                onChange={(value) => setSelectedJobTag(value === '' ? null : value)}
+                onChange={(e) =>
+                  setSelectedJobTag(e.currentTarget.value === '' ? null : e.currentTarget.value)
+                }
                 placeholder="None"
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 disabled={savingJobTag}
               />
+              <datalist id={jobTagDatalistId}>
+                {jobTagOptions
+                  .filter((o) => o.value && o.value !== '')
+                  .map((o) => (
+                    <option key={o.value} value={o.value} />
+                  ))}
+              </datalist>
             </Flex>
             <Flex gap="xs" justify="flex-end">
               <ActionIcon
@@ -1485,16 +1629,18 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Owned by:
               </Text>
-              <Select
-                data={users.map((user) => ({
-                  value: user.id,
-                  label: user.full_name || user.email,
-                }))}
-                value={selectedOwnerId}
-                onChange={setSelectedOwnerId}
-                placeholder="Select owner"
-                searchable
-                clearable
+              <NativeSelect
+                data={[
+                  { value: '', label: 'Select owner' },
+                  ...users.map((user) => ({
+                    value: user.id,
+                    label: user.full_name || user.email,
+                  })),
+                ]}
+                value={selectedOwnerId ?? ''}
+                onChange={(e) =>
+                  setSelectedOwnerId(e.currentTarget.value === '' ? null : e.currentTarget.value)
+                }
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
                 disabled={loadingUsers}
@@ -1701,6 +1847,67 @@ export default function SidebarDetails({
           </Text>
         </Flex>
 
+        {depositPaid && (
+          <>
+            <Flex
+              justify="space-between"
+              align="center"
+              gap="sm"
+              style={{ marginBottom: 'var(--mantine-spacing-xs)' }}
+            >
+              <Text size="sm" fw={500} c="dimmed">
+                Deposit:
+              </Text>
+              <Text size="sm" fw={500} c="green">
+                Paid
+              </Text>
+            </Flex>
+            <Flex
+              justify="space-between"
+              align="flex-start"
+              gap="sm"
+              style={{ marginBottom: depositPaidOnRaw ? 'var(--mantine-spacing-xs)' : 'var(--mantine-spacing-md)' }}
+            >
+              <Text size="sm" fw={500} c="dimmed">
+                Amount paid:
+              </Text>
+              <Stack gap={2} align="flex-end" style={{ flex: 1, maxWidth: '200px' }}>
+                {depositAmountPaidDisplay.primary === null ? (
+                  <Skeleton height={18} width={100} ml="auto" />
+                ) : (
+                  <Text size="sm" fw={600} style={{ textAlign: 'right' }}>
+                    {depositAmountPaidDisplay.primary}
+                  </Text>
+                )}
+                {depositAmountPaidDisplay.hint ? (
+                  <Text size="xs" c="dimmed" style={{ textAlign: 'right' }}>
+                    {depositAmountPaidDisplay.hint}
+                  </Text>
+                ) : null}
+              </Stack>
+            </Flex>
+            {depositPaidOnRaw ? (
+              <Flex
+                justify="space-between"
+                align="center"
+                gap="sm"
+                style={{ marginBottom: 'var(--mantine-spacing-md)' }}
+              >
+                <Text size="sm" fw={500} c="dimmed">
+                  Paid on:
+                </Text>
+                <Text size="sm" c="dimmed" style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}>
+                  {new Date(depositPaidOnRaw).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </Flex>
+            ) : null}
+          </>
+        )}
+
         {/* Discount Percentage */}
         <EditableField
           label="Discount Percentage"
@@ -1735,30 +1942,27 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Job Crew Lead:
               </Text>
-              <Select
+              <NativeSelect
                 data={[
-                  ...teamConfig.leadPainters.map((name) => ({ value: name, label: name })),
-                  ...(selectedCrewLead && !teamConfig.leadPainters.includes(selectedCrewLead)
-                    ? [{ value: selectedCrewLead, label: selectedCrewLead }]
-                    : []),
+                  { value: '', label: 'Select crew lead' },
+                  ...crewLeadSelectData,
                 ]}
-                value={selectedCrewLead}
-                onChange={async (value) => {
+                value={selectedCrewLead ?? ''}
+                onChange={async (e) => {
+                  const value = e.currentTarget.value || null;
                   setSelectedCrewLead(value);
                   if (savingCrewLead) return;
                   setSavingCrewLead(true);
                   try {
-                    await updateCrewLead(value || '');
+                    await updateCrewLead(value);
                     setEditingCrewLead(false);
                   } finally {
                     setSavingCrewLead(false);
                   }
                 }}
-                placeholder="Select crew lead"
-                clearable
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
-                disabled={loadingTeamConfig || savingCrewLead}
+                disabled={loadingAssignmentPools || savingCrewLead}
               />
             </Flex>
             <Flex gap="xs" justify="flex-end">
@@ -1766,7 +1970,7 @@ export default function SidebarDetails({
                 color="red"
                 variant="light"
                 onClick={() => {
-                  setSelectedCrewLead(estimate.project_crew_lead || null);
+                  setSelectedCrewLead(crewLeadSelectValue(estimate));
                   setEditingCrewLead(false);
                 }}
                 disabled={savingCrewLead}
@@ -1785,12 +1989,12 @@ export default function SidebarDetails({
               size="sm"
               style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
               onClick={() => {
-                setSelectedCrewLead(estimate.project_crew_lead || null);
+                setSelectedCrewLead(crewLeadSelectValue(estimate));
                 setEditingCrewLead(true);
               }}
-              c={estimate.project_crew_lead ? 'dark' : 'dimmed'}
+              c={crewLeadSelectValue(estimate) ? 'dark' : 'dimmed'}
             >
-              {estimate.project_crew_lead || '—'}
+              {displayCrewLead(estimate, users)}
             </Text>
           </Flex>
         )}
@@ -1802,24 +2006,14 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Production Manager:
               </Text>
-              <Select
+              <NativeSelect
                 data={[
-                  ...teamConfig.productionManagers.map((name) => ({
-                    value: name,
-                    label: name,
-                  })),
-                  ...(selectedProductionManager &&
-                  !teamConfig.productionManagers.includes(selectedProductionManager)
-                    ? [
-                        {
-                            value: selectedProductionManager,
-                            label: selectedProductionManager,
-                        },
-                      ]
-                    : []),
+                  { value: '', label: 'Select production manager' },
+                  ...productionManagerSelectData,
                 ]}
-                value={selectedProductionManager}
-                onChange={async (value) => {
+                value={selectedProductionManager ?? ''}
+                onChange={async (e) => {
+                  const value = e.currentTarget.value || null;
                   setSelectedProductionManager(value);
                   if (savingProductionManager) return;
                   setSavingProductionManager(true);
@@ -1830,11 +2024,9 @@ export default function SidebarDetails({
                     setSavingProductionManager(false);
                   }
                 }}
-                placeholder="Select production manager"
-                clearable
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
-                disabled={loadingTeamConfig || savingProductionManager}
+                disabled={loadingAssignmentPools || savingProductionManager}
               />
             </Flex>
             <Flex gap="xs" justify="flex-end">
@@ -1842,7 +2034,7 @@ export default function SidebarDetails({
                 color="red"
                 variant="light"
                 onClick={() => {
-                  setSelectedProductionManager(estimate.production_manager || null);
+                  setSelectedProductionManager(productionManagerSelectValue(estimate));
                   setEditingProductionManager(false);
                 }}
                 disabled={savingProductionManager}
@@ -1861,12 +2053,12 @@ export default function SidebarDetails({
               size="sm"
               style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
               onClick={() => {
-                setSelectedProductionManager(estimate.production_manager || null);
+                setSelectedProductionManager(productionManagerSelectValue(estimate));
                 setEditingProductionManager(true);
               }}
-              c={estimate.production_manager ? 'dark' : 'dimmed'}
+              c={productionManagerSelectValue(estimate) ? 'dark' : 'dimmed'}
             >
-              {estimate.production_manager || '—'}
+              {displayProductionManager(estimate, users)}
             </Text>
           </Flex>
         )}
@@ -1878,15 +2070,14 @@ export default function SidebarDetails({
               <Text size="sm" fw={500} c="dimmed">
                 Sales Person:
               </Text>
-              <Select
+              <NativeSelect
                 data={[
-                  ...teamConfig.salesPeople.map((name) => ({ value: name, label: name })),
-                  ...(selectedSalesPerson && !teamConfig.salesPeople.includes(selectedSalesPerson)
-                    ? [{ value: selectedSalesPerson, label: selectedSalesPerson }]
-                    : []),
+                  { value: '', label: 'Select sales person' },
+                  ...salesPersonSelectData,
                 ]}
-                value={selectedSalesPerson}
-                onChange={async (value) => {
+                value={selectedSalesPerson ?? ''}
+                onChange={async (e) => {
+                  const value = e.currentTarget.value || null;
                   setSelectedSalesPerson(value);
                   if (savingSalesPerson) return;
                   setSavingSalesPerson(true);
@@ -1897,11 +2088,9 @@ export default function SidebarDetails({
                     setSavingSalesPerson(false);
                   }
                 }}
-                placeholder="Select sales person"
-                clearable
                 style={{ flex: 1, maxWidth: '200px' }}
                 size="sm"
-                disabled={loadingTeamConfig || savingSalesPerson}
+                disabled={loadingAssignmentPools || savingSalesPerson}
               />
             </Flex>
             <Flex gap="xs" justify="flex-end">
@@ -1909,7 +2098,7 @@ export default function SidebarDetails({
                 color="red"
                 variant="light"
                 onClick={() => {
-                  setSelectedSalesPerson(estimate.sales_person || null);
+                  setSelectedSalesPerson(salesPersonSelectValue(estimate));
                   setEditingSalesPerson(false);
                 }}
                 disabled={savingSalesPerson}
@@ -1928,12 +2117,12 @@ export default function SidebarDetails({
               size="sm"
               style={{ cursor: 'pointer', textAlign: 'right', flex: 1, maxWidth: '200px' }}
               onClick={() => {
-                setSelectedSalesPerson(estimate.sales_person || null);
+                setSelectedSalesPerson(salesPersonSelectValue(estimate));
                 setEditingSalesPerson(true);
               }}
-              c={estimate.sales_person ? 'dark' : 'dimmed'}
+              c={salesPersonSelectValue(estimate) ? 'dark' : 'dimmed'}
             >
-              {estimate.sales_person || '—'}
+              {displaySalesPerson(estimate, users)}
             </Text>
           </Flex>
         )}
@@ -2092,17 +2281,19 @@ export default function SidebarDetails({
             <Skeleton height={200} />
           ) : (
             <>
-              <Select
+              <NativeSelect
                 label="QuickBooks Customer"
-                placeholder="Select a customer"
-                data={quickbooksCustomers.map((customer) => ({
-                  value: customer.id,
-                  label: `${customer.name}${customer.email ? ` (${customer.email})` : ''}`,
-                }))}
-                value={selectedCustomerId}
-                onChange={setSelectedCustomerId}
-                searchable
-                clearable
+                data={[
+                  { value: '', label: 'None' },
+                  ...quickbooksCustomers.map((customer) => ({
+                    value: customer.id,
+                    label: `${customer.name}${customer.email ? ` (${customer.email})` : ''}`,
+                  })),
+                ]}
+                value={selectedCustomerId ?? ''}
+                onChange={(e) =>
+                  setSelectedCustomerId(e.currentTarget.value === '' ? null : e.currentTarget.value)
+                }
               />
               <Flex gap="md" justify="flex-end">
                 <Button

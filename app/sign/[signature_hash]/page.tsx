@@ -18,6 +18,8 @@ function SignaturePageContent() {
     const payRaw = searchParams.get('pay');
     const payIntent =
         payRaw === 'balance' || payRaw === 'deposit' ? payRaw : null;
+    const tabRaw = searchParams.get('tab');
+    const tabIntent = tabRaw === 'payment' ? tabRaw : null;
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -145,6 +147,7 @@ function SignaturePageContent() {
           linkInfo={linkInfo}
           signatureHash={signatureHash}
           payIntent={payIntent}
+          tabIntent={tabIntent}
           setLinkInfo={setLinkInfo}
           signed={signed}
           setSigned={setSigned}

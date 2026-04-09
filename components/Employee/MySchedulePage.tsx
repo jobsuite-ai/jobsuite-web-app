@@ -27,6 +27,8 @@ import classes from '@/components/Calendar/CalendarPage.module.css';
 import type { CalendarGridJobEvent, WeekCalRow } from '@/utils/calendarGridMath';
 import {
   assignLanesForWeek,
+  buildDoubleBookHighlightForWeekBar,
+  buildTeamMultiProjectDayKeyMap,
   CALENDAR_LOCKED_FETCH_PADDING_DAYS,
   CAL_EVENT_ROW_PX,
   CAL_WEEK_BODY_MIN_PX,
@@ -161,6 +163,23 @@ export function MySchedulePage() {
     [calendarJobEvents, range]
   );
 
+  const estimateTitleByIdForDoubleBook = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const ev of calendarJobEventsInView) {
+      const eid = ev.estimate_id?.trim();
+      if (eid) {
+        const t = (ev.title || '').trim() || eid;
+        m.set(eid, t);
+      }
+    }
+    return m;
+  }, [calendarJobEventsInView]);
+
+  const teamMultiProjectDayMap = useMemo(
+    () => buildTeamMultiProjectDayKeyMap(calendarJobEventsInView, range),
+    [calendarJobEventsInView, range]
+  );
+
   const legendTeams = useMemo(() => {
     const m = new Map<string, string>();
     for (const ev of calendarJobEventsInView) {
@@ -267,14 +286,14 @@ export function MySchedulePage() {
       <Stack gap="lg">
         <Group justify="space-between" align="flex-start" wrap="wrap">
           <Stack gap={4}>
-            <Title order={2}>My schedule</Title>
+            <Title order={2} c="gray.0">My schedule</Title>
             <Text c="dimmed" size="sm">
               Four-week crew calendar for teams you belong to. Overlapping jobs stack so you can
               spot double-booked days. Time you logged in JobSuite appears below the grid.
             </Text>
             <Switch
               size="sm"
-              label="Show weekends"
+              label={<Text size="sm" c="gray.0">Show weekends</Text>}
               checked={showNonWorkingDays}
               onChange={(e) => setShowNonWorkingDaysPersisted(e.currentTarget.checked)}
             />
@@ -433,6 +452,16 @@ export function MySchedulePage() {
                               ? { background: row.backlogBackgroundCss }
                               : {}),
                           };
+                          const doubleBook =
+                            !row.isBacklog && !row.scheduleTentative && row.estimateId
+                              ? buildDoubleBookHighlightForWeekBar(
+                                  row,
+                                  weekStart,
+                                  seg,
+                                  teamMultiProjectDayMap,
+                                  estimateTitleByIdForDoubleBook
+                                )
+                              : null;
                           return (
                             <CalendarEventBar
                               key={row.rowKey}
@@ -449,6 +478,8 @@ export function MySchedulePage() {
                               solidBg={solidBg}
                               segmentDates={segmentDates}
                               metaSuffix={metaSuffix}
+                              doubleBookDays={doubleBook?.dayFlags}
+                              doubleBookTooltip={doubleBook?.tooltip}
                             />
                           );
                         })}

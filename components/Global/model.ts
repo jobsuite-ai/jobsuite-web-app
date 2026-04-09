@@ -196,6 +196,9 @@ export type Estimate = {
     project_crew_lead?: string;
     production_manager?: string;
     sales_person?: string;
+    project_crew_lead_user_id?: string | null;
+    production_manager_user_id?: string | null;
+    sales_person_user_id?: string | null;
     // Change order fields
     change_orders?: string[];
     original_estimate_id?: string;
@@ -226,6 +229,11 @@ export type Estimate = {
     tentative_scheduling_date?: string;
     invoiced_date?: string;
     payment_received_date?: string;
+    /** Set when the client pays the deposit online (Helcim) or when a manual deposit is recorded */
+    deposit_paid_date?: string | null;
+    /** Offline deposit (check/cash) amount recorded from invoice email or manual payment */
+    manual_deposit_paid_amount?: number | null;
+    manual_deposit_paid_at?: string | null;
     quickbooks_customer_id?: string;
     quickbooks_estimate_id?: string;
     quickbooks_invoice_id?: string;
@@ -351,9 +359,17 @@ export type ContractorClient = {
     updated_at: string;
 };
 
+export type UserInvitationStatus = 'active' | 'pending_invite';
+
 export type User = {
     id: string;
     email: string;
     full_name?: string;
     role?: string;
+    invitation_status?: UserInvitationStatus | null;
+    last_invite_sent_at?: string | null;
+    /**
+     * At most one job role (PM, sales, office); crew lead uses login `role` (lead/support painter).
+     */
+    team_assignment_roles?: string[] | null;
 };

@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 
 import AcceptInvitation from './accept-invitation/page';
 
+import { isPainterRole } from '@/app/utils/roles';
 import LoginForm from '@/components/AuthButtons/LoginForm';
 import { MySchedulePage } from '@/components/Employee/MySchedulePage';
 import Homepage from '@/components/Homepage/Homepage';
@@ -27,8 +28,8 @@ function HomePageContent() {
 
   // Show homepage for authenticated users (even if still loading, show structure)
   if (isAuthenticated) {
-    const employeeHome = user?.role === 'employee';
-    if (employeeHome) {
+    const painterHome = isPainterRole(user?.role);
+    if (painterHome) {
       return <MySchedulePage />;
     }
     return <Homepage />;

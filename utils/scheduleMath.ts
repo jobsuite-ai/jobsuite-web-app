@@ -3,7 +3,7 @@ import { addDays, isWeekend, startOfDay } from 'date-fns';
 import type { ScheduleTeam } from '@/hooks/useTeamConfig';
 
 /** Default hours applied per business day when no team-specific capacity is available. */
-export const DEFAULT_SCHEDULE_DAILY_HOURS = 8;
+export const DEFAULT_SCHEDULE_DAILY_HOURS = 10;
 
 /** API / Employee teams: one row from `team_config.team_capacity`. */
 export interface TeamCapacityRowInput {

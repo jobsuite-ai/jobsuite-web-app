@@ -2,7 +2,7 @@
 
 import type { CSSProperties } from 'react';
 
-import { ActionIcon, Menu } from '@mantine/core';
+import { ActionIcon, Menu, Tooltip } from '@mantine/core';
 import { IconCalendarEvent, IconDots, IconPencil, IconUsers } from '@tabler/icons-react';
 import Link from 'next/link';
 
@@ -30,6 +30,9 @@ type CalendarEventBarProps = {
   onSchedule?: () => void;
   /** Locked jobs: change / remove production team */
   onChangeTeam?: () => void;
+  /** Same length as bar day columns; true = red inset outline (team double-booked that day). */
+  doubleBookDays?: boolean[];
+  doubleBookTooltip?: string | null;
 };
 
 export function CalendarEventBar({
@@ -41,6 +44,8 @@ export function CalendarEventBar({
   isPreview,
   onSchedule,
   onChangeTeam,
+  doubleBookDays,
+  doubleBookTooltip,
 }: CalendarEventBarProps) {
   const { isBacklog, scheduleId, estimateId } = row;
   const showMenu =
@@ -51,6 +56,7 @@ export function CalendarEventBar({
 
   const style: CSSProperties = {
     ...barStyle,
+    position: 'relative',
     ...(isBacklog ? {} : { backgroundColor: solidBg }),
     ...(isPreview
       ? {
@@ -59,6 +65,11 @@ export function CalendarEventBar({
         }
       : {}),
   };
+
+  const showDayOutlines =
+    Array.isArray(doubleBookDays) &&
+    doubleBookDays.length > 0 &&
+    doubleBookDays.some(Boolean);
 
   const titleBlock = row.href ? (
     <Link
@@ -86,9 +97,38 @@ export function CalendarEventBar({
 
   const className = [classes.eventBar, ''].filter(Boolean).join(' ');
 
-  return (
+  const barBody = (
     <div className={className} style={style}>
-      <div className={classes.eventBarInner}>
+      {showDayOutlines ? (
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            zIndex: 0,
+            borderRadius: 'inherit',
+            overflow: 'hidden',
+            pointerEvents: 'none',
+          }}
+        >
+          {doubleBookDays!.map((flag, i) => (
+            <div
+              key={i}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                boxSizing: 'border-box',
+                boxShadow: flag ? 'inset 0 0 0 2px var(--mantine-color-red-6)' : undefined,
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+      <div
+        className={classes.eventBarInner}
+        style={showDayOutlines ? { position: 'relative', zIndex: 1 } : undefined}
+      >
         {titleBlock}
         {showMenu ? (
           <div className={classes.eventBarActions}>
@@ -125,4 +165,14 @@ export function CalendarEventBar({
       </div>
     </div>
   );
+
+  if (doubleBookTooltip) {
+    return (
+      <Tooltip label={doubleBookTooltip} multiline maw={360} withArrow>
+        {barBody}
+      </Tooltip>
+    );
+  }
+
+  return barBody;
 }
