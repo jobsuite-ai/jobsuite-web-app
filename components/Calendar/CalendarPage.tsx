@@ -74,7 +74,10 @@ import {
   teamBacklogCardBackground,
 } from '@/utils/scheduleColors';
 import type { TeamCapacityRowInput } from '@/utils/scheduleMath';
-import { buildSyntheticTeamBacklogCalendarEvent } from '@/utils/tentativeBacklogCalendar';
+import {
+  buildSyntheticTeamBacklogCalendarEvent,
+  type LockedIntervalIso,
+} from '@/utils/tentativeBacklogCalendar';
 
 const SHOW_NON_WORKING_DAYS_STORAGE_KEY = 'jobsuite-calendar-show-non-working-days';
 const LEGACY_SHOW_WEEKENDS_STORAGE_KEY = 'jobsuite-calendar-show-weekends';
@@ -687,20 +690,21 @@ export function CalendarPage() {
   }, [teams, calTick]);
 
   /**
-   * API calendar jobs only (no synthetic backlog): max locked job end date (`schedule_end_date`)
-   * per team.
+   * API calendar jobs only (no synthetic backlog): locked job inclusive [start, end] spans per
+   * team (gap-aware tentative backlog placement).
    */
-  const lastLockedJobEndByTeamId = useMemo(() => {
-    const map: Record<string, string> = {};
+  const lockedIntervalsByTeamId = useMemo(() => {
+    const map: Record<string, LockedIntervalIso[]> = {};
     for (const ev of calendarEvents) {
       if (ev.calendar_kind === 'job' && !ev.schedule_tentative) {
         const tid = ev.team_id?.trim();
-        const end = ev.schedule_end_date?.trim().slice(0, 10);
-        if (tid && end) {
-          const cur = map[tid];
-          if (!cur || end > cur) {
-            map[tid] = end;
+        const startIso = ev.schedule_start_date?.trim().slice(0, 10);
+        const endIso = ev.schedule_end_date?.trim().slice(0, 10);
+        if (tid && startIso && endIso) {
+          if (!map[tid]) {
+            map[tid] = [];
           }
+          map[tid].push({ startIso, endIso });
         }
       }
     }
@@ -717,7 +721,7 @@ export function CalendarPage() {
           (bl.items?.some((i) => (Number(i.labor_hours) || 0) > 0) ?? false);
         if (hasHours) {
           const ev = buildSyntheticTeamBacklogCalendarEvent(t, {
-            lastLockedJobEndDateIso: lastLockedJobEndByTeamId[t.id] ?? null,
+            lockedIntervals: lockedIntervalsByTeamId[t.id] ?? null,
             items: bl.items,
           });
           if (ev) {
@@ -727,7 +731,7 @@ export function CalendarPage() {
       }
     }
     return [...calendarEvents, ...synth];
-  }, [calendarEvents, teams, backlogByTeam, lastLockedJobEndByTeamId]);
+  }, [calendarEvents, teams, backlogByTeam, lockedIntervalsByTeamId]);
 
   const displayCalendarEventsTeamFiltered = useMemo(() => {
     if (selectedTeamFilterIds.length === 0) {
@@ -964,6 +968,65 @@ export function CalendarPage() {
           </Group>
         </Group>
 
+        {teamLegendEntries.length > 0 && (
+          <Paper p="md" withBorder radius="md">
+            <Group justify="space-between" align="center" mb="xs" wrap="wrap" gap="xs">
+              <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                Teams
+              </Text>
+              {selectedTeamFilterIds.length > 0 ? (
+                <Button variant="subtle" size="compact-xs" onClick={clearTeamFilter}>
+                  Clear
+                </Button>
+              ) : null}
+            </Group>
+            <Group gap="lg" align="center" wrap="wrap">
+              {teamLegendEntries.map((team) => {
+                const { color, shade } = colorForScheduleKey(team.id);
+                const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
+                const cfg = teamConfig.scheduleTeams.find((t) => t.id === team.id);
+                const rosterHint = [
+                  cfg?.painterCount != null ? `${cfg.painterCount} painters` : '',
+                  cfg?.weeklyHours != null ? `${cfg.weeklyHours} hrs/wk` : '',
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
+                const selected = selectedTeamFilterIds.includes(team.id);
+                return (
+                  <UnstyledButton
+                    key={team.id}
+                    type="button"
+                    onClick={() => toggleTeamFilter(team.id)}
+                    className={`${classes.legendTeamChip} ${selected ? classes.legendTeamChipSelected : ''}`}
+                    aria-pressed={selected}
+                    aria-label={`${selected ? 'Remove' : 'Add'} ${team.name} ${selected ? 'from' : 'to'} calendar filter`}
+                  >
+                    <Stack gap={rosterHint ? 2 : 0}>
+                      <Group gap="xs" wrap="nowrap" align="center">
+                        <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
+                        <Text size="sm" fw={600} lh={1.2}>
+                          {team.name}
+                        </Text>
+                      </Group>
+                      {rosterHint ? (
+                        <Group gap="xs" wrap="nowrap" align="flex-start">
+                          <Box
+                            aria-hidden
+                            style={{ width: 14, flexShrink: 0 }}
+                          />
+                          <Text size="xs" c="dimmed" lh={1.35}>
+                            {rosterHint}
+                          </Text>
+                        </Group>
+                      ) : null}
+                    </Stack>
+                  </UnstyledButton>
+                );
+              })}
+            </Group>
+          </Paper>
+        )}
+
         <Paper p="md" withBorder radius="md">
           <Group justify="space-between" mb="md">
             <Text fw={600}>
@@ -999,65 +1062,6 @@ export function CalendarPage() {
               </Button>
             </Group>
           </Group>
-
-          {teamLegendEntries.length > 0 && (
-            <div className={classes.legendWrap}>
-              <Group justify="space-between" align="center" mb="xs" wrap="wrap" gap="xs">
-                <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-                  Teams
-                </Text>
-                {selectedTeamFilterIds.length > 0 ? (
-                  <Button variant="subtle" size="compact-xs" onClick={clearTeamFilter}>
-                    Clear
-                  </Button>
-                ) : null}
-              </Group>
-              <Group gap="lg" align="center" wrap="wrap">
-                {teamLegendEntries.map((team) => {
-                  const { color, shade } = colorForScheduleKey(team.id);
-                  const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
-                  const cfg = teamConfig.scheduleTeams.find((t) => t.id === team.id);
-                  const rosterHint = [
-                    cfg?.painterCount != null ? `${cfg.painterCount} painters` : '',
-                    cfg?.weeklyHours != null ? `${cfg.weeklyHours} hrs/wk` : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' · ');
-                  const selected = selectedTeamFilterIds.includes(team.id);
-                  return (
-                    <UnstyledButton
-                      key={team.id}
-                      type="button"
-                      onClick={() => toggleTeamFilter(team.id)}
-                      className={`${classes.legendTeamChip} ${selected ? classes.legendTeamChipSelected : ''}`}
-                      aria-pressed={selected}
-                      aria-label={`${selected ? 'Remove' : 'Add'} ${team.name} ${selected ? 'from' : 'to'} calendar filter`}
-                    >
-                      <Stack gap={rosterHint ? 2 : 0}>
-                        <Group gap="xs" wrap="nowrap" align="center">
-                          <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
-                          <Text size="sm" fw={600} lh={1.2}>
-                            {team.name}
-                          </Text>
-                        </Group>
-                        {rosterHint ? (
-                          <Group gap="xs" wrap="nowrap" align="flex-start">
-                            <Box
-                              aria-hidden
-                              style={{ width: 14, flexShrink: 0 }}
-                            />
-                            <Text size="xs" c="dimmed" lh={1.35}>
-                              {rosterHint}
-                            </Text>
-                          </Group>
-                        ) : null}
-                      </Stack>
-                    </UnstyledButton>
-                  );
-                })}
-              </Group>
-            </div>
-          )}
 
           {errors.estimates && (
             <Alert color="red" title="Could not load estimates" mb="md">
@@ -1313,7 +1317,7 @@ export function CalendarPage() {
                   team={t}
                   totalLaborHours={bl.total_labor_hours}
                   serverItems={bl.items}
-                  lastLockedJobEndIso={lastLockedJobEndByTeamId[t.id]}
+                  lockedIntervals={lockedIntervalsByTeamId[t.id]}
                   estimates={estimates}
                   onLockSchedule={(e, impliedStartIso) => {
                     openLockScheduleFromBacklog(e, t.id, impliedStartIso);

@@ -24,6 +24,9 @@ export type BacklogLaborItem = {
   labor_hours?: number;
 };
 
+/** Inclusive calendar span for locked jobs (YYYY-MM-DD), merged for overlap/touch. */
+export type LockedIntervalIso = { startIso: string; endIso: string };
+
 export type SyntheticTeamBacklogCalendarEvent = {
   schedule_id: string;
   estimate_id: null;
@@ -84,10 +87,82 @@ function nextTeamWorkDayOnOrAfter(team: TeamShapeForBacklogBar, fromDay: Date): 
   return cur;
 }
 
-function endDateAfterNWorkingDays(
+/** Merge overlapping or touching locked spans
+ * (matches job-engine merge_inclusive_date_intervals). */
+export function mergeLockedIntervals(intervals: LockedIntervalIso[]): LockedIntervalIso[] {
+  if (!intervals.length) {
+    return [];
+  }
+  const sorted = [...intervals]
+    .map((iv) => ({
+      start: startOfDay(parseLocalDateString(iv.startIso.slice(0, 10))),
+      end: startOfDay(parseLocalDateString(iv.endIso.slice(0, 10))),
+    }))
+    .filter((iv) => iv.end >= iv.start)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+  if (!sorted.length) {
+    return [];
+  }
+  const out: { start: Date; end: Date }[] = [{ ...sorted[0] }];
+  for (let i = 1; i < sorted.length; i += 1) {
+    const cur = sorted[i];
+    const last = out[out.length - 1];
+    if (cur.start.getTime() <= addDays(last.end, 1).getTime()) {
+      last.end = cur.end > last.end ? cur.end : last.end;
+    } else {
+      out.push({ ...cur });
+    }
+  }
+  return out.map((iv) => ({
+    startIso: format(iv.start, 'yyyy-MM-dd'),
+    endIso: format(iv.end, 'yyyy-MM-dd'),
+  }));
+}
+
+function dateInLockedInterval(d: Date, intervals: LockedIntervalIso[]): boolean {
+  const t = startOfDay(d).getTime();
+  for (const iv of intervals) {
+    const s = startOfDay(parseLocalDateString(iv.startIso.slice(0, 10))).getTime();
+    const e = startOfDay(parseLocalDateString(iv.endIso.slice(0, 10))).getTime();
+    if (t >= s && t <= e) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function advanceCursorPastLockedIntervals(
+  team: TeamShapeForBacklogBar,
+  cursor: Date,
+  intervals: LockedIntervalIso[]
+): Date {
+  let cur = startOfDay(cursor);
+  let guard = 0;
+  while (guard < 366) {
+    guard += 1;
+    let moved = false;
+    for (const iv of intervals) {
+      const s = startOfDay(parseLocalDateString(iv.startIso.slice(0, 10)));
+      const e = startOfDay(parseLocalDateString(iv.endIso.slice(0, 10)));
+      const c = startOfDay(cur);
+      if (c >= s && c <= e) {
+        cur = nextTeamWorkDayOnOrAfter(team, addDays(e, 1));
+        moved = true;
+        break;
+      }
+    }
+    if (!moved) {
+      return cur;
+    }
+  }
+  return cur;
+}
+
+function endDateAfterNBacklogWorkingDays(
   team: TeamShapeForBacklogBar,
   start: Date,
-  n: number
+  n: number,
+  intervals: LockedIntervalIso[]
 ): Date {
   if (n <= 0) {
     return addDays(startOfDay(start), -1);
@@ -95,7 +170,7 @@ function endDateAfterNWorkingDays(
   let cur = startOfDay(start);
   let left = n;
   for (let iter = 0; iter < 732; iter += 1) {
-    if (isTeamWorkingDay(team, cur)) {
+    if (isTeamWorkingDay(team, cur) && !dateInLockedInterval(cur, intervals)) {
       left -= 1;
       if (left === 0) {
         return cur;
@@ -128,16 +203,14 @@ export type TentativeBacklogPlacementClient = {
 };
 
 /**
- * Sequential placement after the last locked job's end date (from calendar data), else today:
- * each job uses working_days = ceil(labor_hours / daily_labor_capacity at block start).
+ * Sequential placement from today, skipping locked job intervals (gap-aware).
+ * Each job uses working_days = ceil(labor_hours / daily_labor_capacity at block start).
  */
 export function computeTentativeBacklogPlacementClient(
   team: TeamShapeForBacklogBar,
   params: {
-    /**
-     * Max locked job `schedule_end_date` (ISO) for this team; backlog starts the next calendar day.
-     */
-    lastLockedJobEndDateIso: string | null | undefined;
+    /** Locked job inclusive date spans for this team (merged inside). */
+    lockedIntervals?: LockedIntervalIso[] | null;
     items: BacklogLaborItem[];
   }
 ): TentativeBacklogPlacementClient | null {
@@ -145,13 +218,11 @@ export function computeTentativeBacklogPlacementClient(
     return null;
   }
 
-  let anchor: Date;
-  if (params.lastLockedJobEndDateIso?.trim()) {
-    anchor = addDays(startOfDay(parseLocalDateString(params.lastLockedJobEndDateIso)), 1);
-  } else {
-    anchor = startOfDay(new Date());
-  }
-  let cursor = nextTeamWorkDayOnOrAfter(team, anchor);
+  const locked = mergeLockedIntervals(params.lockedIntervals ?? []);
+
+  let cursor = nextTeamWorkDayOnOrAfter(team, startOfDay(new Date()));
+  cursor = advanceCursorPastLockedIntervals(team, cursor, locked);
+
   const workDates: string[] = [];
   const itemWorkingDays: number[] = [];
   const itemDateRanges: Array<{ startIso: string; endIso: string } | null> = [];
@@ -162,20 +233,27 @@ export function computeTentativeBacklogPlacementClient(
       itemWorkingDays.push(0);
       itemDateRanges.push(null);
     } else {
-      let cap = dailyLaborCapacityOnDate(team, cursor);
       let guard = 0;
-      while (cap <= 1e-9 && guard < 366) {
-        cursor = nextTeamWorkDayOnOrAfter(team, addDays(cursor, 1));
-        cap = dailyLaborCapacityOnDate(team, cursor);
+      while (guard < 366) {
         guard += 1;
+        cursor = advanceCursorPastLockedIntervals(team, cursor, locked);
+        const cap = dailyLaborCapacityOnDate(team, cursor);
+        if (cap > 1e-9) {
+          break;
+        }
+        cursor = nextTeamWorkDayOnOrAfter(team, addDays(cursor, 1));
       }
+      if (guard >= 366) {
+        return null;
+      }
+      const cap = dailyLaborCapacityOnDate(team, cursor);
       if (cap <= 1e-9) {
         return null;
       }
       const wd = Math.max(1, workingDaysFromLaborHoursCeil(raw, cap));
       itemWorkingDays.push(wd);
       const startBlock = startOfDay(cursor);
-      const end = endDateAfterNWorkingDays(team, cursor, wd);
+      const end = endDateAfterNBacklogWorkingDays(team, cursor, wd, locked);
       itemDateRanges.push({
         startIso: format(startBlock, 'yyyy-MM-dd'),
         endIso: format(startOfDay(end), 'yyyy-MM-dd'),
@@ -183,12 +261,13 @@ export function computeTentativeBacklogPlacementClient(
       let walk = startOfDay(cursor);
       const endWalk = startOfDay(end);
       while (walk <= endWalk) {
-        if (isTeamWorkingDay(team, walk)) {
+        if (isTeamWorkingDay(team, walk) && !dateInLockedInterval(walk, locked)) {
           workDates.push(format(walk, 'yyyy-MM-dd'));
         }
         walk = addDays(walk, 1);
       }
       cursor = nextTeamWorkDayOnOrAfter(team, addDays(endWalk, 1));
+      cursor = advanceCursorPastLockedIntervals(team, cursor, locked);
     }
   }
 
@@ -207,7 +286,7 @@ export function computeTentativeBacklogPlacementClient(
 export function computeTentativeBacklogCalendarBar(
   team: TeamShapeForBacklogBar,
   params: {
-    lastLockedJobEndDateIso: string | null | undefined;
+    lockedIntervals?: LockedIntervalIso[] | null;
     items: BacklogLaborItem[];
   }
 ): Omit<TentativeBacklogPlacementClient, 'itemWorkingDays' | 'itemDateRanges'> | null {
@@ -223,11 +302,11 @@ export function buildSyntheticTeamBacklogCalendarEvent(
   team: TeamShapeForBacklogBar,
   backlog: {
     items: BacklogLaborItem[];
-    lastLockedJobEndDateIso: string | null | undefined;
+    lockedIntervals?: LockedIntervalIso[] | null;
   }
 ): SyntheticTeamBacklogCalendarEvent | null {
   const bar = computeTentativeBacklogCalendarBar(team, {
-    lastLockedJobEndDateIso: backlog.lastLockedJobEndDateIso,
+    lockedIntervals: backlog.lockedIntervals,
     items: backlog.items,
   });
   if (!bar) {
