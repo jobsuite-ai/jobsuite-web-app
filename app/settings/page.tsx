@@ -512,12 +512,6 @@ export default function SettingsPage() {
             <Stack gap="xs" mb="xl">
                 <Text c="dimmed">
                     Manage your contractor configuration and notification preferences.
-                    Production teams and roster lists live under Employees &amp; Teams in the main
-                    menu.
-                </Text>
-                <Text c="dimmed">
-                    To put work dates on a job, open a proposal and use Team schedule in the
-                    sidebar: Preview, then Save schedule.
                 </Text>
             </Stack>
 

@@ -372,4 +372,6 @@ export type User = {
      * At most one job role (PM, sales, office); crew lead uses login `role` (lead/support painter).
      */
     team_assignment_roles?: string[] | null;
+    /** QuickBooks Employee Id for posting time (set by admin in roster). */
+    quickbooks_employee_id?: string | null;
 };

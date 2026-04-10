@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Button, Group, Modal, Stack, Text } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
+import { Calendar, DatePickerInput } from '@mantine/dates';
+import { isSameDay } from 'date-fns';
 
 type Props = {
   opened: boolean;
@@ -41,6 +42,13 @@ export function LockedScheduleEditModal({
 }: Props) {
   const [start, setStart] = useState<Date | null>(null);
   const [nonWorking, setNonWorking] = useState<Date[]>([]);
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
+
+  /** Stable key so parent passing `[]` every render does not retrigger sync. */
+  const nonWorkingKey = useMemo(
+    () => JSON.stringify([...(nonWorkingIso ?? [])].map((s) => s.slice(0, 10)).sort()),
+    [nonWorkingIso]
+  );
 
   useEffect(() => {
     if (!opened || !scheduleId) {
@@ -53,24 +61,48 @@ export function LockedScheduleEditModal({
         .map((s) => parseYmd(s))
         .filter((d): d is Date => d !== null)
     );
-  }, [opened, scheduleId, startIso, nonWorkingIso]);
+    setCalendarViewDate(sd ?? new Date());
+  }, [opened, scheduleId, startIso, nonWorkingKey]);
 
-  const emit = (nextStart: Date | null, nextNw: Date[]) => {
-    setStart(nextStart);
-    setNonWorking(nextNw);
-    onChange({
-      startIso: nextStart ? toYmd(nextStart) : null,
-      nonWorkingIso: nextNw.map((d) => toYmd(d)).sort(),
-    });
-  };
+  const emit = useCallback(
+    (nextStart: Date | null, nextNw: Date[]) => {
+      setStart(nextStart);
+      setNonWorking(nextNw);
+      onChange({
+        startIso: nextStart ? toYmd(nextStart) : null,
+        nonWorkingIso: nextNw.map((d) => toYmd(d)).sort(),
+      });
+    },
+    [onChange]
+  );
 
   return (
-    <Modal opened={opened} onClose={onClose} title="Adjust schedule" size="md">
+    <Modal
+      opened={opened}
+      onClose={onClose}
+      title="Adjust schedule"
+      size="md"
+      zIndex={400}
+      overlayProps={{ opacity: 0.52 }}
+      keepMounted={false}
+    >
       <Stack gap="md">
-        <DatePickerInput
-          label="Start date"
-          value={start}
-          onChange={(d) => emit(d, nonWorking)}
+        <Text size="sm" fw={500}>
+          Start date
+        </Text>
+        <Calendar
+          firstDayOfWeek={1}
+          date={calendarViewDate}
+          onDateChange={setCalendarViewDate}
+          getDayProps={(dayDate) => ({
+            selected: start != null && isSameDay(dayDate, start),
+          })}
+          __onDayClick={(_event, dayDate) => {
+            emit(dayDate, nonWorking);
+          }}
+          minLevel="month"
+          maxLevel="month"
+          size="sm"
         />
         <DatePickerInput
           type="multiple"
@@ -78,10 +110,13 @@ export function LockedScheduleEditModal({
           value={nonWorking}
           onChange={(nw) => emit(start, nw ?? [])}
           clearable
+          dropdownType="popover"
+          popoverProps={{ withinPortal: true, zIndex: 500 }}
         />
         <Text size="sm" c="dimmed">
           End date and work days are calculated from {laborHours.toFixed(1)} bid hours, team
-          capacity, and non-working days. Changes preview on the calendar; use Save below to apply.
+          capacity, and non-working days. Changes preview on the calendar; use Save on the page
+          to apply.
         </Text>
         <Group justify="flex-end" mt="md">
           <Button variant="default" onClick={onClose}>

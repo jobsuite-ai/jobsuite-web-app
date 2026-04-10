@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 
 import {
+  ActionIcon,
   Badge,
   Button,
   Card,
@@ -15,10 +16,11 @@ import {
   TextInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconMailPlus, IconPlus, IconX } from '@tabler/icons-react';
+import { IconCheck, IconMailPlus, IconPencil, IconPlus, IconX } from '@tabler/icons-react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import type { User } from '@/components/Global/model';
+import { useAuth } from '@/hooks/useAuth';
 import { TEAM_ASSIGNMENT_ROLE_OPTIONS } from '@/hooks/useTeamAssignmentPools';
 import { useUsers } from '@/hooks/useUsers';
 
@@ -40,10 +42,15 @@ function statusLabel(u: User): string {
 
 export default function EmployeeRosterCard() {
   const { users, loading, refetch } = useUsers();
+  const { user: currentUser } = useAuth({ fetchUser: true });
+  const isAdmin = currentUser?.role === 'admin';
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [savingRolesId, setSavingRolesId] = useState<string | null>(null);
+  const [savingQbId, setSavingQbId] = useState(false);
+  const [qbModalUser, setQbModalUser] = useState<User | null>(null);
+  const [qbModalValue, setQbModalValue] = useState('');
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<string | null>('lead-painter');
@@ -183,6 +190,53 @@ export default function EmployeeRosterCard() {
     }
   };
 
+  const openQbModal = (u: User) => {
+    setQbModalUser(u);
+    setQbModalValue(u.quickbooks_employee_id?.trim() ?? '');
+  };
+
+  const closeQbModal = () => {
+    setQbModalUser(null);
+    setQbModalValue('');
+  };
+
+  const saveQuickbooksEmployeeId = async () => {
+    if (!qbModalUser) return;
+    const userId = qbModalUser.id;
+    setSavingQbId(true);
+    try {
+      const trimmed = qbModalValue.trim();
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          quickbooks_employee_id: trimmed.length > 0 ? trimmed : null,
+        }),
+      });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(errBody.message || errBody.detail || 'Update failed');
+      }
+      notifications.show({
+        title: 'Saved',
+        message: trimmed.length > 0 ? 'QuickBooks employee ID updated' : 'QuickBooks employee ID cleared',
+        color: 'green',
+        icon: <IconCheck size={16} />,
+      });
+      closeQbModal();
+      refetch();
+    } catch (e) {
+      notifications.show({
+        title: 'Error',
+        message: e instanceof Error ? e.message : 'Update failed',
+        color: 'red',
+        icon: <IconX size={16} />,
+      });
+    } finally {
+      setSavingQbId(false);
+    }
+  };
+
   if (loading) {
     return (
       <Card shadow="sm" padding="lg" withBorder>
@@ -205,6 +259,13 @@ export default function EmployeeRosterCard() {
             anyone with login role Lead painter or Support painter. Pick at most one{' '}
             <strong>Job role</strong> (production manager, sales, or office manager) for estimates
             and routing. This is separate from login <strong>Role</strong> (permissions).
+            {isAdmin && (
+              <>
+                {' '}
+                <strong>QuickBooks employee ID</strong> (admins only) maps each person to a
+                QuickBooks Employee for posting time.
+              </>
+            )}
           </Text>
         </div>
         <Button leftSection={<IconPlus size={16} />} onClick={openCreate}>
@@ -219,6 +280,7 @@ export default function EmployeeRosterCard() {
             <Table.Th style={{ width: '22%' }}>Email</Table.Th>
             <Table.Th style={{ width: '14%' }}>Role</Table.Th>
             <Table.Th>Job role</Table.Th>
+            <Table.Th style={{ width: 130 }}>QuickBooks</Table.Th>
             <Table.Th style={{ width: '10%' }}>Access</Table.Th>
             <Table.Th style={{ width: 140 }} />
           </Table.Tr>
@@ -241,6 +303,32 @@ export default function EmployeeRosterCard() {
                   disabled={savingRolesId === u.id}
                   comboboxProps={{ withinPortal: true }}
                 />
+              </Table.Td>
+              <Table.Td>
+                <Group gap="xs" wrap="nowrap" align="center">
+                  <Badge
+                    size="sm"
+                    color={u.quickbooks_employee_id ? 'teal' : 'gray'}
+                    variant="light"
+                  >
+                    {u.quickbooks_employee_id ? 'Set' : 'Not set'}
+                  </Badge>
+                  {isAdmin && (
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size="sm"
+                      aria-label={
+                        u.quickbooks_employee_id
+                          ? 'Edit QuickBooks employee ID'
+                          : 'Set QuickBooks employee ID'
+                      }
+                      onClick={() => openQbModal(u)}
+                    >
+                      <IconPencil size={16} />
+                    </ActionIcon>
+                  )}
+                </Group>
               </Table.Td>
               <Table.Td>
                 <Badge color={isPendingInvite(u) ? 'yellow' : 'green'} variant="light">
@@ -274,6 +362,47 @@ export default function EmployeeRosterCard() {
           No employees yet. Add someone to get started.
         </Text>
       )}
+
+      <Modal
+        opened={qbModalUser !== null}
+        onClose={closeQbModal}
+        title="QuickBooks employee ID"
+        size="md"
+        centered
+      >
+        <Stack gap="md">
+          {qbModalUser && (
+            <Text size="sm" c="dimmed">
+              {qbModalUser.full_name || qbModalUser.email}
+            </Text>
+          )}
+          <TextInput
+            label="Employee ID in QuickBooks"
+            description="Paste the QuickBooks Employee Id from your connected company (sandbox or production)."
+            placeholder="e.g. 42"
+            value={qbModalValue}
+            onChange={(e) => setQbModalValue(e.currentTarget.value)}
+            autoFocus
+          />
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={closeQbModal}>
+              Cancel
+            </Button>
+            <Button
+              variant="light"
+              color="red"
+              onClick={() => {
+                setQbModalValue('');
+              }}
+            >
+              Clear
+            </Button>
+            <Button onClick={saveQuickbooksEmployeeId} loading={savingQbId}>
+              Save
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
 
       <Modal
         opened={modalOpen}

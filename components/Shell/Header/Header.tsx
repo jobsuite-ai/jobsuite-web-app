@@ -2,9 +2,46 @@
 
 import { MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import { Autocomplete, AutocompleteProps, Badge, Divider, Group, Menu, NavLink, rem, Stack, Text, UnstyledButton, useMantineTheme } from '@mantine/core';
+import {
+  Autocomplete,
+  AutocompleteProps,
+  Badge,
+  Button,
+  Divider,
+  Group,
+  Menu,
+  Modal,
+  NavLink,
+  rem,
+  Stack,
+  Text,
+  UnstyledButton,
+  useMantineTheme,
+} from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconBuilding, IconCalendar, IconCheck, IconClock, IconFilePlus, IconFileText, IconFolder, IconHome, IconLayoutDashboard, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconList, IconMail, IconMenu2, IconNotification, IconSearch, IconSettings, IconUserCircle, IconUsers, IconUsersGroup } from '@tabler/icons-react';
+import {
+  IconBuilding,
+  IconCalendar,
+  IconCheck,
+  IconClock,
+  IconFilePlus,
+  IconFileText,
+  IconFolder,
+  IconHome,
+  IconLayoutDashboard,
+  IconLayoutSidebarLeftCollapse,
+  IconLayoutSidebarLeftExpand,
+  IconList,
+  IconLogout,
+  IconMail,
+  IconMenu2,
+  IconNotification,
+  IconSearch,
+  IconSettings,
+  IconUserCircle,
+  IconUsers,
+  IconUsersGroup,
+} from '@tabler/icons-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -12,8 +49,11 @@ import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { clearClientAuthSession, redirectToLoginPage } from '@/app/utils/authSession';
+import { isCachedAuthMeStaleForToken } from '@/app/utils/authToken';
+import { getCachedAuthMe } from '@/app/utils/dataCache';
 import { isPainterRole } from '@/app/utils/roles';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, type User } from '@/hooks/useAuth';
 import { useContractorLogo } from '@/hooks/useContractorLogo';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllClients } from '@/store/slices/clientsSlice';
@@ -67,6 +107,21 @@ interface Notification {
   updated_at: string;
 }
 
+function getSessionCachedUser(): User | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    return null;
+  }
+  const cached = getCachedAuthMe<User>();
+  if (!cached || isCachedAuthMeStaleForToken(token, cached)) {
+    return null;
+  }
+  return cached;
+}
+
 export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [autocompleteValue, setAutocompleteValue] = useState<string>('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -75,6 +130,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const [messageCount, setMessageCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [logoutModalOpened, setLogoutModalOpened] = useState(false);
   const [jobTitles, setJobTitles] = useState<Record<string, string>>({});
   const unacknowledgedCountRef = useRef<number>(0);
   const inFlightJobTitlesRef = useRef<Record<string, Promise<string | null>>>({});
@@ -87,6 +143,14 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   const { logoUrl } = useContractorLogo();
   const theme = useMantineTheme();
   const isMobile = useMediaQuery(`(max-width: ${theme.breakpoints.sm})`);
+
+  // Prefer live user; else token-scoped auth cache (avoids full nav flash before /api/auth/me).
+  const effectiveRole = useMemo(() => {
+    if (user?.role) {
+      return user.role;
+    }
+    return getSessionCachedUser()?.role ?? null;
+  }, [user?.role]);
 
   // Utility function to extract estimate_id from notification link
   const extractEstimateId = useCallback((link: string | null): string | null => {
@@ -106,11 +170,17 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     }
   };
 
+  const handleConfirmLogout = useCallback(() => {
+    setLogoutModalOpened(false);
+    clearClientAuthSession();
+    redirectToLoginPage();
+  }, []);
+
   // Map links to their icons
   const getLinkIcon = (linkPath: string) => {
     switch (linkPath) {
       case '/':
-        return pathname === '/' && isPainterRole(user?.role) ? (
+        return pathname === '/' && isPainterRole(effectiveRole) ? (
           <IconCalendar size={18} />
         ) : (
           <IconHome size={18} />
@@ -145,18 +215,21 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
   };
 
   const isLeadOrSupportPainter =
-    user?.role === 'lead-painter' || user?.role === 'support-painter';
+    effectiveRole === 'lead-painter' || effectiveRole === 'support-painter';
 
   const mainNavLinks = useMemo(() => {
+    if (!effectiveRole) {
+      return [];
+    }
     if (isLeadOrSupportPainter) {
       // Lead/support: only the "Employee Options" block (no duplicate links above it).
       return [];
     }
-    if (isPainterRole(user?.role)) {
+    if (isPainterRole(effectiveRole)) {
       return employeeNavLinks;
     }
     return fullNavLinks;
-  }, [user?.role, isLeadOrSupportPainter]);
+  }, [effectiveRole, isLeadOrSupportPainter]);
 
   const showEmployeeOptionsSection = isLeadOrSupportPainter;
 
@@ -196,13 +269,12 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
     return [
       ...primary,
-      <Divider key="employee-options-divider" my="sm" />,
       <Text key="employee-options-label" size="xs" c="dimmed" fw={600} px="xs">
         Employee Options
       </Text>,
       ...employeeNavLinks.map((link) => mapLink(link, 'emp')),
     ];
-  }, [isMobile, pathname, messageCount, mainNavLinks, showEmployeeOptionsSection, user?.role]);
+  }, [isMobile, pathname, messageCount, mainNavLinks, showEmployeeOptionsSection]);
 
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {
@@ -894,7 +966,126 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     });
   }, []);
 
-  // Always render header structure - auth-dependent features will handle their own loading states
+  const renderNotificationsDropdown = () => (
+    <Menu
+      shadow="md"
+      width={400}
+      position="bottom-end"
+      onOpen={fetchNotifications}
+    >
+      <Menu.Target>
+        <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
+          <IconNotification color="black" size={22} />
+          {unacknowledgedCount > 0 && (
+            <Badge
+              size="xs"
+              color="red"
+              variant="filled"
+              style={{
+                position: 'absolute',
+                top: rem(-4),
+                right: rem(-4),
+                minWidth: rem(18),
+                height: rem(18),
+                padding: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: rem(10),
+              }}
+            >
+              {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
+            </Badge>
+          )}
+        </div>
+      </Menu.Target>
+      <Menu.Dropdown>
+        <Menu.Label>
+          <Group justify="space-between">
+            <Text size="sm" fw={600}>
+              Notifications
+            </Text>
+            {unacknowledgedCount > 0 && (
+              <Badge size="sm" color="red" variant="light">
+                {unacknowledgedCount} new
+              </Badge>
+            )}
+          </Group>
+        </Menu.Label>
+        {notificationsLoading ? (
+          <Menu.Item disabled>
+            <Text size="sm" c="dimmed">
+              Loading...
+            </Text>
+          </Menu.Item>
+        ) : notifications.length === 0 ? (
+          <Menu.Item disabled>
+            <Text size="sm" c="dimmed" ta="center">
+              {unacknowledgedCount > 0 ? 'No notifications to show' : 'All Caught Up!'}
+            </Text>
+          </Menu.Item>
+        ) : (
+          notifications.map((notification) => (
+            <Menu.Item
+              key={notification.id}
+              rightSection={(
+                <UnstyledButton
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    acknowledgeNotification(notification.id);
+                  }}
+                  aria-label="Acknowledge notification"
+                  title="Acknowledge"
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  <IconCheck size={16} color="var(--mantine-color-blue-6)" />
+                </UnstyledButton>
+              )}
+              onClick={() => {
+                acknowledgeNotification(notification.id);
+                if (notification.link) {
+                  const link = notification.link.replace('/estimates/', '/proposals/');
+                  router.push(link);
+                }
+              }}
+            >
+              <Stack gap={4}>
+                <Text size="sm" fw={500} lineClamp={1}>
+                  {notification.title}
+                </Text>
+
+                {(() => {
+                  const estimateId = extractEstimateId(notification.link);
+                  const jobTitle = estimateId ? jobTitles[estimateId] : null;
+                  return jobTitle ? (
+                    <Text size="xs" c="blue" fw={500} lineClamp={1}>
+                      {jobTitle}
+                    </Text>
+                  ) : null;
+                })()}
+                {notification.link && (
+                  <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
+                    View details →
+                  </Text>
+                )}
+              </Stack>
+            </Menu.Item>
+          ))
+        )}
+        <Divider />
+        <Menu.Item
+          leftSection={<IconList size={16} />}
+          onClick={() => {
+            router.push('/notifications');
+          }}
+        >
+          <Text size="sm">View All Notifications</Text>
+        </Menu.Item>
+      </Menu.Dropdown>
+    </Menu>
+  );
+
   return (
     <>
       <aside className={`${classes.sidebar} ${sidebarOpened ? classes.sidebarOpen : ''}`}>
@@ -984,137 +1175,54 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
           <Group gap="sm" className={classes.iconsGroup}>
             {isAuthenticated && !isLoading && (
               <>
-                <Link
+                {effectiveRole && !isPainterRole(effectiveRole) ? (
+                  <Link
+                    style={{ marginTop: rem(5) }}
+                    key="Settings"
+                    href="/settings"
+                    onClick={(event) => handleNavLinkClick(event, '/settings')}
+                  >
+                    <IconSettings color="black" size={22} radius="xl" />
+                  </Link>
+                ) : null}
+                {renderNotificationsDropdown()}
+                <UnstyledButton
+                  type="button"
+                  aria-label="Log out"
+                  onClick={() => setLogoutModalOpened(true)}
                   style={{ marginTop: rem(5) }}
-                  key="Settings"
-                  href="/settings"
-                  onClick={(event) => handleNavLinkClick(event, '/settings')}
                 >
-                  <IconSettings color="black" size={22} radius="xl" />
-                </Link>
-                <Menu
-                  shadow="md"
-                  width={400}
-                  position="bottom-end"
-                  onOpen={fetchNotifications}
-                >
-                  <Menu.Target>
-                    <div style={{ marginTop: rem(5), cursor: 'pointer', position: 'relative' }}>
-                      <IconNotification color="black" size={22} radius="xl" />
-                      {unacknowledgedCount > 0 && (
-                        <Badge
-                          size="xs"
-                          color="red"
-                          variant="filled"
-                          style={{
-                            position: 'absolute',
-                            top: rem(-4),
-                            right: rem(-4),
-                            minWidth: rem(18),
-                            height: rem(18),
-                            padding: 0,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: rem(10),
-                          }}
-                        >
-                          {unacknowledgedCount > 99 ? '99+' : unacknowledgedCount}
-                        </Badge>
-                      )}
-                    </div>
-                  </Menu.Target>
-              <Menu.Dropdown>
-                <Menu.Label>
-                  <Group justify="space-between">
-                    <Text size="sm" fw={600}>
-                      Notifications
-                    </Text>
-                    {unacknowledgedCount > 0 && (
-                      <Badge size="sm" color="red" variant="light">
-                        {unacknowledgedCount} new
-                      </Badge>
-                    )}
-                  </Group>
-                </Menu.Label>
-                {notificationsLoading ? (
-                  <Menu.Item disabled>
-                    <Text size="sm" c="dimmed">
-                      Loading...
-                    </Text>
-                  </Menu.Item>
-                ) : notifications.length === 0 ? (
-                  <Menu.Item disabled>
-                    <Text size="sm" c="dimmed" ta="center">
-                      {unacknowledgedCount > 0 ? 'No notifications to show' : 'All Caught Up!'}
-                    </Text>
-                  </Menu.Item>
-                ) : (
-                  notifications.map((notification) => (
-                    <Menu.Item
-                      key={notification.id}
-                      rightSection={(
-                        <UnstyledButton
-                          onClick={(event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                            acknowledgeNotification(notification.id);
-                          }}
-                          aria-label="Acknowledge notification"
-                          title="Acknowledge"
-                          style={{ display: 'flex', alignItems: 'center' }}
-                        >
-                          <IconCheck size={16} color="var(--mantine-color-blue-6)" />
-                        </UnstyledButton>
-                      )}
-                      onClick={() => {
-                        acknowledgeNotification(notification.id);
-                        if (notification.link) {
-                          // Transform /estimates/ to /proposals/ for backward compatibility
-                          const link = notification.link.replace('/estimates/', '/proposals/');
-                          router.push(link);
-                        }
-                      }}
-                    >
-                      <Stack gap={4}>
-                        <Text size="sm" fw={500} lineClamp={1}>
-                          {notification.title}
-                        </Text>
-
-                        {(() => {
-                          const estimateId = extractEstimateId(notification.link);
-                          const jobTitle = estimateId ? jobTitles[estimateId] : null;
-                          return jobTitle ? (
-                            <Text size="xs" c="blue" fw={500} lineClamp={1}>
-                              {jobTitle}
-                            </Text>
-                          ) : null;
-                        })()}
-                        {notification.link && (
-                          <Text size="xs" c="blue" style={{ cursor: 'pointer' }}>
-                            View details →
-                          </Text>
-                        )}
-                      </Stack>
-                    </Menu.Item>
-                  ))
-                )}
-                <Divider />
-                <Menu.Item
-                  leftSection={<IconList size={16} />}
-                  onClick={() => {
-                    router.push('/notifications');
-                  }}
-                >
-                  <Text size="sm">View All Notifications</Text>
-                </Menu.Item>
-              </Menu.Dropdown>
-                </Menu>
+                  <IconLogout color="black" size={22} stroke={1.5} />
+                </UnstyledButton>
               </>
             )}
           </Group>
         </div>
       </header>
+
+      <Modal
+        opened={logoutModalOpened}
+        onClose={() => setLogoutModalOpened(false)}
+        title="Log out"
+        size="sm"
+        zIndex={400}
+        overlayProps={{ opacity: 0.52 }}
+        keepMounted={false}
+      >
+        <Stack gap="lg">
+          <Text size="sm" c="dimmed">
+            Are you sure you want to log out? You will need to sign in again to access your account.
+          </Text>
+          <Group justify="flex-end" gap="sm">
+            <Button variant="default" onClick={() => setLogoutModalOpened(false)}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmLogout}>
+              Log out
+            </Button>
+          </Group>
+        </Stack>
+      </Modal>
     </>
   );
 }

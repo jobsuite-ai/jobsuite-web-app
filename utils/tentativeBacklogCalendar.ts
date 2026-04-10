@@ -8,6 +8,11 @@ import {
   pickCapacityRowForDate,
   type TeamCapacityRowInput,
 } from '@/utils/scheduleMath';
+import {
+  adjustStartForSchedulingSeason,
+  DEFAULT_SCHEDULING_SEASON_RULES,
+  type SchedulingSeasonRules,
+} from '@/utils/schedulingSeason';
 
 /** Subset of calendar team shape; backlog bar math only needs capacity + crew size. */
 export type TeamShapeForBacklogBar = {
@@ -22,6 +27,8 @@ export type TeamShapeForBacklogBar = {
 
 export type BacklogLaborItem = {
   labor_hours?: number;
+  /** Aligns tentative bars with API lock-in (exterior season, etc.). */
+  estimate_type?: string;
 };
 
 /** Inclusive calendar span for locked jobs (YYYY-MM-DD), merged for overlap/touch. */
@@ -212,12 +219,15 @@ export function computeTentativeBacklogPlacementClient(
     /** Locked job inclusive date spans for this team (merged inside). */
     lockedIntervals?: LockedIntervalIso[] | null;
     items: BacklogLaborItem[];
+    /** Contractor scheduling season; when omitted, defaults match the API engine. */
+    seasonRules?: SchedulingSeasonRules;
   }
 ): TentativeBacklogPlacementClient | null {
   if (!params.items.length) {
     return null;
   }
 
+  const seasonRules = params.seasonRules ?? DEFAULT_SCHEDULING_SEASON_RULES;
   const locked = mergeLockedIntervals(params.lockedIntervals ?? []);
 
   let cursor = nextTeamWorkDayOnOrAfter(team, startOfDay(new Date()));
@@ -236,6 +246,8 @@ export function computeTentativeBacklogPlacementClient(
       let guard = 0;
       while (guard < 366) {
         guard += 1;
+        cursor = advanceCursorPastLockedIntervals(team, cursor, locked);
+        cursor = adjustStartForSchedulingSeason(cursor, it.estimate_type, seasonRules);
         cursor = advanceCursorPastLockedIntervals(team, cursor, locked);
         const cap = dailyLaborCapacityOnDate(team, cursor);
         if (cap > 1e-9) {
@@ -288,6 +300,7 @@ export function computeTentativeBacklogCalendarBar(
   params: {
     lockedIntervals?: LockedIntervalIso[] | null;
     items: BacklogLaborItem[];
+    seasonRules?: SchedulingSeasonRules;
   }
 ): Omit<TentativeBacklogPlacementClient, 'itemWorkingDays' | 'itemDateRanges'> | null {
   const p = computeTentativeBacklogPlacementClient(team, params);
@@ -303,11 +316,13 @@ export function buildSyntheticTeamBacklogCalendarEvent(
   backlog: {
     items: BacklogLaborItem[];
     lockedIntervals?: LockedIntervalIso[] | null;
+    seasonRules?: SchedulingSeasonRules;
   }
 ): SyntheticTeamBacklogCalendarEvent | null {
   const bar = computeTentativeBacklogCalendarBar(team, {
     lockedIntervals: backlog.lockedIntervals,
     items: backlog.items,
+    seasonRules: backlog.seasonRules,
   });
   if (!bar) {
     return null;

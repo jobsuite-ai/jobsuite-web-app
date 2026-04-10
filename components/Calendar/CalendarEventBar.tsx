@@ -2,8 +2,8 @@
 
 import type { CSSProperties } from 'react';
 
-import { ActionIcon, Menu, Tooltip } from '@mantine/core';
-import { IconCalendarEvent, IconDots, IconPencil, IconUsers } from '@tabler/icons-react';
+import { ActionIcon, Group, Menu, Tooltip } from '@mantine/core';
+import { IconCalendarEvent, IconDots, IconGripVertical, IconPencil, IconUsers } from '@tabler/icons-react';
 import Link from 'next/link';
 
 import classes from './CalendarPage.module.css';
@@ -33,6 +33,12 @@ type CalendarEventBarProps = {
   /** Same length as bar day columns; true = red inset outline (team double-booked that day). */
   doubleBookDays?: boolean[];
   doubleBookTooltip?: string | null;
+  /** Locked jobs: drag handle for calendar reschedule (from @dnd-kit useDraggable). */
+  dragHandle?: {
+    setNodeRef: (el: HTMLElement | null) => void;
+    attributes: Record<string, unknown>;
+    listeners?: Record<string, unknown>;
+  } | null;
 };
 
 export function CalendarEventBar({
@@ -46,6 +52,7 @@ export function CalendarEventBar({
   onChangeTeam,
   doubleBookDays,
   doubleBookTooltip,
+  dragHandle,
 }: CalendarEventBarProps) {
   const { isBacklog, scheduleId, estimateId } = row;
   const showMenu =
@@ -129,7 +136,25 @@ export function CalendarEventBar({
         className={classes.eventBarInner}
         style={showDayOutlines ? { position: 'relative', zIndex: 1 } : undefined}
       >
-        {titleBlock}
+        <Group gap={4} wrap="nowrap" align="flex-start" style={{ minWidth: 0, flex: 1 }}>
+          {dragHandle ? (
+            <ActionIcon
+              ref={dragHandle.setNodeRef}
+              {...dragHandle.attributes}
+              {...dragHandle.listeners}
+              variant="filled"
+              color="dark"
+              size="sm"
+              aria-label="Drag to reschedule on calendar"
+              className={classes.eventBarDragHandle}
+              style={{ cursor: 'grab', flexShrink: 0, touchAction: 'none' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <IconGripVertical size={14} />
+            </ActionIcon>
+          ) : null}
+          {titleBlock}
+        </Group>
         {showMenu ? (
           <div className={classes.eventBarActions}>
             <Menu shadow="md" width={220} withinPortal>

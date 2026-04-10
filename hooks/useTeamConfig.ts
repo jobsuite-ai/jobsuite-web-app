@@ -2,6 +2,11 @@ import { useEffect, useState } from 'react';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { DEFAULT_SCHEDULE_DAILY_HOURS } from '@/utils/scheduleMath';
+import {
+  DEFAULT_SCHEDULING_SEASON_RULES,
+  normalizeExteriorEarliestMmdd,
+  type SchedulingSeasonRules,
+} from '@/utils/schedulingSeason';
 
 export interface ScheduleTeam {
   id: string;
@@ -16,6 +21,8 @@ export interface TeamConfig {
   scheduleDefaultDailyHours: number;
   /** Optional teams for capacity + calendar assignment */
   scheduleTeams: ScheduleTeam[];
+  /** Exterior season + interior year-round (matches job-engine schedule routes). */
+  schedulingSeason: SchedulingSeasonRules;
 }
 
 let teamConfigCache: TeamConfig | null = null;
@@ -54,6 +61,20 @@ function parseScheduleTeams(raw: unknown): ScheduleTeam[] {
   return out;
 }
 
+function parseSchedulingSeason(
+  configuration: Record<string, unknown> | undefined
+): SchedulingSeasonRules {
+  if (!configuration) {
+    return { ...DEFAULT_SCHEDULING_SEASON_RULES };
+  }
+  return {
+    exteriorEarliestMmdd: normalizeExteriorEarliestMmdd(
+      configuration.scheduling_exterior_earliest_mmdd
+    ),
+    interiorYearRound: configuration.scheduling_interior_year_round !== false,
+  };
+}
+
 function parseTeamConfig(configuration: Record<string, unknown> | undefined): TeamConfig {
   const scheduleRaw = configuration?.schedule_default_daily_hours;
   let scheduleDefaultDailyHours = DEFAULT_SCHEDULE_DAILY_HOURS;
@@ -64,6 +85,7 @@ function parseTeamConfig(configuration: Record<string, unknown> | undefined): Te
   return {
     scheduleDefaultDailyHours,
     scheduleTeams: parseScheduleTeams(configuration?.schedule_teams),
+    schedulingSeason: parseSchedulingSeason(configuration),
   };
 }
 
@@ -72,6 +94,7 @@ export function useTeamConfig() {
     teamConfigCache ?? {
       scheduleDefaultDailyHours: DEFAULT_SCHEDULE_DAILY_HOURS,
       scheduleTeams: [],
+      schedulingSeason: { ...DEFAULT_SCHEDULING_SEASON_RULES },
     }
   );
   const [loading, setLoading] = useState(!teamConfigCache);
@@ -123,6 +146,7 @@ export function useTeamConfig() {
         const fallback: TeamConfig = {
           scheduleDefaultDailyHours: DEFAULT_SCHEDULE_DAILY_HOURS,
           scheduleTeams: [],
+          schedulingSeason: { ...DEFAULT_SCHEDULING_SEASON_RULES },
         };
         setTeamConfig(fallback);
         setLoading(false);

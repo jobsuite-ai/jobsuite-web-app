@@ -41,6 +41,7 @@ import {
   mantineColorToCss,
   teamBacklogPaperBackground,
 } from '@/utils/scheduleColors';
+import type { SchedulingSeasonRules } from '@/utils/schedulingSeason';
 import {
   computeTentativeBacklogPlacementClient,
   type LockedIntervalIso,
@@ -138,6 +139,7 @@ export function TentativeBacklogTeamCard({
   serverItems,
   lockedIntervals,
   estimates,
+  schedulingSeason,
   onLockSchedule,
   onChangeTeam,
   onSaved,
@@ -147,6 +149,7 @@ export function TentativeBacklogTeamCard({
   serverItems: TentativeBacklogItemRow[];
   lockedIntervals: LockedIntervalIso[] | undefined;
   estimates: Estimate[];
+  schedulingSeason: SchedulingSeasonRules;
   onLockSchedule: (e: Estimate, impliedStartIso: string) => void;
   onChangeTeam: (e: Estimate) => void;
   onSaved: () => void;
@@ -165,9 +168,21 @@ export function TentativeBacklogTeamCard({
 
   const effectiveItems = draftItems ?? serverItems;
 
+  const placementItems = useMemo(
+    () =>
+      effectiveItems.map((i) => ({
+        labor_hours: i.labor_hours,
+        estimate_type: estimates.find((e) => e.id === i.estimate_id)?.estimate_type as
+          | string
+          | undefined,
+      })),
+    [effectiveItems, estimates]
+  );
+
   const placement = computeTentativeBacklogPlacementClient(team, {
     lockedIntervals: lockedIntervals ?? null,
-    items: effectiveItems,
+    items: placementItems,
+    seasonRules: schedulingSeason,
   });
 
   const totalWd = placement?.itemWorkingDays.reduce((a, b) => a + b, 0) ?? 0;
