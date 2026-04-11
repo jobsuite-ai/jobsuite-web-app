@@ -565,7 +565,7 @@ export default function MessagingCenter() {
         <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
             <Group justify="space-between" mb="xl">
                 <div>
-                    <Title c="white" order={1} mb="xs">
+                    <Title c="gray.0" order={1} mb="xs">
                         Messaging Center
                     </Title>
                     <Text c="dimmed">

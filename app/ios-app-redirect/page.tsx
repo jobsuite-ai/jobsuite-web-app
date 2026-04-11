@@ -5,7 +5,7 @@ import { Container, Title, Text, Button, Paper } from '@mantine/core';
 export default function IOSAppRedirectPage() {
   return (
     <Container size={420} my={40}>
-      <Title ta="center" fw={900}>
+      <Title ta="center" fw={900} c="gray.0">
         Welcome to Jobsuite!
       </Title>
       <Text ta="center" c="dimmed" size="sm" mt={5}>
