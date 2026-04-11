@@ -32,7 +32,51 @@ function logApiBaseResolution(
   console.info('[getApiBaseUrl]', { baseUrl, reason, ...extra });
 }
 
-export const getApiBaseUrl = () => {
+/** Server Route Handler opts: align job-engine URL with browser host (e.g. QA Amplify previews). */
+export type ApiBaseUrlOptions = {
+  request?: Request;
+};
+
+function hostnameFromIncomingRequest(request: Request): string | undefined {
+  const raw = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  if (!raw) {
+    return undefined;
+  }
+  const first = raw.split(',')[0].trim();
+  const host = first.split(':')[0];
+  return host || undefined;
+}
+
+export const getApiBaseUrl = (opts?: ApiBaseUrlOptions) => {
+  // Server Route Handler: prefer Host / X-Forwarded-Host so QA matches client-side resolution
+  // (Amplify preview branches may not set AWS_BRANCH=qa; unknown branch used to default to prod).
+  if (opts?.request) {
+    const hostname = hostnameFromIncomingRequest(opts.request);
+    if (hostname) {
+      const h = hostname.toLowerCase();
+      if (h === 'www.jobsuite.app' || h === 'jobsuite.app') {
+        const baseUrl = 'https://api.jobsuite.app';
+        logApiBaseResolution('server:incoming-request-host:jobsuite.app', baseUrl, { hostname: h });
+        return baseUrl;
+      }
+      if (h.includes('qa') || h.includes('staging') || h.endsWith('amplifyapp.com')) {
+        const baseUrl = 'https://qa.api.jobsuite.app';
+        logApiBaseResolution('server:incoming-request-host:qa-or-staging-or-amplify', baseUrl, {
+          hostname: h,
+        });
+        return baseUrl;
+      }
+      if (h === 'localhost' || h === '127.0.0.1') {
+        const url =
+          process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL ||
+          process.env.JOB_ENGINE_LOCAL_URL ||
+          'http://localhost:8000';
+        logApiBaseResolution('server:incoming-request-host:localhost', url, { hostname: h });
+        return url;
+      }
+    }
+  }
+
   // Client-side: detect environment from current hostname
   if (typeof window !== 'undefined') {
     const { hostname } = window.location;

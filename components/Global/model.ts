@@ -237,7 +237,7 @@ export type Estimate = {
     quickbooks_customer_id?: string;
     quickbooks_estimate_id?: string;
     quickbooks_invoice_id?: string;
-    hours_worked?: number; // Calculated from time entries
+    hours_worked?: number; // Sum of JobSuite work time for the job
     // Follow-up and column tracking
     column_entered_at?: string;
     follow_up_count?: number;
