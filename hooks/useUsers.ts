@@ -48,6 +48,7 @@ export function useUsers() {
 
     usersCachePromise = fetch('/api/users', {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,

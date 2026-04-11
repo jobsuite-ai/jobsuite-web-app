@@ -1,8 +1,22 @@
 'use client';
 
 import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  pointerWithin,
+  rectIntersection,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import type { MantineTheme } from '@mantine/core';
 import {
   ActionIcon,
   Alert,
@@ -30,11 +44,21 @@ import {
   IconChevronRight,
   IconRefresh,
 } from '@tabler/icons-react';
-import { addDays, eachWeekOfInterval, format, isValid, parse, startOfDay } from 'date-fns';
+import {
+  addDays,
+  differenceInCalendarDays,
+  eachWeekOfInterval,
+  format,
+  isValid,
+  parse,
+  startOfDay,
+} from 'date-fns';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createPortal } from 'react-dom';
 
-import { CalendarEventBar } from './CalendarEventBar';
+import { CalendarDayDropCell } from './CalendarDayDropCell';
 import classes from './CalendarPage.module.css';
+import { CalendarScheduleDraggableBar } from './CalendarScheduleDraggableBar';
 import { ChangeTeamModal } from './ChangeTeamModal';
 import { LockedScheduleEditModal } from './LockedScheduleEditModal';
 import { ScheduleJobModal, type CalendarTeamOption } from './ScheduleJobModal';
@@ -74,6 +98,7 @@ import {
   teamBacklogCardBackground,
 } from '@/utils/scheduleColors';
 import type { TeamCapacityRowInput } from '@/utils/scheduleMath';
+import { reasonStartDateNotAllowed } from '@/utils/schedulingSeason';
 import {
   buildSyntheticTeamBacklogCalendarEvent,
   type LockedIntervalIso,
@@ -109,6 +134,10 @@ type ScheduleEditDraft = {
 type SchedulePreviewPayload = {
   work_dates: string[];
   end_date: string;
+  /** Present when exterior/both start is adjusted to season (`compute_preview_payload`). */
+  season_message?: string | null;
+  tentative?: boolean;
+  suggested_window_start?: string | null;
 };
 
 function scheduleEditDraftsEqual(
@@ -128,28 +157,152 @@ function scheduleEditDraftsEqual(
   );
 }
 
+function shiftScheduleDateYmd(ymd: string, deltaDays: number): string {
+  const d = startOfDay(parseLocalDateString(ymd));
+  return format(addDays(d, deltaDays), 'yyyy-MM-dd');
+}
+
+/**
+ * Merges unsaved schedule edits into calendar events.
+ * When the preview API has not returned yet, applies an optimistic shift so drag/drop and
+ * modal edits move the bar immediately; server preview replaces this when available.
+ */
 function applySchedulePreviewPatch(
   events: CalendarApiEvent[],
   draft: ScheduleEditDraft | null,
   preview: SchedulePreviewPayload | null
 ): CalendarApiEvent[] {
-  if (!draft || !preview?.end_date) {
+  if (!draft) {
     return events;
   }
-  const start =
-    preview.work_dates?.length > 0 ? preview.work_dates[0].slice(0, 10) : draft.startIso;
+
+  const hasServerPreview =
+    preview != null &&
+    typeof preview.end_date === 'string' &&
+    preview.end_date.trim().length > 0;
+
   return events.map((ev) => {
     if (ev.calendar_kind !== 'job' || ev.schedule_id !== draft.scheduleId) {
       return ev;
     }
+
+    const nw = draft.nonWorkingIso.map((s) => s.slice(0, 10));
+
+    if (hasServerPreview) {
+      const wd = preview!.work_dates ?? [];
+      const start =
+        wd.length > 0 ? wd[0]!.slice(0, 10) : draft.startIso;
+      return {
+        ...ev,
+        schedule_start_date: start,
+        schedule_end_date: preview!.end_date.slice(0, 10),
+        schedule_work_dates: wd.map((w) => w.slice(0, 10)),
+        schedule_non_working_dates: nw,
+      };
+    }
+
+    // Optimistic: draft only (preview loading, debounce, or API failure)
+    const oldStartStr = ev.schedule_start_date?.trim().slice(0, 10);
+    if (!oldStartStr) {
+      return {
+        ...ev,
+        schedule_start_date: draft.startIso,
+        schedule_non_working_dates: nw,
+      };
+    }
+    const oldStart = startOfDay(parseLocalDateString(oldStartStr));
+    const newStart = startOfDay(parseLocalDateString(draft.startIso));
+    const delta = differenceInCalendarDays(newStart, oldStart);
+    if (delta === 0) {
+      return {
+        ...ev,
+        schedule_non_working_dates: nw,
+      };
+    }
+    const explicit = (ev.schedule_work_dates ?? []).filter(
+      (s): s is string => typeof s === 'string' && s.trim().length > 0
+    );
+    const oldEndStr = ev.schedule_end_date?.trim().slice(0, 10);
+    const newEndStr = oldEndStr
+      ? shiftScheduleDateYmd(oldEndStr.slice(0, 10), delta)
+      : draft.startIso;
+    if (explicit.length > 0) {
+      return {
+        ...ev,
+        schedule_start_date: draft.startIso,
+        schedule_end_date: newEndStr,
+        schedule_work_dates: explicit.map((w) => shiftScheduleDateYmd(w.slice(0, 10), delta)),
+        schedule_non_working_dates: nw,
+      };
+    }
     return {
       ...ev,
-      schedule_start_date: start,
-      schedule_end_date: preview.end_date.slice(0, 10),
-      schedule_work_dates: (preview.work_dates ?? []).map((w) => w.slice(0, 10)),
-      schedule_non_working_dates: draft.nonWorkingIso.map((s) => s.slice(0, 10)),
+      schedule_start_date: draft.startIso,
+      schedule_end_date: newEndStr,
+      schedule_non_working_dates: nw,
     };
   });
+}
+
+function buildScheduleEditDraftFromRow(
+  row: WeekCalRow,
+  estimates: Estimate[],
+  startIso: string
+): ScheduleEditDraft | null {
+  if (!row.estimateId) {
+    return null;
+  }
+  const est = estimates.find((e) => e.id === row.estimateId);
+  const fromSchedule = row.scheduleLaborHours;
+  const fromBid = est?.hours_bid ?? 0;
+  const laborHours =
+    fromSchedule != null && fromSchedule > 0
+      ? fromSchedule
+      : fromBid > 0
+        ? fromBid
+        : 0;
+  return {
+    scheduleId: row.scheduleId,
+    estimateId: row.estimateId,
+    teamId: row.colorKey,
+    startIso,
+    nonWorkingIso: row.scheduleNonWorkingIso.map((s) => s.slice(0, 10)),
+    laborHours,
+  };
+}
+
+const calendarCollisionDetection: CollisionDetection = (args) => {
+  const inside = pointerWithin(args);
+  if (inside.length > 0) {
+    return inside;
+  }
+  return rectIntersection(args);
+};
+
+/**
+ * Same date/team lines as {@link CalendarScheduleDraggableBar} / {@link CalendarEventBar}
+ * (drag overlay).
+ */
+function buildDragOverlayForWeekCalRow(
+  row: WeekCalRow,
+  teams: CalendarTeamOption[],
+  colors: MantineTheme['colors']
+): { title: string; solidBg: string; segmentLine: string } {
+  const { color, shade } = colorForScheduleKey(row.colorKey);
+  const solidBg = mantineColorToCss(colors, color, shade ?? 6);
+  const segmentDates =
+    row.isBacklog && row.scheduleStartIso && row.scheduleEndIso
+      ? (formatBacklogSpanLabel(row.scheduleStartIso, row.scheduleEndIso) ??
+        `${format(row.labelRangeStart, 'MMM d')}–${format(row.labelRangeEnd, 'MMM d')}`)
+      : `${format(row.labelRangeStart, 'MMM d')}–${format(row.labelRangeEnd, 'MMM d')}`;
+  const teamLabel =
+    row.teamName || teams.find((t) => t.id === row.colorKey)?.name || '—';
+  const metaSuffix = row.isBacklog ? ' · tentative backlog' : ` · ${teamLabel}`;
+  return {
+    title: row.title,
+    solidBg,
+    segmentLine: `${segmentDates}${metaSuffix}`,
+  };
 }
 
 export function CalendarPage() {
@@ -221,6 +374,36 @@ export function CalendarPage() {
   );
   const [scheduleConflictCode, setScheduleConflictCode] = useState<string | null>(null);
 
+  const [calendarDragActive, setCalendarDragActive] = useState(false);
+  /** While dragging, day column is invalid as a start date (e.g. before exterior season). */
+  const [dragInvalidDrop, setDragInvalidDrop] = useState<{
+    ymd: string;
+    reason: string;
+  } | null>(null);
+  /** Viewport position for the invalid-drop floating hint (anchored to the day cell). */
+  const [invalidDropAnchor, setInvalidDropAnchor] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+  const dayCellElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+
+  const registerDayCellElement = useCallback((ymd: string, el: HTMLDivElement | null) => {
+    if (el) {
+      dayCellElementsRef.current.set(ymd, el);
+    } else {
+      dayCellElementsRef.current.delete(ymd);
+    }
+  }, []);
+  const [dragOverlayLabel, setDragOverlayLabel] = useState<{
+    title: string;
+    solidBg: string;
+    segmentLine: string;
+    showPreviewTag: boolean;
+  } | null>(null);
+
+  const scheduleEditDraftRef = useRef<ScheduleEditDraft | null>(null);
+
   const [changeTeamCtx, setChangeTeamCtx] = useState<{
     estimate: Estimate;
     currentTeamId: string | null;
@@ -232,6 +415,16 @@ export function CalendarPage() {
   const [showNonWorkingDays, setShowNonWorkingDays] = useState(false);
   /** Empty = show all teams. Non-empty = calendar shows only those teams (client-side). */
   const [selectedTeamFilterIds, setSelectedTeamFilterIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    scheduleEditDraftRef.current = scheduleEditDraft;
+  }, [scheduleEditDraft]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 10 },
+    })
+  );
 
   const toggleTeamFilter = useCallback((teamId: string) => {
     setSelectedTeamFilterIds((prev) => {
@@ -310,23 +503,171 @@ export function CalendarPage() {
       if (!row.estimateId) {
         return;
       }
-      const est = estimates.find((e) => e.id === row.estimateId);
       const startIso =
-        row.scheduleStartIso ?? row.workRange.start.toISOString().slice(0, 10);
-      const base: ScheduleEditDraft = {
-        scheduleId: row.scheduleId,
-        estimateId: row.estimateId,
-        teamId: row.colorKey,
-        startIso,
-        nonWorkingIso: row.scheduleNonWorkingIso.map((s) => s.slice(0, 10)),
-        laborHours: est?.hours_bid ?? 0,
-      };
+        row.scheduleStartIso ?? format(startOfDay(row.workRange.start), 'yyyy-MM-dd');
+      const base = buildScheduleEditDraftFromRow(row, estimates, startIso);
+      if (!base) {
+        return;
+      }
       setScheduleEditBaseline({ ...base });
       setScheduleEditDraft({ ...base });
       setAdjustOpen(true);
     },
     [estimates]
   );
+
+  const applyRescheduleFromDrop = useCallback(
+    (row: WeekCalRow, newStartYmd: string) => {
+      const currentRowStart =
+        row.scheduleStartIso ?? format(startOfDay(row.workRange.start), 'yyyy-MM-dd');
+      if (newStartYmd === currentRowStart) {
+        return;
+      }
+      const nextDraft = buildScheduleEditDraftFromRow(row, estimates, newStartYmd);
+      if (!nextDraft) {
+        return;
+      }
+      const prev = scheduleEditDraftRef.current;
+      if (prev && prev.scheduleId === nextDraft.scheduleId) {
+        setScheduleEditDraft({ ...prev, startIso: newStartYmd });
+        setAdjustOpen(false);
+        return;
+      }
+      const baselineStart =
+        row.scheduleStartIso ?? format(startOfDay(row.workRange.start), 'yyyy-MM-dd');
+      const baselineDraft = buildScheduleEditDraftFromRow(row, estimates, baselineStart);
+      if (baselineDraft) {
+        setScheduleEditBaseline(baselineDraft);
+      }
+      setScheduleEditDraft(nextDraft);
+      setAdjustOpen(false);
+    },
+    [estimates]
+  );
+
+  const handleScheduleDragStart = useCallback(
+    (event: DragStartEvent) => {
+      setAdjustOpen(false);
+      setCalendarDragActive(true);
+      setDragInvalidDrop(null);
+      const data = event.active.data.current as { row?: WeekCalRow } | undefined;
+      const row = data?.row;
+      if (!row) {
+        setDragOverlayLabel(null);
+        return;
+      }
+      const base = buildDragOverlayForWeekCalRow(row, teams, theme.colors);
+      const showPreviewTag = Boolean(
+        scheduleEditDraft && !row.isBacklog && row.scheduleId === scheduleEditDraft.scheduleId
+      );
+      setDragOverlayLabel({
+        ...base,
+        showPreviewTag,
+      });
+    },
+    [teams, theme.colors, scheduleEditDraft]
+  );
+
+  const handleScheduleDragOver = useCallback(
+    (event: DragOverEvent) => {
+      const { active, over } = event;
+      const row = active.data.current?.row as WeekCalRow | undefined;
+      if (!row || row.isBacklog || row.scheduleTentative || !row.estimateId) {
+        setDragInvalidDrop(null);
+        return;
+      }
+      if (!over?.id) {
+        setDragInvalidDrop(null);
+        return;
+      }
+      const oid = String(over.id);
+      if (!oid.startsWith('cal-drop:')) {
+        setDragInvalidDrop(null);
+        return;
+      }
+      const ymd = oid.slice('cal-drop:'.length);
+      const est = estimates.find((e) => e.id === row.estimateId);
+      const day = parseLocalDateString(ymd);
+      const reason = reasonStartDateNotAllowed(
+        est?.estimate_type ? String(est.estimate_type) : undefined,
+        teamConfig.schedulingSeason,
+        day
+      );
+      if (reason) {
+        setDragInvalidDrop({ ymd, reason });
+      } else {
+        setDragInvalidDrop(null);
+      }
+    },
+    [estimates, teamConfig.schedulingSeason]
+  );
+
+  const handleScheduleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      setCalendarDragActive(false);
+      setDragOverlayLabel(null);
+      setDragInvalidDrop(null);
+      const { active, over } = event;
+      if (!over) {
+        return;
+      }
+      const overId = String(over.id);
+      if (!overId.startsWith('cal-drop:')) {
+        return;
+      }
+      const newStartYmd = overId.slice('cal-drop:'.length);
+      const data = active.data.current as { row?: WeekCalRow } | undefined;
+      const row = data?.row;
+      if (!row || row.isBacklog || row.scheduleTentative || !row.estimateId) {
+        return;
+      }
+      const est = estimates.find((e) => e.id === row.estimateId);
+      const blockReason = reasonStartDateNotAllowed(
+        est?.estimate_type ? String(est.estimate_type) : undefined,
+        teamConfig.schedulingSeason,
+        parseLocalDateString(newStartYmd)
+      );
+      if (blockReason) {
+        notifications.show({
+          title: 'Can’t reschedule there',
+          message: blockReason,
+          color: 'yellow',
+        });
+        return;
+      }
+      applyRescheduleFromDrop(row, newStartYmd);
+    },
+    [applyRescheduleFromDrop, estimates, teamConfig.schedulingSeason]
+  );
+
+  const handleScheduleDragCancel = useCallback(() => {
+    setCalendarDragActive(false);
+    setDragOverlayLabel(null);
+    setDragInvalidDrop(null);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!calendarDragActive || !dragInvalidDrop) {
+      setInvalidDropAnchor(null);
+      return () => {};
+    }
+    const update = () => {
+      const el = dayCellElementsRef.current.get(dragInvalidDrop.ymd);
+      if (!el) {
+        setInvalidDropAnchor(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setInvalidDropAnchor({ top: r.top, left: r.left, width: r.width });
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [calendarDragActive, dragInvalidDrop]);
 
   const handleScheduleDraftChange = useCallback(
     (next: { startIso: string | null; nonWorkingIso: string[] }) => {
@@ -350,6 +691,10 @@ export function CalendarPage() {
       if (!scheduleEditDraft) {
         return;
       }
+      if (!scheduleEditDraft.laborHours || scheduleEditDraft.laborHours <= 0) {
+        setSchedulePreviewPayload(null);
+        return;
+      }
 
       const est = estimates.find((e) => e.id === scheduleEditDraft.estimateId);
       fetch('/api/schedule/preview', {
@@ -367,16 +712,43 @@ export function CalendarPage() {
         }),
       })
         .then(async (res) => {
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok || cancelled) {
+          const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          if (!res.ok) {
+            if (!cancelled) {
+              const { detail } = data;
+              const msg =
+                typeof detail === 'string'
+                  ? detail
+                  : typeof data.message === 'string'
+                    ? data.message
+                    : 'Schedule preview failed';
+              notifications.show({
+                id: 'schedule-preview-error',
+                title: 'Could not preview schedule',
+                message: msg,
+                color: 'red',
+              });
+              setSchedulePreviewPayload(null);
+            }
+            return;
+          }
+          if (cancelled) {
             return;
           }
           const wd = data.work_dates;
           const end = data.end_date;
           if (Array.isArray(wd) && typeof end === 'string') {
+            notifications.hide('schedule-preview-error');
             setSchedulePreviewPayload({
               work_dates: wd as string[],
               end_date: end,
+              season_message:
+                typeof data.season_message === 'string' ? data.season_message : null,
+              tentative: typeof data.tentative === 'boolean' ? data.tentative : undefined,
+              suggested_window_start:
+                typeof data.suggested_window_start === 'string'
+                  ? data.suggested_window_start
+                  : null,
             });
           } else {
             setSchedulePreviewPayload(null);
@@ -385,9 +757,15 @@ export function CalendarPage() {
         .catch(() => {
           if (!cancelled) {
             setSchedulePreviewPayload(null);
+            notifications.show({
+              id: 'schedule-preview-error',
+              title: 'Could not preview schedule',
+              message: 'Network error',
+              color: 'red',
+            });
           }
         });
-    }, 250);
+    }, 80);
 
     if (!scheduleEditDraft) {
       setSchedulePreviewPayload(null);
@@ -410,9 +788,11 @@ export function CalendarPage() {
       try {
         const body: Record<string, unknown> = {
           start_date: scheduleEditDraft.startIso,
-          labor_hours: scheduleEditDraft.laborHours,
           non_working_dates: scheduleEditDraft.nonWorkingIso,
         };
+        if (scheduleEditDraft.laborHours > 0) {
+          body.labor_hours = scheduleEditDraft.laborHours;
+        }
         if (flags?.confirm_activate_job !== undefined) {
           body.confirm_activate_job = flags.confirm_activate_job;
         }
@@ -488,14 +868,17 @@ export function CalendarPage() {
       return;
     }
     try {
+      const undoBody: Record<string, unknown> = {
+        start_date: undoScheduleSnapshot.startIso,
+        non_working_dates: undoScheduleSnapshot.nonWorkingIso,
+      };
+      if (undoScheduleSnapshot.laborHours > 0) {
+        undoBody.labor_hours = undoScheduleSnapshot.laborHours;
+      }
       const res = await fetch(`/api/schedule/${undoScheduleSnapshot.scheduleId}`, {
         method: 'PUT',
         headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          start_date: undoScheduleSnapshot.startIso,
-          labor_hours: undoScheduleSnapshot.laborHours,
-          non_working_dates: undoScheduleSnapshot.nonWorkingIso,
-        }),
+        body: JSON.stringify(undoBody),
       });
       const errBody = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -720,9 +1103,16 @@ export function CalendarPage() {
           bl.total_labor_hours > 0 ||
           (bl.items?.some((i) => (Number(i.labor_hours) || 0) > 0) ?? false);
         if (hasHours) {
+          const itemsWithTypes = bl.items.map((i) => ({
+            labor_hours: i.labor_hours,
+            estimate_type: estimates.find((e) => e.id === i.estimate_id)?.estimate_type as
+              | string
+              | undefined,
+          }));
           const ev = buildSyntheticTeamBacklogCalendarEvent(t, {
             lockedIntervals: lockedIntervalsByTeamId[t.id] ?? null,
-            items: bl.items,
+            items: itemsWithTypes,
+            seasonRules: teamConfig.schedulingSeason,
           });
           if (ev) {
             synth.push(ev);
@@ -731,7 +1121,14 @@ export function CalendarPage() {
       }
     }
     return [...calendarEvents, ...synth];
-  }, [calendarEvents, teams, backlogByTeam, lockedIntervalsByTeamId]);
+  }, [
+    calendarEvents,
+    teams,
+    backlogByTeam,
+    lockedIntervalsByTeamId,
+    estimates,
+    teamConfig.schedulingSeason,
+  ]);
 
   const displayCalendarEventsTeamFiltered = useMemo(() => {
     if (selectedTeamFilterIds.length === 0) {
@@ -896,6 +1293,10 @@ export function CalendarPage() {
               scheduleEndIso: ev.schedule_end_date?.trim()
                 ? ev.schedule_end_date.slice(0, 10)
                 : null,
+              scheduleLaborHours:
+                typeof ev.labor_hours === 'number' && Number.isFinite(ev.labor_hours)
+                  ? ev.labor_hours
+                  : undefined,
               backlogBackgroundCss,
             });
           }
@@ -1028,40 +1429,47 @@ export function CalendarPage() {
         )}
 
         <Paper p="md" withBorder radius="md">
-          <Group justify="space-between" mb="md">
-            <Text fw={600}>
-              {`${format(range.start, 'MMM d')} – ${format(range.end, 'MMM d, yyyy')}`}
-            </Text>
-            <Group gap="xs">
-              <Badge variant="light" color="gray">
-                {estimates.length} loaded ·{' '}
-                {calendarJobEventsInView.length + teamBacklogEventsInView.length} in this window ·{' '}
-                {calendarJobEvents.length} scheduled · {unassignedTeam.length} not assigned
-              </Badge>
-              {undoScheduleSnapshot ? (
+          <Stack gap="xs" mb="md">
+            <Group justify="space-between" wrap="wrap" align="flex-start">
+              <Text fw={600}>
+                {`${format(range.start, 'MMM d')} – ${format(range.end, 'MMM d, yyyy')}`}
+              </Text>
+              <Group gap="xs">
+                <Badge variant="light" color="gray">
+                  {estimates.length} loaded ·{' '}
+                  {calendarJobEventsInView.length + teamBacklogEventsInView.length} in this window ·{' '}
+                  {calendarJobEvents.length} scheduled · {unassignedTeam.length} not assigned
+                </Badge>
+                {undoScheduleSnapshot ? (
+                  <Button
+                    variant="light"
+                    size="compact-sm"
+                    leftSection={<IconArrowBackUp size={14} />}
+                    onClick={undoScheduleEdit}
+                  >
+                    Undo
+                  </Button>
+                ) : null}
                 <Button
                   variant="light"
                   size="compact-sm"
-                  leftSection={<IconArrowBackUp size={14} />}
-                  onClick={undoScheduleEdit}
+                  leftSection={<IconRefresh size={14} />}
+                  loading={loading.estimates || calendarLoading}
+                  onClick={() => {
+                    setCalTick((n) => n + 1);
+                    refreshData('estimates').catch(() => {});
+                  }}
                 >
-                  Undo
+                  Refresh
                 </Button>
-              ) : null}
-              <Button
-                variant="light"
-                size="compact-sm"
-                leftSection={<IconRefresh size={14} />}
-                loading={loading.estimates || calendarLoading}
-                onClick={() => {
-                  setCalTick((n) => n + 1);
-                  refreshData('estimates').catch(() => {});
-                }}
-              >
-                Refresh
-              </Button>
+              </Group>
             </Group>
-          </Group>
+            <Text size="xs" c="dimmed">
+              Locked jobs: drag the grip icon onto a day column to set a new start date (preview on
+              the grid). Use Schedule in the menu for non-working days. Save or cancel when the bar
+              shows preview.
+            </Text>
+          </Stack>
 
           {errors.estimates && (
             <Alert color="red" title="Could not load estimates" mb="md">
@@ -1079,7 +1487,18 @@ export function CalendarPage() {
               <Loader />
             </Group>
           ) : (
-            <Stack gap="xl">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={calendarCollisionDetection}
+              onDragStart={handleScheduleDragStart}
+              onDragOver={handleScheduleDragOver}
+              onDragEnd={handleScheduleDragEnd}
+              onDragCancel={handleScheduleDragCancel}
+            >
+              <Stack
+                gap="xl"
+                className={calendarDragActive ? classes.calendarGridDragging : undefined}
+              >
               {estimates.length === 0 && (
                 <Alert color="blue" title="No jobs in the app cache">
                   Estimates have not loaded yet or your account has no jobs. Use Refresh or sign in.
@@ -1159,9 +1578,17 @@ export function CalendarPage() {
                           gridTemplateColumns,
                         }}
                       >
-                        {days.map((d) => (
-                          <div key={d.toISOString()} className={classes.dayCell} />
-                        ))}
+                        {days.map((d) => {
+                          const ymd = format(d, 'yyyy-MM-dd');
+                          return (
+                            <CalendarDayDropCell
+                              key={d.toISOString()}
+                              day={d}
+                              invalidDrop={dragInvalidDrop?.ymd === ymd}
+                              registerDayCell={registerDayCellElement}
+                            />
+                          );
+                        })}
                       </div>
                       <div
                         className={classes.weekEvents}
@@ -1206,8 +1633,12 @@ export function CalendarPage() {
                                 )
                               : null;
                           return (
-                            <CalendarEventBar
+                            <CalendarScheduleDraggableBar
                               key={row.rowKey}
+                              rowMeta={row}
+                              dragEnabled={
+                                !row.isBacklog && !row.scheduleTentative && Boolean(row.estimateId)
+                              }
                               row={{
                                 rowKey: row.rowKey,
                                 title: row.title,
@@ -1247,8 +1678,58 @@ export function CalendarPage() {
                   </div>
                 );
               })}
-            </Stack>
+              </Stack>
+              <DragOverlay zIndex={10000} dropAnimation={null}>
+                {dragOverlayLabel ? (
+                  <div
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 10,
+                      background: dragOverlayLabel.solidBg,
+                      color: '#fff',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      maxWidth: 'min(560px, calc(100vw - 40px))',
+                      minWidth: 280,
+                      boxShadow: '0 6px 24px rgb(0 0 0 / 32%)',
+                      border: '1px solid rgb(255 255 255 / 28%)',
+                      whiteSpace: 'normal',
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, fontSize: 14 }}>{dragOverlayLabel.title}</div>
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        opacity: 0.95,
+                      }}
+                    >
+                      {dragOverlayLabel.segmentLine}
+                      {dragOverlayLabel.showPreviewTag ? ' · preview' : ''}
+                    </div>
+                  </div>
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           )}
+          {scheduleEditDirty &&
+          schedulePreviewPayload &&
+          scheduleEditDraft &&
+          !schedulePreviewPayload.season_message &&
+          schedulePreviewPayload.work_dates.length > 0 &&
+          schedulePreviewPayload.work_dates[0]?.slice(0, 10) !==
+            scheduleEditDraft.startIso?.slice(0, 10) ? (
+            <Alert color="gray" variant="light" title="Start date differs from selection" mt="md">
+              Labor begins on{' '}
+              {format(
+                parseLocalDateString(schedulePreviewPayload.work_dates[0]!.slice(0, 10)),
+                'MMM d, yyyy'
+              )}
+              , not the day you picked—often due to team non-working days or capacity.
+            </Alert>
+          ) : null}
           {scheduleEditDirty ? (
             <Group
               justify="space-between"
@@ -1319,6 +1800,7 @@ export function CalendarPage() {
                   serverItems={bl.items}
                   lockedIntervals={lockedIntervalsByTeamId[t.id]}
                   estimates={estimates}
+                  schedulingSeason={teamConfig.schedulingSeason}
                   onLockSchedule={(e, impliedStartIso) => {
                     openLockScheduleFromBacklog(e, t.id, impliedStartIso);
                   }}
@@ -1407,6 +1889,36 @@ export function CalendarPage() {
           </Button>
         </Group>
       </Modal>
+
+      {typeof document !== 'undefined' &&
+        invalidDropAnchor &&
+        dragInvalidDrop &&
+        createPortal(
+          <Paper
+            shadow="md"
+            radius="sm"
+            p="xs"
+            withBorder
+            bd="1px solid var(--mantine-color-red-4)"
+            style={{
+              position: 'fixed',
+              zIndex: 10001,
+              top: invalidDropAnchor.top - 8,
+              left: invalidDropAnchor.left + invalidDropAnchor.width / 2,
+              transform: 'translate(-50%, -100%)',
+              maxWidth: 'min(320px, calc(100vw - 24px))',
+              pointerEvents: 'none',
+            }}
+          >
+            <Text size="xs" fw={700} c="red.7" mb={4}>
+              Can’t drop here
+            </Text>
+            <Text size="xs" c="dimmed">
+              {dragInvalidDrop.reason}
+            </Text>
+          </Paper>,
+          document.body
+        )}
     </Container>
   );
 }

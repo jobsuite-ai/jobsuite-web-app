@@ -33,6 +33,8 @@ export type CalendarGridJobEvent = {
   title: string | null;
   team_id: string | null;
   team_name: string | null;
+  /** Locked schedule row labor hours (API); used for preview when bid hours are missing. */
+  labor_hours?: number;
   schedule_start_date: string | null;
   schedule_end_date: string | null;
   schedule_tentative: boolean;
@@ -59,6 +61,8 @@ export type WeekCalRow = {
   scheduleNonWorkingIso: string[];
   scheduleStartIso: string | null;
   scheduleEndIso: string | null;
+  /** From schedule row; preferred over estimate bid hours for preview/save. */
+  scheduleLaborHours?: number;
   backlogBackgroundCss: string | null;
 };
 

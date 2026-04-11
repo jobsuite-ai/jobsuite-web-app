@@ -86,6 +86,18 @@ import {
 } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
 
+function formatJobsuiteWorkDate(isoDate: string | undefined): string {
+    if (!isoDate) return 'N/A';
+    const d = new Date(`${isoDate}T12:00:00Z`);
+    if (Number.isNaN(d.getTime())) return isoDate;
+    return d.toLocaleDateString(undefined, { timeZone: 'UTC' });
+}
+
+function formatJobsuiteHours(hours: number | undefined): string {
+    if (typeof hours === 'number') return hours.toFixed(2);
+    return String(hours ?? '');
+}
+
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const dispatch = useAppDispatch();
     const {
@@ -162,9 +174,23 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             bid_hours: number;
             logged_hours: number;
             marked_complete: boolean;
+            time_entries?: Array<{
+                user_id: string;
+                user_name?: string | null;
+                hours: number;
+                work_date: string;
+            }>;
         }>
     >([]);
-    const [jobSuiteProgressOpen, setJobSuiteProgressOpen] = useState(false);
+    const [jobSuiteLineDetailsOpen, setJobSuiteLineDetailsOpen] = useState<
+        Record<string, boolean>
+    >({});
+    const toggleJobSuiteLineDetails = useCallback((lineId: string) => {
+        setJobSuiteLineDetailsOpen((prev) => ({
+            ...prev,
+            [lineId]: !(prev[lineId] ?? false),
+        }));
+    }, []);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
     // Initialize signatures from cached data immediately
@@ -223,6 +249,24 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     </Table.Tr>
                 );
             });
+    };
+
+    type JobsuiteTe = {
+        user_id: string;
+        user_name?: string | null;
+        hours: number;
+        work_date: string;
+    };
+
+    const renderJobsuiteTimeEntryRows = (entries: JobsuiteTe[] | undefined, lineId: string) => {
+        if (!entries?.length) return null;
+        return entries.map((te, idx) => (
+            <Table.Tr key={`${lineId}-${idx}`}>
+                <Table.Td>{te.user_name || te.user_id}</Table.Td>
+                <Table.Td>{formatJobsuiteHours(te.hours)}</Table.Td>
+                <Table.Td>{formatJobsuiteWorkDate(te.work_date)}</Table.Td>
+            </Table.Tr>
+        ));
     };
 
     // Load cached details data immediately for instant display
@@ -632,7 +676,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             } else {
                                 setJobsuiteProgress([]);
                             }
-                            setJobSuiteProgressOpen(false);
+                            setJobSuiteLineDetailsOpen({});
                         }
 
                         // Update estimate with data from details (overwrites summary)
@@ -2025,71 +2069,116 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                                     {jobsuiteProgress.length > 0 && isMountedRef.current && (
                                         <div style={{ marginBottom: '1.5rem' }}>
-                                            <Button
-                                              variant="subtle"
-                                              size="xs"
-                                              onClick={() =>
-                                                    setJobSuiteProgressOpen((o) => !o)
-                                                }
-                                            >
-                                                {jobSuiteProgressOpen ? 'Hide' : 'Show'} JobSuite
-                                                progress
-                                            </Button>
-                                            <Collapse in={jobSuiteProgressOpen}>
-                                                <Stack gap="sm" mt="sm">
-                                                    {jobsuiteProgress.map((row) => {
-                                                        const progressPct =
-                                                            row.bid_hours > 0
-                                                                ? Math.min(
-                                                                      (row.logged_hours /
-                                                                          row.bid_hours) *
-                                                                          100,
-                                                                      100
-                                                                  )
-                                                                : 0;
-                                                        return (
-                                                            <Box key={row.line_item_id}>
-                                                                <Flex
-                                                                  justify="space-between"
-                                                                  align="center"
-                                                                  gap="sm"
-                                                                  mb={4}
-                                                                >
-                                                                    <Text size="sm" fw={500}>
-                                                                        {row.title}
-                                                                    </Text>
-                                                                    {row.marked_complete ? (
-                                                                        <Badge
-                                                                          size="xs"
-                                                                          color="green"
-                                                                          variant="light"
-                                                                        >
-                                                                            Complete
-                                                                        </Badge>
-                                                                    ) : null}
-                                                                </Flex>
-                                                                <Text size="xs" c="dimmed">
-                                                                    {`${row.logged_hours.toFixed(
-                                                                        2
-                                                                    )} / ${row.bid_hours.toFixed(2)} h`}
-                                                                </Text>
-                                                                <Progress
-                                                                  value={progressPct}
-                                                                  color={
-                                                                        row.logged_hours >
-                                                                        row.bid_hours
-                                                                            ? 'red'
-                                                                            : 'blue'
-                                                                    }
-                                                                  size="sm"
-                                                                  radius="md"
-                                                                  mt={4}
-                                                                />
-                                                            </Box>
+                                            <Stack gap="sm">
+                                                {jobsuiteProgress.map((row) => {
+                                                    const progressPct =
+                                                        row.bid_hours > 0
+                                                            ? Math.min(
+                                                                  (row.logged_hours /
+                                                                      row.bid_hours) *
+                                                                      100,
+                                                                  100
+                                                              )
+                                                            : 0;
+                                                    const hasTe =
+                                                        row.time_entries &&
+                                                        row.time_entries.length > 0;
+                                                    const lineId = row.line_item_id;
+                                                    const detailsOpen =
+                                                        jobSuiteLineDetailsOpen[lineId] ??
+                                                        false;
+                                                    const jobsuiteTeRows =
+                                                        renderJobsuiteTimeEntryRows(
+                                                            row.time_entries,
+                                                            lineId
                                                         );
-                                                    })}
-                                                </Stack>
-                                            </Collapse>
+                                                    return (
+                                                        <Box key={lineId}>
+                                                            <Flex
+                                                              justify="space-between"
+                                                              align="center"
+                                                              gap="sm"
+                                                              mb={4}
+                                                            >
+                                                                <Text size="sm" fw={500}>
+                                                                    {row.title}
+                                                                </Text>
+                                                                {row.marked_complete ? (
+                                                                    <Badge
+                                                                      size="xs"
+                                                                      color="green"
+                                                                      variant="light"
+                                                                    >
+                                                                        Complete
+                                                                    </Badge>
+                                                                ) : null}
+                                                            </Flex>
+                                                            <Text size="xs" c="dimmed">
+                                                                {`${row.logged_hours.toFixed(
+                                                                    2
+                                                                )} / ${row.bid_hours.toFixed(2)} h`}
+                                                            </Text>
+                                                            <Progress
+                                                              value={progressPct}
+                                                              color={
+                                                                    row.logged_hours >
+                                                                    row.bid_hours
+                                                                        ? 'red'
+                                                                        : 'blue'
+                                                                }
+                                                              size="sm"
+                                                              radius="md"
+                                                              mt={4}
+                                                            />
+                                                            {hasTe ? (
+                                                                <>
+                                                                    <Button
+                                                                      variant="subtle"
+                                                                      size="xs"
+                                                                      mt="xs"
+                                                                      onClick={() =>
+                                                                          toggleJobSuiteLineDetails(
+                                                                              lineId
+                                                                          )
+                                                                      }
+                                                                    >
+                                                                        {detailsOpen
+                                                                            ? 'Hide'
+                                                                            : 'Show'}{' '}
+                                                                        time details
+                                                                    </Button>
+                                                                    <Collapse in={detailsOpen}>
+                                                                        <Table
+                                                                          striped
+                                                                          highlightOnHover
+                                                                          withTableBorder
+                                                                          withColumnBorders
+                                                                          mt="xs"
+                                                                        >
+                                                                            <Table.Thead>
+                                                                                <Table.Tr>
+                                                                                    <Table.Th>
+                                                                                        Person
+                                                                                    </Table.Th>
+                                                                                    <Table.Th>
+                                                                                        Hours
+                                                                                    </Table.Th>
+                                                                                    <Table.Th>
+                                                                                        Date
+                                                                                    </Table.Th>
+                                                                                </Table.Tr>
+                                                                            </Table.Thead>
+                                                                            <Table.Tbody>
+                                                                                {jobsuiteTeRows}
+                                                                            </Table.Tbody>
+                                                                        </Table>
+                                                                    </Collapse>
+                                                                </>
+                                                            ) : null}
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Stack>
                                         </div>
                                     )}
 

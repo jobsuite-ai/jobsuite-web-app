@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from 'react';
 
-import { Button, Group, Modal, Stack, Text } from '@mantine/core';
+import { Alert, Button, Group, Loader, Modal, Stack, Text } from '@mantine/core';
 import { Calendar } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
-import { isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 
 import classes from './ScheduleJobModal.module.css';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
+import { parseLocalDateString } from '@/utils/calendarWorkingDays';
 import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
 import { apiEstimateType } from '@/utils/scheduleApiTypes';
 
@@ -35,6 +36,10 @@ function parseLocalYmd(iso: string): Date | null {
   const day = Number(m[3]);
   const d = new Date(y, mo, day);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function ymdFromLocalDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 interface ScheduleJobModalProps {
@@ -63,6 +68,13 @@ export function ScheduleJobModal({
   const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
   const [saving, setSaving] = useState(false);
   const [conflictCode, setConflictCode] = useState<string | null>(null);
+  const [lockPreview, setLockPreview] = useState<{
+    season_message?: string | null;
+    firstWorkYmd: string | null;
+    endYmd: string | null;
+  } | null>(null);
+  const [lockPreviewLoading, setLockPreviewLoading] = useState(false);
+  const [lockPreviewError, setLockPreviewError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!estimate || !opened) {
@@ -75,6 +87,92 @@ export function ScheduleJobModal({
     setStart(initial ?? view);
     setCalendarViewDate(view);
   }, [estimate, opened, lockInStartIso]);
+
+  const selectedYmd = start ? ymdFromLocalDate(start) : null;
+
+  useEffect(() => {
+    if (!estimate || !opened || !lockInTeamId?.trim() || !start || !selectedYmd) {
+      setLockPreview(null);
+      setLockPreviewError(null);
+      setLockPreviewLoading(false);
+      return () => {};
+    }
+    const hoursBid = Number(estimate.hours_bid) || 0;
+    if (hoursBid <= 0) {
+      setLockPreview(null);
+      setLockPreviewError(null);
+      setLockPreviewLoading(false);
+      return () => {};
+    }
+    let cancelled = false;
+    setLockPreviewLoading(true);
+    setLockPreviewError(null);
+    const t = window.setTimeout(() => {
+      fetch('/api/schedule/preview', {
+        method: 'POST',
+        headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          team_id: lockInTeamId,
+          labor_hours: hoursBid,
+          start_date: selectedYmd,
+          estimate_type: apiEstimateType(String(estimate.estimate_type)),
+          tentative: false,
+          non_working_dates: [],
+        }),
+      })
+        .then(async (res) => {
+          const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+          if (cancelled) {
+            return;
+          }
+          setLockPreviewLoading(false);
+          if (!res.ok) {
+            const msg =
+              typeof data.detail === 'string'
+                ? data.detail
+                : typeof data.message === 'string'
+                  ? data.message
+                  : 'Could not load schedule preview';
+            setLockPreviewError(msg);
+            setLockPreview(null);
+            return;
+          }
+          const wd = data.work_dates;
+          const end = data.end_date;
+          if (Array.isArray(wd) && wd.length > 0 && typeof end === 'string') {
+            const w0 = typeof wd[0] === 'string' ? wd[0].slice(0, 10) : null;
+            setLockPreview({
+              season_message:
+                typeof data.season_message === 'string' ? data.season_message : null,
+              firstWorkYmd: w0,
+              endYmd: end.slice(0, 10),
+            });
+            setLockPreviewError(null);
+          } else {
+            setLockPreview(null);
+          }
+        })
+        .catch(() => {
+          if (cancelled) {
+            return;
+          }
+          setLockPreviewLoading(false);
+          setLockPreviewError('Could not load schedule preview');
+          setLockPreview(null);
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [
+    estimate?.estimate_type,
+    estimate?.hours_bid,
+    estimate?.id,
+    opened,
+    lockInTeamId,
+    selectedYmd,
+  ]);
 
   const hoursBid = estimate?.hours_bid ?? 0;
   const teamName = teams.find((t) => t.id === lockInTeamId)?.name ?? '—';
@@ -202,6 +300,42 @@ export function ScheduleJobModal({
             maxLevel="month"
             size="md"
           />
+          {lockPreviewLoading ? (
+            <Group gap="xs">
+              <Loader size="sm" />
+              <Text size="xs" c="dimmed">
+                Checking schedule rules…
+              </Text>
+            </Group>
+          ) : null}
+          {lockPreviewError ? (
+            <Alert color="red" variant="light" title="Cannot preview this schedule">
+              {lockPreviewError}
+            </Alert>
+          ) : null}
+          {lockPreview?.season_message ? (
+            <Alert color="blue" variant="light" title="Why the saved schedule may differ">
+              {lockPreview.season_message}
+            </Alert>
+          ) : null}
+          {!lockPreview?.season_message &&
+          lockPreview?.firstWorkYmd &&
+          selectedYmd &&
+          lockPreview.firstWorkYmd !== selectedYmd ? (
+            <Alert color="gray" variant="light" title="Actual first work day">
+              Labor will start on{' '}
+              <strong>
+                {format(parseLocalDateString(lockPreview.firstWorkYmd), 'MMM d, yyyy')}
+              </strong>{' '}
+              (not the calendar day you selected).
+            </Alert>
+          ) : null}
+          {lockPreview?.endYmd && lockPreview?.firstWorkYmd ? (
+            <Text size="xs" c="dimmed">
+              Preview: {format(parseLocalDateString(lockPreview.firstWorkYmd), 'MMM d')} –{' '}
+              {format(parseLocalDateString(lockPreview.endYmd), 'MMM d, yyyy')}
+            </Text>
+          ) : null}
           <Group justify="flex-end" mt="md">
             <Button variant="default" onClick={onClose}>
               Cancel

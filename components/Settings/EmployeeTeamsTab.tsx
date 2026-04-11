@@ -329,6 +329,7 @@ export default function EmployeeTeamsTab() {
         onClose={() => setTeamIdPendingDelete(null)}
         title="Delete team?"
         size="sm"
+        centered
       >
         <Stack gap="md">
           <Text size="sm">This team will be removed. Jobs referencing it may need to be rescheduled.</Text>
@@ -348,6 +349,7 @@ export default function EmployeeTeamsTab() {
         onClose={() => setModalOpen(false)}
         title={editingId ? 'Edit team' : 'New team'}
         size="lg"
+        centered
       >
         <Stack gap="md">
           <TextInput label="Team name" value={name} onChange={(e) => setName(e.currentTarget.value)} required />
