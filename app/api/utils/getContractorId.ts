@@ -23,7 +23,7 @@ export async function getContractorId(request: NextRequest | Request): Promise<s
     }
 
     const token = authHeader.substring(7);
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
 
     try {
         const userResponse = await fetch(`${apiBaseUrl}/api/v1/auth/me`, {
