@@ -13,7 +13,7 @@ function ErrorContent() {
   return (
     <Container size={420} my={40}>
       <IconExclamationCircle color="#FF7F7F" size={180} style={{ margin: '0 auto', display: 'block' }} />
-      <Title ta="center" fw={900}>
+      <Title ta="center" fw={900} c="gray.0">
         Error
       </Title>
       <Text ta="center" c="dimmed" size="sm" mt={5}>

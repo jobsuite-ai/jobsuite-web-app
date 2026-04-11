@@ -1332,7 +1332,7 @@ export function CalendarPage() {
         <Group justify="space-between" align="flex-start" wrap="wrap">
           <Stack gap={4}>
             <Group>
-              <Title order={2} c="white">Calendar</Title>
+              <Title order={2} c="gray.0">Calendar</Title>
               <Switch
                 size="sm"
                 label="Show weekends"

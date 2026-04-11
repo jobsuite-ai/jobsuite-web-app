@@ -10,7 +10,7 @@ export default function EmployeesTeamsPage() {
     <Container size="lg" py="xl">
       <Stack gap="xl">
         <div>
-          <Title order={1} c="white" mb="xs">
+          <Title order={1} c="gray.0" mb="xs">
             Employees &amp; Teams
           </Title>
           <Text c="dimmed" size="sm">

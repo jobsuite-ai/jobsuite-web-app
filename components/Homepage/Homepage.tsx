@@ -518,7 +518,7 @@ export default function Homepage() {
 
         {/* Key Metrics */}
         <AnimatedSection delay={0.3}>
-          <Title order={2} mb="md" c="gray.1">
+          <Title order={2} mb="md" c="gray.0">
             Key Metrics
           </Title>
           <Grid gutter="md">
@@ -577,7 +577,7 @@ export default function Homepage() {
         {data.in_progress_jobs.length > 0 && (
           <AnimatedSection delay={0.4}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">In Progress Jobs</Title>
+              <Title order={2} c="gray.0">In Progress Jobs</Title>
               <Button
                 variant="subtle"
                 size="sm"
@@ -608,7 +608,7 @@ export default function Homepage() {
         {data.recently_sold.length > 0 && (
           <AnimatedSection delay={0.5}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">Recently Sold</Title>
+              <Title order={2} c="gray.0">Recently Sold</Title>
               <Button
                 variant="subtle"
                 size="sm"
@@ -637,7 +637,7 @@ export default function Homepage() {
         {data.recently_finished.length > 0 && (
           <AnimatedSection delay={0.6}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">Recently Finished</Title>
+              <Title order={2} c="gray.0">Recently Finished</Title>
               <Button
                 variant="subtle"
                 size="sm"

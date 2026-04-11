@@ -506,7 +506,7 @@ export default function SettingsPage() {
 
     return (
         <div style={{ padding: '2rem', maxWidth: '1200px', margin: '0 auto' }}>
-            <Title c="white" order={1} mb="xl">
+            <Title c="gray.0" order={1} mb="xl">
                 Settings
             </Title>
             <Stack gap="xs" mb="xl">

@@ -110,7 +110,7 @@ function AcceptInvitationContent() {
 
   return (
     <Container size={420} my={40}>
-      <Title ta="center" fw={900}>
+      <Title ta="center" fw={900} c="gray.0">
         Set Up Your Account
       </Title>
       <Text ta="center" c="dimmed" size="sm" mt={5}>
