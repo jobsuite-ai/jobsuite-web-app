@@ -543,14 +543,21 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Total revenue from signed estimates"
+                description="Total revenue from signed estimates this month"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
+                title="Projects Completed This Month"
+                value={(data.metrics.completed_this_month ?? 0).toString()}
+                description="Projects completed this month"
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
+              <MetricCard
                 title="Conversion Rate"
                 value={`${(data.metrics.conversion_rate ?? 0).toFixed(1)}%`}
-                description="Percentage of new leads signed year-to-date"
+                description="Estimates sold ÷ new estimates, year-to-date (dashboard snapshots)"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
@@ -560,14 +567,7 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Average revenue per signed estimate year-to-date"
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
-              <MetricCard
-                title="Projects Completed This Month"
-                value={(data.metrics.completed_this_month ?? 0).toString()}
-                description="Projects completed this month"
+                description="Average revenue per sold job, year-to-date (dashboard snapshots)"
               />
             </Grid.Col>
           </Grid>
