@@ -64,12 +64,16 @@ type WorkTimeEntry = {
   work_date: string;
   notes: string | null;
   line_allocations?: LineAllocApi[] | null;
+  /** Server row is an open clock session until clock-out (hours stay 0). */
+  clock_started_at?: string | null;
 };
 
 type ClockSession = {
   startedAt: string;
   estimateId: string;
   label: string;
+  /** Persisted open work-time row; clock-out uses PUT instead of POST. */
+  openEntryId?: string;
 };
 
 type LineItemRow = { id: string; title: string; estimatedHours: number };
@@ -91,6 +95,17 @@ function getElapsedMinutes(session: ClockSession): number {
 function getElapsedHours(session: ClockSession): number {
   const m = getElapsedMinutes(session);
   return Math.max(0.01, Math.round((m / 60) * 100) / 100);
+}
+
+/** Live hours for a list row backed by an open clock (matches server effective hours). */
+function displayHoursForOpenEntry(row: WorkTimeEntry, liveTick: number): number {
+  if (!row.clock_started_at) {
+    return row.hours;
+  }
+  const start = new Date(row.clock_started_at);
+  const min = Math.max(1, Math.round((Date.now() - start.getTime()) / 60000));
+  const h = Math.max(0.01, Math.round((min / 60) * 100) / 100);
+  return h + liveTick * 0;
 }
 
 /** Formats a duration given as decimal hours (API shape) for display, e.g. 1.5 → "1h 30m". */
@@ -557,16 +572,16 @@ export function MyTimePage() {
   }, [session, user?.id]);
 
   useEffect(() => {
-    let id: number | undefined;
-    if (session) {
-      id = window.setInterval(() => tickClock(), 1000);
+    const needLiveTick =
+      session !== null || entries.some((e) => Boolean(e.clock_started_at));
+    if (!needLiveTick) {
+      return undefined;
     }
+    const id = window.setInterval(() => tickClock(), 1000);
     return () => {
-      if (id !== undefined) {
-        window.clearInterval(id);
-      }
+      window.clearInterval(id);
     };
-  }, [session]);
+  }, [session, entries]);
 
   const suggestedJob = useMemo(
     () => pickPrimaryJobScheduledOnDay(calEvents, new Date()),
@@ -687,29 +702,53 @@ export function MyTimePage() {
 
     setSaving(true);
     try {
-      const body: Record<string, unknown> = {
-        hours,
-        work_date: workDate,
-        notes: opts.notes?.trim() ? opts.notes.trim() : null,
-      };
-      if (opts.shop) {
-        body.is_shop_time = true;
-      } else {
-        body.estimate_id = session.estimateId;
-        if (opts.lineAllocations && opts.lineAllocations.length > 0) {
+      const closeOpenRow = Boolean(session.openEntryId);
+
+      if (closeOpenRow) {
+        const body: Record<string, unknown> = {
+          hours,
+          work_date: workDate,
+          notes: opts.notes?.trim() ? opts.notes.trim() : null,
+          clock_started_at: null,
+        };
+        if (!opts.shop && opts.lineAllocations && opts.lineAllocations.length > 0) {
           body.line_allocations = opts.lineAllocations;
+        }
+        const res = await fetch(`/api/jobsuite-work-time/${session.openEntryId}`, {
+          method: 'PUT',
+          headers: getApiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Save failed');
+        }
+      } else {
+        const body: Record<string, unknown> = {
+          hours,
+          work_date: workDate,
+          notes: opts.notes?.trim() ? opts.notes.trim() : null,
+        };
+        if (opts.shop) {
+          body.is_shop_time = true;
+        } else {
+          body.estimate_id = session.estimateId;
+          if (opts.lineAllocations && opts.lineAllocations.length > 0) {
+            body.line_allocations = opts.lineAllocations;
+          }
+        }
+
+        const res = await fetch('/api/jobsuite-work-time', {
+          method: 'POST',
+          headers: getApiHeaders(),
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Save failed');
         }
       }
 
-      const res = await fetch('/api/jobsuite-work-time', {
-        method: 'POST',
-        headers: getApiHeaders(),
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || 'Save failed');
-      }
       notifications.show({
         title: 'Clocked out',
         message: `${formatDecimalHoursForDisplay(hours)} logged`,
@@ -782,15 +821,51 @@ export function MyTimePage() {
     }).catch(() => {});
   };
 
-  const confirmClockIn = () => {
+  const confirmClockIn = async () => {
+    const workDate = format(new Date(), 'yyyy-MM-dd');
+    const startedIso = new Date().toISOString();
+
     if (modalShopMode) {
-      setSession({
-        startedAt: new Date().toISOString(),
-        estimateId: SHOP_TIME_ESTIMATE_ID,
-        label: 'Shop time',
-      });
-      setClockInModalOpen(false);
-      notifications.show({ title: 'Clocked in', message: 'Shop time', color: 'green' });
+      setSaving(true);
+      try {
+        const res = await fetch('/api/jobsuite-work-time', {
+          method: 'POST',
+          headers: getApiHeaders(),
+          body: JSON.stringify({
+            is_shop_time: true,
+            hours: 0,
+            work_date: workDate,
+            clock_started_at: startedIso,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || 'Clock-in failed');
+        }
+        const data = (await res.json()) as {
+          id: string;
+          clock_started_at?: string | null;
+        };
+        const startAt =
+          typeof data.clock_started_at === 'string' ? data.clock_started_at : startedIso;
+        setSession({
+          startedAt: startAt,
+          estimateId: SHOP_TIME_ESTIMATE_ID,
+          label: 'Shop time',
+          openEntryId: data.id,
+        });
+        setClockInModalOpen(false);
+        notifications.show({ title: 'Clocked in', message: 'Shop time', color: 'green' });
+        await loadEntries();
+      } catch (e) {
+        notifications.show({
+          title: 'Clock-in failed',
+          message: e instanceof Error ? e.message : 'Error',
+          color: 'red',
+        });
+      } finally {
+        setSaving(false);
+      }
       return;
     }
     if (!modalEstimateId) {
@@ -803,13 +878,47 @@ export function MyTimePage() {
     const label =
       estimateOptionsWithScheduleFallback.find((o) => o.value === modalEstimateId)?.label ??
       'Job';
-    setSession({
-      startedAt: new Date().toISOString(),
-      estimateId: modalEstimateId,
-      label,
-    });
-    setClockInModalOpen(false);
-    notifications.show({ title: 'Clocked in', message: label, color: 'green' });
+
+    setSaving(true);
+    try {
+      const res = await fetch('/api/jobsuite-work-time', {
+        method: 'POST',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          estimate_id: modalEstimateId,
+          hours: 0,
+          work_date: workDate,
+          clock_started_at: startedIso,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Clock-in failed');
+      }
+      const data = (await res.json()) as {
+        id: string;
+        clock_started_at?: string | null;
+      };
+      const startAt =
+        typeof data.clock_started_at === 'string' ? data.clock_started_at : startedIso;
+      setSession({
+        startedAt: startAt,
+        estimateId: modalEstimateId,
+        label,
+        openEntryId: data.id,
+      });
+      setClockInModalOpen(false);
+      notifications.show({ title: 'Clocked in', message: label, color: 'green' });
+      await loadEntries();
+    } catch (e) {
+      notifications.show({
+        title: 'Clock-in failed',
+        message: e instanceof Error ? e.message : 'Error',
+        color: 'red',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const submitManual = async () => {
@@ -1210,7 +1319,14 @@ export function MyTimePage() {
               <Button variant="default" onClick={() => setClockInModalOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={confirmClockIn}>Clock in</Button>
+              <Button
+                onClick={() => {
+                  confirmClockIn().catch(() => {});
+                }}
+                loading={saving}
+              >
+                Clock in
+              </Button>
             </Group>
           </Stack>
         </Modal>
@@ -1514,7 +1630,16 @@ export function MyTimePage() {
                 {entries.map((row) => (
                   <Table.Tr key={row.id}>
                     <Table.Td>{row.work_date.slice(0, 10)}</Table.Td>
-                    <Table.Td>{formatDecimalHoursForDisplay(row.hours)}</Table.Td>
+                    <Table.Td>
+                      {formatDecimalHoursForDisplay(
+                        displayHoursForOpenEntry(row, clockTick)
+                      )}
+                      {row.clock_started_at ? (
+                        <Text span size="xs" c="dimmed" ml={6}>
+                          (in progress)
+                        </Text>
+                      ) : null}
+                    </Table.Td>
                     <Table.Td>{estimateTitle(row.estimate_id)}</Table.Td>
                     <Table.Td style={{ minWidth: 280, maxWidth: 420, verticalAlign: 'top' }}>
                       <EntryLineItemsCell row={row} lineTitle={lineItemTitle} />
@@ -1522,15 +1647,17 @@ export function MyTimePage() {
                     {canManageEntries ? (
                       <Table.Td style={{ width: 88, whiteSpace: 'nowrap' }}>
                         <Group gap={4} wrap="nowrap">
-                          <ActionIcon
-                            variant="subtle"
-                            color="gray"
-                            size="sm"
-                            aria-label="Edit time entry"
-                            onClick={() => openEditEntry(row)}
-                          >
-                            <IconEdit size={16} />
-                          </ActionIcon>
+                          {!row.clock_started_at ? (
+                            <ActionIcon
+                              variant="subtle"
+                              color="gray"
+                              size="sm"
+                              aria-label="Edit time entry"
+                              onClick={() => openEditEntry(row)}
+                            >
+                              <IconEdit size={16} />
+                            </ActionIcon>
+                          ) : null}
                           <ActionIcon
                             variant="subtle"
                             color="red"
