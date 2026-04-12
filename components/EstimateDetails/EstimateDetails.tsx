@@ -9,7 +9,6 @@ import {
     Box,
     Button,
     Center,
-    Collapse,
     Flex,
     Menu,
     Modal,
@@ -85,18 +84,6 @@ import {
     selectEstimateById,
 } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
-
-function formatJobsuiteWorkDate(isoDate: string | undefined): string {
-    if (!isoDate) return 'N/A';
-    const d = new Date(`${isoDate}T12:00:00Z`);
-    if (Number.isNaN(d.getTime())) return isoDate;
-    return d.toLocaleDateString(undefined, { timeZone: 'UTC' });
-}
-
-function formatJobsuiteHours(hours: number | undefined): string {
-    if (typeof hours === 'number') return hours.toFixed(2);
-    return String(hours ?? '');
-}
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const dispatch = useAppDispatch();
@@ -182,15 +169,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }>;
         }>
     >([]);
-    const [jobSuiteLineDetailsOpen, setJobSuiteLineDetailsOpen] = useState<
-        Record<string, boolean>
-    >({});
-    const toggleJobSuiteLineDetails = useCallback((lineId: string) => {
-        setJobSuiteLineDetailsOpen((prev) => ({
-            ...prev,
-            [lineId]: !(prev[lineId] ?? false),
-        }));
-    }, []);
     const [showTimeEntryDetails, setShowTimeEntryDetails] = useState(false);
     const [detailsLoaded, setDetailsLoaded] = useState(false);
     // Initialize signatures from cached data immediately
@@ -249,24 +227,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     </Table.Tr>
                 );
             });
-    };
-
-    type JobsuiteTe = {
-        user_id: string;
-        user_name?: string | null;
-        hours: number;
-        work_date: string;
-    };
-
-    const renderJobsuiteTimeEntryRows = (entries: JobsuiteTe[] | undefined, lineId: string) => {
-        if (!entries?.length) return null;
-        return entries.map((te, idx) => (
-            <Table.Tr key={`${lineId}-${idx}`}>
-                <Table.Td>{te.user_name || te.user_id}</Table.Td>
-                <Table.Td>{formatJobsuiteHours(te.hours)}</Table.Td>
-                <Table.Td>{formatJobsuiteWorkDate(te.work_date)}</Table.Td>
-            </Table.Tr>
-        ));
     };
 
     // Load cached details data immediately for instant display
@@ -676,7 +636,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             } else {
                                 setJobsuiteProgress([]);
                             }
-                            setJobSuiteLineDetailsOpen({});
                         }
 
                         // Update estimate with data from details (overwrites summary)
@@ -2031,7 +1990,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     )).toFixed(2)} hours
                                                 </Text>
                                             )}
-                                            {timeEntries.length > 0 && (
+                                            {(jobsuiteProgress.length > 0 ||
+                                                timeEntries.length > 0) && (
                                                 <Button
                                                   variant="subtle"
                                                   size="xs"
@@ -2043,142 +2003,97 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                                     {showTimeEntryDetails ? 'Hide' : 'Show'} Details
                                                 </Button>
                                             )}
-                                            {showTimeEntryDetails && timeEntries.length > 0 && (
+                                            {showTimeEntryDetails &&
+                                                (jobsuiteProgress.length > 0 ||
+                                                    timeEntries.length > 0) && (
                                                 <div style={{ marginTop: '1rem' }}>
-                                                    <Table
-                                                      striped
-                                                      highlightOnHover
-                                                      withTableBorder
-                                                      withColumnBorders
-                                                    >
-                                                        <Table.Thead>
-                                                            <Table.Tr>
-                                                                <Table.Th>Employee</Table.Th>
-                                                                <Table.Th>Hours</Table.Th>
-                                                                <Table.Th>Date</Table.Th>
-                                                            </Table.Tr>
-                                                        </Table.Thead>
-                                                        <Table.Tbody>
-                                                            {renderTimeEntryRows()}
-                                                        </Table.Tbody>
-                                                    </Table>
+                                                    {jobsuiteProgress.length > 0 && (
+                                                        <Stack gap="sm" mb={timeEntries.length > 0 ? 'md' : 0}>
+                                                            <Text size="sm" fw={600}>
+                                                                Line item hours
+                                                            </Text>
+                                                            {jobsuiteProgress.map((row) => {
+                                                                const progressPct =
+                                                                    row.bid_hours > 0
+                                                                        ? Math.min(
+                                                                              (row.logged_hours /
+                                                                                  row.bid_hours) *
+                                                                                  100,
+                                                                              100
+                                                                          )
+                                                                        : 0;
+                                                                const lineId = row.line_item_id;
+                                                                return (
+                                                                    <Box key={lineId}>
+                                                                        <Flex
+                                                                          justify="space-between"
+                                                                          align="center"
+                                                                          gap="sm"
+                                                                          mb={4}
+                                                                        >
+                                                                            <Text size="sm" fw={500}>
+                                                                                {row.title}
+                                                                            </Text>
+                                                                            {row.marked_complete ? (
+                                                                                <Badge
+                                                                                  size="xs"
+                                                                                  color="green"
+                                                                                  variant="light"
+                                                                                >
+                                                                                    Complete
+                                                                                </Badge>
+                                                                            ) : null}
+                                                                        </Flex>
+                                                                        <Text size="xs" c="dimmed">
+                                                                            {`${row.logged_hours.toFixed(
+                                                                                2
+                                                                            )} / ${row.bid_hours.toFixed(2)} h`}
+                                                                        </Text>
+                                                                        <Progress
+                                                                          value={progressPct}
+                                                                          color={
+                                                                                row.logged_hours >
+                                                                                row.bid_hours
+                                                                                    ? 'red'
+                                                                                    : 'blue'
+                                                                            }
+                                                                          size="sm"
+                                                                          radius="md"
+                                                                          mt={4}
+                                                                        />
+                                                                    </Box>
+                                                                );
+                                                            })}
+                                                        </Stack>
+                                                    )}
+                                                    {timeEntries.length > 0 && (
+                                                        <>
+                                                            <Text size="sm" fw={600} mb="xs">
+                                                                Time entries
+                                                            </Text>
+                                                            <Table
+                                                              striped
+                                                              highlightOnHover
+                                                              withTableBorder
+                                                              withColumnBorders
+                                                            >
+                                                                <Table.Thead>
+                                                                    <Table.Tr>
+                                                                        <Table.Th>
+                                                                            Employee
+                                                                        </Table.Th>
+                                                                        <Table.Th>Hours</Table.Th>
+                                                                        <Table.Th>Date</Table.Th>
+                                                                    </Table.Tr>
+                                                                </Table.Thead>
+                                                                <Table.Tbody>
+                                                                    {renderTimeEntryRows()}
+                                                                </Table.Tbody>
+                                                            </Table>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
-                                        </div>
-                                    )}
-
-                                    {jobsuiteProgress.length > 0 && isMountedRef.current && (
-                                        <div style={{ marginBottom: '1.5rem' }}>
-                                            <Stack gap="sm">
-                                                {jobsuiteProgress.map((row) => {
-                                                    const progressPct =
-                                                        row.bid_hours > 0
-                                                            ? Math.min(
-                                                                  (row.logged_hours /
-                                                                      row.bid_hours) *
-                                                                      100,
-                                                                  100
-                                                              )
-                                                            : 0;
-                                                    const hasTe =
-                                                        row.time_entries &&
-                                                        row.time_entries.length > 0;
-                                                    const lineId = row.line_item_id;
-                                                    const detailsOpen =
-                                                        jobSuiteLineDetailsOpen[lineId] ??
-                                                        false;
-                                                    const jobsuiteTeRows =
-                                                        renderJobsuiteTimeEntryRows(
-                                                            row.time_entries,
-                                                            lineId
-                                                        );
-                                                    return (
-                                                        <Box key={lineId}>
-                                                            <Flex
-                                                              justify="space-between"
-                                                              align="center"
-                                                              gap="sm"
-                                                              mb={4}
-                                                            >
-                                                                <Text size="sm" fw={500}>
-                                                                    {row.title}
-                                                                </Text>
-                                                                {row.marked_complete ? (
-                                                                    <Badge
-                                                                      size="xs"
-                                                                      color="green"
-                                                                      variant="light"
-                                                                    >
-                                                                        Complete
-                                                                    </Badge>
-                                                                ) : null}
-                                                            </Flex>
-                                                            <Text size="xs" c="dimmed">
-                                                                {`${row.logged_hours.toFixed(
-                                                                    2
-                                                                )} / ${row.bid_hours.toFixed(2)} h`}
-                                                            </Text>
-                                                            <Progress
-                                                              value={progressPct}
-                                                              color={
-                                                                    row.logged_hours >
-                                                                    row.bid_hours
-                                                                        ? 'red'
-                                                                        : 'blue'
-                                                                }
-                                                              size="sm"
-                                                              radius="md"
-                                                              mt={4}
-                                                            />
-                                                            {hasTe ? (
-                                                                <>
-                                                                    <Button
-                                                                      variant="subtle"
-                                                                      size="xs"
-                                                                      mt="xs"
-                                                                      onClick={() =>
-                                                                          toggleJobSuiteLineDetails(
-                                                                              lineId
-                                                                          )
-                                                                      }
-                                                                    >
-                                                                        {detailsOpen
-                                                                            ? 'Hide'
-                                                                            : 'Show'}{' '}
-                                                                        time details
-                                                                    </Button>
-                                                                    <Collapse in={detailsOpen}>
-                                                                        <Table
-                                                                          striped
-                                                                          highlightOnHover
-                                                                          withTableBorder
-                                                                          withColumnBorders
-                                                                          mt="xs"
-                                                                        >
-                                                                            <Table.Thead>
-                                                                                <Table.Tr>
-                                                                                    <Table.Th>
-                                                                                        Person
-                                                                                    </Table.Th>
-                                                                                    <Table.Th>
-                                                                                        Hours
-                                                                                    </Table.Th>
-                                                                                    <Table.Th>
-                                                                                        Date
-                                                                                    </Table.Th>
-                                                                                </Table.Tr>
-                                                                            </Table.Thead>
-                                                                            <Table.Tbody>
-                                                                                {jobsuiteTeRows}
-                                                                            </Table.Tbody>
-                                                                        </Table>
-                                                                    </Collapse>
-                                                                </>
-                                                            ) : null}
-                                                        </Box>
-                                                    );
-                                                })}
-                                            </Stack>
                                         </div>
                                     )}
 
