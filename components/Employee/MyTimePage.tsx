@@ -76,6 +76,23 @@ type ClockSession = {
   openEntryId?: string;
 };
 
+/** Build client session state from an API row with an open clock (`clock_started_at` set). */
+function buildSessionFromOpenEntry(
+  row: WorkTimeEntry,
+  labelForEstimate: (estimateId: string) => string
+): ClockSession {
+  const startedAt = row.clock_started_at as string;
+  const estimateId = row.estimate_id;
+  const label =
+    estimateId === SHOP_TIME_ESTIMATE_ID ? 'Shop time' : labelForEstimate(estimateId);
+  return {
+    startedAt,
+    estimateId,
+    label,
+    openEntryId: row.id,
+  };
+}
+
 type LineItemRow = { id: string; title: string; estimatedHours: number };
 
 type PerLineState = {
@@ -658,6 +675,57 @@ export function MyTimePage() {
     },
     [estimates, calendarTitleByEstimateId, jobTitlesById]
   );
+
+  /**
+   * Keep the hero card / clock-out flow in sync with the server: session is also in localStorage,
+   * so it can be missing after another device, cleared storage, or a fresh tab while the API
+   * still has an open `clock_started_at` row.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user?.id || authLoading || loadingEntries) {
+      return;
+    }
+
+    const openRows = entries.filter((e) => Boolean(e.clock_started_at));
+    const picked =
+      openRows.length === 0
+        ? null
+        : openRows.reduce((best, row) => {
+            const t = new Date(row.clock_started_at as string).getTime();
+            const bt = new Date(best.clock_started_at as string).getTime();
+            return t >= bt ? row : best;
+          });
+
+    if (picked) {
+      const desired = buildSessionFromOpenEntry(picked, estimateTitle);
+      setSession((prev) => {
+        if (
+          prev &&
+          prev.openEntryId === desired.openEntryId &&
+          prev.startedAt === desired.startedAt &&
+          prev.estimateId === desired.estimateId
+        ) {
+          return prev.label === desired.label ? prev : desired;
+        }
+        return desired;
+      });
+      return;
+    }
+
+    setSession((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      if (prev.openEntryId) {
+        const row = entries.find((e) => e.id === prev.openEntryId);
+        if (row && !row.clock_started_at) {
+          return null;
+        }
+        return prev;
+      }
+      return null;
+    });
+  }, [user?.id, authLoading, loadingEntries, entries, estimateTitle]);
 
   const lineItemTitle = useCallback(
     (lineItemId: string) => {
