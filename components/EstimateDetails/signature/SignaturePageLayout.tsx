@@ -125,6 +125,83 @@ export interface SignatureLinkInfo {
     current_status?: string;
 }
 
+function CardBrandPill({
+    children,
+    label,
+}: {
+    children: React.ReactNode;
+    label: string;
+}) {
+    return (
+        <Paper
+          withBorder
+          radius="md"
+          px={10}
+          py={6}
+          style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--mantine-color-body)',
+            }}
+          aria-label={label}
+        >
+            {children}
+        </Paper>
+    );
+}
+
+function VisaLogoMark() {
+    return (
+        <svg
+          width="34"
+          height="12"
+          viewBox="0 0 34 12"
+          role="img"
+          aria-label="Visa"
+        >
+            <title>Visa</title>
+            <text
+              x="0"
+              y="10"
+              fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+              fontWeight="800"
+              fontSize="12"
+              fill="var(--mantine-color-dark-9)"
+              letterSpacing="1"
+            >
+                VISA
+            </text>
+        </svg>
+    );
+}
+
+function MastercardLogoMark() {
+    return (
+        <svg
+          width="44"
+          height="14"
+          viewBox="0 0 44 14"
+          role="img"
+          aria-label="Mastercard"
+        >
+            <title>Mastercard</title>
+            <circle cx="18" cy="7" r="6" fill="#EB001B" />
+            <circle cx="26" cy="7" r="6" fill="#F79E1B" fillOpacity="0.95" />
+            <text
+              x="0"
+              y="13"
+              fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+              fontWeight="700"
+              fontSize="0"
+              fill="transparent"
+            >
+                Mastercard
+            </text>
+        </svg>
+    );
+}
+
 interface SignaturePageLayoutProps {
     linkInfo: SignatureLinkInfo;
     signatureHash: string;
@@ -491,6 +568,13 @@ export default function SignaturePageLayout({
         paymentSummary.amount_due_now > 0 &&
         !paymentSummary.fully_paid &&
         (payIntent === 'balance' || isFullBalancePaymentPhase);
+
+    const showAcceptedCardsIndicator =
+        (linkInfo.helcim_configured ?? false) &&
+        !isContractorViewer &&
+        signed &&
+        (showBalancePayment || showClientDeposit) &&
+        !paymentSummary?.fully_paid;
 
     /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
     useEffect(() => {
@@ -902,6 +986,29 @@ export default function SignaturePageLayout({
                                         this project.
                                     </Text>
                                 </div>
+                                {showAcceptedCardsIndicator ? (
+                                    <Paper withBorder radius="md" p="md">
+                                        <Group justify="space-between" align="center" wrap="wrap">
+                                            <Stack gap={2}>
+                                                <Text size="sm" fw={600}>
+                                                    Accepted cards
+                                                </Text>
+                                                <Text size="xs" c="dimmed">
+                                                    Visa and Mastercard only (American Express not
+                                                    accepted)
+                                                </Text>
+                                            </Stack>
+                                            <Group gap="xs" wrap="wrap">
+                                                <CardBrandPill label="Visa accepted">
+                                                    <VisaLogoMark />
+                                                </CardBrandPill>
+                                                <CardBrandPill label="Mastercard accepted">
+                                                    <MastercardLogoMark />
+                                                </CardBrandPill>
+                                            </Group>
+                                        </Group>
+                                    </Paper>
+                                ) : null}
                                 {linkInfo.payment_line_items &&
                                     linkInfo.payment_line_items.length > 0 && (
                                     <Paper
