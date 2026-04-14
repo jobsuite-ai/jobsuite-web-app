@@ -49,12 +49,18 @@ export function ChangeTeamModal({
     }
     setSaving(true);
     try {
-      await assignEstimateTeamOrUnassign(estimate.id, teamId?.trim() ? teamId : null);
+      const result = await assignEstimateTeamOrUnassign(
+        estimate.id,
+        teamId?.trim() ? teamId : null
+      );
       notifications.show({
         title: teamId ? 'Team updated' : 'Team removed',
-        message: teamId
-          ? 'The job is in the new team’s tentative backlog.'
-          : 'The job is back in Not assigned yet.',
+        message:
+          result === 'scheduled'
+            ? 'The job stayed scheduled and was moved to the new team.'
+            : result === 'tentative'
+              ? 'The job is in the new team’s tentative backlog.'
+              : 'The job is back in Not assigned yet.',
         color: 'green',
       });
       const nextTeamId = teamId?.trim() ? teamId : null;
@@ -76,8 +82,10 @@ export function ChangeTeamModal({
       {estimate ? (
         <Stack gap="md">
           <Text size="sm">
-            {estimate.title || estimate.address_street || 'Job'} — schedule dates will be cleared.
-            {teamId ? ' The job will be placed in that team’s tentative backlog.' : ' Removing the team moves the job to Not assigned yet.'}
+            {estimate.title || estimate.address_street || 'Job'}.
+            {teamId
+              ? ' If this job is already scheduled, it will stay scheduled in the same spot for the new team. If it’s not scheduled yet, it will be placed in that team’s tentative backlog.'
+              : ' Removing the team moves the job to Not assigned yet.'}
           </Text>
           <Select
             label="Production team"

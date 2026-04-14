@@ -3,14 +3,23 @@ import { EstimateStatus } from '@/components/Global/model';
 
 type ScheduleRow = { id?: string };
 
+export type AssignTeamResult = 'scheduled' | 'tentative' | 'unassigned';
+
 /**
- * Move job to another team’s tentative backlog, or clear team (Not assigned yet).
+ * Change the job's team assignment.
+ *
+ * Behavior:
+ * - If the job has an existing schedule row and a new team is chosen, keep it scheduled and
+ *   move that schedule row to the new team.
+ * - If the job has no schedule row and a team is chosen, it will live in that team's tentative
+ *   backlog.
+ * - If the team is cleared, remove scheduling and move it to Not assigned yet.
  * Updates the primary schedule row in place (PUT) instead of deleting and recreating it.
  */
 export async function assignEstimateTeamOrUnassign(
   estimateId: string,
   teamId: string | null
-): Promise<void> {
+): Promise<AssignTeamResult> {
   const listRes = await fetch(`/api/schedule/estimates/${estimateId}`, {
     headers: getApiHeaders(),
   });
@@ -31,7 +40,6 @@ export async function assignEstimateTeamOrUnassign(
         headers: { ...getApiHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           team_id: teamId,
-          reset_to_tentative: true,
         }),
       });
       if (!putRes.ok) {
@@ -51,7 +59,24 @@ export async function assignEstimateTeamOrUnassign(
           });
         }
       }
-    } else {
+
+      const res = await fetch(`/api/estimates/${estimateId}`, {
+        method: 'PUT',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          schedule_team_id: teamId,
+        }),
+      });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (typeof errBody.message === 'string' && errBody.message) ||
+            (typeof errBody.detail === 'string' && errBody.detail) ||
+            'Failed to update estimate'
+        );
+      }
+      return 'scheduled';
+    }
       for (const row of rows) {
         const id = row?.id;
         if (id) {
@@ -69,23 +94,46 @@ export async function assignEstimateTeamOrUnassign(
           }
         }
       }
-    }
+
+      const res = await fetch(`/api/estimates/${estimateId}`, {
+        method: 'PUT',
+        headers: getApiHeaders(),
+        body: JSON.stringify({
+          status: EstimateStatus.PROJECT_NOT_SCHEDULED,
+          schedule_team_id: null,
+        }),
+      });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          (typeof errBody.message === 'string' && errBody.message) ||
+            (typeof errBody.detail === 'string' && errBody.detail) ||
+            'Failed to update estimate'
+        );
+      }
+      return 'unassigned';
   }
 
-  const res = await fetch(`/api/estimates/${estimateId}`, {
-    method: 'PUT',
-    headers: getApiHeaders(),
-    body: JSON.stringify({
-      status: EstimateStatus.PROJECT_NOT_SCHEDULED,
-      schedule_team_id: teamId,
-    }),
-  });
-  const errBody = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(
-      (typeof errBody.message === 'string' && errBody.message) ||
-        (typeof errBody.detail === 'string' && errBody.detail) ||
-        'Failed to update estimate'
-    );
+  if (teamId) {
+    const res = await fetch(`/api/estimates/${estimateId}`, {
+      method: 'PUT',
+      headers: getApiHeaders(),
+      body: JSON.stringify({
+        status: EstimateStatus.PROJECT_NOT_SCHEDULED,
+        schedule_team_id: teamId,
+      }),
+    });
+    const errBody = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(
+        (typeof errBody.message === 'string' && errBody.message) ||
+          (typeof errBody.detail === 'string' && errBody.detail) ||
+          'Failed to update estimate'
+      );
+    }
+    return 'tentative';
   }
+
+  // No schedule rows and team cleared — nothing to do.
+  return 'unassigned';
 }
