@@ -4,7 +4,7 @@ import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
 /**
  * Gets the contractor_id from the request headers if available,
- * otherwise fetches it from the /users/me endpoint.
+ * otherwise fetches it from GET /api/v1/auth/me (employee-safe; /users/me is manager-only).
  * @param request - The Next.js request object
  * @returns The contractor_id or null if not found
  */
@@ -15,7 +15,7 @@ export async function getContractorId(request: NextRequest | Request): Promise<s
         return contractorIdHeader;
     }
 
-    // If not in headers, fetch from /users/me endpoint
+    // If not in headers, fetch from /auth/me (works for employee role; /users/me is manager-only).
     const authHeader = request.headers.get('Authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,10 +23,10 @@ export async function getContractorId(request: NextRequest | Request): Promise<s
     }
 
     const token = authHeader.substring(7);
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
 
     try {
-        const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
+        const userResponse = await fetch(`${apiBaseUrl}/api/v1/auth/me`, {
             method: 'GET',
             headers: {
                 Authorization: `Bearer ${token}`,

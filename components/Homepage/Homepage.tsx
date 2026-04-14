@@ -30,6 +30,10 @@ import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
+import {
+  getApiErrorMessage,
+  invalidateSessionAndRedirectToLogin,
+} from '@/app/utils/authSession';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppSelector } from '@/store/hooks';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
@@ -203,7 +207,10 @@ export default function Homepage() {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'Failed to fetch homepage data');
+          if (invalidateSessionAndRedirectToLogin(response, errorData)) {
+            return;
+          }
+          throw new Error(getApiErrorMessage(errorData) || 'Failed to fetch homepage data');
         }
 
         const homepageData = await response.json();
@@ -511,7 +518,7 @@ export default function Homepage() {
 
         {/* Key Metrics */}
         <AnimatedSection delay={0.3}>
-          <Title order={2} mb="md" c="gray.1">
+          <Title order={2} mb="md" c="gray.0">
             Key Metrics
           </Title>
           <Grid gutter="md">
@@ -536,14 +543,21 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Total revenue from signed estimates"
+                description="Total revenue from signed estimates this month"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
               <MetricCard
+                title="Projects Completed This Month"
+                value={(data.metrics.completed_this_month ?? 0).toString()}
+                description="Projects completed this month"
+              />
+            </Grid.Col>
+            <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
+              <MetricCard
                 title="Conversion Rate"
                 value={`${(data.metrics.conversion_rate ?? 0).toFixed(1)}%`}
-                description="Percentage of new leads signed year-to-date"
+                description="Estimates sold ÷ new estimates, year-to-date (dashboard snapshots)"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
@@ -553,14 +567,7 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Average revenue per signed estimate year-to-date"
-              />
-            </Grid.Col>
-            <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
-              <MetricCard
-                title="Projects Completed This Month"
-                value={(data.metrics.completed_this_month ?? 0).toString()}
-                description="Projects completed this month"
+                description="Average revenue per sold job, year-to-date (dashboard snapshots)"
               />
             </Grid.Col>
           </Grid>
@@ -570,7 +577,7 @@ export default function Homepage() {
         {data.in_progress_jobs.length > 0 && (
           <AnimatedSection delay={0.4}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">In Progress Jobs</Title>
+              <Title order={2} c="gray.0">In Progress Jobs</Title>
               <Button
                 variant="subtle"
                 size="sm"
@@ -601,7 +608,7 @@ export default function Homepage() {
         {data.recently_sold.length > 0 && (
           <AnimatedSection delay={0.5}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">Recently Sold</Title>
+              <Title order={2} c="gray.0">Recently Sold</Title>
               <Button
                 variant="subtle"
                 size="sm"
@@ -630,7 +637,7 @@ export default function Homepage() {
         {data.recently_finished.length > 0 && (
           <AnimatedSection delay={0.6}>
             <Group justify="space-between" mb="md">
-              <Title order={2} c="gray.1">Recently Finished</Title>
+              <Title order={2} c="gray.0">Recently Finished</Title>
               <Button
                 variant="subtle"
                 size="sm"

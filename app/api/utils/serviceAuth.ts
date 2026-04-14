@@ -32,7 +32,51 @@ function logApiBaseResolution(
   console.info('[getApiBaseUrl]', { baseUrl, reason, ...extra });
 }
 
-export const getApiBaseUrl = () => {
+/** Server Route Handler opts: align job-engine URL with browser host (e.g. QA Amplify previews). */
+export type ApiBaseUrlOptions = {
+  request?: Request;
+};
+
+function hostnameFromIncomingRequest(request: Request): string | undefined {
+  const raw = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  if (!raw) {
+    return undefined;
+  }
+  const first = raw.split(',')[0].trim();
+  const host = first.split(':')[0];
+  return host || undefined;
+}
+
+export const getApiBaseUrl = (opts?: ApiBaseUrlOptions) => {
+  // Server Route Handler: prefer Host / X-Forwarded-Host so QA matches client-side resolution
+  // (Amplify preview branches may not set AWS_BRANCH=qa; unknown branch used to default to prod).
+  if (opts?.request) {
+    const hostname = hostnameFromIncomingRequest(opts.request);
+    if (hostname) {
+      const h = hostname.toLowerCase();
+      if (h === 'www.jobsuite.app' || h === 'jobsuite.app') {
+        const baseUrl = 'https://api.jobsuite.app';
+        logApiBaseResolution('server:incoming-request-host:jobsuite.app', baseUrl, { hostname: h });
+        return baseUrl;
+      }
+      if (h.includes('qa') || h.includes('staging') || h.endsWith('amplifyapp.com')) {
+        const baseUrl = 'https://qa.api.jobsuite.app';
+        logApiBaseResolution('server:incoming-request-host:qa-or-staging-or-amplify', baseUrl, {
+          hostname: h,
+        });
+        return baseUrl;
+      }
+      if (h === 'localhost' || h === '127.0.0.1') {
+        const url =
+          process.env.NEXT_PUBLIC_JOB_ENGINE_LOCAL_URL ||
+          process.env.JOB_ENGINE_LOCAL_URL ||
+          'http://localhost:8000';
+        logApiBaseResolution('server:incoming-request-host:localhost', url, { hostname: h });
+        return url;
+      }
+    }
+  }
+
   // Client-side: detect environment from current hostname
   if (typeof window !== 'undefined') {
     const { hostname } = window.location;
@@ -80,7 +124,8 @@ export const getApiBaseUrl = () => {
     return url;
   }
 
-  // Use AWS_BRANCH or AMPLIFY_BRANCH to determine environment
+  // Use AWS_BRANCH or AMPLIFY_BRANCH (written into .env.production during Amplify preBuild
+  // so Next.js inlines them at build time — same mechanism as other server env).
   // Note: main branch uses QA endpoints, not production
   const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
 
@@ -107,10 +152,34 @@ export const getApiBaseUrl = () => {
     return baseUrl;
   }
 
-  // Default to prod for unknown branches
+  // Fallback: NEXT_PUBLIC_ENV is set per branch in Amplify and is always inlined at build.
+  const publicEnv = process.env.NEXT_PUBLIC_ENV;
+  if (publicEnv === 'production') {
+    const baseUrl = 'https://api.jobsuite.app';
+    logApiBaseResolution('server:next-public-env-fallback:production', baseUrl, {
+      NEXT_PUBLIC_ENV: publicEnv,
+      ...serverExtras,
+    });
+    return baseUrl;
+  }
+  if (
+    publicEnv === 'qa' ||
+    publicEnv === 'staging' ||
+    publicEnv === 'development' ||
+    publicEnv === 'dev'
+  ) {
+    const baseUrl = 'https://qa.api.jobsuite.app';
+    logApiBaseResolution('server:next-public-env-fallback:non-prod', baseUrl, {
+      NEXT_PUBLIC_ENV: publicEnv,
+      ...serverExtras,
+    });
+    return baseUrl;
+  }
+
   const fallback = 'https://api.jobsuite.app';
   logApiBaseResolution('server:branch:unknown-default-prod', fallback, {
     branch: branch ?? '(unset)',
+    NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
     AWS_BRANCH: process.env.AWS_BRANCH,
     AMPLIFY_BRANCH: process.env.AMPLIFY_BRANCH,
     ...serverExtras,

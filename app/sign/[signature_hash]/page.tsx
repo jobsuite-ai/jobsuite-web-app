@@ -11,6 +11,46 @@ import SignaturePageLayout, {
 } from '@/components/EstimateDetails/signature/SignaturePageLayout';
 import { logToCloudWatch } from '@/public/logger';
 
+/** True when the client has completed signing for this visit (drives Payment tab, CTAs). */
+function isClientSignedState(data: {
+    status?: string;
+    signatures?: unknown[];
+    current_status?: string;
+}): boolean {
+    const raw = data.status;
+    const linkStatus =
+        typeof raw === 'string' ? raw.toUpperCase() : String(raw ?? '');
+    if (linkStatus === 'REVOKED') {
+        return false;
+    }
+    // Backend sets link to SIGNED only after persisting the signature; do not require
+    // signatures[] in the payload (it can be empty if the fetch fails or lags).
+    if (linkStatus === 'SIGNED') {
+        return true;
+    }
+    const sigs = data.signatures;
+    if (Array.isArray(sigs) && sigs.length > 0) {
+        return true;
+    }
+    const cs = data.current_status;
+    if (typeof cs !== 'string' || !cs) {
+        return false;
+    }
+    if (cs === 'ESTIMATE_DECLINED') {
+        return false;
+    }
+    if (cs === 'ESTIMATE_ACCEPTED') {
+        return true;
+    }
+    if (cs === 'CONTRACTOR_SIGNED' || cs === 'ACCOUNTING_NEEDED') {
+        return true;
+    }
+    if (cs.startsWith('PROJECT_')) {
+        return true;
+    }
+    return false;
+}
+
 function SignaturePageContent() {
     const params = useParams();
     const searchParams = useSearchParams();
@@ -18,6 +58,8 @@ function SignaturePageContent() {
     const payRaw = searchParams.get('pay');
     const payIntent =
         payRaw === 'balance' || payRaw === 'deposit' ? payRaw : null;
+    const tabRaw = searchParams.get('tab');
+    const tabIntent = tabRaw === 'payment' ? tabRaw : null;
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -85,11 +127,7 @@ function SignaturePageContent() {
                         `hash=${signatureHash}, status=${data.status}`
                 );
 
-                const hasValidSignatures =
-                    data.signatures && data.signatures.length > 0;
-                const isLinkSigned = data.status === 'SIGNED';
-                const isLinkRevoked = data.status === 'REVOKED';
-                if (!isLinkRevoked && isLinkSigned && hasValidSignatures) {
+                if (isClientSignedState(data)) {
                     setSigned(true);
                 }
             } catch (err: unknown) {
@@ -145,6 +183,7 @@ function SignaturePageContent() {
           linkInfo={linkInfo}
           signatureHash={signatureHash}
           payIntent={payIntent}
+          tabIntent={tabIntent}
           setLinkInfo={setLinkInfo}
           signed={signed}
           setSigned={setSigned}

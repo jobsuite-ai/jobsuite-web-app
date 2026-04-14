@@ -47,6 +47,7 @@ export async function POST(
         const data = await res.json();
         return NextResponse.json(data);
     } catch (error) {
+        // eslint-disable-next-line no-console
         console.error('Helcim checkout session error:', error);
         return NextResponse.json(
             { message: 'Internal server error' },

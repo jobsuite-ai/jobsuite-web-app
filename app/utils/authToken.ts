@@ -1,3 +1,5 @@
+import { isPainterRole } from '@/app/utils/roles';
+
 const ACCESS_TOKEN_EXPIRES_AT_KEY = 'access_token_expires_at';
 const ACCESS_TOKEN_ISSUED_AT_KEY = 'access_token_issued_at';
 const DEFAULT_ACCESS_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -7,7 +9,7 @@ function decodeBase64Url(input: string): string {
   return atob(padded);
 }
 
-function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
+export function decodeJwtPayload(accessToken: string): Record<string, unknown> | null {
   const parts = accessToken.split('.');
   if (parts.length < 2) {
     return null;
@@ -68,4 +70,48 @@ export function clearAccessTokenMetadata(): void {
   }
   localStorage.removeItem(ACCESS_TOKEN_EXPIRES_AT_KEY);
   localStorage.removeItem(ACCESS_TOKEN_ISSUED_AT_KEY);
+}
+
+/** Role claim from the stored access token (for cache policy; not a security boundary). */
+export function isPainterRoleFromToken(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    return false;
+  }
+  const payload = decodeJwtPayload(token);
+  const r = payload?.role;
+  return typeof r === 'string' && isPainterRole(r);
+}
+
+/**
+ * @deprecated Use isPainterRoleFromToken — kept for call sites that still say "employee session".
+ */
+export function isEmployeeRoleFromToken(): boolean {
+  return isPainterRoleFromToken();
+}
+
+/**
+ * True when cached /api/auth/me data should not be used for this access token
+ * (different user, or role changed in a new token while localStorage cache is stale).
+ */
+export function isCachedAuthMeStaleForToken(
+  accessToken: string,
+  cached: { id: string; role: string }
+): boolean {
+  const payload = decodeJwtPayload(accessToken);
+  if (!payload) {
+    return true;
+  }
+  const sub = typeof payload.sub === 'string' ? payload.sub : null;
+  if (!sub || cached.id !== sub) {
+    return true;
+  }
+  const tokenRole = typeof payload.role === 'string' ? payload.role : null;
+  if (tokenRole != null && tokenRole !== cached.role) {
+    return true;
+  }
+  return false;
 }

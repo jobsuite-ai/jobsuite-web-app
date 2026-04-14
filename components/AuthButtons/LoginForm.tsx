@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { setAccessTokenMetadata } from '@/app/utils/authToken';
+import { clearCachedAuthMe } from '@/app/utils/dataCache';
 import { encryptPassword } from '@/app/utils/encryption';
 
 export default function LoginForm() {
@@ -54,6 +55,7 @@ export default function LoginForm() {
 
       // Store tokens in localStorage
       if (data.access_token) {
+        clearCachedAuthMe();
         localStorage.setItem('access_token', data.access_token);
         const expiresInRaw = data.expires_in ?? data.expiresIn;
         const expiresInSeconds = typeof expiresInRaw === 'number' ? expiresInRaw : Number(expiresInRaw);

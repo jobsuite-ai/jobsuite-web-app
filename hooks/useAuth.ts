@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 
-import { clearCachedContractorId, getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
-import { clearAccessTokenMetadata, getAccessTokenExpiresAt } from '@/app/utils/authToken';
+import { getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
+import { clearClientAuthSession } from '@/app/utils/authSession';
+import { getAccessTokenExpiresAt, isCachedAuthMeStaleForToken } from '@/app/utils/authToken';
 import { clearCachedAuthMe, getCachedAuthMe, setCachedAuthMe } from '@/app/utils/dataCache';
 
 export interface User {
@@ -50,12 +51,7 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
   const [error, setError] = useState<string | null>(null);
 
   const clearAuthStorage = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    clearAccessTokenMetadata();
-    clearCachedAuthMe();
-    clearCachedContractorId();
-    window.dispatchEvent(new Event('localStorageChange'));
+    clearClientAuthSession();
   };
 
   useEffect(() => {
@@ -76,8 +72,12 @@ export function useAuth(options: UseAuthOptions = {}): UseAuthReturn {
       const expiresAt = getAccessTokenExpiresAt(accessToken);
       const isExpired = expiresAt !== null && Date.now() >= expiresAt;
 
-      // Check cache first
-      const cachedUserData = getCachedAuthMe<User>();
+      // Check cache first (must match current token subject/role or we show the wrong UI)
+      let cachedUserData = getCachedAuthMe<User>();
+      if (cachedUserData && isCachedAuthMeStaleForToken(accessToken, cachedUserData)) {
+        clearCachedAuthMe();
+        cachedUserData = null;
+      }
       if (cachedUserData) {
         // Use cached data immediately
         setIsAuthenticated(true);

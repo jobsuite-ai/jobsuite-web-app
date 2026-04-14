@@ -8,7 +8,11 @@ import { Header } from './Header/Header';
 import classes from './Shell.module.css';
 
 import { clearCachedContractorId, getApiHeaders, setCachedContractorId } from '@/app/utils/apiClient';
-import { clearAccessTokenMetadata, getAccessTokenExpiresAt } from '@/app/utils/authToken';
+import {
+  clearAccessTokenMetadata,
+  getAccessTokenExpiresAt,
+  isCachedAuthMeStaleForToken,
+} from '@/app/utils/authToken';
 import { clearCachedAuthMe, getCachedAuthMe, setCachedAuthMe } from '@/app/utils/dataCache';
 import type { User } from '@/hooks/useAuth';
 
@@ -69,7 +73,11 @@ export function Shell({ children }: { children: any }) {
     const expiresAt = getAccessTokenExpiresAt(accessToken);
     const isExpired = expiresAt !== null && Date.now() >= expiresAt;
 
-    const cachedUserData = getCachedAuthMe<User>();
+    let cachedUserData = getCachedAuthMe<User>();
+    if (cachedUserData && isCachedAuthMeStaleForToken(accessToken, cachedUserData)) {
+      clearCachedAuthMe();
+      cachedUserData = null;
+    }
     if (cachedUserData) {
       setIsAuthenticated(true);
       if (cachedUserData.contractor_id) {
@@ -225,7 +233,9 @@ export function Shell({ children }: { children: any }) {
       {isAuthenticated ? (
         <Header sidebarOpened={sidebarOpened} setSidebarOpened={setSidebarOpened} />
       ) : null}
-      <div className={`${classes.wrapper} ${sidebarOpened ? classes.wrapperWithSidebar : ''} ${!isAuthenticated ? classes.wrapperNoHeader : ''}`}>
+      <div
+        className={`${classes.wrapper} ${sidebarOpened && isAuthenticated ? classes.wrapperWithSidebar : ''} ${!isAuthenticated ? classes.wrapperNoHeader : ''}`}
+      >
         <div className={classes.main}>
           {children}
         </div>

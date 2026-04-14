@@ -105,7 +105,7 @@ export default function QuickBooksCallbackPage() {
           <Center>
             <Stack align="center" gap="lg" style={{ textAlign: 'center' }}>
               <Loader size="xl" />
-              <Title order={2} c="dimmed">Connecting to QuickBooks...</Title>
+              <Title order={2} c="gray.0">Connecting to QuickBooks...</Title>
               <p
                 style={{
                   color: 'var(--mantine-color-dimmed)',

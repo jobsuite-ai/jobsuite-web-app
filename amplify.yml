@@ -7,8 +7,6 @@ frontend:
           set -e
           npm ci
 
-          echo "AMPLIFY_BRANCH=$AWS_BRANCH" >> .env.production
-
           SECRET_ARN="${AWS_CREDENTIALS_SECRET_ARN:-arn:aws:secretsmanager:us-west-2:122610504404:secret:jobsuite-web-app/aws-credentials-O7MIkg}"
           echo "Resolving Secrets Manager credentials from: $SECRET_ARN"
           SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id "$SECRET_ARN" --query SecretString --output text)
@@ -52,10 +50,22 @@ frontend:
           fi
 
           # Amplify sets env vars (and resolved secrets) in the build environment, but Next.js
-          # API routes only see vars that are in .env.production at build time. Append any
-          # server-side vars so they are available at runtime.
-          env | grep -E '^JIRA_|^WEBHOOK_|^RESEND_|^SUPPORT_FROM_EMAIL=' || true >> .env.production
-          echo "Jira API Token added to .env.production"
+          # inlines server env from .env.production at build time. Append server-side vars here.
+          # Note: `grep ... || true >> file` is wrong — a successful grep writes to stdout, not the file.
+          env | grep -E '^JIRA_|^WEBHOOK_|^RESEND_|^SUPPORT_FROM_EMAIL=' >> .env.production || true
+          echo "Jira/webhook-related keys appended to .env.production (if present in build env)"
+
+          # Branch identity for getApiBaseUrl() and similar — must be last so it wins over any
+          # duplicate keys. Prefer AWS_BRANCH (Amplify-injected); fall back to AMPLIFY_BRANCH from console.
+          BRANCH_REF="${AWS_BRANCH:-${AMPLIFY_BRANCH:-}}"
+          if [ -z "$BRANCH_REF" ]; then
+            echo "ERROR: Neither AWS_BRANCH nor AMPLIFY_BRANCH is set in the Amplify build environment."
+            exit 1
+          fi
+          echo "AWS_BRANCH=$BRANCH_REF" >> .env.production
+          echo "AMPLIFY_BRANCH=$BRANCH_REF" >> .env.production
+          echo "VERIFY .env.production branch keys (values masked):"
+          grep -E '^(AWS_BRANCH|AMPLIFY_BRANCH)=' .env.production | tail -n 2 | sed 's/=.*/=<set>/'
     build:
       commands:
         - npm run build

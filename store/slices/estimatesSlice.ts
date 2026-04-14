@@ -2,7 +2,8 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 import { Estimate, EstimateStatus } from '@/components/Global/model';
 
-const mergeEstimatePreservingValues = (
+/** Merge list payload with existing entity; used when combining proposal + project list fetches. */
+export const mergeEstimatePreservingValues = (
   existing: Estimate | undefined,
   incoming: Estimate
 ): Estimate => {

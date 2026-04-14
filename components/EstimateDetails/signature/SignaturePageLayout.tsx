@@ -31,6 +31,7 @@ import {
     IconInfoCircle,
     IconLicense,
     IconSignature,
+    IconThumbDown,
 } from '@tabler/icons-react';
 
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
@@ -41,7 +42,12 @@ import SignatureForm, { SignaturePayload } from '@/components/EstimateDetails/si
 import SignaturePageSections, {
     PastProject,
 } from '@/components/EstimateDetails/signature/SignaturePageSections';
-import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
+import {
+    ContractorClient,
+    Estimate,
+    EstimateResource,
+    EstimateStatus,
+} from '@/components/Global/model';
 import { logToCloudWatch } from '@/public/logger';
 
 /** Live payment totals from the API (aligned with Helcim checkout-session rules). */
@@ -119,11 +125,90 @@ export interface SignatureLinkInfo {
     current_status?: string;
 }
 
+function CardBrandPill({
+    children,
+    label,
+}: {
+    children: React.ReactNode;
+    label: string;
+}) {
+    return (
+        <Paper
+          withBorder
+          radius="md"
+          px={10}
+          py={6}
+          style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--mantine-color-body)',
+            }}
+          aria-label={label}
+        >
+            {children}
+        </Paper>
+    );
+}
+
+function VisaLogoMark() {
+    return (
+        <svg
+          width="34"
+          height="12"
+          viewBox="0 0 34 12"
+          role="img"
+          aria-label="Visa"
+        >
+            <title>Visa</title>
+            <text
+              x="0"
+              y="10"
+              fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+              fontWeight="800"
+              fontSize="12"
+              fill="var(--mantine-color-dark-9)"
+              letterSpacing="1"
+            >
+                VISA
+            </text>
+        </svg>
+    );
+}
+
+function MastercardLogoMark() {
+    return (
+        <svg
+          width="44"
+          height="14"
+          viewBox="0 0 44 14"
+          role="img"
+          aria-label="Mastercard"
+        >
+            <title>Mastercard</title>
+            <circle cx="18" cy="7" r="6" fill="#EB001B" />
+            <circle cx="26" cy="7" r="6" fill="#F79E1B" fillOpacity="0.95" />
+            <text
+              x="0"
+              y="13"
+              fontFamily="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif"
+              fontWeight="700"
+              fontSize="0"
+              fill="transparent"
+            >
+                Mastercard
+            </text>
+        </svg>
+    );
+}
+
 interface SignaturePageLayoutProps {
     linkInfo: SignatureLinkInfo;
     signatureHash: string;
     /** From `?pay=balance` or `?pay=deposit` on the sign URL (e.g. invoice email). */
     payIntent?: 'balance' | 'deposit' | null;
+    /** From `?tab=payment` on the sign URL. */
+    tabIntent?: 'payment' | null;
     isPreviewMode?: boolean;
     setLinkInfo?: (fn: (prev: SignatureLinkInfo | null) => SignatureLinkInfo | null) => void;
     signed?: boolean;
@@ -136,6 +221,7 @@ export default function SignaturePageLayout({
     linkInfo,
     signatureHash,
     payIntent = null,
+    tabIntent = null,
     isPreviewMode = false,
     setLinkInfo,
     signed = false,
@@ -148,7 +234,11 @@ export default function SignaturePageLayout({
     const [activeTab, setActiveTab] = useState<string | null>('estimate');
     const [depositModalOpened, setDepositModalOpened] = useState(false);
     const [depositPaidThisSession, setDepositPaidThisSession] = useState(false);
+    const [declineModalOpened, setDeclineModalOpened] = useState(false);
+    const [declineSubmitting, setDeclineSubmitting] = useState(false);
+    const [declineError, setDeclineError] = useState<string | null>(null);
     const initialPaidTabRedirectRef = useRef(false);
+    const initialDepositIntentRef = useRef(false);
 
     const refreshLinkInfo = useCallback(async () => {
         if (!setLinkInfo) return;
@@ -218,6 +308,34 @@ export default function SignaturePageLayout({
             setSignatureModalOpened(true);
         }
     }, [isContractorViewer, setSignatureModalOpened]);
+
+    const handleConfirmDecline = useCallback(async () => {
+        setDeclineSubmitting(true);
+        setDeclineError(null);
+        try {
+            const response = await fetch(`/api/signature/${signatureHash}/decline`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const body = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                setDeclineError(
+                    (body as { error?: string; detail?: string }).error
+                        || (body as { detail?: string }).detail
+                        || 'Could not decline this estimate. Please try again.'
+                );
+                return;
+            }
+            setDeclineModalOpened(false);
+            await refreshLinkInfo();
+            logToCloudWatch(
+                '[SIGNATURE_FLOW_EVENT] Estimate declined by client. ' +
+                    `hash=${signatureHash}`
+            ).catch(() => {});
+        } finally {
+            setDeclineSubmitting(false);
+        }
+    }, [refreshLinkInfo, signatureHash]);
 
     const config = linkInfo.signature_page_config || {};
     const showDocuments =
@@ -299,10 +417,25 @@ export default function SignaturePageLayout({
         );
     };
 
+    const estimateLiveStatus =
+        linkInfo.current_status ??
+        linkInfo.estimate?.status ??
+        '';
+    const isEstimateDeclined =
+        estimateLiveStatus === EstimateStatus.ESTIMATE_DECLINED ||
+        estimateLiveStatus === 'ESTIMATE_DECLINED';
+
     const showQuickSignCta =
         !isContractorViewer &&
         !!setSignatureModalOpened &&
-        !signed;
+        !signed &&
+        !isEstimateDeclined;
+
+    const showDeclineCta =
+        !isPreviewMode &&
+        !isContractorViewer &&
+        !signed &&
+        !isEstimateDeclined;
 
     const renderHeader = () => (
         <Box
@@ -345,25 +478,56 @@ export default function SignaturePageLayout({
                             minWidth: 0,
                         }}
                     >
-                        {showQuickSignCta ? (
-                            <Button
-                              size={isMobile ? 'sm' : 'md'}
-                              leftSection={<IconSignature size={isMobile ? 16 : 18} />}
-                              onClick={handleSignatureClick}
-                              variant="filled"
-                              radius="md"
-                              fw={600}
-                              style={{
-                                  minWidth: isMobile ? 140 : 440,
-                              }}
-                            >
-                                Quick Sign
-                            </Button>
+                        {showQuickSignCta || showDeclineCta ? (
+                            <Group gap="sm" justify="center" wrap="wrap">
+                                {showQuickSignCta ? (
+                                    <Button
+                                      size={isMobile ? 'sm' : 'md'}
+                                      leftSection={
+                                            <IconSignature size={isMobile ? 16 : 18} />
+                                        }
+                                      onClick={handleSignatureClick}
+                                      variant="filled"
+                                      radius="md"
+                                      fw={600}
+                                      style={{
+                                          minWidth: isMobile ? 140 : 200,
+                                      }}
+                                    >
+                                        Quick Sign
+                                    </Button>
+                                ) : null}
+                                {showDeclineCta ? (
+                                    <Button
+                                      size={isMobile ? 'sm' : 'md'}
+                                      leftSection={
+                                            <IconThumbDown size={isMobile ? 16 : 18} />
+                                        }
+                                      onClick={() => {
+                                            setDeclineError(null);
+                                            setDeclineModalOpened(true);
+                                        }}
+                                      variant="default"
+                                      color="gray"
+                                      radius="md"
+                                      fw={600}
+                                    >
+                                        Decline estimate
+                                    </Button>
+                                ) : null}
+                            </Group>
                         ) : signed && !isContractorViewer ? (
                             <Group gap="xs" c="dimmed">
                                 <IconSignature size={18} />
                                 <Text size="sm" fw={500}>
                                     Signed
+                                </Text>
+                            </Group>
+                        ) : isEstimateDeclined && !isContractorViewer ? (
+                            <Group gap="xs" c="dimmed">
+                                <IconThumbDown size={18} />
+                                <Text size="sm" fw={500}>
+                                    Declined
                                 </Text>
                             </Group>
                         ) : null}
@@ -405,6 +569,13 @@ export default function SignaturePageLayout({
         !paymentSummary.fully_paid &&
         (payIntent === 'balance' || isFullBalancePaymentPhase);
 
+    const showAcceptedCardsIndicator =
+        (linkInfo.helcim_configured ?? false) &&
+        !isContractorViewer &&
+        signed &&
+        (showBalancePayment || showClientDeposit) &&
+        !paymentSummary?.fully_paid;
+
     /** Invoice links use `?pay=balance` — open the Payment tab when balance can be paid. */
     useEffect(() => {
         if (
@@ -418,6 +589,36 @@ export default function SignaturePageLayout({
         setActiveTab('payment');
         return undefined;
     }, [payIntent, signed, isContractorViewer, showBalancePayment]);
+
+    /**
+     * Deposit links use `?pay=deposit` — open Payment and (when eligible) open the deposit modal.
+     * We dedupe to avoid reopening the modal on re-renders.
+     */
+    useEffect(() => {
+        if (
+            initialDepositIntentRef.current ||
+            payIntent !== 'deposit' ||
+            !signed ||
+            isContractorViewer
+        ) {
+            return undefined;
+        }
+        setActiveTab('payment');
+        if (showClientDeposit) {
+            initialDepositIntentRef.current = true;
+            setDepositModalOpened(true);
+        }
+        return undefined;
+    }, [payIntent, signed, isContractorViewer, showClientDeposit]);
+
+    /** Direct tab deep-link: `?tab=payment` — select Payment when it becomes available. */
+    useEffect(() => {
+        if (tabIntent !== 'payment' || isContractorViewer || !showPaymentTab) {
+            return undefined;
+        }
+        setActiveTab('payment');
+        return undefined;
+    }, [tabIntent, isContractorViewer, showPaymentTab]);
 
     /** Already paid in full: land on Payment once (e.g. returning from email). */
     useEffect(() => {
@@ -489,6 +690,49 @@ export default function SignaturePageLayout({
 
     return (
         <>
+            <Modal
+              opened={declineModalOpened}
+              onClose={() => {
+                    setDeclineModalOpened(false);
+                    setDeclineError(null);
+                }}
+              title="Decline this estimate?"
+              centered
+              size="md"
+              radius="md"
+            >
+                <Stack gap="md">
+                    <Text size="sm">
+                        This tells the contractor you are not moving forward with this
+                        proposal. You will not be asked to sign unless they send a new
+                        estimate.
+                    </Text>
+                    {declineError ? (
+                        <Alert color="red" variant="light">
+                            {declineError}
+                        </Alert>
+                    ) : null}
+                    <Group justify="flex-end" gap="sm">
+                        <Button
+                          variant="default"
+                          onClick={() => {
+                                setDeclineModalOpened(false);
+                                setDeclineError(null);
+                            }}
+                          disabled={declineSubmitting}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                          color="red"
+                          loading={declineSubmitting}
+                          onClick={handleConfirmDecline}
+                        >
+                            Decline estimate
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
             <Modal
               opened={depositModalOpened && showClientDeposit}
               onClose={() => setDepositModalOpened(false)}
@@ -587,6 +831,17 @@ export default function SignaturePageLayout({
 
                         {activeTab === 'estimate' && (
                             <>
+                                {isEstimateDeclined && !isContractorViewer && (
+                                    <Alert
+                                      icon={<IconThumbDown size={16} />}
+                                      title="Estimate declined"
+                                      color="gray"
+                                      variant="light"
+                                      mb="xl"
+                                    >
+                                        You have declined this proposal.
+                                    </Alert>
+                                )}
                                 {signed && (
                                     <Alert
                                       icon={<IconInfoCircle size={16} />}
@@ -611,7 +866,9 @@ export default function SignaturePageLayout({
                                       client={linkInfo.client || undefined}
                                       onSignatureClick={handleSignatureClick}
                                       showSignatureClickable={
-                                            !isContractorViewer && !signed
+                                            !isContractorViewer &&
+                                            !signed &&
+                                            !isEstimateDeclined
                                         }
                                       signatures={linkInfo.signatures || []}
                                     />
@@ -619,7 +876,8 @@ export default function SignaturePageLayout({
                                 {!isContractorViewer &&
                                     setLinkInfo &&
                                     setSigned &&
-                                    setSignatureModalOpened && (
+                                    setSignatureModalOpened &&
+                                    !isEstimateDeclined && (
                                         <SignatureForm
                                           signatureHash={signatureHash}
                                           clientEmail={linkInfo.client?.email || ''}
@@ -728,6 +986,29 @@ export default function SignaturePageLayout({
                                         this project.
                                     </Text>
                                 </div>
+                                {showAcceptedCardsIndicator ? (
+                                    <Paper withBorder radius="md" p="md">
+                                        <Group justify="space-between" align="center" wrap="wrap">
+                                            <Stack gap={2}>
+                                                <Text size="sm" fw={600}>
+                                                    Accepted cards
+                                                </Text>
+                                                <Text size="xs" c="dimmed">
+                                                    Visa and Mastercard only (American Express not
+                                                    accepted)
+                                                </Text>
+                                            </Stack>
+                                            <Group gap="xs" wrap="wrap">
+                                                <CardBrandPill label="Visa accepted">
+                                                    <VisaLogoMark />
+                                                </CardBrandPill>
+                                                <CardBrandPill label="Mastercard accepted">
+                                                    <MastercardLogoMark />
+                                                </CardBrandPill>
+                                            </Group>
+                                        </Group>
+                                    </Paper>
+                                ) : null}
                                 {linkInfo.payment_line_items &&
                                     linkInfo.payment_line_items.length > 0 && (
                                     <Paper

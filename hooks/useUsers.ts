@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { User } from '@/components/Global/model';
 
@@ -6,20 +6,37 @@ import { User } from '@/components/Global/model';
 let usersCache: User[] | null = null;
 let usersCachePromise: Promise<User[]> | null = null;
 
+const cacheInvalidationListeners = new Set<() => void>();
+
 export function useUsers() {
   const [users, setUsers] = useState<User[]>(usersCache || []);
   const [loading, setLoading] = useState(!usersCache);
+  const [fetchGeneration, setFetchGeneration] = useState(0);
 
   useEffect(() => {
-    // If we already have cached data, use it
-    if (usersCache) {
+    const listener = () => setFetchGeneration((g) => g + 1);
+    cacheInvalidationListeners.add(listener);
+    return () => {
+      cacheInvalidationListeners.delete(listener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('access_token');
+    if (!accessToken) {
+      setLoading(false);
+      return;
+    }
+
+    const skipCache = fetchGeneration > 0;
+
+    if (!skipCache && usersCache) {
       setUsers(usersCache);
       setLoading(false);
       return;
     }
 
-    // If there's already a fetch in progress, wait for it
-    if (usersCachePromise) {
+    if (!skipCache && usersCachePromise) {
       usersCachePromise.then((data) => {
         setUsers(data);
         setLoading(false);
@@ -27,16 +44,11 @@ export function useUsers() {
       return;
     }
 
-    // Otherwise, fetch users
     setLoading(true);
-    const accessToken = localStorage.getItem('access_token');
-    if (!accessToken) {
-      setLoading(false);
-      return;
-    }
 
     usersCachePromise = fetch('/api/users', {
       method: 'GET',
+      cache: 'no-store',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
@@ -65,13 +77,18 @@ export function useUsers() {
       .finally(() => {
         usersCachePromise = null;
       });
+  }, [fetchGeneration]);
+
+  const refetch = useCallback(() => {
+    invalidateUsersCache();
   }, []);
 
-  return { users, loading };
+  return { users, loading, refetch };
 }
 
-// Function to invalidate the cache (useful if users are updated)
+/** Clears cache and notifies all mounted `useUsers` hooks to refetch. */
 export function invalidateUsersCache() {
   usersCache = null;
   usersCachePromise = null;
+  cacheInvalidationListeners.forEach((listener) => listener());
 }
