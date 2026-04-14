@@ -307,6 +307,16 @@ export function DepositSection({
                         {`Total project value: $${estimateTotal.toFixed(2)}`}
                     </Text>
                 )}
+                {isBalance && helcimConfigured && (
+                    <Stack gap={4}>
+                        <Text size="sm" fw={600}>
+                            Accepted cards
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                            Visa and Mastercard only. American Express is not accepted.
+                        </Text>
+                    </Stack>
+                )}
                 {payError && (
                     <Alert color="red" variant="light" onClose={() => setPayError(null)} withCloseButton>
                         {payError}
