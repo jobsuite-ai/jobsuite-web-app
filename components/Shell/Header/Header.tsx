@@ -779,13 +779,13 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       }
     };
 
-    // Initial fetch
-    fetchMessageCount();
+    // Initial fetch; Messaging Center loads counts and dispatches outreachDueTodayCountUpdated
+    if (pathname !== '/messaging-center') {
+      fetchMessageCount();
+    }
     fetchUnacknowledgedCount();
 
-    // Smart polling intervals:
-    // - When user is active: 60s for messages, adaptive for notifications (60s/120s)
-    // - When user is inactive: 5 minutes for both
+    // ~3 min outreach poll when active; Messaging Center pushes counts on that route
     const getPollInterval = (isActive: boolean, hasNotifications: boolean) => {
       if (!isActive) {
         return 5 * 60 * 1000; // 5 minutes when inactive
@@ -794,7 +794,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       if (hasNotifications) {
         return 45 * 1000; // 45 seconds when there are notifications
       }
-      return 2 * 60 * 1000; // 2 minutes when no notifications
+      return 3 * 60 * 1000; // 3 minutes when no notifications
     };
 
     let messageTimeoutId: NodeJS.Timeout;
@@ -802,7 +802,7 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
 
     const scheduleMessagePoll = () => {
       messageTimeoutId = setTimeout(() => {
-        if (isUserActive()) {
+        if (pathname !== '/messaging-center' && isUserActive()) {
           fetchMessageCount();
         }
         scheduleMessagePoll();
@@ -827,11 +827,21 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     // Poll when page becomes visible again
     const handleVisibilityChange = () => {
       if (!document.hidden && isUserActive()) {
-        fetchMessageCount();
+        if (pathname !== '/messaging-center') {
+          fetchMessageCount();
+        }
         fetchUnacknowledgedCount();
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    const handleOutreachDueTodayCount = (event: Event) => {
+      const ce = event as CustomEvent<{ count: number }>;
+      if (typeof ce.detail?.count === 'number') {
+        setMessageCount(ce.detail.count);
+      }
+    };
+    window.addEventListener('outreachDueTodayCountUpdated', handleOutreachDueTodayCount);
 
     // Listen for notification acknowledgment events to update count immediately
     const handleNotificationAcknowledged = () => {
@@ -845,9 +855,10 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       clearTimeout(messageTimeoutId);
       clearTimeout(notificationTimeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('outreachDueTodayCountUpdated', handleOutreachDueTodayCount);
       window.removeEventListener('notificationAcknowledged', handleNotificationAcknowledged);
     };
-  }, [isAuthenticated, isLoading, isUserActive]);
+  }, [isAuthenticated, isLoading, isUserActive, pathname]);
 
   // Fetch job title for a notification
   const fetchJobTitle = useCallback(async (estimateId: string) => {
