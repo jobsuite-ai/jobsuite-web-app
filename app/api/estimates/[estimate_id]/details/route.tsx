@@ -10,6 +10,8 @@ export async function GET(
 ) {
     try {
         const { estimate_id } = await params;
+        const { searchParams } = new URL(request.url);
+        const include = searchParams.get('include');
 
         // Get the access token from the Authorization header
         const authHeader = request.headers.get('Authorization');
@@ -35,8 +37,9 @@ export async function GET(
         }
 
         // Get comprehensive estimate details from backend
+        const includeQuery = include ? `?include=${encodeURIComponent(include)}` : '';
         const detailsResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/details`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/details${includeQuery}`,
             {
                 method: 'GET',
                 headers: {
