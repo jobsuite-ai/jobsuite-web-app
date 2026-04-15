@@ -44,7 +44,7 @@ export type SyntheticTeamBacklogCalendarEvent = {
   schedule_end_date: string;
   schedule_tentative: boolean;
   schedule_work_dates: string[];
-  schedule_non_working_dates: string[];
+  schedule_day_toggles: string[];
   calendar_kind: 'team_backlog';
 };
 
@@ -337,7 +337,7 @@ export function buildSyntheticTeamBacklogCalendarEvent(
     schedule_end_date: bar.schedule_end_date,
     schedule_tentative: true,
     schedule_work_dates: bar.schedule_work_dates,
-    schedule_non_working_dates: [],
+    schedule_day_toggles: [],
     calendar_kind: 'team_backlog',
   };
 }

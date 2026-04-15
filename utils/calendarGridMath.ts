@@ -15,10 +15,7 @@ import {
   startOfWeek,
 } from 'date-fns';
 
-import {
-  parseLocalDateString,
-  splitRangeIntoWeekdaySegments,
-} from '@/utils/calendarWorkingDays';
+import { parseLocalDateString } from '@/utils/calendarWorkingDays';
 
 /** Vertical stride for stacked bars (must be ≥ bar min-height + top margin). */
 export const CAL_EVENT_ROW_PX = 56;
@@ -39,7 +36,8 @@ export type CalendarGridJobEvent = {
   schedule_end_date: string | null;
   schedule_tentative: boolean;
   schedule_work_dates?: string[];
-  schedule_non_working_dates?: string[];
+  /** Dates that flip baseline team working vs non-working for this schedule. */
+  schedule_day_toggles?: string[];
   calendar_kind: 'job' | 'team_backlog';
 };
 
@@ -58,7 +56,7 @@ export type WeekCalRow = {
   estimateId: string | null;
   calendarKind: 'job' | 'team_backlog';
   workDatesIso: string[];
-  scheduleNonWorkingIso: string[];
+  scheduleDayTogglesIso: string[];
   scheduleStartIso: string | null;
   scheduleEndIso: string | null;
   /** From schedule row; preferred over estimate bid hours for preview/save. */
@@ -101,27 +99,23 @@ export function jobIsScheduledOnLocalDay(
   const end = startOfDay(parseLocalDateString(ev.schedule_end_date));
   const r = isAfter(start, end) ? { start: end, end: start } : { start, end };
   const ymd = format(d, 'yyyy-MM-dd');
-  const nonWorking = new Set(
-    (ev.schedule_non_working_dates ?? [])
+  const toggles = new Set(
+    (ev.schedule_day_toggles ?? [])
       .map((s) => s.trim().slice(0, 10))
       .filter(Boolean)
   );
-  if (nonWorking.has(ymd)) {
-    return false;
-  }
   const explicit = (ev.schedule_work_dates ?? []).filter(
     (s): s is string => typeof s === 'string' && s.trim().length > 0
   );
   if (explicit.length > 0) {
     return explicit.some((iso) => iso.trim().slice(0, 10) === ymd);
   }
-  const segments = splitRangeIntoWeekdaySegments(r.start, r.end);
-  for (const seg of segments) {
-    if (!isBefore(d, seg.start) && !isAfter(d, seg.end)) {
-      return true;
-    }
+  if (isBefore(d, r.start) || isAfter(d, r.end)) {
+    return false;
   }
-  return false;
+  const baselineWeekday = !isWeekend(d);
+  const effective = toggles.has(ymd) ? !baselineWeekday : baselineWeekday;
+  return effective;
 }
 
 /**
@@ -377,22 +371,21 @@ function rangesOverlap(a: [number, number], b: [number, number]): boolean {
  * `jobIsScheduledOnLocalDay` for the same schedule segment.
  */
 export function workDateYmdsForCalendarRow(row: WeekCalRow): string[] {
-  const non = new Set(
-    row.scheduleNonWorkingIso.map((s) => s.trim().slice(0, 10)).filter(Boolean)
-  );
   if (row.workDatesIso.length > 0) {
     return row.workDatesIso
       .map((s) => s.trim().slice(0, 10))
-      .filter((ymd) => ymd && !non.has(ymd));
+      .filter(Boolean);
   }
-  const segments = splitRangeIntoWeekdaySegments(row.workRange.start, row.workRange.end);
+  const toggles = new Set(
+    row.scheduleDayTogglesIso.map((s) => s.trim().slice(0, 10)).filter(Boolean)
+  );
   const out: string[] = [];
-  for (const seg of segments) {
-    for (const d of eachDayOfInterval({ start: seg.start, end: seg.end })) {
-      const ymd = format(d, 'yyyy-MM-dd');
-      if (!non.has(ymd)) {
-        out.push(ymd);
-      }
+  for (const d of eachDayOfInterval({ start: row.workRange.start, end: row.workRange.end })) {
+    const ymd = format(d, 'yyyy-MM-dd');
+    const baseline = !isWeekend(d);
+    const effective = toggles.has(ymd) ? !baseline : baseline;
+    if (effective) {
+      out.push(ymd);
     }
   }
   return out;

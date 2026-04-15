@@ -1,6 +1,6 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
@@ -86,6 +86,7 @@ import {
   segmentForWeekOrFallback,
 } from '@/utils/calendarGridMath';
 import { isUnassignedTeamProject } from '@/utils/calendarProjectFilters';
+import { computeTogglesAfterResizeWeekEdge } from '@/utils/calendarResizeToggles';
 import {
   parseLocalDateString,
   splitExplicitWorkDatesIntoContiguousSegments,
@@ -127,7 +128,7 @@ type ScheduleEditDraft = {
   estimateId: string;
   teamId: string;
   startIso: string;
-  nonWorkingIso: string[];
+  dayTogglesIso: string[];
   laborHours: number;
 };
 
@@ -153,7 +154,7 @@ function scheduleEditDraftsEqual(
   return (
     a.scheduleId === b.scheduleId &&
     a.startIso === b.startIso &&
-    JSON.stringify([...a.nonWorkingIso].sort()) === JSON.stringify([...b.nonWorkingIso].sort())
+    JSON.stringify([...a.dayTogglesIso].sort()) === JSON.stringify([...b.dayTogglesIso].sort())
   );
 }
 
@@ -186,7 +187,7 @@ function applySchedulePreviewPatch(
       return ev;
     }
 
-    const nw = draft.nonWorkingIso.map((s) => s.slice(0, 10));
+    const nw = draft.dayTogglesIso.map((s) => s.slice(0, 10));
 
     if (hasServerPreview) {
       const wd = preview!.work_dates ?? [];
@@ -197,7 +198,7 @@ function applySchedulePreviewPatch(
         schedule_start_date: start,
         schedule_end_date: preview!.end_date.slice(0, 10),
         schedule_work_dates: wd.map((w) => w.slice(0, 10)),
-        schedule_non_working_dates: nw,
+        schedule_day_toggles: nw,
       };
     }
 
@@ -207,7 +208,7 @@ function applySchedulePreviewPatch(
       return {
         ...ev,
         schedule_start_date: draft.startIso,
-        schedule_non_working_dates: nw,
+        schedule_day_toggles: nw,
       };
     }
     const oldStart = startOfDay(parseLocalDateString(oldStartStr));
@@ -216,7 +217,7 @@ function applySchedulePreviewPatch(
     if (delta === 0) {
       return {
         ...ev,
-        schedule_non_working_dates: nw,
+        schedule_day_toggles: nw,
       };
     }
     const explicit = (ev.schedule_work_dates ?? []).filter(
@@ -232,14 +233,14 @@ function applySchedulePreviewPatch(
         schedule_start_date: draft.startIso,
         schedule_end_date: newEndStr,
         schedule_work_dates: explicit.map((w) => shiftScheduleDateYmd(w.slice(0, 10), delta)),
-        schedule_non_working_dates: nw,
+        schedule_day_toggles: nw,
       };
     }
     return {
       ...ev,
       schedule_start_date: draft.startIso,
       schedule_end_date: newEndStr,
-      schedule_non_working_dates: nw,
+      schedule_day_toggles: nw,
     };
   });
 }
@@ -266,7 +267,7 @@ function buildScheduleEditDraftFromRow(
     estimateId: row.estimateId,
     teamId: row.colorKey,
     startIso,
-    nonWorkingIso: row.scheduleNonWorkingIso.map((s) => s.slice(0, 10)),
+    dayTogglesIso: row.scheduleDayTogglesIso.map((s) => s.slice(0, 10)),
     laborHours,
   };
 }
@@ -387,6 +388,18 @@ export function CalendarPage() {
     width: number;
   } | null>(null);
   const dayCellElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const weekBodyElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const scheduleEditDraftRef = useRef<ScheduleEditDraft | null>(null);
+  const schedulePreviewPayloadRef = useRef<SchedulePreviewPayload | null>(null);
+  const barResizeRef = useRef<{
+    pointerId: number;
+    weekStart: Date;
+    weekEnd: Date;
+    weekGridCols: 5 | 7;
+    weekBodyEl: HTMLElement;
+    days: Date[];
+    scheduleId: string;
+  } | null>(null);
 
   const registerDayCellElement = useCallback((ymd: string, el: HTMLDivElement | null) => {
     if (el) {
@@ -402,8 +415,6 @@ export function CalendarPage() {
     showPreviewTag: boolean;
   } | null>(null);
 
-  const scheduleEditDraftRef = useRef<ScheduleEditDraft | null>(null);
-
   const [changeTeamCtx, setChangeTeamCtx] = useState<{
     estimate: Estimate;
     currentTeamId: string | null;
@@ -418,7 +429,75 @@ export function CalendarPage() {
 
   useEffect(() => {
     scheduleEditDraftRef.current = scheduleEditDraft;
-  }, [scheduleEditDraft]);
+    schedulePreviewPayloadRef.current = schedulePreviewPayload;
+  }, [scheduleEditDraft, schedulePreviewPayload]);
+
+  const onBarResizePointerDown = useCallback(
+    (
+      e: ReactPointerEvent<HTMLDivElement>,
+      ctx: {
+        weekKey: string;
+        weekStart: Date;
+        weekEnd: Date;
+        weekGridCols: 5 | 7;
+        days: Date[];
+        row: WeekCalRow;
+      }
+    ) => {
+      const draft = scheduleEditDraftRef.current;
+      const preview = schedulePreviewPayloadRef.current;
+      if (!draft || draft.scheduleId !== ctx.row.scheduleId) return;
+      if (!preview?.work_dates?.length) return;
+      const el = weekBodyElementsRef.current.get(ctx.weekKey);
+      if (!el) return;
+      e.preventDefault();
+      e.stopPropagation();
+      barResizeRef.current = {
+        pointerId: e.pointerId,
+        weekStart: ctx.weekStart,
+        weekEnd: ctx.weekEnd,
+        weekGridCols: ctx.weekGridCols,
+        weekBodyEl: el,
+        days: ctx.days,
+        scheduleId: ctx.row.scheduleId,
+      };
+    },
+    []
+  );
+
+  useEffect(() => {
+    const finish = (e: PointerEvent) => {
+      const st = barResizeRef.current;
+      if (!st || e.pointerId !== st.pointerId) return;
+      barResizeRef.current = null;
+      const draft = scheduleEditDraftRef.current;
+      const preview = schedulePreviewPayloadRef.current;
+      if (!draft || draft.scheduleId !== st.scheduleId) return;
+      if (!preview?.work_dates?.length) return;
+      const rect = st.weekBodyEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const colW = rect.width / st.weekGridCols;
+      const col = Math.max(1, Math.min(st.weekGridCols, Math.floor(x / colW) + 1));
+      const desiredLastYmd = format(st.days[col - 1]!, 'yyyy-MM-dd');
+      const nextToggles = computeTogglesAfterResizeWeekEdge({
+        prevToggleYmds: draft.dayTogglesIso,
+        previewWorkYmds: preview.work_dates,
+        weekStart: st.weekStart,
+        weekEnd: st.weekEnd,
+        desiredLastYmd,
+      });
+      setScheduleEditDraft((prev) => {
+        if (!prev || prev.scheduleId !== st.scheduleId) return prev;
+        return { ...prev, dayTogglesIso: nextToggles };
+      });
+    };
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+    return () => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+    };
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -670,7 +749,7 @@ export function CalendarPage() {
   }, [calendarDragActive, dragInvalidDrop]);
 
   const handleScheduleDraftChange = useCallback(
-    (next: { startIso: string | null; nonWorkingIso: string[] }) => {
+    (next: { startIso: string | null; dayTogglesIso: string[] }) => {
       setScheduleEditDraft((prev) => {
         if (!prev) {
           return null;
@@ -678,7 +757,7 @@ export function CalendarPage() {
         return {
           ...prev,
           startIso: next.startIso ?? prev.startIso,
-          nonWorkingIso: next.nonWorkingIso,
+          dayTogglesIso: next.dayTogglesIso,
         };
       });
     },
@@ -708,7 +787,7 @@ export function CalendarPage() {
             est?.estimate_type ? String(est.estimate_type) : undefined
           ),
           tentative: false,
-          non_working_dates: scheduleEditDraft.nonWorkingIso,
+          schedule_day_toggles: scheduleEditDraft.dayTogglesIso,
         }),
       })
         .then(async (res) => {
@@ -788,7 +867,7 @@ export function CalendarPage() {
       try {
         const body: Record<string, unknown> = {
           start_date: scheduleEditDraft.startIso,
-          non_working_dates: scheduleEditDraft.nonWorkingIso,
+          schedule_day_toggles: scheduleEditDraft.dayTogglesIso,
         };
         if (scheduleEditDraft.laborHours > 0) {
           body.labor_hours = scheduleEditDraft.laborHours;
@@ -870,7 +949,7 @@ export function CalendarPage() {
     try {
       const undoBody: Record<string, unknown> = {
         start_date: undoScheduleSnapshot.startIso,
-        non_working_dates: undoScheduleSnapshot.nonWorkingIso,
+        schedule_day_toggles: undoScheduleSnapshot.dayTogglesIso,
       };
       if (undoScheduleSnapshot.laborHours > 0) {
         undoBody.labor_hours = undoScheduleSnapshot.laborHours;
@@ -1284,7 +1363,7 @@ export function CalendarPage() {
               estimateId: ev.estimate_id,
               calendarKind: ev.calendar_kind,
               workDatesIso: explicitForSeg,
-              scheduleNonWorkingIso: (ev.schedule_non_working_dates ?? []).filter(
+              scheduleDayTogglesIso: (ev.schedule_day_toggles ?? []).filter(
                 (s): s is string => typeof s === 'string' && s.trim().length > 0
               ),
               scheduleStartIso: ev.schedule_start_date?.trim()
@@ -1466,7 +1545,7 @@ export function CalendarPage() {
             </Group>
             <Text size="xs" c="dimmed">
               Locked jobs: drag the grip icon onto a day column to set a new start date (preview on
-              the grid). Use Schedule in the menu for non-working days. Save or cancel when the bar
+              the grid). Use Schedule in the menu for day toggles. Save or cancel when the bar
               shows preview.
             </Text>
           </Stack>
@@ -1570,7 +1649,17 @@ export function CalendarPage() {
                         </div>
                       ))}
                     </div>
-                    <div className={classes.weekBody} style={{ minHeight: weekBodyMinH }}>
+                    <div
+                      className={classes.weekBody}
+                      ref={(el) => {
+                        if (el) {
+                          weekBodyElementsRef.current.set(key, el);
+                        } else {
+                          weekBodyElementsRef.current.delete(key);
+                        }
+                      }}
+                      style={{ minHeight: weekBodyMinH }}
+                    >
                       <div
                         className={classes.weekDayCells}
                         style={{
@@ -1669,6 +1758,26 @@ export function CalendarPage() {
                                 !row.isBacklog && !row.scheduleTentative && row.estimateId
                                   ? () => openChangeTeamForRow(row)
                                   : undefined
+                              }
+                              resizeHandle={
+                                scheduleEditDraft &&
+                                schedulePreviewPayload?.work_dates?.length &&
+                                !row.isBacklog &&
+                                !row.scheduleTentative &&
+                                row.scheduleId === scheduleEditDraft.scheduleId
+                                  ? {
+                                      onPointerDown: (e) => {
+                                        onBarResizePointerDown(e, {
+                                          weekKey: key,
+                                          weekStart,
+                                          weekEnd: startOfDay(days[days.length - 1]!),
+                                          weekGridCols,
+                                          days,
+                                          row,
+                                        });
+                                      },
+                                    }
+                                  : null
                               }
                             />
                           );
@@ -1833,7 +1942,7 @@ export function CalendarPage() {
         onClose={() => setAdjustOpen(false)}
         scheduleId={scheduleEditDraft?.scheduleId ?? null}
         startIso={scheduleEditDraft?.startIso ?? null}
-        nonWorkingIso={scheduleEditDraft?.nonWorkingIso ?? []}
+        dayTogglesIso={scheduleEditDraft?.dayTogglesIso ?? []}
         onChange={handleScheduleDraftChange}
         laborHours={scheduleEditDraft?.laborHours ?? 0}
       />
