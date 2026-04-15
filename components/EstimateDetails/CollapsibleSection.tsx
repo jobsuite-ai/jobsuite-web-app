@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Collapse, Flex, Loader, Text, UnstyledButton } from '@mantine/core';
 import { IconChevronDown, IconChevronRight } from '@tabler/icons-react';
@@ -13,6 +13,8 @@ interface CollapsibleSectionProps {
   defaultOpen?: boolean;
   headerActions?: React.ReactNode;
   loading?: boolean;
+  /** Called the first time the section is opened (including auto-open from defaultOpen). */
+  onOpen?: () => void;
 }
 
 export default function CollapsibleSection({
@@ -21,8 +23,10 @@ export default function CollapsibleSection({
   defaultOpen = true,
   headerActions,
   loading = false,
+  onOpen,
 }: CollapsibleSectionProps) {
   const [opened, setOpened] = useState(false);
+  const hasNotifiedOpenRef = useRef(false);
 
   // Only expand when not loading and defaultOpen is true
   useEffect(() => {
@@ -31,13 +35,26 @@ export default function CollapsibleSection({
     }
   }, [loading, defaultOpen]);
 
+  useEffect(() => {
+    if (!opened) return;
+    if (hasNotifiedOpenRef.current) return;
+    hasNotifiedOpenRef.current = true;
+    onOpen?.();
+  }, [opened, onOpen]);
+
   return (
     <div className={classes.collapsibleSection}>
       <div className={classes.collapsibleSectionHeader}>
         <UnstyledButton
           onClick={() => {
             if (!loading) {
-              setOpened((o) => !o);
+              setOpened((o) => {
+                const next = !o;
+                if (next) {
+                  onOpen?.();
+                }
+                return next;
+              });
             }
           }}
           style={{ flex: 1, cursor: loading ? 'default' : 'pointer' }}
