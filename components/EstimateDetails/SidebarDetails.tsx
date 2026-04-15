@@ -1393,6 +1393,9 @@ export default function SidebarDetails({
     return { primary: 'Paid online', hint: null as string | null };
   })();
 
+  const finalPaid = estimate.payment_received_date != null;
+  const finalPaidOnRaw = estimate.payment_received_date || null;
+
   return (
     <Paper shadow="sm" radius="md" withBorder p="lg">
       <Flex direction="column" gap="sm">
@@ -1905,6 +1908,49 @@ export default function SidebarDetails({
                 </Text>
               </Flex>
             ) : null}
+          </>
+        )}
+
+        {finalPaid && (
+          <>
+            <Flex
+              justify="space-between"
+              align="center"
+              gap="sm"
+              style={{ marginBottom: 'var(--mantine-spacing-xs)' }}
+            >
+              <Text size="sm" fw={500} c="dimmed">
+                Final payment:
+              </Text>
+              <Text size="sm" fw={500} c="green">
+                Paid
+              </Text>
+            </Flex>
+            {finalPaidOnRaw ? (
+              <Flex
+                justify="space-between"
+                align="center"
+                gap="sm"
+                style={{ marginBottom: 'var(--mantine-spacing-md)' }}
+              >
+                <Text size="sm" fw={500} c="dimmed">
+                  Paid on:
+                </Text>
+                <Text
+                  size="sm"
+                  c="dimmed"
+                  style={{ textAlign: 'right', flex: 1, maxWidth: '200px' }}
+                >
+                  {new Date(finalPaidOnRaw).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </Text>
+              </Flex>
+            ) : (
+              <div style={{ marginBottom: 'var(--mantine-spacing-md)' }} />
+            )}
           </>
         )}
 

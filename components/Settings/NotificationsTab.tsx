@@ -30,6 +30,10 @@ export interface NotificationSettingsConfig {
     new_estimate: boolean;
     /** Estimate marked sold (accepted) — emailed to all users who opt in. */
     sold_estimate: boolean;
+    /** Deposit paid — emailed to opted-in admin users. */
+    deposit_paid: boolean;
+    /** Final invoice paid — emailed to opted-in admin users. */
+    final_invoice_paid: boolean;
     estimate_updates: NotificationSettingsBucket;
     comments: NotificationSettingsBucket;
     job_status: NotificationSettingsBucket;
@@ -52,6 +56,8 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
         delivery_method: 'email_and_push',
         new_estimate: true,
         sold_estimate: true,
+        deposit_paid: true,
+        final_invoice_paid: true,
         estimate_updates: { owner: true, non_owner: true },
         comments: { owner: true, non_owner: true },
         job_status: { owner: true, non_owner: true },
@@ -82,6 +88,11 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
             overrides?.delivery_method ?? defaultNotificationSettings.delivery_method,
         new_estimate: overrides?.new_estimate ?? defaultNotificationSettings.new_estimate,
         sold_estimate: overrides?.sold_estimate ?? defaultNotificationSettings.sold_estimate,
+        deposit_paid:
+            overrides?.deposit_paid ?? defaultNotificationSettings.deposit_paid,
+        final_invoice_paid:
+            overrides?.final_invoice_paid ??
+            defaultNotificationSettings.final_invoice_paid,
         estimate_updates: {
             owner:
                 overrides?.estimate_updates?.owner ??
@@ -371,6 +382,37 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                                             setNotificationHasChanges(true);
                                         }}
                                     />
+                                </Stack>
+
+                                <Stack gap="xs">
+                                    <Text fw={500}>Payments</Text>
+                                    <Text size="sm" c="dimmed">
+                                        Successful deposit and final invoice payments.
+                                    </Text>
+                                    <Flex direction="column" gap="lg">
+                                        <Checkbox
+                                          label="Notify me when a deposit is paid"
+                                          checked={notificationSettings.deposit_paid}
+                                          onChange={(event) => {
+                                                setNotificationSettings((prev) => ({
+                                                    ...prev,
+                                                    deposit_paid: event.currentTarget.checked,
+                                                }));
+                                                setNotificationHasChanges(true);
+                                            }}
+                                        />
+                                        <Checkbox
+                                          label="Notify me when the final invoice is paid"
+                                          checked={notificationSettings.final_invoice_paid}
+                                          onChange={(event) => {
+                                                setNotificationSettings((prev) => ({
+                                                    ...prev,
+                                                    final_invoice_paid: event.currentTarget.checked,
+                                                }));
+                                                setNotificationHasChanges(true);
+                                            }}
+                                        />
+                                    </Flex>
                                 </Stack>
 
                                 <Stack gap="xs">
