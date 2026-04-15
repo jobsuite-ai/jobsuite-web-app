@@ -1,0 +1,16 @@
+/* Stretch Mantine Calendar to modal content width (month grid + header). */
+.calendarWrap {
+  width: 100%;
+  max-width: 100%;
+  align-self: stretch;
+}
+
+.calendarWrap :global([data-month-level]) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.calendarWrap :global(table) {
+  width: 100%;
+  table-layout: fixed;
+}

@@ -117,7 +117,7 @@ export function ScheduleJobModal({
           start_date: selectedYmd,
           estimate_type: apiEstimateType(String(estimate.estimate_type)),
           tentative: false,
-          non_working_dates: [],
+          schedule_day_toggles: [],
         }),
       })
         .then(async (res) => {
@@ -219,7 +219,7 @@ export function ScheduleJobModal({
         start_date: startDay,
         estimate_type: apiEstimateType(String(estimate.estimate_type)),
         tentative: false,
-        non_working_dates: [],
+        schedule_day_toggles: [],
       };
       if (opts?.confirm_activate_job !== undefined) {
         payload.confirm_activate_job = opts.confirm_activate_job;

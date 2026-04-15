@@ -15,6 +15,8 @@ import {
 } from '@mantine/core';
 import Image from 'next/image';
 
+import { MastercardLogoMark, VisaLogoMark } from './CardBrandMarks';
+
 const HELCIM_SCRIPT_URL = 'https://secure.helcim.app/helcim-pay/services/start.js';
 
 interface DepositSectionProps {
@@ -331,9 +333,17 @@ export function DepositSection({
                           size="md"
                           fullWidth
                         >
-                            {isBalance
-                                ? `Pay now ($${chargeAmount.toFixed(2)})`
-                                : `Pay 30% deposit now ($${depositAmount.toFixed(2)})`}
+                            <Stack gap={6} align="center" justify="center">
+                                <span>
+                                    {isBalance
+                                        ? `Pay now ($${chargeAmount.toFixed(2)})`
+                                        : `Pay 30% deposit now ($${depositAmount.toFixed(2)})`}
+                                </span>
+                                <Group gap="xs" justify="center" wrap="nowrap">
+                                    <VisaLogoMark />
+                                    <MastercardLogoMark />
+                                </Group>
+                            </Stack>
                         </Button>
                         <PaySecurelyWithHelcim />
                     </>

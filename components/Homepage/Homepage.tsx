@@ -557,7 +557,7 @@ export default function Homepage() {
               <MetricCard
                 title="Conversion Rate"
                 value={`${(data.metrics.conversion_rate ?? 0).toFixed(1)}%`}
-                description="Estimates sold ÷ new estimates, year-to-date (dashboard snapshots)"
+                description="Estimates sold ÷ new estimates, year-to-date (same rules as dashboard)"
               />
             </Grid.Col>
             <Grid.Col span={{ base: 12, sm: 6, md: 6 }}>
@@ -567,7 +567,7 @@ export default function Homepage() {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 })}`}
-                description="Average revenue per sold job, year-to-date (dashboard snapshots)"
+                description="Average revenue per sold job, year-to-date (same rules as dashboard)"
               />
             </Grid.Col>
           </Grid>

@@ -251,7 +251,7 @@ export function MySchedulePage() {
               estimateId: ev.estimate_id,
               calendarKind: ev.calendar_kind,
               workDatesIso: explicitForSeg,
-              scheduleNonWorkingIso: (ev.schedule_non_working_dates ?? []).filter(
+              scheduleDayTogglesIso: (ev.schedule_day_toggles ?? []).filter(
                 (s): s is string => typeof s === 'string' && s.trim().length > 0
               ),
               scheduleStartIso: ev.schedule_start_date?.trim()

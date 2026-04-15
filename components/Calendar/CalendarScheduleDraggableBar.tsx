@@ -8,15 +8,22 @@ import { CalendarEventBar } from './CalendarEventBar';
 
 import type { WeekCalRow } from '@/utils/calendarGridMath';
 
-type Props = Omit<ComponentProps<typeof CalendarEventBar>, 'dragHandle'> & {
+type Props = Omit<ComponentProps<typeof CalendarEventBar>, 'dragHandle' | 'resizeHandle'> & {
   rowMeta: WeekCalRow;
   dragEnabled: boolean;
+  resizeHandle?: ComponentProps<typeof CalendarEventBar>['resizeHandle'];
 };
 
 /**
  * Locked schedule segments: grip handle uses @dnd-kit to drop on calendar day cells.
  */
-export function CalendarScheduleDraggableBar({ rowMeta, dragEnabled, barStyle, ...rest }: Props) {
+export function CalendarScheduleDraggableBar({
+  rowMeta,
+  dragEnabled,
+  barStyle,
+  resizeHandle,
+  ...rest
+}: Props) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `cal-drag:${rowMeta.rowKey}`,
     disabled: !dragEnabled,
@@ -41,6 +48,7 @@ export function CalendarScheduleDraggableBar({ rowMeta, dragEnabled, barStyle, .
               listeners: listeners as unknown as Record<string, unknown>,
             }
       }
+      resizeHandle={resizeHandle}
     />
   );
 }
