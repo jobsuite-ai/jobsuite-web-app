@@ -29,7 +29,7 @@ import { MetricCard } from '../Dashboard/MetricCard';
 import LoadingState from '../Global/LoadingState';
 import UniversalError from '../Global/UniversalError';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { fetchEstimateTitleFromSummary, getApiHeaders } from '@/app/utils/apiClient';
 import {
   getApiErrorMessage,
   invalidateSessionAndRedirectToLogin,
@@ -271,24 +271,15 @@ export default function Homepage() {
       return cachedEstimate.title;
     }
 
-    // Fetch from API
     try {
-      const response = await fetch(`/api/estimates/${estimateId}`, {
-        method: 'GET',
-        headers: getApiHeaders(),
-      });
-
-      if (response.ok) {
-        const estimate = await response.json();
-        const title = estimate.title || null;
-        if (title) {
-          setJobTitles((prev) => {
-            if (prev[estimateId]) return prev;
-            return { ...prev, [estimateId]: title };
-          });
-        }
-        return title;
+      const title = await fetchEstimateTitleFromSummary(estimateId);
+      if (title) {
+        setJobTitles((prev) => {
+          if (prev[estimateId]) return prev;
+          return { ...prev, [estimateId]: title };
+        });
       }
+      return title;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error fetching job title:', err);
