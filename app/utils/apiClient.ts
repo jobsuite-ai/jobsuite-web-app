@@ -53,3 +53,28 @@ export function getApiHeaders(): HeadersInit {
 
     return headers;
 }
+
+/**
+ * Resolve an estimate title via GET /api/estimates/:id/summary (same data source as the
+ * details page initial summary load). Prefer this over GET /api/estimates/:id so we do not
+ * issue a second full estimate fetch alongside refreshes that use include_change_orders.
+ */
+export async function fetchEstimateTitleFromSummary(estimateId: string): Promise<string | null> {
+    if (typeof window === 'undefined') {
+        return null;
+    }
+    try {
+        const response = await fetch(`/api/estimates/${estimateId}/summary`, {
+            method: 'GET',
+            headers: getApiHeaders(),
+        });
+        if (!response.ok) {
+            return null;
+        }
+        const data = (await response.json()) as { estimate?: { title?: string | null } };
+        const title = data?.estimate?.title;
+        return typeof title === 'string' && title.trim() ? title.trim() : null;
+    } catch {
+        return null;
+    }
+}

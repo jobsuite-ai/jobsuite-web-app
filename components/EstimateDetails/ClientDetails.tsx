@@ -15,6 +15,7 @@ import { ContractorClient, Estimate, EstimateStatus } from '../Global/model';
 import { getEstimateBadgeColor, getFormattedEstimateStatus } from '../Global/utils';
 
 import { UpdateHoursAndRateInput, UpdateJobContent } from '@/app/api/projects/jobTypes';
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useTeamAssignmentPools } from '@/hooks/useTeamAssignmentPools';
 import { useUsers } from '@/hooks/useUsers';
@@ -197,14 +198,9 @@ export default function ClientDetails({ initialEstimate }: { initialEstimate: Es
 
                 const commentResponse = await fetch(`/api/estimate-comments/${estimate.id}`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                     body: JSON.stringify({
-                        id: crypto.randomUUID(),
-                        commenter: 'System',
                         comment_contents: commentContent,
-                        timestamp: new Date().toISOString(),
                     }),
                 });
 

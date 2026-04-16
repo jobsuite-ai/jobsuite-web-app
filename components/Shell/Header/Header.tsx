@@ -48,7 +48,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import classes from './Header.module.css';
 import { JobsuiteLogo } from '../../Global/JobsuiteLogo';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { fetchEstimateTitleFromSummary, getApiHeaders } from '@/app/utils/apiClient';
 import { clearClientAuthSession, redirectToLoginPage } from '@/app/utils/authSession';
 import { isCachedAuthMeStaleForToken } from '@/app/utils/authToken';
 import { getCachedAuthMe } from '@/app/utils/dataCache';
@@ -881,24 +881,15 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       return cachedEstimate.title;
     }
 
-    // Fetch from API
     try {
-      const response = await fetch(`/api/estimates/${estimateId}`, {
-        method: 'GET',
-        headers: getApiHeaders(),
-      });
-
-      if (response.ok) {
-        const estimate = await response.json();
-        const title = estimate.title || null;
-        if (title) {
-          setJobTitles((prev) => {
-            if (prev[estimateId]) return prev;
-            return { ...prev, [estimateId]: title };
-          });
-        }
-        return title;
+      const title = await fetchEstimateTitleFromSummary(estimateId);
+      if (title) {
+        setJobTitles((prev) => {
+          if (prev[estimateId]) return prev;
+          return { ...prev, [estimateId]: title };
+        });
       }
+      return title;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error fetching job title:', err);

@@ -17,7 +17,7 @@ import {
 import { IconBell, IconCheck, IconClock, IconChevronDown } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { fetchEstimateTitleFromSummary, getApiHeaders } from '@/app/utils/apiClient';
 import LoadingState from '@/components/Global/LoadingState';
 import UniversalError from '@/components/Global/UniversalError';
 import { useAuth } from '@/hooks/useAuth';
@@ -175,24 +175,15 @@ export default function NotificationsPage() {
         return cachedEstimate.title;
       }
 
-    // Fetch from API
     try {
-      const response = await fetch(`/api/estimates/${estimateId}`, {
-        method: 'GET',
-        headers: getApiHeaders(),
-      });
-
-      if (response.ok) {
-        const estimate = await response.json();
-        const title = estimate.title || null;
-        if (title) {
-          setJobTitles((prev) => {
-            if (prev[estimateId]) return prev; // Already set
-            return { ...prev, [estimateId]: title };
-          });
-        }
-        return title;
+      const title = await fetchEstimateTitleFromSummary(estimateId);
+      if (title) {
+        setJobTitles((prev) => {
+          if (prev[estimateId]) return prev; // Already set
+          return { ...prev, [estimateId]: title };
+        });
       }
+      return title;
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Error fetching job title:', err);
