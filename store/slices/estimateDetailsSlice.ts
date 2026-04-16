@@ -31,20 +31,23 @@ export type TimeEntry = {
   [key: string]: any;
 };
 
+interface EstimateDetailEntry {
+  lineItems: EstimateLineItem[];
+  comments: EstimateComment[];
+  changeOrders: Estimate[];
+  timeEntries: TimeEntry[];
+  resources: EstimateResource[];
+  signatures: EstimateSignature[];
+  /** True after comments were loaded from the API at least once (including empty list). */
+  commentsFetched: boolean;
+  /** True after line items were loaded from the API at least once (including empty list). */
+  lineItemsFetched: boolean;
+  lastFetched: number | null;
+}
+
 interface EstimateDetailsState {
   // Map of estimate ID to its details
-  details: Record<
-    string,
-    {
-      lineItems: EstimateLineItem[];
-      comments: EstimateComment[];
-      changeOrders: Estimate[];
-      timeEntries: TimeEntry[];
-      resources: EstimateResource[];
-      signatures: EstimateSignature[];
-      lastFetched: number | null;
-    }
-  >;
+  details: Record<string, EstimateDetailEntry>;
 }
 
 const initialState: EstimateDetailsState = {
@@ -75,13 +78,23 @@ const estimateDetailsSlice = createSlice({
         timeEntries: [],
         resources: [],
         signatures: [],
+        commentsFetched: false,
+        lineItemsFetched: false,
         lastFetched: null,
       };
 
       state.details[estimateId] = {
         ...existing,
-        ...(data.lineItems !== undefined && { lineItems: data.lineItems }),
-        ...(data.comments !== undefined && { comments: data.comments }),
+        commentsFetched: existing.commentsFetched ?? false,
+        lineItemsFetched: existing.lineItemsFetched ?? false,
+        ...(data.lineItems !== undefined && {
+          lineItems: data.lineItems,
+          lineItemsFetched: true,
+        }),
+        ...(data.comments !== undefined && {
+          comments: data.comments,
+          commentsFetched: true,
+        }),
         ...(data.changeOrders !== undefined && { changeOrders: data.changeOrders }),
         ...(data.timeEntries !== undefined && { timeEntries: data.timeEntries }),
         ...(data.resources !== undefined && { resources: data.resources }),
@@ -99,6 +112,7 @@ const estimateDetailsSlice = createSlice({
       const { estimateId, lineItems } = action.payload;
       if (state.details[estimateId]) {
         state.details[estimateId].lineItems = lineItems;
+        state.details[estimateId].lineItemsFetched = true;
         state.details[estimateId].lastFetched = Date.now();
       }
     },
@@ -160,6 +174,7 @@ const estimateDetailsSlice = createSlice({
       const { estimateId, comments } = action.payload;
       if (state.details[estimateId]) {
         state.details[estimateId].comments = comments;
+        state.details[estimateId].commentsFetched = true;
         state.details[estimateId].lastFetched = Date.now();
       }
     },
@@ -340,5 +355,15 @@ export const selectDetailsLastFetched = (
   state: { estimateDetails: EstimateDetailsState },
   estimateId: string
 ): number | null => state.estimateDetails.details[estimateId]?.lastFetched || null;
+
+export const selectCommentsFetched = (
+  state: { estimateDetails: EstimateDetailsState },
+  estimateId: string
+): boolean => state.estimateDetails.details[estimateId]?.commentsFetched ?? false;
+
+export const selectLineItemsFetched = (
+  state: { estimateDetails: EstimateDetailsState },
+  estimateId: string
+): boolean => state.estimateDetails.details[estimateId]?.lineItemsFetched ?? false;
 
 export default estimateDetailsSlice.reducer;

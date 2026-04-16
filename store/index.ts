@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { persistReducer, persistStore, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import storage from 'redux-persist/lib/storage';
+import storageSession from 'redux-persist/lib/storage/session';
 
 import { refreshMiddleware } from './middleware/refreshMiddleware';
 import clientsReducer from './slices/clientsSlice';
@@ -38,12 +39,22 @@ const persistedProjectsReducer = persistReducer(
   projectsReducer
 );
 
+// Session-only: speeds up reload in the same tab without growing localStorage
+const persistedEstimateDetailsReducer = persistReducer(
+  {
+    key: 'estimateDetails',
+    storage: storageSession,
+    whitelist: ['details'],
+  },
+  estimateDetailsReducer
+);
+
 export const store = configureStore({
   reducer: {
     estimates: persistedEstimatesReducer,
     clients: persistedClientsReducer,
     projects: persistedProjectsReducer,
-    estimateDetails: estimateDetailsReducer, // Don't persist estimateDetails (too large)
+    estimateDetails: persistedEstimateDetailsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
