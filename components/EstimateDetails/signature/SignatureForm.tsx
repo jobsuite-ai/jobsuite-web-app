@@ -514,7 +514,7 @@ export default function SignatureForm({
                 </div>
 
                 <Checkbox
-                  label="I consent to sign this electronic document and agree to the terms of the estimate"
+                  label="I consent to sign this electronic document and agree to the terms of the estimate, including that we may send transactional text messages about this project (e.g. deposit and invoice links) to my mobile number if provided; message and data rates may apply"
                   checked={consentGiven}
                   onChange={(e) => setConsentGiven(e.currentTarget.checked)}
                   required

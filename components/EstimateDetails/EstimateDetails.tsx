@@ -71,8 +71,10 @@ import { selectClientById } from '@/store/slices/clientsSlice';
 import {
     selectChangeOrders,
     selectComments,
+    selectCommentsFetched,
     selectEstimateDetails,
     selectLineItems,
+    selectLineItemsFetched,
     selectResources,
     selectSignatures,
     selectTimeEntries,
@@ -83,6 +85,21 @@ import {
     selectEstimateById,
 } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
+
+/** Show onboarding Stepper only while estimate is still in early pipeline stages */
+function showOnboardingStepperForStatus(status: EstimateStatus | undefined): boolean {
+    if (!status) {
+        return false;
+    }
+    return (
+        status === EstimateStatus.NEW_LEAD
+        || status === EstimateStatus.ESTIMATE_NOT_SCHEDULED
+        || status === EstimateStatus.ESTIMATE_SCHEDULED
+        || status === EstimateStatus.ESTIMATE_IN_PROGRESS
+        || status === EstimateStatus.NEEDS_FOLLOW_UP
+        || status === EstimateStatus.STALE_ESTIMATE
+    );
+}
 
 const DynamicLoadingFallback = () => <LoadingState />;
 
@@ -120,6 +137,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const cachedTimeEntries = useAppSelector((state) => selectTimeEntries(state, estimateID));
     const cachedResources = useAppSelector((state) => selectResources(state, estimateID));
     const cachedSignatures = useAppSelector((state) => selectSignatures(state, estimateID));
+    const commentsFetchedFromRedux = useAppSelector((state) =>
+        selectCommentsFetched(state, estimateID)
+    );
+    const lineItemsFetchedFromRedux = useAppSelector((state) =>
+        selectLineItemsFetched(state, estimateID)
+    );
 
     const [objectExists, setObjectExists] = useState(false);
     const [summaryHasVideo, setSummaryHasVideo] = useState(false);
@@ -203,6 +226,13 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const hasFetchedInitialDataRef = useRef<string | null>(null);
     const signatureLinksRef = useRef<any[] | null>(null);
     const hasProcessedSignatureLinksRef = useRef<string | null>(null);
+    /** Summary request finished — avoids Stepper flash with stale booleans */
+    const [summaryLoaded, setSummaryLoaded] = useState(false);
+    /** Initial parallel bundle (summary, signatures, comments, line items) finished */
+    const [initialParallelFetchDone, setInitialParallelFetchDone] = useState(false);
+
+    const commentsFeedComplete = initialParallelFetchDone || commentsFetchedFromRedux;
+    const lineItemsReadyForChild = initialParallelFetchDone || lineItemsFetchedFromRedux;
 
     const renderTimeEntryRows = () => {
         const parseEntryDate = (value: any) => {
@@ -469,20 +499,35 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     setSignaturesLoaded(false);
                 }
 
-                // Start both requests in parallel
-                const [summaryResult, signaturesResult] = await Promise.allSettled([
-                    fetch(`/api/estimates/${estimateID}/summary`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }),
-                    fetch(`/api/estimates/${estimateID}/signatures`, {
-                        method: 'GET',
-                        headers: getApiHeaders(),
-                    }),
-                ]);
+                // Summary, signatures, comments, and line items in parallel
+                const [summaryResult, signaturesResult, commentsResult, lineItemsResult] =
+                    await Promise.allSettled([
+                        fetch(`/api/estimates/${estimateID}/summary`, {
+                            method: 'GET',
+                            headers: {
+                                Authorization: `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                        }),
+                        fetch(`/api/estimates/${estimateID}/signatures`, {
+                            method: 'GET',
+                            headers: getApiHeaders(),
+                        }),
+                        fetch(`/api/estimate-comments/${estimateID}`, {
+                            method: 'GET',
+                            headers: {
+                                Authorization: `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                        }),
+                        fetch(`/api/estimates/${estimateID}/line-items`, {
+                            method: 'GET',
+                            headers: {
+                                Authorization: `Bearer ${accessToken}`,
+                                'Content-Type': 'application/json',
+                            },
+                        }),
+                    ]);
 
                 if (!isMountedRef.current) return;
 
@@ -600,6 +645,69 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     console.error('Error fetching signatures:', errorMsg);
                 }
 
+                // Comments (parallel)
+                if (commentsResult.status === 'fulfilled' && commentsResult.value.ok) {
+                    try {
+                        const commentsData = await commentsResult.value.json();
+                        const commentsArray = Array.isArray(commentsData.Items)
+                            ? commentsData.Items
+                            : Array.isArray(commentsData)
+                                ? commentsData
+                                : [];
+                        if (isMountedRef.current) {
+                            setComments(commentsArray);
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    comments: commentsArray,
+                                })
+                            );
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error parsing comments response:', error);
+                    }
+                } else if (
+                    commentsResult.status === 'rejected' ||
+                    (commentsResult.status === 'fulfilled' && !commentsResult.value.ok)
+                ) {
+                    const errMsg = commentsResult.status === 'rejected'
+                        ? commentsResult.reason
+                        : 'Request failed';
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching estimate comments:', errMsg);
+                }
+
+                // Line items (parallel)
+                if (lineItemsResult.status === 'fulfilled' && lineItemsResult.value.ok) {
+                    try {
+                        const itemsData = await lineItemsResult.value.json();
+                        const itemsArray = Array.isArray(itemsData) ? itemsData : [];
+                        if (isMountedRef.current) {
+                            setLineItems(itemsArray);
+                            setLineItemsCount(itemsArray.length);
+                            dispatch(
+                                setEstimateDetails({
+                                    estimateId: estimateID,
+                                    lineItems: itemsArray,
+                                })
+                            );
+                        }
+                    } catch (error) {
+                        // eslint-disable-next-line no-console
+                        console.error('Error parsing line items response:', error);
+                    }
+                } else if (
+                    lineItemsResult.status === 'rejected' ||
+                    (lineItemsResult.status === 'fulfilled' && !lineItemsResult.value.ok)
+                ) {
+                    const errMsg = lineItemsResult.status === 'rejected'
+                        ? lineItemsResult.reason
+                        : 'Request failed';
+                    // eslint-disable-next-line no-console
+                    console.error('Error fetching line items:', errMsg);
+                }
+
                 // Check if we have any data to show
                 if (!estimate) {
                     // If summary failed, set error
@@ -621,6 +729,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (isMountedRef.current) {
                     setInitialLoading(false);
                     setSignaturesLoaded(true);
+                    setInitialParallelFetchDone(true);
+                    setSummaryLoaded(true);
                 }
             }
         };
@@ -817,47 +927,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Error fetching change orders:', error);
-        }
-    }, [estimateID, dispatch]);
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const fetchComments = useCallback(async () => {
-        const accessToken = localStorage.getItem('access_token');
-        if (!accessToken) return;
-
-        try {
-            const response = await fetch(
-                `/api/estimate-comments/${estimateID}`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (response.ok && isMountedRef.current) {
-                const commentsData = await response.json();
-                // API returns { Items: [...] } format
-                const commentsArray = Array.isArray(commentsData.Items)
-                    ? commentsData.Items
-                    : Array.isArray(commentsData)
-                    ? commentsData
-                    : [];
-                setComments(commentsArray);
-
-                // Update Redux cache
-                dispatch(
-                    setEstimateDetails({
-                        estimateId: estimateID,
-                        comments: commentsArray,
-                    })
-                );
-            }
-        } catch (error) {
-            // eslint-disable-next-line no-console
-            console.error('Error fetching comments:', error);
         }
     }, [estimateID, dispatch]);
 
@@ -1475,6 +1544,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
+    const hasVideoForStepper = hasVideo || summaryHasVideo;
+    const hasImagesForStepper = hasImages || summaryHasImages;
     const showVideoSection = hasVideo || summaryHasVideo;
     const showImagesSection = hasImages || summaryHasImages;
     const showFilesSection = hasFiles || summaryHasFiles;
@@ -1778,35 +1849,29 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     </Flex>
                                 </Modal>
 
-                                {/* Timeline/Stepper showing progress - Hide once all steps are
-                                complete and preview is visible. Only show when page is loaded
-                                and resources have been checked. */}
+                                {/* Timeline/Stepper — only after summary loads (no false Required)
+                                and only for early pipeline statuses */}
                                 {!initialLoading
                                     && detailsLoaded
+                                    && summaryLoaded
+                                    && showOnboardingStepperForStatus(estimate.status)
                                     && (
-                                        (!hasVideo && !hasDescription)
-                                        || !hasImages
+                                        (!hasVideoForStepper && !hasDescription)
+                                        || !hasImagesForStepper
                                         || lineItemsCount === 0
                                     ) && (
                                     <div style={{ marginBottom: '1.5rem' }}>
                                         <Stepper
                                           active={(() => {
-                                            // Find the first incomplete step
-                                            const firstIncomplete = (!hasVideo && !hasDescription)
-                                                ? 0
-                                                : !hasImages
-                                                    ? 1
-                                                    : lineItemsCount === 0 ? 2 : 3;
+                                            const firstIncomplete =
+                                                (!hasVideoForStepper && !hasDescription)
+                                                    ? 0
+                                                    : !hasImagesForStepper
+                                                        ? 1
+                                                        : lineItemsCount === 0 ? 2 : 3;
 
-                                            // If all steps are complete, set to 3
                                             if (firstIncomplete === 3) return 3;
 
-                                            // Set active to first incomplete step
-                                            // Note: Mantine Stepper marks steps before active as
-                                            // completed, so out-of-order completion won't show
-                                            // perfectly in the stepper visual, but the
-                                            // description text ("Complete" vs "Required") shows
-                                            // the actual status
                                             return firstIncomplete;
                                           })()}
                                           size="sm"
@@ -1814,14 +1879,14 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         >
                                             <Stepper.Step
                                               label="Add Description or Video"
-                                              description={(hasVideo || hasDescription)
+                                              description={(hasVideoForStepper || hasDescription)
                                                 ? 'Complete'
                                                 : 'Required'}
                                               completedIcon={<IconVideo size={18} />}
                                             />
                                             <Stepper.Step
                                               label="Upload Image"
-                                              description={hasImages ? 'Complete' : 'Required'}
+                                              description={hasImagesForStepper ? 'Complete' : 'Required'}
                                               completedIcon={<IconPhoto size={18} />}
                                             />
                                             <Stepper.Step
@@ -2011,7 +2076,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         <JobComments
                                           estimateID={estimateID}
                                           initialComments={comments}
-                                          skipInitialFetch={comments.length > 0}
+                                          initialFetchComplete={commentsFeedComplete}
                                         />
                                     </CollapsibleSection>
 
@@ -2170,6 +2235,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <LineItems
                                               ref={lineItemsRef}
                                               estimateID={estimateID}
+                                              lineItemsReady={lineItemsReadyForChild}
+                                              parentLineItems={lineItems}
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
@@ -2189,6 +2256,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                             <LineItems
                                               ref={lineItemsRef}
                                               estimateID={estimateID}
+                                              lineItemsReady={lineItemsReadyForChild}
+                                              parentLineItems={lineItems}
                                               onLineItemsChange={(count) => {
                                                 setLineItemsCount(count);
                                               }}
@@ -2270,6 +2339,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     <SidebarDetails
                                       estimate={estimate}
                                       estimateID={estimateID}
+                                      initialClient={client}
                                       onUpdate={getEstimate}
                                       detailsLoaded={detailsLoaded}
                                       registerCheckInDateOpener={registerCheckInDateOpener}
@@ -2469,9 +2539,12 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         estimateID,
         hasVideo,
         hasImages,
+        hasVideoForStepper,
+        hasImagesForStepper,
         hasFiles,
         hasDescription,
         hasSpanishTranscription,
+        summaryLoaded,
         videoResources,
         imageResources,
         fileResources,
@@ -2481,6 +2554,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         showDescriptionEditor,
         showSpanishTranscriptionEditor,
         lineItemsCount,
+        lineItems,
+        lineItemsReadyForChild,
+        commentsFeedComplete,
+        client,
         isModalOpen,
         showCreateChangeOrderModal,
         comments,
@@ -2508,7 +2585,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 export default function EstimateDetails({ estimateID }: { estimateID: string }) {
     return (
         <Suspense fallback={<LoadingState />}>
-            <EstimateDetailsContent estimateID={estimateID} />
+            <EstimateDetailsContent key={estimateID} estimateID={estimateID} />
         </Suspense>
     );
 }
