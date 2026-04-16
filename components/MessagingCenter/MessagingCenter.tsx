@@ -256,19 +256,27 @@ export default function MessagingCenter() {
 
         loadMessages();
         loadCount();
-        loadPastDueCount();
-        // Refresh count every minute
+        // One request returns due-today + past-due counts (see /outreach-messages/count)
+        const intervalMs = 120000; // 2 min; list refresh is separate when user changes tabs
         const interval = setInterval(() => {
+            if (document.hidden) {
+                return;
+            }
             loadCount().catch(() => {
                 // Ignore errors
             });
-            loadPastDueCount().catch(() => {
-                // Ignore errors
-            });
-            return undefined;
-        }, 60000);
+        }, intervalMs);
+        const onVisibility = () => {
+            if (!document.hidden) {
+                loadCount().catch(() => {
+                    // Ignore errors
+                });
+            }
+        };
+        document.addEventListener('visibilitychange', onVisibility);
         return function cleanup() {
             clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibility);
         };
     }, [isAuthenticated, isLoading]);
 
@@ -336,37 +344,19 @@ export default function MessagingCenter() {
 
             if (response.ok) {
                 const data = await response.json();
-                setCount(data.count || 0);
+                const dueToday = data.count || 0;
+                setCount(dueToday);
+                if (typeof data.past_due_count === 'number') {
+                    setPastDueCount(data.past_due_count);
+                }
+                window.dispatchEvent(
+                    new CustomEvent('outreachDueTodayCountUpdated', {
+                        detail: { count: dueToday },
+                    })
+                );
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load count');
-        }
-    };
-
-    const loadPastDueCount = async () => {
-        // Don't make request if not authenticated
-        if (!isAuthenticated || isLoading) {
-            return;
-        }
-
-        try {
-            const now = getUtcStartOfToday();
-            const response = await fetch(
-                `/api/outreach-messages?status=PENDING&due_before=${encodeURIComponent(
-                    now.toISOString()
-                )}`,
-                {
-                    method: 'GET',
-                    headers: getApiHeaders(),
-                }
-            );
-
-            if (response.ok) {
-                const data: OutreachMessage[] = await response.json();
-                setPastDueCount(data.length);
-            }
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to load past due count');
         }
     };
 
@@ -477,7 +467,6 @@ export default function MessagingCenter() {
 
             // Update count without reloading all messages
             await loadCount();
-            await loadPastDueCount();
 
             notifications.show({
                 title: 'Success',
@@ -532,7 +521,6 @@ export default function MessagingCenter() {
 
             // Update count without reloading all messages
             await loadCount();
-            await loadPastDueCount();
 
             notifications.show({
                 title: 'Success',

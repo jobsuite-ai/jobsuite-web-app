@@ -37,18 +37,13 @@ import {
     IconReceipt,
     IconVideo,
 } from '@tabler/icons-react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 
 import ChangeOrders from './ChangeOrders';
 import CollapsibleSection from './CollapsibleSection';
-import LoadingState from '../Global/LoadingState';
-import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
-import UniversalError from '../Global/UniversalError';
-import { BADGE_COLORS } from '../Global/utils';
-import JobComments from './comments/JobComments';
 import ContractorSignatureRequired from './ContractorSignatureRequired';
 import CreateChangeOrder from './CreateChangeOrder';
-import EstimatePreview from './estimate/EstimatePreview';
 import { EstimateLineItem } from './estimate/LineItem';
 import LineItems, { LineItemsRef } from './estimate/LineItems';
 import SpanishTranscription from './estimate/SpanishTranscription';
@@ -60,13 +55,17 @@ import ImageGallery from './ImageGallery';
 import ImageUpload from './ImageUpload';
 import JobTitle from './JobTitle';
 import ResourceLink from './ResourceLink';
-import SidebarDetails from './SidebarDetails';
+import LoadingState from '../Global/LoadingState';
+import { ContractorClient, Estimate, EstimateResource, EstimateStatus } from '../Global/model';
+import UniversalError from '../Global/UniversalError';
+import { BADGE_COLORS } from '../Global/utils';
 import classes from './styles/EstimateDetails.module.css';
 import VideoUploader from './VideoUploader';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { VideoFrame } from '@/components/EstimateDetails/VideoFrame';
 import { useDataCache } from '@/contexts/DataCacheContext';
+import { logToCloudWatch } from '@/public/logger';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { selectClientById } from '@/store/slices/clientsSlice';
 import {
@@ -84,6 +83,21 @@ import {
     selectEstimateById,
 } from '@/store/slices/estimatesSlice';
 import { generateEstimatePdf } from '@/utils/estimatePdfGenerator';
+
+const DynamicLoadingFallback = () => <LoadingState />;
+
+const SidebarDetails = dynamic(() => import('./SidebarDetails'), {
+    ssr: false,
+    loading: DynamicLoadingFallback,
+});
+const JobComments = dynamic(() => import('./comments/JobComments'), {
+    ssr: false,
+    loading: DynamicLoadingFallback,
+});
+const EstimatePreview = dynamic(() => import('./estimate/EstimatePreview'), {
+    ssr: false,
+    loading: DynamicLoadingFallback,
+});
 
 function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const dispatch = useAppDispatch();
@@ -108,6 +122,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const cachedSignatures = useAppSelector((state) => selectSignatures(state, estimateID));
 
     const [objectExists, setObjectExists] = useState(false);
+    const [summaryHasVideo, setSummaryHasVideo] = useState(false);
+    const [summaryHasImages, setSummaryHasImages] = useState(false);
+    const [summaryHasFiles, setSummaryHasFiles] = useState(false);
+    const [summaryChangeOrdersCount, setSummaryChangeOrdersCount] = useState(0);
     const [isModalOpen, setIsModalOpen] = useState(false);
     // Initialize estimate from cached data immediately (synchronously) to avoid loading flash
     const [estimate, setEstimate] = useState<Estimate | undefined>(cachedEstimate);
@@ -154,7 +172,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const [comments, setComments] = useState<any[]>(cachedComments);
     const [changeOrders, setChangeOrders] = useState<Estimate[]>(cachedChangeOrders);
     const [timeEntries, setTimeEntries] = useState<any[]>(cachedTimeEntries);
-    const [jobsuiteProgress, setJobsuiteProgress] = useState<
+    const [jobsuiteProgress] = useState<
         Array<{
             line_item_id: string;
             title: string;
@@ -290,6 +308,26 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         cachedEstimate,
     ]);
 
+    // Mark detail prerequisites as loaded once we have the minimum data needed for previews.
+    useEffect(() => {
+        const lineItemsReady = lineItemsCount === 0 || lineItems.length > 0;
+        const resourcesReady =
+            resources.length > 0
+            || (!summaryHasVideo && !summaryHasImages && !summaryHasFiles);
+        if (estimate && client && lineItemsReady && resourcesReady) {
+            setDetailsLoaded(true);
+        }
+    }, [
+        estimate,
+        client,
+        lineItems,
+        lineItemsCount,
+        resources,
+        summaryHasVideo,
+        summaryHasImages,
+        summaryHasFiles,
+    ]);
+
     const submitManualPayment = useCallback(async () => {
         if (!estimate?.id) return;
         if (typeof manualPaymentAmount !== 'number' || manualPaymentAmount <= 0) {
@@ -419,9 +457,10 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             setInitialLoading(true);
         }
 
-        // Fetch all three endpoints in parallel
+        // Fetch summary + signatures in parallel. Heavy detail data is loaded incrementally.
         const fetchAllData = async () => {
             try {
+                const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
                 if (!hasCachedData) {
                     setInitialLoading(true);
                 }
@@ -430,16 +469,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     setSignaturesLoaded(false);
                 }
 
-                // Start all three requests in parallel
-                const [summaryResult, detailsResult, signaturesResult] = await Promise.allSettled([
+                // Start both requests in parallel
+                const [summaryResult, signaturesResult] = await Promise.allSettled([
                     fetch(`/api/estimates/${estimateID}/summary`, {
-                        method: 'GET',
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                            'Content-Type': 'application/json',
-                        },
-                    }),
-                    fetch(`/api/estimates/${estimateID}/details`, {
                         method: 'GET',
                         headers: {
                             Authorization: `Bearer ${accessToken}`,
@@ -458,6 +490,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 if (summaryResult.status === 'fulfilled' && summaryResult.value.ok) {
                     try {
                         const summaryData = await summaryResult.value.json();
+                        const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                        logToCloudWatch(
+                            `EstimateDetails summary loaded in ${Math.round(t1 - t0)}ms (estimate=${estimateID}, cached=${hasCachedData})`,
+                            'estimate-details-performance'
+                        );
 
                         // Enrich estimate in Redux cache with summary data
                         if (summaryData.estimate) {
@@ -473,9 +510,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                 },
                             }));
 
-                            // Update local state (details will overwrite if it arrives later)
-                            const detailsOk = detailsResult.status === 'fulfilled' && detailsResult.value.ok;
-                            if (isMountedRef.current && !detailsOk) {
+                            // Update local state (incremental loads may overwrite fields later)
+                            if (isMountedRef.current) {
                                 const estimateData = { ...summaryData.estimate };
                                 if (
                                     summaryData.hours_worked !== undefined &&
@@ -487,10 +523,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                             }
                         }
 
-                        // Process client from summary (details will overwrite if it arrives later)
-                        const detailsOk =
-                            detailsResult.status === 'fulfilled' && detailsResult.value.ok;
-                        if (summaryData.client && isMountedRef.current && !detailsOk) {
+                        // Process client from summary
+                        if (summaryData.client && isMountedRef.current) {
                             setClient(summaryData.client);
                         }
 
@@ -498,10 +532,19 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         if (summaryData.has_video && isMountedRef.current) {
                             setObjectExists(true);
                         }
+                        if (isMountedRef.current) {
+                            setSummaryHasVideo(Boolean(summaryData.has_video));
+                            setSummaryHasImages(Boolean(summaryData.has_images));
+                            setSummaryHasFiles(Boolean(summaryData.has_files));
+                            setSummaryChangeOrdersCount(
+                                typeof summaryData.change_orders_count === 'number'
+                                    ? summaryData.change_orders_count
+                                    : 0
+                            );
+                        }
 
-                        // Set counts from summary (details will overwrite if it arrives later)
-                        const detailsOkForCount = detailsResult.status === 'fulfilled' && detailsResult.value.ok;
-                        if (isMountedRef.current && !detailsOkForCount) {
+                        // Set counts from summary
+                        if (isMountedRef.current) {
                             setLineItemsCount(summaryData.line_items_count || 0);
                         }
                     } catch (error) {
@@ -517,166 +560,6 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         : {};
                     // eslint-disable-next-line no-console
                     console.error('Error fetching estimate summary:', errorData);
-                }
-
-                // Process details response (more complete data, overwrites summary)
-                if (detailsResult.status === 'fulfilled' && detailsResult.value.ok) {
-                    try {
-                        const detailsData = await detailsResult.value.json();
-
-                        // Process resources
-                        if (
-                            detailsData.resources &&
-                            Array.isArray(detailsData.resources) &&
-                            isMountedRef.current
-                        ) {
-                            const resourcesArray = detailsData.resources;
-                            setResources(resourcesArray);
-
-                            // Update Redux cache
-                            dispatch(
-                                setEstimateDetails({
-                                    estimateId: estimateID,
-                                    resources: resourcesArray,
-                                })
-                            );
-
-                            // Check if any video resource exists
-                            const videoResource = resourcesArray.find(
-                                (r: EstimateResource) =>
-                                    r.resource_type === 'VIDEO' &&
-                                    r.upload_status === 'COMPLETED'
-                            );
-                            if (videoResource) {
-                                setObjectExists(true);
-                            }
-                        }
-
-                        // Process line items
-                        if (
-                            detailsData.line_items &&
-                            Array.isArray(detailsData.line_items) &&
-                            isMountedRef.current
-                        ) {
-                            const itemsArray = detailsData.line_items;
-                            setLineItems(itemsArray);
-                            setLineItemsCount(itemsArray.length);
-
-                            // Update Redux cache
-                            dispatch(
-                                setEstimateDetails({
-                                    estimateId: estimateID,
-                                    lineItems: itemsArray,
-                                })
-                            );
-                        }
-
-                        // Process comments
-                        if (
-                            detailsData.comments &&
-                            Array.isArray(detailsData.comments) &&
-                            isMountedRef.current
-                        ) {
-                            const commentsArray = detailsData.comments;
-                            setComments(commentsArray);
-
-                            // Update Redux cache
-                            dispatch(
-                                setEstimateDetails({
-                                    estimateId: estimateID,
-                                    comments: commentsArray,
-                                })
-                            );
-                        }
-                        // Note: Comments should be in details response
-
-                        // Process change orders
-                        if (
-                            detailsData.change_orders &&
-                            Array.isArray(detailsData.change_orders) &&
-                            isMountedRef.current
-                        ) {
-                            const changeOrdersArray = detailsData.change_orders;
-                            setChangeOrders(changeOrdersArray);
-
-                            // Update Redux cache
-                            dispatch(
-                                setEstimateDetails({
-                                    estimateId: estimateID,
-                                    changeOrders: changeOrdersArray,
-                                })
-                            );
-                        }
-                        // Note: Change orders should be in details response
-
-                        // Process time entries
-                        if (
-                            detailsData.time_entries &&
-                            Array.isArray(detailsData.time_entries) &&
-                            isMountedRef.current
-                        ) {
-                            const timeEntriesArray = detailsData.time_entries;
-                            setTimeEntries(timeEntriesArray);
-
-                            // Update Redux cache
-                            dispatch(
-                                setEstimateDetails({
-                                    estimateId: estimateID,
-                                    timeEntries: timeEntriesArray,
-                                })
-                            );
-                        }
-
-                        if (isMountedRef.current) {
-                            if (
-                                detailsData.jobsuite_progress &&
-                                Array.isArray(detailsData.jobsuite_progress)
-                            ) {
-                                setJobsuiteProgress(detailsData.jobsuite_progress);
-                            } else {
-                                setJobsuiteProgress([]);
-                            }
-                        }
-
-                        // Update estimate with data from details (overwrites summary)
-                        if (detailsData.estimate && isMountedRef.current) {
-                            const estimateData = { ...detailsData.estimate };
-                            if (
-                                detailsData.hours_worked !== undefined &&
-                                detailsData.hours_worked !== null
-                            ) {
-                                estimateData.hours_worked = detailsData.hours_worked;
-                                dispatch(
-                                    enrichEstimate({
-                                        estimateId: estimateID,
-                                        data: { hours_worked: detailsData.hours_worked },
-                                    })
-                                );
-                            }
-                            setEstimate(estimateData);
-                        }
-
-                        // Process client from details (overwrites summary)
-                        if (detailsData.client && isMountedRef.current) {
-                            setClient(detailsData.client);
-                        }
-
-                        if (isMountedRef.current) {
-                            setDetailsLoaded(true);
-                        }
-                    } catch (error) {
-                        // eslint-disable-next-line no-console
-                        console.error('Error parsing details response:', error);
-                    }
-                } else if (
-                    detailsResult.status === 'rejected' ||
-                    (detailsResult.status === 'fulfilled' && !detailsResult.value.ok)
-                ) {
-                    const errorData = detailsResult.status === 'fulfilled'
-                        ? await detailsResult.value.json().catch(() => ({}))
-                        : {};
-                    // eslint-disable-next-line no-console
-                    console.error('Error fetching estimate details:', errorData);
                 }
 
                 // Process signatures response (independent data)
@@ -719,14 +602,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                 // Check if we have any data to show
                 if (!estimate) {
-                    // If both summary and details failed, set error
+                    // If summary failed, set error
                     const summaryFailed =
                         summaryResult.status === 'rejected' ||
                         (summaryResult.status === 'fulfilled' && !summaryResult.value.ok);
-                    const detailsFailed =
-                        detailsResult.status === 'rejected' ||
-                        (detailsResult.status === 'fulfilled' && !detailsResult.value.ok);
-                    if (summaryFailed && detailsFailed) {
+                    if (summaryFailed) {
                         setHasError(true);
                     }
                 }
@@ -1595,6 +1475,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const hasVideo = videoResources.length > 0;
     const hasImages = imageResources.length > 0;
     const hasFiles = fileResources.length > 0;
+    const showVideoSection = hasVideo || summaryHasVideo;
+    const showImagesSection = hasImages || summaryHasImages;
+    const showFilesSection = hasFiles || summaryHasFiles;
     const hasSignedPdf = signedPdfResource !== undefined;
     const hasDescription = estimate?.transcription_summary
         && estimate.transcription_summary.trim().length > 0;
@@ -2097,14 +1980,26 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </div>
                                     )}
 
-                                    {/* Video Section - Only show if video exists */}
-                                    {hasVideo && (
-                                        <CollapsibleSection title="Video" defaultOpen>
-                                            <VideoFrame
-                                              resource={videoResources[0]}
-                                              estimateID={estimateID}
-                                              refresh={getResources}
-                                            />
+                                    {/* Video Section */}
+                                    {showVideoSection && (
+                                        <CollapsibleSection
+                                          title="Video"
+                                          defaultOpen
+                                          onOpen={() => {
+                                            if (resources.length === 0) {
+                                              getResources();
+                                            }
+                                          }}
+                                        >
+                                            {hasVideo ? (
+                                                <VideoFrame
+                                                  resource={videoResources[0]}
+                                                  estimateID={estimateID}
+                                                  refresh={getResources}
+                                                />
+                                            ) : (
+                                                <LoadingState />
+                                            )}
                                         </CollapsibleSection>
                                     )}
 
@@ -2120,50 +2015,85 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         />
                                     </CollapsibleSection>
 
-                                    {/* Change Orders Section - Only show if not archived and
-                                    there are change orders */}
+                                    {/* Change Orders Section */}
                                     {estimate &&
                                     !estimate.original_estimate_id &&
                                     estimate.status !== EstimateStatus.ARCHIVED &&
-                                    changeOrders.length > 0 && (
-                                        <CollapsibleSection title="Change Orders" defaultOpen>
-                                            <ChangeOrders
-                                              estimate={estimate}
-                                              initialChangeOrders={changeOrders}
-                                              skipInitialFetch={changeOrders.length > 0}
-                                              onUpdate={() => {
-                                                getEstimate();
-                                                fetchChangeOrders();
-                                            }}
-                                            />
+                                    (changeOrders.length > 0 || summaryChangeOrdersCount > 0) && (
+                                        <CollapsibleSection
+                                          title="Change Orders"
+                                          defaultOpen
+                                          onOpen={() => {
+                                            if (changeOrders.length === 0) {
+                                              fetchChangeOrders();
+                                            }
+                                          }}
+                                        >
+                                            {changeOrders.length > 0 ? (
+                                                <ChangeOrders
+                                                  estimate={estimate}
+                                                  initialChangeOrders={changeOrders}
+                                                  skipInitialFetch={changeOrders.length > 0}
+                                                  onUpdate={() => {
+                                                    getEstimate();
+                                                    fetchChangeOrders();
+                                                }}
+                                                />
+                                            ) : (
+                                                <LoadingState />
+                                            )}
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* Image Gallery - Show if images exist */}
-                                    {hasImages && (
-                                        <CollapsibleSection title="Image Gallery" defaultOpen>
-                                            <ImageGallery
-                                              estimateID={estimateID}
-                                              resources={imageResources}
-                                              coverPhotoResourceId={
-                                                estimate.cover_photo_resource_id
-                                              }
-                                              onUpdate={() => {
-                                                getResources();
-                                                getEstimate();
-                                              }}
-                                            />
+                                    {/* Image Gallery */}
+                                    {showImagesSection && (
+                                        <CollapsibleSection
+                                          title="Image Gallery"
+                                          defaultOpen
+                                          onOpen={() => {
+                                            if (resources.length === 0) {
+                                              getResources();
+                                            }
+                                          }}
+                                        >
+                                            {hasImages ? (
+                                                <ImageGallery
+                                                  estimateID={estimateID}
+                                                  resources={imageResources}
+                                                  coverPhotoResourceId={
+                                                    estimate.cover_photo_resource_id
+                                                  }
+                                                  onUpdate={() => {
+                                                    getResources();
+                                                    getEstimate();
+                                                  }}
+                                                />
+                                            ) : (
+                                                <LoadingState />
+                                            )}
                                         </CollapsibleSection>
                                     )}
 
-                                    {/* File List - Show if files exist */}
-                                    {hasFiles && (
-                                        <CollapsibleSection title="Files" defaultOpen>
-                                            <FileList
-                                              estimateID={estimateID}
-                                              resources={fileResources}
-                                              onUpdate={getResources}
-                                            />
+                                    {/* File List */}
+                                    {showFilesSection && (
+                                        <CollapsibleSection
+                                          title="Files"
+                                          defaultOpen
+                                          onOpen={() => {
+                                            if (resources.length === 0) {
+                                              getResources();
+                                            }
+                                          }}
+                                        >
+                                            {hasFiles ? (
+                                                <FileList
+                                                  estimateID={estimateID}
+                                                  resources={fileResources}
+                                                  onUpdate={getResources}
+                                                />
+                                            ) : (
+                                                <LoadingState />
+                                            )}
                                         </CollapsibleSection>
                                     )}
 
@@ -2228,7 +2158,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
                                     {/* Line Items - Always render for ref access */}
                                     {lineItemsCount > 0 ? (
-                                        <CollapsibleSection title="Line Items" defaultOpen>
+                                        <CollapsibleSection
+                                          title="Line Items"
+                                          defaultOpen
+                                          onOpen={() => {
+                                            if (lineItems.length === 0 && lineItemsCount > 0) {
+                                              getLineItems();
+                                            }
+                                          }}
+                                        >
                                             <LineItems
                                               ref={lineItemsRef}
                                               estimateID={estimateID}

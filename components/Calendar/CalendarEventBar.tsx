@@ -1,9 +1,9 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { ActionIcon, Group, Menu, Tooltip } from '@mantine/core';
-import { IconCalendarEvent, IconDots, IconGripVertical, IconPencil, IconUsers } from '@tabler/icons-react';
+import { IconCalendarEvent, IconDots, IconGripVertical, IconUsers } from '@tabler/icons-react';
 import Link from 'next/link';
 
 import classes from './CalendarPage.module.css';
@@ -39,6 +39,10 @@ type CalendarEventBarProps = {
     attributes: Record<string, unknown>;
     listeners?: Record<string, unknown>;
   } | null;
+  /** Trailing edge: drag horizontally to adjust last work day in this week (schedule edit). */
+  resizeHandle?: {
+    onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  } | null;
 };
 
 export function CalendarEventBar({
@@ -53,6 +57,7 @@ export function CalendarEventBar({
   doubleBookDays,
   doubleBookTooltip,
   dragHandle,
+  resizeHandle,
 }: CalendarEventBarProps) {
   const { isBacklog, scheduleId, estimateId } = row;
   const showMenu =
@@ -174,20 +179,32 @@ export function CalendarEventBar({
                     Change team
                   </Menu.Item>
                 ) : null}
-                {row.href ? (
-                  <Menu.Item
-                    component={Link}
-                    href={row.href}
-                    leftSection={<IconPencil size={14} />}
-                  >
-                    Open proposal
-                  </Menu.Item>
-                ) : null}
               </Menu.Dropdown>
             </Menu>
           </div>
         ) : null}
       </div>
+      {resizeHandle ? (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize schedule end in this week"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            resizeHandle.onPointerDown(e);
+          }}
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: 0,
+            bottom: 0,
+            width: 10,
+            cursor: 'ew-resize',
+            zIndex: 2,
+            touchAction: 'none',
+          }}
+        />
+      ) : null}
     </div>
   );
 

@@ -15,6 +15,8 @@ import {
 } from '@mantine/core';
 import Image from 'next/image';
 
+import { MastercardLogoMark, VisaLogoMark } from './CardBrandMarks';
+
 const HELCIM_SCRIPT_URL = 'https://secure.helcim.app/helcim-pay/services/start.js';
 
 interface DepositSectionProps {
@@ -307,6 +309,16 @@ export function DepositSection({
                         {`Total project value: $${estimateTotal.toFixed(2)}`}
                     </Text>
                 )}
+                {isBalance && helcimConfigured && (
+                    <Stack gap={4}>
+                        <Text size="sm" fw={600}>
+                            Accepted cards
+                        </Text>
+                        <Text size="xs" c="dimmed">
+                            Visa and Mastercard only. American Express is not accepted.
+                        </Text>
+                    </Stack>
+                )}
                 {payError && (
                     <Alert color="red" variant="light" onClose={() => setPayError(null)} withCloseButton>
                         {payError}
@@ -321,9 +333,17 @@ export function DepositSection({
                           size="md"
                           fullWidth
                         >
-                            {isBalance
-                                ? `Pay now ($${chargeAmount.toFixed(2)})`
-                                : `Pay 30% deposit now ($${depositAmount.toFixed(2)})`}
+                            <Stack gap={6} align="center" justify="center">
+                                <span>
+                                    {isBalance
+                                        ? `Pay now ($${chargeAmount.toFixed(2)})`
+                                        : `Pay 30% deposit now ($${depositAmount.toFixed(2)})`}
+                                </span>
+                                <Group gap="xs" justify="center" wrap="nowrap">
+                                    <VisaLogoMark />
+                                    <MastercardLogoMark />
+                                </Group>
+                            </Stack>
                         </Button>
                         <PaySecurelyWithHelcim />
                     </>
