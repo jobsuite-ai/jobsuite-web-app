@@ -47,6 +47,8 @@ interface SidebarDetailsProps {
   estimateID: string;
   onUpdate: () => void;
   detailsLoaded?: boolean;
+  /** Hydrate from parent / Redux so we do not wait on a duplicate /api/clients request */
+  initialClient?: ContractorClient;
   /** Called with the function to open the check-in date modal
    * (for use by parent when no date is set) */
   registerCheckInDateOpener?: (open: (() => void) | null) => void;
@@ -57,9 +59,10 @@ export default function SidebarDetails({
   estimateID,
   onUpdate,
   detailsLoaded = false,
+  initialClient,
   registerCheckInDateOpener,
 }: SidebarDetailsProps) {
-  const [client, setClient] = useState<ContractorClient>();
+  const [client, setClient] = useState<ContractorClient | undefined>(initialClient);
   const [menuOpened, setMenuOpened] = useState(false);
   const { users, loading: loadingUsers } = useUsers();
   const assignmentPools = useTeamAssignmentPools();
@@ -262,8 +265,20 @@ export default function SidebarDetails({
   };
 
   useEffect(() => {
+    if (initialClient?.id && estimate?.client_id && initialClient.id === estimate.client_id) {
+      setClient((prev) => (prev ? { ...prev, ...initialClient } : initialClient));
+      fetchedClientIdRef.current = estimate.client_id;
+    }
+  }, [initialClient, estimate?.client_id]);
+
+  useEffect(() => {
     const loadClientDetails = async () => {
       if (!estimate?.client_id) {
+        return;
+      }
+
+      if (initialClient?.id === estimate.client_id) {
+        fetchedClientIdRef.current = estimate.client_id;
         return;
       }
 
@@ -303,7 +318,7 @@ export default function SidebarDetails({
     };
 
     loadClientDetails();
-  }, [estimate?.client_id]);
+  }, [estimate?.client_id, initialClient?.id]);
 
   // Sync selectedOwnerId when estimate changes (but not when editing)
   useEffect(() => {

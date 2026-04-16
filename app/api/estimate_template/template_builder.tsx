@@ -404,6 +404,11 @@ export const generateTemplate = (template: TemplateInput) => `
                     <div style="margin-bottom: 30px;">
                         <ul>
                             <li>A 30% deposit is due prior to commencement of work. Balance is due upon completion.</li>
+                            <li>
+                                If you provide a mobile phone number, you agree that we may send you transactional
+                                text messages about this project, including deposit and invoice payment links. Message
+                                and data rates may apply.
+                            </li>
                             <li>Card, ACH or check payments accepted.</li>
                             <li>We do not wash windows upon completion.</li>
                             <li>We do not dispose of any additional paint or stain material.</li>

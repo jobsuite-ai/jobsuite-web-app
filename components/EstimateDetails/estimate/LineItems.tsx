@@ -37,12 +37,15 @@ const LineItems = forwardRef<LineItemsRef, {
     estimateID: string;
     onLineItemsChange?:(count: number) => void;
     onEstimateUpdate?: () => void;
-}>(({ estimateID, onLineItemsChange, onEstimateUpdate }, ref) => {
+    /** Parent loads line items in parallel with summary; avoid duplicate mount fetch */
+    lineItemsReady: boolean;
+    parentLineItems: EstimateLineItem[];
+}>(({ estimateID, onLineItemsChange, onEstimateUpdate, lineItemsReady, parentLineItems }, ref) => {
     const [opened, setOpened] = useState(false);
     const [editingItem, setEditingItem] = useState<EstimateLineItem | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [lineItems, setLineItems] = useState<EstimateLineItem[]>([]);
-    const [isFetching, setIsFetching] = useState(true);
+    const [lineItems, setLineItems] = useState<EstimateLineItem[]>(parentLineItems);
+    const [isFetching, setIsFetching] = useState(false);
     const [isReordering, setIsReordering] = useState(false);
 
     const sensors = useSensors(
@@ -68,10 +71,13 @@ const LineItems = forwardRef<LineItemsRef, {
         }),
     });
 
-    // Fetch line items on mount
     useEffect(() => {
-        fetchLineItems();
-    }, [estimateID]);
+        if (!lineItemsReady) {
+            return;
+        }
+        setLineItems(parentLineItems);
+        onLineItemsChange?.(parentLineItems.length);
+    }, [estimateID, lineItemsReady, parentLineItems, onLineItemsChange]);
 
     async function fetchLineItems() {
         setIsFetching(true);
@@ -471,6 +477,10 @@ const LineItems = forwardRef<LineItemsRef, {
         openAddModal,
         getLineItemsCount: () => lineItems.length,
     }));
+
+    if (!lineItemsReady) {
+        return <LoadingState />;
+    }
 
     if (isFetching) {
         return <LoadingState />;
