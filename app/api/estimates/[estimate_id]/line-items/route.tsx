@@ -21,7 +21,7 @@ export async function GET(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         const contractorId = await getContractorId(request);
         if (!contractorId) {
@@ -80,7 +80,7 @@ export async function POST(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         const contractorId = await getContractorId(request);
         if (!contractorId) {

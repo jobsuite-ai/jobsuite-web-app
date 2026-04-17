@@ -24,6 +24,7 @@ import { JobComment } from './JobComment';
 import { SingleComment, User } from '../../Global/model';
 import classes from '../styles/EstimateDetails.module.css';
 
+import { getApiHeaders } from '@/app/utils/apiClient';
 import { useUsers } from '@/hooks/useUsers';
 
 const QUICK_REPLIES = [
@@ -122,10 +123,7 @@ export default function JobComments({
                 `/api/estimate-comments/${estimateID}`,
                 {
                     method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                 }
             );
 
@@ -297,10 +295,7 @@ export default function JobComments({
             `/api/estimate-comments/${estimateID}`,
             {
                 method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: getApiHeaders(),
                 body: JSON.stringify({
                     comment_contents: processedText,
                     mentioned_user_ids: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,

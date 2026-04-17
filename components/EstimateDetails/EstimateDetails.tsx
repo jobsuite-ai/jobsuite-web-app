@@ -504,10 +504,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                     await Promise.allSettled([
                         fetch(`/api/estimates/${estimateID}/summary`, {
                             method: 'GET',
-                            headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json',
-                            },
+                            headers: getApiHeaders(),
                         }),
                         fetch(`/api/estimates/${estimateID}/signatures`, {
                             method: 'GET',
@@ -515,17 +512,11 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                         }),
                         fetch(`/api/estimate-comments/${estimateID}`, {
                             method: 'GET',
-                            headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json',
-                            },
+                            headers: getApiHeaders(),
                         }),
                         fetch(`/api/estimates/${estimateID}/line-items`, {
                             method: 'GET',
-                            headers: {
-                                Authorization: `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json',
-                            },
+                            headers: getApiHeaders(),
                         }),
                     ]);
 
@@ -799,10 +790,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 `/api/estimates/${estimateID}?include_change_orders=true`,
                 {
                     method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                 }
             );
 
@@ -827,10 +815,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 `/api/estimates/${estimateID}/resources`,
                 {
                     method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                 }
             );
 
@@ -868,10 +853,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 `/api/estimates/${estimateID}/line-items`,
                 {
                     method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                 }
             );
 
@@ -904,10 +886,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                 `/api/estimates/${estimateID}/change-orders`,
                 {
                     method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
+                    headers: getApiHeaders(),
                 }
             );
 
@@ -1512,10 +1491,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         try {
             await fetch(`/api/estimates/${estimateID}`, {
                 method: 'PUT',
-                headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json',
-                },
+                headers: getApiHeaders(),
                 body: JSON.stringify({ status: EstimateStatus.ARCHIVED }),
             });
             router.push('/proposals');

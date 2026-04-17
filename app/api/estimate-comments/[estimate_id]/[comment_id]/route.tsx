@@ -22,7 +22,7 @@ export async function PUT(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get contractor_id from cache (header) or fetch from API
         const contractorId = await getContractorId(request);
@@ -98,7 +98,7 @@ export async function DELETE(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get contractor_id from cache (header) or fetch from API
         const contractorId = await getContractorId(request);

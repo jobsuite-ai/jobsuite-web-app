@@ -27,7 +27,7 @@ import { IconEdit, IconTrash } from '@tabler/icons-react';
 import { addDays, format, parse, subDays } from 'date-fns';
 import Link from 'next/link';
 
-import { getApiHeaders } from '@/app/utils/apiClient';
+import { fetchEstimateTitleFromSummary, getApiHeaders } from '@/app/utils/apiClient';
 import { isSupportPainter } from '@/app/utils/roles';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -472,20 +472,9 @@ export function MyTimePage() {
     const eligibleIds = new Set(estimates.map((e) => e.id));
 
     async function fetchEstimateTitle(estimateId: string) {
-      try {
-        const res = await fetch(`/api/estimates/${estimateId}`, {
-          headers: getApiHeaders(),
-        });
-        if (!res.ok) {
-          return;
-        }
-        const data = (await res.json()) as { title?: string | null };
-        const t = typeof data?.title === 'string' ? data.title.trim() : '';
-        if (t) {
-          setJobTitlesById((prev) => (prev[estimateId] ? prev : { ...prev, [estimateId]: t }));
-        }
-      } catch {
-        /* ignore */
+      const t = await fetchEstimateTitleFromSummary(estimateId);
+      if (t) {
+        setJobTitlesById((prev) => (prev[estimateId] ? prev : { ...prev, [estimateId]: t }));
       }
     }
 
