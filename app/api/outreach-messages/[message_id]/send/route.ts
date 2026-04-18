@@ -28,7 +28,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Send message via backend API (backend will get from_email from config)
         const sendResponse = await fetch(

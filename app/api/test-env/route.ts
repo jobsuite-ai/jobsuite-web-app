@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
-export async function GET() {
+export async function GET(request: Request) {
   const branch = process.env.AWS_BRANCH || process.env.AMPLIFY_BRANCH;
-  const apiBaseUrl = getApiBaseUrl();
+  const apiBaseUrl = getApiBaseUrl({ request });
 
   return NextResponse.json({
     branch: branch || 'not set',

@@ -16,7 +16,7 @@ export async function GET(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         // eslint-disable-next-line no-console
         console.log(`Fetching signature link from: ${apiBaseUrl}/api/v1/signature/${signature_hash}`);
 

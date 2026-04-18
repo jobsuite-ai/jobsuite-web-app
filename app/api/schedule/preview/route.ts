@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: 'User does not have a contractor ID' }, { status: 400 });
         }
         const body = await request.json();
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/schedule/preview`,
             {

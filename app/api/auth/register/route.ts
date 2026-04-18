@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
     const response = await fetch(`${apiBaseUrl}/api/v1/auth/register`, {
       method: 'POST',
       headers: {

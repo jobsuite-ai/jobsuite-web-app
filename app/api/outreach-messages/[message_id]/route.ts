@@ -28,7 +28,7 @@ export async function GET(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Fetch message from backend
         const messageResponse = await fetch(
@@ -87,7 +87,7 @@ export async function PUT(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json();
 
         // Update message via backend API
@@ -148,7 +148,7 @@ export async function DELETE(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Delete message via backend API
         const deleteResponse = await fetch(

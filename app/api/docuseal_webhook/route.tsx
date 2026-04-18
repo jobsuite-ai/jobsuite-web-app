@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Get estimate from job engine API
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
 
     // Get service account token for authentication
     let accessToken: string;

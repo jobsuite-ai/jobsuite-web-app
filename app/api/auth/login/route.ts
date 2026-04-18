@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     formData.append('client_id', 'string');
     formData.append('client_secret', 'string');
 
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
     // Add remember_me as query parameter
     const rememberMeParam = remember_me ? '?remember_me=true' : '';
     const response = await fetch(`${apiBaseUrl}/api/v1/auth/login${rememberMeParam}`, {

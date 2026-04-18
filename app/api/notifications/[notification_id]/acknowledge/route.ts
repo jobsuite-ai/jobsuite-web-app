@@ -20,7 +20,7 @@ export async function POST(
     }
 
     const token = authHeader.substring(7);
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
     const { notification_id } = await params;
 
     // Get contractor_id from cache (header) or fetch from API

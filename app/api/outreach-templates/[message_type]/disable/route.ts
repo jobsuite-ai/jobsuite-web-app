@@ -28,7 +28,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Disable message type via backend API
         const disableResponse = await fetch(

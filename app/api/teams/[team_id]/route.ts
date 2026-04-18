@@ -19,7 +19,7 @@ export async function GET(
         if (!contractorId) {
             return NextResponse.json({ message: 'User does not have a contractor ID' }, { status: 400 });
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/teams/${team_id}`,
             {
@@ -61,7 +61,7 @@ export async function PUT(
             return NextResponse.json({ message: 'User does not have a contractor ID' }, { status: 400 });
         }
         const body = await request.json();
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/teams/${team_id}`,
             {
@@ -103,7 +103,7 @@ export async function DELETE(
         if (!contractorId) {
             return NextResponse.json({ message: 'User does not have a contractor ID' }, { status: 400 });
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/teams/${team_id}`,
             {

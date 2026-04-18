@@ -28,7 +28,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Enable message type via backend API
         const enableResponse = await fetch(

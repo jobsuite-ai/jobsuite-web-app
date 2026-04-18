@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         if (onlyMyTeams === 'true' || onlyMyTeams === '1') {
             qs.set('only_my_teams', 'true');
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/schedule/calendar?${qs.toString()}`,
             {

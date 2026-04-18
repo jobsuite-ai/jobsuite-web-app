@@ -18,7 +18,7 @@ export async function POST(
 
         const body = await request.json();
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const response = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/sign`,
             {

@@ -24,7 +24,7 @@ export async function GET(
                 { status: 400 }
             );
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/invoice/preview`,
             {

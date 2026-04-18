@@ -27,7 +27,7 @@ export async function GET(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const response = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/upload-pdf/${resource_id}/presigned-url?part_number=${partNumber}`,
             {
