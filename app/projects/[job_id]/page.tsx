@@ -2,22 +2,26 @@
 
 import { useEffect } from 'react';
 
-import { useUser } from '@auth0/nextjs-auth0/client';
 import { useParams, useRouter } from 'next/navigation';
 
-import JobDetails from '@/components/EstimateDetails/EstimateDetails';
+import EstimateDetails from '@/components/EstimateDetails/EstimateDetails';
+import EstimateDetailsSkeleton from '@/components/EstimateDetails/EstimateDetailsSkeleton';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Job() {
     const params = useParams();
-    const { user, isLoading } = useUser();
+    const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && !user) {
-            // Redirect to login page if the user is not logged in
-            router.push('/profile');
+        if (!isLoading && !isAuthenticated) {
+            router.push('/');
         }
-    }, [isLoading, user, router]);
+    }, [isLoading, isAuthenticated, router]);
 
-    return params ? <JobDetails estimateID={params.job_id as string} /> : null;
+    if (isLoading || !isAuthenticated) {
+        return <EstimateDetailsSkeleton />;
+    }
+
+    return params ? <EstimateDetails estimateID={params.job_id as string} /> : null;
 }

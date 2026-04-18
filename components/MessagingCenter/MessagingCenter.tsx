@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
     Badge,
+    Box,
     Button,
     Card,
     Group,
@@ -33,6 +34,16 @@ import MessageEditor from './MessageEditor';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useDataCache } from '@/contexts/DataCacheContext';
 import { useAuth } from '@/hooks/useAuth';
+import { linkifyJobsuiteSignUrls } from '@/utils/linkifySignUrls';
+import {
+    fetchCachedOutreachMessagesCount,
+    fetchCachedOutreachMessagesList,
+    invalidateOutreachMessageCaches,
+} from '@/utils/outreachMessageApiCache';
+import {
+    buildSignaturePageUrl,
+    pickSignatureHashFromAudit,
+} from '@/utils/signatureLinkAudit';
 
 interface OutreachMessage {
     id: string;
@@ -54,6 +65,13 @@ interface OutreachMessage {
     to_emails?: string[];
     owner_id?: string;
     owner_name?: string;
+    /** Server-rendered template snapshot (see job-engine outreach_message_service) */
+    preview_subject?: string | null;
+    preview_body?: string | null;
+}
+
+function hasStoredPreview(message: OutreachMessage): boolean {
+    return message.preview_subject != null && message.preview_body != null;
 }
 
 const MESSAGE_TYPE_LABELS: Record<string, string> = {
@@ -159,7 +177,7 @@ const renderTemplate = (
     });
     result = result.replace(/\{\{today_date\}\}/g, today);
 
-    // Signature link (render as clickable link in preview)
+    // Signature link for preview: read-only URL from audit only (never mint links here).
     if (signatureUrl) {
         const escapedUrl = signatureUrl
             .replace(/&/g, '&amp;')
@@ -169,6 +187,11 @@ const renderTemplate = (
             .replace(/'/g, '&#39;');
         const signatureLinkHtml = `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">${escapedUrl}</a>`;
         result = result.replace(/\{\{signature_url\}\}/g, signatureLinkHtml);
+    } else {
+        result = result.replace(
+            /\{\{signature_url\}\}/g,
+            '[Signature link available after you send the estimate]'
+        );
     }
 
     return result;
@@ -186,10 +209,15 @@ export default function MessagingCenter() {
     const [sending, setSending] = useState<string | null>(null);
     const [renderedMessages, setRenderedMessages] =
         useState<Record<string, { subject: string; body: string }>>({});
+    /**
+     * Preview URL per message, or '' when audit has no link. Read-only; never POST.
+     */
     const [signatureUrlsByMessageId, setSignatureUrlsByMessageId] = useState<
-        Record<string, string>
+        Record<string, string | undefined>
     >({});
     const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+    const [dismissAllModalOpen, setDismissAllModalOpen] = useState(false);
+    const [dismissingAll, setDismissingAll] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
     const { clients, estimates } = useDataCache();
 
@@ -254,7 +282,6 @@ export default function MessagingCenter() {
             return undefined;
         }
 
-        loadMessages();
         loadCount();
         // One request returns due-today + past-due counts (see /outreach-messages/count)
         const intervalMs = 120000; // 2 min; list refresh is separate when user changes tabs
@@ -302,16 +329,9 @@ export default function MessagingCenter() {
             }
             url.searchParams.append('status', 'PENDING');
 
-            const response = await fetch(url.toString(), {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to load messages');
-            }
-
-            let data: OutreachMessage[] = await response.json();
+            let data: OutreachMessage[] = await fetchCachedOutreachMessagesList<
+                OutreachMessage[]
+            >(url.toString());
 
             data = filterMessagesForTab(data, activeTab);
 
@@ -337,24 +357,17 @@ export default function MessagingCenter() {
         }
 
         try {
-            const response = await fetch('/api/outreach-messages/count', {
-                method: 'GET',
-                headers: getApiHeaders(),
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                const dueToday = data.count || 0;
-                setCount(dueToday);
-                if (typeof data.past_due_count === 'number') {
-                    setPastDueCount(data.past_due_count);
-                }
-                window.dispatchEvent(
-                    new CustomEvent('outreachDueTodayCountUpdated', {
-                        detail: { count: dueToday },
-                    })
-                );
+            const data = await fetchCachedOutreachMessagesCount();
+            const dueToday = data.count || 0;
+            setCount(dueToday);
+            if (typeof data.past_due_count === 'number') {
+                setPastDueCount(data.past_due_count);
             }
+            window.dispatchEvent(
+                new CustomEvent('outreachDueTodayCountUpdated', {
+                    detail: { count: dueToday },
+                })
+            );
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to load count');
         }
@@ -374,10 +387,11 @@ export default function MessagingCenter() {
             return;
         }
 
-        // Ensure signature URLs are available for previews that reference {{signature_url}}
+        // Legacy rows without server snapshot: resolve signature for {{signature_url}} only
         const messagesNeedingSignatureUrl = messages.filter((m) => {
+            if (hasStoredPreview(m)) return false;
             if (!m.estimate_id) return false;
-            if (signatureUrlsByMessageId[m.id]) return false;
+            if (m.id in signatureUrlsByMessageId) return false;
             const combined = `${m.subject || ''}\n${m.body || ''}`;
             return /\{\{signature_url\}\}/.test(combined);
         });
@@ -385,28 +399,30 @@ export default function MessagingCenter() {
         if (messagesNeedingSignatureUrl.length > 0) {
             messagesNeedingSignatureUrl.forEach(async (m) => {
                 const client = clientMap.get(m.client_id);
-                const email = (m.to_emails && m.to_emails.length > 0 ? m.to_emails[0] : null) ||
+                const email =
+                    (m.to_emails && m.to_emails.length > 0 ? m.to_emails[0] : null) ||
                     client?.email ||
                     null;
-                if (!email || !m.estimate_id) return;
+                if (!m.estimate_id) return;
 
                 try {
-                    const r = await fetch(`/api/estimates/${m.estimate_id}/signature-links`, {
-                        method: 'POST',
+                    const r = await fetch(`/api/estimates/${m.estimate_id}/signatures`, {
+                        method: 'GET',
                         headers: getApiHeaders(),
-                        body: JSON.stringify({
-                            client_email: email,
-                            expires_in_days: 30,
-                        }),
                     });
                     if (!r.ok) return;
-                    const data = (await r.json()) as { signature_url?: string };
-                    if (data?.signature_url) {
-                        setSignatureUrlsByMessageId((prev) => ({
-                            ...prev,
-                            [m.id]: data.signature_url as string,
-                        }));
-                    }
+                    const data = (await r.json()) as {
+                        signature_links?: Array<{
+                            signature_hash: string;
+                            client_email?: string;
+                            status: string;
+                        }>;
+                    };
+                    const hash = pickSignatureHashFromAudit(data.signature_links, email);
+                    setSignatureUrlsByMessageId((prev) => ({
+                        ...prev,
+                        [m.id]: hash ? buildSignaturePageUrl(hash) : '',
+                    }));
                 } catch {
                     // ignore preview errors
                 }
@@ -416,6 +432,14 @@ export default function MessagingCenter() {
         // Render templates from cached clients/estimates (no per-message fetches)
         const renderedRecord: Record<string, { subject: string; body: string }> = {};
         messages.forEach((message) => {
+            if (hasStoredPreview(message)) {
+                renderedRecord[message.id] = {
+                    subject: message.preview_subject!,
+                    body: linkifyJobsuiteSignUrls(message.preview_body!),
+                };
+                return;
+            }
+
             const client = clientMap.get(message.client_id);
             const estimate = message.estimate_id
                 ? estimateMap.get(message.estimate_id)
@@ -426,13 +450,13 @@ export default function MessagingCenter() {
                     message.subject,
                     client,
                     estimate,
-                    signatureUrlsByMessageId[message.id]
+                    signatureUrlsByMessageId[message.id] || undefined
                 ),
                 body: renderTemplate(
                     message.body,
                     client,
                     estimate,
-                    signatureUrlsByMessageId[message.id]
+                    signatureUrlsByMessageId[message.id] || undefined
                 ),
             };
         });
@@ -465,6 +489,7 @@ export default function MessagingCenter() {
             // (sent messages have status SENT and won't show in PENDING filter)
             setMessages((prev) => prev.filter((m) => m.id !== message.id));
 
+            invalidateOutreachMessageCaches();
             // Update count without reloading all messages
             await loadCount();
 
@@ -486,18 +511,22 @@ export default function MessagingCenter() {
         }
     };
 
+    const dismissMessageRequest = async (messageId: string) => {
+        const response = await fetch(`/api/outreach-messages/${messageId}/dismiss`, {
+            method: 'POST',
+            headers: getApiHeaders(),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to dismiss message');
+        }
+
+        return response.json() as Promise<OutreachMessage | null>;
+    };
+
     const handleDismiss = async (message: OutreachMessage) => {
         try {
-            const response = await fetch(`/api/outreach-messages/${message.id}/dismiss`, {
-                method: 'POST',
-                headers: getApiHeaders(),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to dismiss message');
-            }
-
-            const dismissedMessage = await response.json();
+            const dismissedMessage = await dismissMessageRequest(message.id);
 
             // If message was deleted (null response), remove it from state
             // If message was rescheduled (check-in messages), update it in state
@@ -519,6 +548,7 @@ export default function MessagingCenter() {
                 );
             }
 
+            invalidateOutreachMessageCaches();
             // Update count without reloading all messages
             await loadCount();
 
@@ -535,6 +565,50 @@ export default function MessagingCenter() {
                 color: 'red',
                 icon: <IconX size={16} />,
             });
+        }
+    };
+
+    const handleDismissAll = async () => {
+        if (messages.length === 0 || activeTab !== 'past') {
+            return;
+        }
+
+        setDismissingAll(true);
+        setError(null);
+        const toDismiss = [...messages];
+
+        try {
+            for (const message of toDismiss) {
+                await dismissMessageRequest(message.id);
+            }
+
+            invalidateOutreachMessageCaches();
+            await loadMessages();
+            await loadCount();
+            setDismissAllModalOpen(false);
+
+            notifications.show({
+                title: 'Success',
+                message:
+                    toDismiss.length === 1
+                        ? 'Message dismissed'
+                        : `${toDismiss.length} messages dismissed`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message:
+                    err instanceof Error ? err.message : 'Failed to dismiss all messages',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            invalidateOutreachMessageCaches();
+            await loadMessages();
+            await loadCount();
+        } finally {
+            setDismissingAll(false);
         }
     };
 
@@ -570,6 +644,16 @@ export default function MessagingCenter() {
                         <Badge size="lg" color="red" variant="filled">
                             {count} due today
                         </Badge>
+                    )}
+                    {activeTab === 'past' && messages.length > 0 && (
+                        <Button
+                          variant="light"
+                          color="red"
+                          leftSection={<IconTrash size={16} />}
+                          onClick={() => setDismissAllModalOpen(true)}
+                        >
+                            Dismiss all
+                        </Button>
                     )}
                     <Button
                       leftSection={<IconPlus size={16} />}
@@ -655,7 +739,14 @@ export default function MessagingCenter() {
                                                     </Text>
                                                 )}
                                             </div>
-                                            <Stack gap={4} style={{ flex: 1, alignItems: 'center' }}>
+                                            <Stack
+                                              gap={6}
+                                              style={{
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    alignItems: 'flex-start',
+                                                }}
+                                            >
                                                 <Text size="xs" fw={700}>
                                                     Owner:{' '}
                                                     <Text
@@ -667,35 +758,74 @@ export default function MessagingCenter() {
                                                         {message.owner_name || 'Unknown'}
                                                     </Text>
                                                 </Text>
-                                                <Group gap="md">
-                                                    <Text fw={700} size="xs">
-                                                        From:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          fw={500}
-                                                          size="xs"
-                                                          c="dimmed"
-                                                        >
-                                                            {message.from_email || 'info@jobsuite.app'}
-                                                        </Text>
+                                                <Text size="xs" fw={700}>
+                                                    From:{' '}
+                                                    <Text
+                                                      component="span"
+                                                      fw={500}
+                                                      size="xs"
+                                                      c="dimmed"
+                                                      style={{ wordBreak: 'break-word' }}
+                                                    >
+                                                        {message.from_email || 'info@jobsuite.app'}
                                                     </Text>
-                                                    <Text fw={700} size="xs">
-                                                        To:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          fw={500}
-                                                          size="xs"
-                                                          c="dimmed"
-                                                        >
-                                                            {message.to_emails &&
-                                                            message.to_emails.length > 0
-                                                                ? message.to_emails.join(', ')
-                                                                : 'No recipients'}
+                                                </Text>
+                                                <Box style={{ alignSelf: 'stretch', width: '100%' }}>
+                                                    {message.to_emails &&
+                                                    message.to_emails.length > 0 ? (
+                                                        message.to_emails.length === 1 ? (
+                                                            <Text size="xs" fw={700}>
+                                                                To:{' '}
+                                                                <Text
+                                                                  component="span"
+                                                                  fw={500}
+                                                                  size="xs"
+                                                                  c="dimmed"
+                                                                  style={{ wordBreak: 'break-word' }}
+                                                                >
+                                                                    {message.to_emails[0]}
+                                                                </Text>
+                                                            </Text>
+                                                        ) : (
+                                                            <>
+                                                                <Text size="xs" fw={700} component="div">
+                                                                    To:
+                                                                </Text>
+                                                                <Stack gap={2} mt={4}>
+                                                                    {message.to_emails.map(
+                                                                        (email) => (
+                                                                        <Text
+                                                                          key={email}
+                                                                          fw={500}
+                                                                          size="xs"
+                                                                          c="dimmed"
+                                                                          style={{ wordBreak: 'break-word' }}
+                                                                        >
+                                                                            {email}
+                                                                        </Text>
+                                                                        ))}
+                                                                </Stack>
+                                                            </>
+                                                        )
+                                                    ) : (
+                                                        <Text size="xs" fw={700}>
+                                                            To:{' '}
+                                                            <Text component="span" fw={500} size="xs" c="dimmed">
+                                                                No recipients
+                                                            </Text>
                                                         </Text>
-                                                    </Text>
-                                                </Group>
+                                                    )}
+                                                </Box>
                                             </Stack>
-                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 'xs' }}>
+                                            <div
+                                              style={{
+                                                    flex: 1,
+                                                    display: 'flex',
+                                                    justifyContent: 'flex-end',
+                                                    alignItems: 'flex-start',
+                                                    gap: 'xs',
+                                                }}
+                                            >
                                                 <Badge variant="light">
                                                     {MESSAGE_TYPE_LABELS[
                                                         message.message_type
@@ -766,6 +896,7 @@ export default function MessagingCenter() {
                   onClose={(didUpdate) => {
                         setEditingMessage(null);
                         if (didUpdate) {
+                            invalidateOutreachMessageCaches();
                             loadMessages();
                         }
                     }}
@@ -776,10 +907,53 @@ export default function MessagingCenter() {
               opened={creatingMessage}
               onClose={() => setCreatingMessage(false)}
               onSuccess={() => {
+                    invalidateOutreachMessageCaches();
                     loadMessages();
                     loadCount();
                 }}
             />
+
+            <Modal
+              opened={dismissAllModalOpen}
+              onClose={() => {
+                    if (!dismissingAll) {
+                        setDismissAllModalOpen(false);
+                    }
+                }}
+              title="Dismiss all past due messages?"
+              centered
+              zIndex={400}
+              overlayProps={{
+                backgroundOpacity: 0.75,
+                blur: 3,
+              }}
+            >
+                <Stack gap="md">
+                    <Text>
+                        This will dismiss {messages.length} past due message
+                        {messages.length === 1 ? '' : 's'}. You can&apos;t undo this.
+                    </Text>
+                    <Group justify="flex-end">
+                        <Button
+                          variant="subtle"
+                          onClick={() => setDismissAllModalOpen(false)}
+                          disabled={dismissingAll}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                          color="red"
+                          leftSection={<IconTrash size={16} />}
+                          loading={dismissingAll}
+                          onClick={async () => {
+                                await handleDismissAll();
+                            }}
+                        >
+                            Dismiss all
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
 
             <Modal
               opened={showEmailConfigModal}

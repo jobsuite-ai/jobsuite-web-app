@@ -5,7 +5,9 @@ import { ReactNode, useCallback, useEffect, useRef, createContext, useContext } 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { invalidateSessionAndRedirectToLogin } from '@/app/utils/authSession';
 import { isPainterRoleFromToken } from '@/app/utils/authToken';
+import { LIST_CACHE_TTL_MS } from '@/app/utils/dataCache';
 import { ContractorClient, Estimate, Job } from '@/components/Global/model';
+import { store } from '@/store';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   setClients,
@@ -219,6 +221,20 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     return Array.from(byId.values());
   }, []);
 
+  const isKeyStale = useCallback((k: 'clients' | 'estimates' | 'projects'): boolean => {
+    const state = store.getState();
+    const last =
+      k === 'clients'
+        ? state.clients.lastFetched
+        : k === 'estimates'
+          ? state.estimates.lastFetched
+          : state.projects.lastFetched;
+    if (last === null) {
+      return true;
+    }
+    return Date.now() - last > LIST_CACHE_TTL_MS;
+  }, []);
+
   const fetchProjects = useCallback(async (): Promise<Job[]> => {
     const response = await fetch('/api/projects', {
       method: 'GET',
@@ -238,9 +254,10 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     return Array.isArray(projectsList) ? projectsList : [];
   }, []);
 
-  // Refresh data for a specific key or all keys
+  // Refresh data for a specific key or all keys. force defaults to true (always revalidate).
+  // Pass false for initial load to skip endpoints when Redux lastFetched is within TTL.
   const refreshData = useCallback(
-    async (key?: 'clients' | 'estimates' | 'projects') => {
+    async (key?: 'clients' | 'estimates' | 'projects', force: boolean = true) => {
       const accessToken = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
 
       if (!accessToken) {
@@ -253,9 +270,16 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
       const defaultKeys: Array<'clients' | 'estimates' | 'projects'> = painterSession
         ? ['estimates']
         : ['clients', 'estimates', 'projects'];
-      const keysToFetch: Array<'clients' | 'estimates' | 'projects'> = (
+      let keysToFetch: Array<'clients' | 'estimates' | 'projects'> = (
         key ? [key] : defaultKeys
       ).filter((k) => !painterSession || k === 'estimates');
+      if (keysToFetch.length === 0) {
+        return;
+      }
+
+      if (!force) {
+        keysToFetch = keysToFetch.filter((k) => isKeyStale(k));
+      }
       if (keysToFetch.length === 0) {
         return;
       }
@@ -387,7 +411,7 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [dispatch, fetchClients, fetchEstimates, fetchProjects]
+    [dispatch, fetchClients, fetchEstimates, fetchProjects, isKeyStale]
   );
 
   // Invalidate cache (clear from localStorage and state)
@@ -470,24 +494,22 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
     dispatch(cleanupArchivedEstimates());
     dispatch(cleanupArchivedProjects());
 
-    // Check if we have persisted data in Redux (from redux-persist)
-    // If we have data, we can show it immediately and refresh in background
-    // If no data, fetch immediately
+    // Respect LIST_CACHE_TTL_MS via force=false: skip endpoints when Redux lastFetched is fresh
     const hasPersistedData =
       estimatesRef.current.length > 0 ||
       clientsRef.current.length > 0 ||
       projectsRef.current.length > 0;
 
     if (hasPersistedData) {
-      // We have persisted data, so refresh in background (non-blocking)
-      // This allows the UI to show immediately with cached data
-      refreshData(undefined).catch((err) => {
+      refreshData(undefined, false).catch((err) => {
         // eslint-disable-next-line no-console
         console.error('Background refresh failed:', err);
       });
     } else {
-      // No persisted data, fetch immediately
-      refreshData(undefined);
+      refreshData(undefined, false).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Initial refresh failed:', err);
+      });
     }
   }, [dispatch, refreshData]);
 
@@ -511,8 +533,11 @@ export function DataCacheProvider({ children }: { children: ReactNode }) {
         dispatch(cleanupArchivedEstimates());
         dispatch(cleanupArchivedProjects());
 
-        // Fetch fresh data after login
-        refreshData(undefined);
+        // Fetch fresh data after login (always revalidate)
+        refreshData(undefined, true).catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error('Refresh after login failed:', err);
+        });
       } else {
         // Clear data if logged out
         dispatch(setClients([]));

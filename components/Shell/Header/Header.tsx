@@ -59,6 +59,7 @@ import { useAppSelector } from '@/store/hooks';
 import { selectAllClients } from '@/store/slices/clientsSlice';
 import { selectAllEstimates } from '@/store/slices/estimatesSlice';
 import { selectAllProjects } from '@/store/slices/projectsSlice';
+import { fetchCachedOutreachMessagesCount } from '@/utils/outreachMessageApiCache';
 
 const fullNavLinks = [
   { link: '/', label: 'Home' },
@@ -741,14 +742,8 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
       }
 
       try {
-        const response = await fetch('/api/outreach-messages/count', {
-          method: 'GET',
-          headers: getApiHeaders(),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setMessageCount(data.count || 0);
-        }
+        const data = await fetchCachedOutreachMessagesCount();
+        setMessageCount(data.count || 0);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.error('Error fetching message count:', err);

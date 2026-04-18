@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getContractorId } from '@/app/api/utils/getContractorId';
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
+import { pickSignatureHashFromAudit } from '@/utils/signatureLinkAudit';
 
 export async function POST(
     request: NextRequest,
@@ -35,34 +36,53 @@ export async function POST(
 
         const body = await request.json();
 
-        // First, get or create a signature link for the contractor
-        // We'll use the contractor's email or generate a link
-        // For now, let's create a signature link for the contractor
-        const linkResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/signature-links`,
-            {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    client_email: body.signer_email || body.email,
-                    expires_in_days: 30,
-                }),
-            }
-        );
+        let signatureHash: string | undefined =
+            typeof body.signature_hash === 'string' ? body.signature_hash : undefined;
 
-        if (!linkResponse.ok) {
-            const errorData = await linkResponse.json().catch(() => ({}));
-            return NextResponse.json(
-                { error: errorData.detail || 'Failed to create signature link' },
-                { status: linkResponse.status }
+        if (!signatureHash) {
+            const auditResponse = await fetch(
+                `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/signatures`,
+                {
+                    method: 'GET',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
             );
+
+            if (!auditResponse.ok) {
+                const errorData = await auditResponse.json().catch(() => ({}));
+                return NextResponse.json(
+                    { error: errorData.detail || 'Failed to load signature audit' },
+                    { status: auditResponse.status }
+                );
+            }
+
+            const audit = (await auditResponse.json()) as {
+                signature_links?: Array<{
+                    signature_hash: string;
+                    client_email?: string;
+                    status: string;
+                }>;
+            };
+
+            const signerEmail = body.signer_email || body.email;
+            signatureHash =
+                audit.signature_links?.find((l) => l.client_email === signerEmail)
+                    ?.signature_hash ??
+                pickSignatureHashFromAudit(audit.signature_links, undefined) ??
+                undefined;
         }
 
-        const linkData = await linkResponse.json();
-        const signatureHash = linkData.signature_hash;
+        if (!signatureHash) {
+            return NextResponse.json(
+                {
+                    error:
+                        'No signature link found. Send the estimate to the client first; the same link is used for contractor signing.',
+                },
+                { status: 400 }
+            );
+        }
 
         // Now submit the signature using the hash
         const signatureResponse = await fetch(
@@ -79,7 +99,7 @@ export async function POST(
                     signer_name: body.signer_name,
                     signer_email: body.signer_email || body.email,
                     consent_given: body.consent_given || true,
-                    device_info: body.device_info || navigator.userAgent,
+                    device_info: body.device_info || 'jobsuite-web-app',
                 }),
             }
         );

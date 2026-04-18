@@ -17,6 +17,7 @@ import SignatureForm, { SignaturePayload } from './signature/SignatureForm';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { useAuth } from '@/hooks/useAuth';
+import { pickSignatureHashFromAudit } from '@/utils/signatureLinkAudit';
 
 interface SignatureInfo {
     estimate_id: string;
@@ -168,61 +169,21 @@ export default function ContractorSignatureRequired({
                 return;
             }
 
-            // If contractor hasn't signed, check if we need to generate a signature link
-            // Look for an existing contractor signature link, or use client's link
+            // Resolve hash from audit only (same /sign/{hash} URL for client and contractor).
             const contractorLink = data.signature_links?.find(
                 (link: any) => link.client_email === userEmail
             );
-            const clientSignedLink = data.signature_links?.find(
-                (link: any) => link.status === 'SIGNED'
-            );
-
-            // Use contractor's link if exists, otherwise use client's signed link
-            // (contractors can sign using client's link hash with CONTRACTOR type)
-            if (contractorLink) {
-                setContractorSignatureHash(contractorLink.signature_hash);
-            } else if (clientSignedLink) {
-                setContractorSignatureHash(clientSignedLink.signature_hash);
-            } else if (userEmail) {
-                // Generate a signature link for the contractor
-                await generateContractorSignatureLink();
-            }
+            const clientSignerEmail = clientSignature?.signer_email || undefined;
+            const fromAudit =
+                contractorLink?.signature_hash ??
+                pickSignatureHashFromAudit(data.signature_links, clientSignerEmail);
+            setContractorSignatureHash(fromAudit ?? null);
         } catch (err: any) {
             // eslint-disable-next-line no-console
             console.error('Error fetching signatures:', err);
             setError(err.message || 'Failed to load signature information');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const generateContractorSignatureLink = async () => {
-        if (!userEmail) return;
-
-        try {
-            const response = await fetch(
-                `/api/estimates/${estimateId}/signature-links`,
-                {
-                    method: 'POST',
-                    headers: getApiHeaders(),
-                    body: JSON.stringify({
-                        client_email: userEmail,
-                        expires_in_days: 30,
-                    }),
-                }
-            );
-
-            if (response.ok) {
-                const data = await response.json();
-                setContractorSignatureHash(data.signature_hash);
-            } else {
-                // If generation fails, we can still use client's link
-                // eslint-disable-next-line no-console
-                console.warn('Failed to generate contractor signature link, will use client link');
-            }
-        } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error('Error generating contractor signature link:', err);
         }
     };
 
@@ -382,8 +343,11 @@ export default function ContractorSignatureRequired({
     if (!signatureHash) {
         return (
             <Paper shadow="sm" p="xl" radius="md" withBorder>
-                <Alert color="yellow" title="Signature Link Required">
-                    A signature link is required to sign this estimate. Please generate one first.
+                <Alert color="yellow" title="No signing link found">
+                    <Text size="sm">
+                        Send the estimate to the client first so a signature link exists. The same
+                        link is used for both the client and contractor to sign.
+                    </Text>
                 </Alert>
             </Paper>
         );

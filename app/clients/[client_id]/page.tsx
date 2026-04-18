@@ -2,44 +2,54 @@
 
 import { useEffect, useState } from 'react';
 
-import { useUser } from '@auth0/nextjs-auth0/client';
 import { useParams, useRouter } from 'next/navigation';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
 import SingleClient from '@/components/Clients/Client';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient } from '@/components/Global/model';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Clients() {
     const [client, setClient] = useState<ContractorClient>();
     const params = useParams();
-    const { user, isLoading } = useUser();
+    const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!isLoading && !user) {
-            // Redirect to login page if the user is not logged in
-            router.push('/profile');
+        if (!isLoading && !isAuthenticated) {
+            router.push('/');
         }
-        const fetchClient = async () => {
-            await getClient();
-        };
-        if (!client) {
-            fetchClient();
-        }
-    }, [isLoading, user, router, client]);
+    }, [isLoading, isAuthenticated, router]);
 
-    async function getClient() {
-        const response = await fetch(
-            `/api/clients/${params.client_id as string}`,
-            {
+    useEffect(() => {
+        if (isLoading || !isAuthenticated) {
+            return () => {};
+        }
+        const clientId = params.client_id as string;
+        setClient(undefined);
+        let cancelled = false;
+
+        const load = async () => {
+            const response = await fetch(`/api/clients/${clientId}`, {
                 method: 'GET',
                 headers: getApiHeaders(),
-            }
-        );
+            });
 
-        const { Item } = await response.json();
-        setClient(Item);
+            const { Item } = await response.json();
+            if (!cancelled) {
+                setClient(Item);
+            }
+        };
+
+        load();
+        return () => {
+            cancelled = true;
+        };
+    }, [isLoading, isAuthenticated, params.client_id]);
+
+    if (isLoading || !isAuthenticated) {
+        return <LoadingState />;
     }
 
     return (
