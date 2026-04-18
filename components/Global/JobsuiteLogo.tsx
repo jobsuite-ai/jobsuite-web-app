@@ -1,3 +1,7 @@
+'use client';
+
+import { useState } from 'react';
+
 import { Image } from '@mantine/core';
 
 import classes from './JobsuiteLogo.module.css';
@@ -7,8 +11,9 @@ interface JobsuiteLogoProps {
 }
 
 export function JobsuiteLogo({ logoUrl }: JobsuiteLogoProps = {}) {
-  // Use contractor logo if provided, otherwise default to Jobsuite logo
-  const src = logoUrl || '/jobsuite-logo-horizontal.png';
+  const [contractorLogoFailed, setContractorLogoFailed] = useState(false);
+  const useContractor = Boolean(logoUrl) && !contractorLogoFailed;
+  const src = useContractor ? logoUrl! : '/jobsuite-logo-horizontal.png';
 
   return (
     <Image
@@ -16,7 +21,12 @@ export function JobsuiteLogo({ logoUrl }: JobsuiteLogoProps = {}) {
       w="auto"
       className={classes.image}
       src={src}
-      alt={logoUrl ? 'Company Logo' : 'Jobsuite Logo'}
+      alt={useContractor ? 'Company Logo' : 'Jobsuite Logo'}
+      onError={() => {
+        if (logoUrl && !contractorLogoFailed) {
+          setContractorLogoFailed(true);
+        }
+      }}
     />
   );
 }

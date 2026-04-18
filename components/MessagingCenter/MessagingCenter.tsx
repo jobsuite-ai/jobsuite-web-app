@@ -644,6 +644,16 @@ export default function MessagingCenter() {
                             {count} due today
                         </Badge>
                     )}
+                    {activeTab === 'past' && messages.length > 0 && (
+                        <Button
+                          variant="light"
+                          color="red"
+                          leftSection={<IconTrash size={16} />}
+                          onClick={() => setDismissAllModalOpen(true)}
+                        >
+                            Dismiss all
+                        </Button>
+                    )}
                     <Button
                       leftSection={<IconPlus size={16} />}
                       onClick={() => setCreatingMessage(true)}
@@ -689,18 +699,6 @@ export default function MessagingCenter() {
                         </Paper>
                     ) : (
                         <Stack gap="md">
-                            {activeTab === 'past' && messages.length > 0 && (
-                                <Group justify="flex-end">
-                                    <Button
-                                      variant="light"
-                                      color="red"
-                                      leftSection={<IconTrash size={16} />}
-                                      onClick={() => setDismissAllModalOpen(true)}
-                                    >
-                                        Dismiss all
-                                    </Button>
-                                </Group>
-                            )}
                             {messages.map((message) => (
                                 <Card
                                   key={message.id}
