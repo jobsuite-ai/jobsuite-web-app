@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Fetch templates from backend
         const templatesResponse = await fetch(

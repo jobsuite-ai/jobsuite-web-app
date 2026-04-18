@@ -33,7 +33,7 @@ export async function POST(
         backendFormData.append('part_number', partNumber.toString());
         backendFormData.append('file', file);
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const response = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/upload-pdf/${resource_id}/part`,
             {

@@ -20,7 +20,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const authHeader = request.headers.get('Authorization');
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',

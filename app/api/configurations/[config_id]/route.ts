@@ -29,7 +29,7 @@ export async function GET(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Fetch configuration from backend
         const configResponse = await fetch(
@@ -89,7 +89,7 @@ export async function PUT(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get request body
         const body = await request.json();
@@ -153,7 +153,7 @@ export async function DELETE(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Delete configuration via backend API
         const deleteResponse = await fetch(

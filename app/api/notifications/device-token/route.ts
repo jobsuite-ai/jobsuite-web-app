@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ message: 'Contractor ID not found' }, { status: 400 });
   }
 
-  const apiBaseUrl = getApiBaseUrl();
+  const apiBaseUrl = getApiBaseUrl({ request });
   const response = await fetch(
     `${apiBaseUrl}/api/v1/contractors/${contractorId}/notifications/device-token`,
     {

@@ -24,7 +24,7 @@ export async function POST(
                 { status: 400 }
             );
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json().catch(() => ({}));
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/invoice/send-email`,

@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
                 { status: 400 }
             );
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/helcim/status`,
             {

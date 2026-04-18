@@ -429,7 +429,7 @@ export default function SignaturePageLayout({
                         }}
                     >
                         {showQuickSignCta || showDeclineCta ? (
-                            <Group gap="sm" justify="center" wrap="wrap">
+                            <Group gap="sm" justify="center" wrap="nowrap">
                                 {showQuickSignCta ? (
                                     <Button
                                       size={isMobile ? 'sm' : 'md'}

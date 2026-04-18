@@ -16,7 +16,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const response = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/decline`,
             {

@@ -28,7 +28,7 @@ export async function POST(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Dismiss message via backend API
         const dismissResponse = await fetch(

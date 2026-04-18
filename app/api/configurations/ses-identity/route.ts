@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json();
 
         if (!body.email) {
