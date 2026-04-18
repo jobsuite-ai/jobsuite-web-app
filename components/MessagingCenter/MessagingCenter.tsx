@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import {
     Badge,
+    Box,
     Button,
     Card,
     Group,
@@ -738,7 +739,14 @@ export default function MessagingCenter() {
                                                     </Text>
                                                 )}
                                             </div>
-                                            <Stack gap={4} style={{ flex: 1, alignItems: 'center' }}>
+                                            <Stack
+                                              gap={6}
+                                              style={{
+                                                    flex: 1,
+                                                    minWidth: 0,
+                                                    alignItems: 'flex-start',
+                                                }}
+                                            >
                                                 <Text size="xs" fw={700}>
                                                     Owner:{' '}
                                                     <Text
@@ -750,35 +758,74 @@ export default function MessagingCenter() {
                                                         {message.owner_name || 'Unknown'}
                                                     </Text>
                                                 </Text>
-                                                <Group gap="md">
-                                                    <Text fw={700} size="xs">
-                                                        From:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          fw={500}
-                                                          size="xs"
-                                                          c="dimmed"
-                                                        >
-                                                            {message.from_email || 'info@jobsuite.app'}
-                                                        </Text>
+                                                <Text size="xs" fw={700}>
+                                                    From:{' '}
+                                                    <Text
+                                                      component="span"
+                                                      fw={500}
+                                                      size="xs"
+                                                      c="dimmed"
+                                                      style={{ wordBreak: 'break-word' }}
+                                                    >
+                                                        {message.from_email || 'info@jobsuite.app'}
                                                     </Text>
-                                                    <Text fw={700} size="xs">
-                                                        To:{' '}
-                                                        <Text
-                                                          component="span"
-                                                          fw={500}
-                                                          size="xs"
-                                                          c="dimmed"
-                                                        >
-                                                            {message.to_emails &&
-                                                            message.to_emails.length > 0
-                                                                ? message.to_emails.join(', ')
-                                                                : 'No recipients'}
+                                                </Text>
+                                                <Box style={{ alignSelf: 'stretch', width: '100%' }}>
+                                                    {message.to_emails &&
+                                                    message.to_emails.length > 0 ? (
+                                                        message.to_emails.length === 1 ? (
+                                                            <Text size="xs" fw={700}>
+                                                                To:{' '}
+                                                                <Text
+                                                                  component="span"
+                                                                  fw={500}
+                                                                  size="xs"
+                                                                  c="dimmed"
+                                                                  style={{ wordBreak: 'break-word' }}
+                                                                >
+                                                                    {message.to_emails[0]}
+                                                                </Text>
+                                                            </Text>
+                                                        ) : (
+                                                            <>
+                                                                <Text size="xs" fw={700} component="div">
+                                                                    To:
+                                                                </Text>
+                                                                <Stack gap={2} mt={4}>
+                                                                    {message.to_emails.map(
+                                                                        (email) => (
+                                                                        <Text
+                                                                          key={email}
+                                                                          fw={500}
+                                                                          size="xs"
+                                                                          c="dimmed"
+                                                                          style={{ wordBreak: 'break-word' }}
+                                                                        >
+                                                                            {email}
+                                                                        </Text>
+                                                                        ))}
+                                                                </Stack>
+                                                            </>
+                                                        )
+                                                    ) : (
+                                                        <Text size="xs" fw={700}>
+                                                            To:{' '}
+                                                            <Text component="span" fw={500} size="xs" c="dimmed">
+                                                                No recipients
+                                                            </Text>
                                                         </Text>
-                                                    </Text>
-                                                </Group>
+                                                    )}
+                                                </Box>
                                             </Stack>
-                                            <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start', gap: 'xs' }}>
+                                            <div
+                                              style={{
+                                                    flex: 1,
+                                                    display: 'flex',
+                                                    justifyContent: 'flex-end',
+                                                    alignItems: 'flex-start',
+                                                    gap: 'xs',
+                                                }}
+                                            >
                                                 <Badge variant="light">
                                                     {MESSAGE_TYPE_LABELS[
                                                         message.message_type
