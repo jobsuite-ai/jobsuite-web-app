@@ -4,6 +4,8 @@
 
 export type CacheKey = 'clients' | 'estimates' | 'projects';
 
+export const LIST_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 interface CachedData<T> {
   data: T[];
   timestamp: number;
@@ -18,9 +20,9 @@ const CACHE_PREFIX = 'jobsuite_cache_';
 
 // Cache expiration times in milliseconds
 const CACHE_EXPIRATION: Record<CacheKey, number> = {
-  clients: 10 * 60 * 1000, // 10 minutes
-  estimates: 10 * 60 * 1000, // 10 minutes
-  projects: 10 * 60 * 1000, // 10 minutes
+  clients: LIST_CACHE_TTL_MS,
+  estimates: LIST_CACHE_TTL_MS,
+  projects: LIST_CACHE_TTL_MS,
 };
 
 /**

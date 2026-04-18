@@ -6,9 +6,8 @@ import { setProjects as setProjectsAction } from '../slices/projectsSlice';
 import { AppDispatch, RootState } from '../types';
 
 import { getApiHeaders } from '@/app/utils/apiClient';
-import { isCacheValid, type CacheKey } from '@/app/utils/dataCache';
+import { isCacheValid, LIST_CACHE_TTL_MS, type CacheKey } from '@/app/utils/dataCache';
 
-const CACHE_EXPIRATION_MS = 10 * 60 * 1000; // 10 minutes
 const REFRESH_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
 
 const refreshTimers: Map<CacheKey, NodeJS.Timeout> = new Map();
@@ -135,7 +134,7 @@ function setupRefreshTimer(
     // Check if cache is expired or about to expire
     const now = Date.now();
     const cacheAge = lastFetched ? now - lastFetched : Infinity;
-    const isExpired = cacheAge > CACHE_EXPIRATION_MS && !isValid;
+    const isExpired = cacheAge > LIST_CACHE_TTL_MS && !isValid;
 
     // Only refresh if expired and user is active
     // Also check if there's already a request in flight

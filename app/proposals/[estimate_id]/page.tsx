@@ -5,12 +5,14 @@ import { useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 
 import EstimateDetails from '@/components/EstimateDetails/EstimateDetails';
+import EstimateDetailsSkeleton from '@/components/EstimateDetails/EstimateDetailsSkeleton';
 import { useAuth } from '@/hooks/useAuth';
 
 export default function Proposal() {
     const params = useParams();
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
+    const estimateId = typeof params?.estimate_id === 'string' ? params.estimate_id : undefined;
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
@@ -20,8 +22,8 @@ export default function Proposal() {
     }, [isLoading, isAuthenticated, router]);
 
     if (isLoading || !isAuthenticated) {
-        return null;
+        return <EstimateDetailsSkeleton />;
     }
 
-    return params ? <EstimateDetails estimateID={params.estimate_id as string} /> : null;
+    return estimateId ? <EstimateDetails estimateID={estimateId} /> : <EstimateDetailsSkeleton />;
 }
