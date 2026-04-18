@@ -96,7 +96,7 @@ export default function IntegrationsTab() {
             setHelcimError(null);
 
             try {
-                const response = await fetch('/api/quickbooks/status', {
+                const response = await fetch('/api/quickbooks/status?verify=1', {
                     method: 'GET',
                     headers: getApiHeaders(),
                 });

@@ -28,9 +28,16 @@ export async function GET(request: NextRequest) {
             );
         }
 
+        const incoming = new URL(request.url);
+        const verifyParam = incoming.searchParams.get('verify');
+        const verifyQs =
+            verifyParam === '1' || verifyParam?.toLowerCase() === 'true'
+                ? '?verify=true'
+                : '';
+
         // Get QuickBooks connection status from backend
         const statusResponse = await fetch(
-            `${apiBaseUrl}/api/v1/contractors/${contractorId}/quickbooks/status`,
+            `${apiBaseUrl}/api/v1/contractors/${contractorId}/quickbooks/status${verifyQs}`,
             {
                 method: 'GET',
                 headers: {
