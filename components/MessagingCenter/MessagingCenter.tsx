@@ -215,6 +215,8 @@ export default function MessagingCenter() {
         Record<string, string | undefined>
     >({});
     const [showEmailConfigModal, setShowEmailConfigModal] = useState(false);
+    const [dismissAllModalOpen, setDismissAllModalOpen] = useState(false);
+    const [dismissingAll, setDismissingAll] = useState(false);
     const { isAuthenticated, isLoading } = useAuth();
     const { clients, estimates } = useDataCache();
 
@@ -508,18 +510,22 @@ export default function MessagingCenter() {
         }
     };
 
+    const dismissMessageRequest = async (messageId: string) => {
+        const response = await fetch(`/api/outreach-messages/${messageId}/dismiss`, {
+            method: 'POST',
+            headers: getApiHeaders(),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to dismiss message');
+        }
+
+        return response.json() as Promise<OutreachMessage | null>;
+    };
+
     const handleDismiss = async (message: OutreachMessage) => {
         try {
-            const response = await fetch(`/api/outreach-messages/${message.id}/dismiss`, {
-                method: 'POST',
-                headers: getApiHeaders(),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to dismiss message');
-            }
-
-            const dismissedMessage = await response.json();
+            const dismissedMessage = await dismissMessageRequest(message.id);
 
             // If message was deleted (null response), remove it from state
             // If message was rescheduled (check-in messages), update it in state
@@ -558,6 +564,50 @@ export default function MessagingCenter() {
                 color: 'red',
                 icon: <IconX size={16} />,
             });
+        }
+    };
+
+    const handleDismissAll = async () => {
+        if (messages.length === 0 || activeTab !== 'past') {
+            return;
+        }
+
+        setDismissingAll(true);
+        setError(null);
+        const toDismiss = [...messages];
+
+        try {
+            for (const message of toDismiss) {
+                await dismissMessageRequest(message.id);
+            }
+
+            invalidateOutreachMessageCaches();
+            await loadMessages();
+            await loadCount();
+            setDismissAllModalOpen(false);
+
+            notifications.show({
+                title: 'Success',
+                message:
+                    toDismiss.length === 1
+                        ? 'Message dismissed'
+                        : `${toDismiss.length} messages dismissed`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
+        } catch (err) {
+            notifications.show({
+                title: 'Error',
+                message:
+                    err instanceof Error ? err.message : 'Failed to dismiss all messages',
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+            invalidateOutreachMessageCaches();
+            await loadMessages();
+            await loadCount();
+        } finally {
+            setDismissingAll(false);
         }
     };
 
@@ -639,6 +689,18 @@ export default function MessagingCenter() {
                         </Paper>
                     ) : (
                         <Stack gap="md">
+                            {activeTab === 'past' && messages.length > 0 && (
+                                <Group justify="flex-end">
+                                    <Button
+                                      variant="light"
+                                      color="red"
+                                      leftSection={<IconTrash size={16} />}
+                                      onClick={() => setDismissAllModalOpen(true)}
+                                    >
+                                        Dismiss all
+                                    </Button>
+                                </Group>
+                            )}
                             {messages.map((message) => (
                                 <Card
                                   key={message.id}
@@ -805,6 +867,48 @@ export default function MessagingCenter() {
                     loadCount();
                 }}
             />
+
+            <Modal
+              opened={dismissAllModalOpen}
+              onClose={() => {
+                    if (!dismissingAll) {
+                        setDismissAllModalOpen(false);
+                    }
+                }}
+              title="Dismiss all past due messages?"
+              centered
+              zIndex={400}
+              overlayProps={{
+                backgroundOpacity: 0.75,
+                blur: 3,
+              }}
+            >
+                <Stack gap="md">
+                    <Text>
+                        This will dismiss {messages.length} past due message
+                        {messages.length === 1 ? '' : 's'}. You can&apos;t undo this.
+                    </Text>
+                    <Group justify="flex-end">
+                        <Button
+                          variant="subtle"
+                          onClick={() => setDismissAllModalOpen(false)}
+                          disabled={dismissingAll}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                          color="red"
+                          leftSection={<IconTrash size={16} />}
+                          loading={dismissingAll}
+                          onClick={async () => {
+                                await handleDismissAll();
+                            }}
+                        >
+                            Dismiss all
+                        </Button>
+                    </Group>
+                </Stack>
+            </Modal>
 
             <Modal
               opened={showEmailConfigModal}
