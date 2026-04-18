@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Parse query parameters
         const url = new URL(request.url);
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json();
 
         // Create message via backend API

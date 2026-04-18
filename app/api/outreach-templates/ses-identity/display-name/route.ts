@@ -24,7 +24,7 @@ export async function PUT(request: NextRequest) {
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json();
 
         // Update display name via backend API

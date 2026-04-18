@@ -18,7 +18,7 @@ export async function POST(
                 { status: 400 }
             );
         }
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/send-deposit-email`,
             {

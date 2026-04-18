@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
         // Generate signature links for each email
         const signatureLinks: string[] = [];
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const authHeader = request.headers.get('Authorization');
 
         if (!authHeader) {

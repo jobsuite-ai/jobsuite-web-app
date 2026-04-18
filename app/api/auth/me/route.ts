@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
 
     // Use /auth/me so employees are not blocked by manager-only /users/me router.
     const userResponse = await fetch(`${apiBaseUrl}/api/v1/auth/me`, {

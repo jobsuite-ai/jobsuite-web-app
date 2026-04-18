@@ -19,7 +19,7 @@ export async function POST(
             );
         }
         const body = await request.json();
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/signature/${signature_hash}/helcim/confirm-payment`,
             {

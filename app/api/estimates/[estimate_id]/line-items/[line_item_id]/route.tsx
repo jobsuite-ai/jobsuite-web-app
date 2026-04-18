@@ -20,7 +20,7 @@ export async function GET(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get user info to obtain contractor_id
         const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
@@ -104,7 +104,7 @@ export async function PUT(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get user info to obtain contractor_id
         const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
@@ -192,7 +192,7 @@ export async function DELETE(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
 
         // Get user info to obtain contractor_id
         const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {

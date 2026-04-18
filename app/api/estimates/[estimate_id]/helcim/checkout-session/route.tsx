@@ -25,7 +25,7 @@ export async function POST(
             );
         }
         const body = await request.json();
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const res = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractorId}/estimates/${estimate_id}/helcim/checkout-session`,
             {

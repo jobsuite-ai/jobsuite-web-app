@@ -28,7 +28,7 @@ export async function PUT(
             );
         }
 
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const body = await request.json();
 
         // Update template via backend API

@@ -21,7 +21,7 @@ export async function GET(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const { job_id } = await params;
 
         // Get contractor_id from cache (header) or fetch from API
@@ -83,7 +83,7 @@ export async function PUT(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const { job_id } = await params;
 
         // Get contractor_id from cache (header) or fetch from API
@@ -149,7 +149,7 @@ export async function DELETE(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
+        const apiBaseUrl = getApiBaseUrl({ request });
         const { job_id } = await params;
 
         // Get contractor_id from cache (header) or fetch from API

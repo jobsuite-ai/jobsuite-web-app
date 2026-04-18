@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 
 import { getApiBaseUrl } from '@/app/api/utils/serviceAuth';
 
-async function getContractorId(token: string): Promise<string> {
-    const apiBaseUrl = getApiBaseUrl();
+async function getContractorId(request: Request, token: string): Promise<string> {
+    const apiBaseUrl = getApiBaseUrl({ request });
     const userResponse = await fetch(`${apiBaseUrl}/api/v1/users/me`, {
         method: 'GET',
         headers: {
@@ -45,8 +45,8 @@ export async function PUT(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
-        const contractor_id = await getContractorId(token);
+        const apiBaseUrl = getApiBaseUrl({ request });
+        const contractor_id = await getContractorId(request, token);
         const body = await request.json();
 
         const response = await fetch(
@@ -97,8 +97,8 @@ export async function DELETE(
         }
 
         const token = authHeader.substring(7);
-        const apiBaseUrl = getApiBaseUrl();
-        const contractor_id = await getContractorId(token);
+        const apiBaseUrl = getApiBaseUrl({ request });
+        const contractor_id = await getContractorId(request, token);
 
         const response = await fetch(
             `${apiBaseUrl}/api/v1/contractors/${contractor_id}/contractor_clients/${client_id}/sub_clients/${sub_client_id}`,

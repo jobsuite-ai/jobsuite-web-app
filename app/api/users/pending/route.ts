@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const apiBaseUrl = getApiBaseUrl();
+    const apiBaseUrl = getApiBaseUrl({ request });
 
     const usersResponse = await fetch(
       `${apiBaseUrl}/api/v1/users/contractor/${contractorId}/pending`,
