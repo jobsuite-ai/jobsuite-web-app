@@ -176,7 +176,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
     const registerCheckInDateOpener = useCallback((fn: (() => void) | null) => {
         openCheckInDateModalRef.current = fn ?? null;
     }, []);
-    const [buttonTransform, setButtonTransform] = useState({ x: 0, y: 0 });
+    const addButtonWrapperRef = useRef<HTMLDivElement>(null);
+    const buttonTransformRef = useRef({ x: 0, y: 0 });
     const router = useRouter();
     const [manualPaymentModalOpened, setManualPaymentModalOpened] = useState(false);
     const [manualPaymentPurpose, setManualPaymentPurpose] = useState<'deposit' | 'balance'>(
@@ -986,18 +987,25 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
         let returnToCenterTimeoutId: NodeJS.Timeout | null = null;
         let lastScrollTime = Date.now();
 
-        const animateReturnToCenter = () => {
-            setButtonTransform(prev => {
-                const newX = prev.x * 0.9;
-                const newY = prev.y * 0.9;
+        const applyTransform = (x: number, y: number) => {
+            buttonTransformRef.current = { x, y };
+            if (addButtonWrapperRef.current) {
+                addButtonWrapperRef.current.style.transform = `translate(${x}px, ${y}px)`;
+            }
+        };
 
-                // Continue animating if not close enough to center
-                if (Math.abs(newX) > 0.1 || Math.abs(newY) > 0.1) {
-                    returnToCenterRafId = requestAnimationFrame(animateReturnToCenter);
-                    return { x: newX, y: newY };
-                }
-                return { x: 0, y: 0 };
-            });
+        const animateReturnToCenter = () => {
+            const { x, y } = buttonTransformRef.current;
+            const newX = x * 0.9;
+            const newY = y * 0.9;
+
+            // Continue animating if not close enough to center
+            if (Math.abs(newX) > 0.1 || Math.abs(newY) > 0.1) {
+                applyTransform(newX, newY);
+                returnToCenterRafId = requestAnimationFrame(animateReturnToCenter);
+                return;
+            }
+            applyTransform(0, 0);
         };
 
         const handleScroll = () => {
@@ -1030,7 +1038,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             }
 
             rafId = requestAnimationFrame(() => {
-                setButtonTransform({ x: movementX, y: movementY });
+                applyTransform(movementX, movementY);
             });
 
             lastScrollTop = currentScrollTop;
@@ -1058,6 +1066,8 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
             if (returnToCenterTimeoutId) {
                 clearTimeout(returnToCenterTimeoutId);
             }
+            // Reset on cleanup so the button doesn't get stuck translated.
+            applyTransform(0, 0);
         }
         // eslint-disable-next-line consistent-return
         return cleanup;
@@ -1553,6 +1563,75 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
 
     const isSignatureRequired = hasClientSignature && !hasContractorSignature;
 
+    const handleContractorSignatureComplete = useCallback((signature: {
+        signature_type: string;
+        signature_data?: string;
+        signer_name?: string;
+        signer_email?: string;
+        signed_at?: string;
+        is_valid?: boolean;
+        id?: string;
+    }) => {
+        const prevSignatures = signatures;
+        const prevEstimate = estimate;
+
+        const nextSignatures = [
+            ...prevSignatures.filter(
+                (sig) => sig.signature_type !== 'CONTRACTOR' || sig.is_valid === false
+            ),
+            signature,
+        ];
+
+        setSignatures(nextSignatures);
+        dispatch(
+            setEstimateDetails({
+                estimateId: estimateID,
+                signatures: nextSignatures,
+            })
+        );
+
+        if (prevEstimate && isSignatureRequired) {
+            const currentStatus = prevEstimate.status;
+            const nextStatus =
+                currentStatus === EstimateStatus.ESTIMATE_ACCEPTED
+                    ? EstimateStatus.ACCOUNTING_NEEDED
+                    : currentStatus;
+
+            if (nextStatus !== currentStatus) {
+                const nextEstimate = { ...prevEstimate, status: nextStatus };
+                setEstimate(nextEstimate);
+                updateEstimate(nextEstimate);
+            }
+        }
+
+        // Reconcile in the background (PDF resource + audit-trail signatures).
+        getResources();
+        fetchSignatures();
+
+        return () => {
+            setSignatures(prevSignatures);
+            dispatch(
+                setEstimateDetails({
+                    estimateId: estimateID,
+                    signatures: prevSignatures,
+                })
+            );
+            if (prevEstimate) {
+                setEstimate(prevEstimate);
+                updateEstimate(prevEstimate);
+            }
+        };
+    }, [
+        dispatch,
+        estimate,
+        estimateID,
+        fetchSignatures,
+        getResources,
+        isSignatureRequired,
+        signatures,
+        updateEstimate,
+    ]);
+
     // Process signature links from initial fetch (only if estimate has been sent)
     // We no longer generate signature links automatically - they're only created when sending
     useEffect(() => {
@@ -1706,9 +1785,9 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         <div
                                           className={`${classes.addButtonWrapper} ${classes.addButtonFixed}`}
                                           style={{
-                                                transform: `translate(${buttonTransform.x}px, ${buttonTransform.y}px)`,
                                                 transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
                                             }}
+                                          ref={addButtonWrapperRef}
                                         >
                                             <Menu shadow="md" width={200} position="bottom-start" offset={5}>
                                                 <Menu.Target>
@@ -1787,6 +1866,15 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                         </div>
                                     </Flex>
                                 </div>
+
+                                {estimate && signaturesLoaded && isSignatureRequired && (
+                                    <div style={{ marginBottom: 16 }}>
+                                        <ContractorSignatureRequired
+                                          estimateId={estimateID}
+                                          onSignatureComplete={handleContractorSignatureComplete}
+                                        />
+                                    </div>
+                                )}
 
                                 <Modal
                                   opened={manualPaymentModalOpened}
@@ -2258,11 +2346,7 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                     hasImages &&
                                     lineItemsCount > 0 && (
                                         <CollapsibleSection
-                                          title={
-                                            isSignatureRequired
-                                                ? 'Signature Required'
-                                                : 'Estimate Preview'
-                                          }
+                                          title="Estimate Preview"
                                           defaultOpen={!hasSignedPdf && !isSignatureRequired}
                                           headerActions={
                                               !isSignatureRequired
@@ -2277,32 +2361,21 @@ function EstimateDetailsContent({ estimateID }: { estimateID: string }) {
                                               ) : undefined
                                           }
                                         >
-                                            {isSignatureRequired ? (
-                                                <ContractorSignatureRequired
-                                                  estimateId={estimateID}
-                                                  onSignatureComplete={() => {
-                                                      getEstimate();
-                                                      getResources();
-                                                      fetchSignatures();
-                                                  }}
-                                                />
-                                            ) : (
-                                                <EstimatePreview
-                                                  estimate={estimate}
-                                                  imageResources={imageResources}
-                                                  videoResources={videoResources}
-                                                  lineItems={lineItems}
-                                                  client={client}
-                                                  signatureUrl={signatureUrl}
-                                                  loadingSignatureUrl={false}
-                                                  signatures={signatures}
-                                                  onSignatureUrlGenerated={(url) => {
-                                                      setSignatureUrl(url);
-                                                  }}
-                                                  onResourcesRefresh={getResources}
-                                                  onEstimateRefresh={getEstimate}
-                                                />
-                                            )}
+                                            <EstimatePreview
+                                              estimate={estimate}
+                                              imageResources={imageResources}
+                                              videoResources={videoResources}
+                                              lineItems={lineItems}
+                                              client={client}
+                                              signatureUrl={signatureUrl}
+                                              loadingSignatureUrl={false}
+                                              signatures={signatures}
+                                              onSignatureUrlGenerated={(url) => {
+                                                  setSignatureUrl(url);
+                                              }}
+                                              onResourcesRefresh={getResources}
+                                              onEstimateRefresh={getEstimate}
+                                            />
                                         </CollapsibleSection>
                                     )}
                                 </div>

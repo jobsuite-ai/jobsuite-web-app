@@ -269,9 +269,6 @@ function placeSignaturesInElement(
                     img.alt = signature.signer_name || 'Signature';
 
                     signatureField.appendChild(img);
-
-                    // eslint-disable-next-line no-console
-                    console.log(`Placed ${signatureType} signature on ${role} field`);
                 } else {
                     // No signature - ensure the line is visible
                     // Add a spacer div that takes up the space
@@ -284,9 +281,6 @@ function placeSignaturesInElement(
 
                     // The border-bottom on signatureField itself will provide the line
                     // No need for additional lineDiv that might cause rendering issues
-
-                    // eslint-disable-next-line no-console
-                    console.log(`No signature found for ${signatureType} (role: ${role}), showing empty line`);
                 }
             });
 
