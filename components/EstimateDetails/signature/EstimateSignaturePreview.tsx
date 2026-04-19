@@ -15,6 +15,27 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 
+function getSignatureContentKey(
+    signatures:
+        | Array<{
+              signature_type: string;
+              signature_data?: string;
+              is_valid?: boolean;
+          }>
+        | undefined
+): string {
+    if (!signatures || signatures.length === 0) return '';
+    return signatures
+        .map((sig) => {
+            const data = sig.signature_data ?? '';
+            const head = data.slice(0, 24);
+            const tail = data.slice(-24);
+            const validFlag = sig.is_valid === false ? '0' : '1';
+            return `${sig.signature_type}:${validFlag}:${data.length}:${head}:${tail}`;
+        })
+        .join('|');
+}
+
 interface EstimateSignaturePreviewProps {
     estimate: Estimate;
     imageResources?: EstimateResource[];
@@ -50,6 +71,7 @@ function EstimateSignaturePreviewBase({
         signature_data: string;
         signer_name?: string;
     }>>([]);
+    const lastPropSignaturesKeyRef = useRef<string>('');
 
     // Get image path from resources - prioritize cover photo
     // Use presigned URL to ensure correct Content-Type header
@@ -270,6 +292,11 @@ function EstimateSignaturePreviewBase({
         // This ensures we use the filtered valid signatures from the signature page API
         // rather than fetching all signatures (including invalid ones) from the audit endpoint
         if (propSignatures !== undefined) {
+            const key = getSignatureContentKey(propSignatures);
+            if (key === lastPropSignaturesKeyRef.current) {
+                return;
+            }
+            lastPropSignaturesKeyRef.current = key;
             // Filter to only valid signatures if is_valid field is present
             const validSignatures = propSignatures.filter((sig) =>
                 sig.is_valid !== false // Default to true if not specified
@@ -365,6 +392,12 @@ function EstimateSignaturePreviewBase({
                         signatureDataUrl = `data:image/png;base64,${signatureDataUrl}`;
                     }
 
+                    const existingImg = field.querySelector('img');
+                    const existingSrc = existingImg?.getAttribute('src');
+                    if (existingSrc === signatureDataUrl) {
+                        return;
+                    }
+
                     // Create an img element with the signature
                     const img = document.createElement('img');
                     img.src = signatureDataUrl;
@@ -378,12 +411,6 @@ function EstimateSignaturePreviewBase({
                     // Clear the field and add the signature image
                     field.innerHTML = '';
                     field.appendChild(img);
-
-                    // eslint-disable-next-line no-console
-                    console.log(`Placed ${signatureType} signature on ${role} field`);
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.log(`No signature found for ${signatureType} (role: ${role})`);
                 }
             });
         }, 100); // Small delay to ensure DOM is ready
