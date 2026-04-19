@@ -14,6 +14,25 @@ import UniversalError from '@/components/Global/UniversalError';
 import { buildEstimateTemplateHtml } from '@/utils/estimatePdfGenerator';
 import { getEstimatePreviewDataKey } from '@/utils/estimatePreviewDataKey';
 
+function getSignatureContentKey(
+    signatures: Array<{
+        signature_type: string;
+        signature_data?: string;
+        is_valid?: boolean;
+    }>
+): string {
+    return signatures
+        .map((sig) => {
+            const data = sig.signature_data ?? '';
+            // Avoid embedding full base64 in the key; length + edges is enough to detect changes.
+            const head = data.slice(0, 24);
+            const tail = data.slice(-24);
+            const validFlag = sig.is_valid === false ? '0' : '1';
+            return `${sig.signature_type}:${validFlag}:${data.length}:${head}:${tail}`;
+        })
+        .join('|');
+}
+
 interface EstimatePreviewProps {
     estimate: Estimate;
     imageResources?: EstimateResource[];
@@ -53,8 +72,13 @@ export default function EstimatePreview({
     const [isSending, setIsSending] = useState(false);
     const [template, setTemplate] = useState<string>('');
     const templateRef = useRef<HTMLDivElement>(null);
-    // Use signatures from props (already loaded by parent)
-    const signatures = propSignatures.filter((sig) => sig.is_valid !== false);
+    const signatureContentKey = getSignatureContentKey(propSignatures);
+    // Use signatures from props (already loaded by parent), but keep a stable reference
+    // when the signature content does not change to avoid DOM re-placement flicker.
+    const signatures = useMemo(
+        () => propSignatures.filter((sig) => sig.is_valid !== false),
+        [signatureContentKey]
+    );
 
     const previewDataKey = getEstimatePreviewDataKey(
         estimate,
@@ -162,6 +186,12 @@ export default function EstimatePreview({
                         signatureDataUrl = `data:image/png;base64,${signatureDataUrl}`;
                     }
 
+                    const existingImg = field.querySelector('img');
+                    const existingSrc = existingImg?.getAttribute('src');
+                    if (existingSrc === signatureDataUrl) {
+                        return;
+                    }
+
                     // Create an img element with the signature
                     const img = document.createElement('img');
                     img.src = signatureDataUrl;
@@ -175,12 +205,6 @@ export default function EstimatePreview({
                     // Clear the field and add the signature image
                     field.innerHTML = '';
                     field.appendChild(img);
-
-                    // eslint-disable-next-line no-console
-                    console.log(`Placed ${signatureType} signature on ${role} field`);
-                } else {
-                    // eslint-disable-next-line no-console
-                    console.log(`No signature found for ${signatureType} (role: ${role})`);
                 }
             });
         }, 100); // Small delay to ensure DOM is ready
@@ -189,7 +213,7 @@ export default function EstimatePreview({
         return () => {
             clearTimeout(timeoutId);
         };
-    }, [template, signatures]);
+    }, [template, signatureContentKey]);
 
     // Check if estimate has been signed by both parties (using existing signatures state)
     const isFullySigned = useMemo(() => {

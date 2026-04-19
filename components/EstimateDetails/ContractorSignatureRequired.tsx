@@ -52,7 +52,7 @@ interface ContractorConfiguration {
 
 interface ContractorSignatureRequiredProps {
     estimateId: string;
-    onSignatureComplete: () => void;
+    onSignatureComplete: (signature: SignaturePayload) => void | (() => void);
 }
 
 export default function ContractorSignatureRequired({
@@ -192,6 +192,7 @@ export default function ContractorSignatureRequired({
             id: signature.id || `temp-${Date.now()}`,
             ...signature,
         };
+        const parentRollback = onSignatureComplete(signatureWithId) || undefined;
         setSigned(true);
         setSignatureInfo((prev) => {
             if (!prev) return prev;
@@ -212,9 +213,8 @@ export default function ContractorSignatureRequired({
         // when signatures are recorded via _generate_and_store_pdf_after_signature.
         // No need to generate/upload PDF from the frontend.
 
-        onSignatureComplete();
-
         return () => {
+            parentRollback?.();
             setSigned(false);
             setSignatureInfo((prev) => {
                 if (!prev?.signatures) return prev;

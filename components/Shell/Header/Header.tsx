@@ -277,6 +277,14 @@ export function Header({ sidebarOpened, setSidebarOpened }: HeaderProps) {
     ];
   }, [isMobile, pathname, messageCount, mainNavLinks, showEmployeeOptionsSection]);
 
+  // While role (and thus nav links) are unavailable, keep the sidebar closed — an open drawer
+  // looks broken with an empty nav (e.g. auth/session still resolving).
+  useEffect(() => {
+    if (!effectiveRole) {
+      setSidebarOpened(false);
+    }
+  }, [effectiveRole, setSidebarOpened]);
+
   // Fuzzy match function - checks if search term appears in the text
   const fuzzyMatch = (text: string, searchTerm: string): boolean => {
     if (!text || !searchTerm) {
