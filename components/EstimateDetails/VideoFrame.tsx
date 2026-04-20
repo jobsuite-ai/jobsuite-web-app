@@ -9,6 +9,7 @@ import ReactPlayer from 'react-player';
 
 import classes from './styles/EstimateDetails.module.css';
 
+import { getOrFetchPresignedUrl } from '@/app/utils/presignedUrlCache';
 import { EstimateResource } from '@/components/Global/model';
 
 export function VideoFrame({ resource, estimateID, refresh }: {
@@ -101,27 +102,12 @@ export function VideoFrame({ resource, estimateID, refresh }: {
         if (!accessToken) return;
 
         try {
-            const response = await fetch(
-                `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error('Failed to get download URL');
-            }
-
-            const data = await response.json();
-            const presignedUrl = data.presigned_url || data.url;
-
-            if (presignedUrl) {
-                window.open(presignedUrl, '_blank');
-            }
+            const presignedUrl = await getOrFetchPresignedUrl({
+                estimateId: estimateID,
+                resourceId: resource.id,
+                accessToken,
+            });
+            if (presignedUrl) window.open(presignedUrl, '_blank');
         } catch (error) {
             // eslint-disable-next-line no-console
             console.error('Failed to download video:', error);

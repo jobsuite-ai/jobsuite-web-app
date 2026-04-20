@@ -6,6 +6,7 @@ import { generatePdfFromElement, generatePdfFromHtmlString } from './pdfGenerato
 
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
+import { getOrFetchPresignedUrl } from '@/app/utils/presignedUrlCache';
 import { EstimateLineItem } from '@/components/EstimateDetails/estimate/LineItem';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 
@@ -57,24 +58,12 @@ async function getImagePath(
     const accessToken = localStorage.getItem('access_token');
     if (accessToken && selectedImage.s3_bucket && selectedImage.s3_key && selectedImage.id) {
         try {
-            const response = await fetch(
-                `/api/estimates/${estimate.id}/resources/${selectedImage.id}/presigned-url`,
-                {
-                    method: 'GET',
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                    },
-                }
-            );
-
-            if (response.ok) {
-                const data = await response.json();
-                const presignedUrl = data.presigned_url || data.url;
-                if (presignedUrl) {
-                    return presignedUrl;
-                }
-            }
+            const presignedUrl = await getOrFetchPresignedUrl({
+                estimateId: estimate.id,
+                resourceId: selectedImage.id,
+                accessToken,
+            });
+            if (presignedUrl) return presignedUrl;
         } catch (error) {
             // eslint-disable-next-line no-console
             console.warn('Failed to get presigned URL for image:', error);
