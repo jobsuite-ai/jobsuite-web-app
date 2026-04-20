@@ -8,6 +8,7 @@ import { IconChevronLeft, IconChevronRight, IconPhoto, IconPlus, IconX } from '@
 import ImageUpload from './ImageUpload';
 import classes from './styles/EstimateDetails.module.css';
 
+import { getOrFetchPresignedUrl } from '@/app/utils/presignedUrlCache';
 import { EstimateResource } from '@/components/Global/model';
 
 interface ImageGalleryProps {
@@ -51,29 +52,13 @@ export default function ImageGallery({
               // Only fetch presigned URL if we have s3_bucket and s3_key
               // Legacy resources without these will fall back to direct URL
               if (resource.s3_bucket && resource.s3_key) {
-                try {
-                  const response = await fetch(
-                    `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-                    {
-                      method: 'GET',
-                      headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json',
-                      },
-                    }
-                  );
-
-                  if (response.ok) {
-                    const data = await response.json();
-                    const presignedUrl = data.presigned_url || data.url;
-                    if (presignedUrl) {
-                      return { url: presignedUrl, resource };
-                    }
-                  }
-                } catch (error) {
-                  // eslint-disable-next-line no-console
-                  console.warn(`Failed to get presigned URL for resource ${resource.id}:`, error);
-                  // Fall through to direct URL construction
+                const presignedUrl = await getOrFetchPresignedUrl({
+                  estimateId: estimateID,
+                  resourceId: resource.id,
+                  accessToken,
+                });
+                if (presignedUrl) {
+                  return { url: presignedUrl, resource };
                 }
               }
 
