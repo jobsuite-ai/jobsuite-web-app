@@ -14,6 +14,7 @@ import type { Estimate } from '@/components/Global/model';
 import { parseLocalDateString } from '@/utils/calendarWorkingDays';
 import { effectiveProjectStartDate } from '@/utils/estimateScheduleDisplay';
 import { apiEstimateType } from '@/utils/scheduleApiTypes';
+import type { TeamCapacityRowInput } from '@/utils/scheduleMath';
 
 /** Full-viewport fixed inner + clickable sheet (see module CSS). */
 const modalLayoutProps = {
@@ -22,10 +23,20 @@ const modalLayoutProps = {
   styles: { content: { pointerEvents: 'auto' as const } },
 };
 
-/** Subset of team row for display label only */
+/** Team row subset for calendar; CalendarPage extends from /api/teams. */
 export type CalendarTeamOption = {
   id: string;
   name: string;
+  /** Full API team_config for PUT merges (calendar color, backlog snapshot, etc.). */
+  teamConfigRaw?: Record<string, unknown>;
+  calendarColor?: string | null;
+  calendarColorShade?: number | null;
+  calendarColorHex?: string | null;
+  memberCount?: number;
+  scheduleFromApi?: {
+    painterCount: number;
+    capacityRows: TeamCapacityRowInput[];
+  };
 };
 
 function parseLocalYmd(iso: string): Date | null {

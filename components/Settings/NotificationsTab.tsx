@@ -387,7 +387,9 @@ export default function NotificationsTab({ user }: NotificationsTabProps) {
                                 <Stack gap="xs">
                                     <Text fw={500}>Payments</Text>
                                     <Text size="sm" c="dimmed">
-                                        Successful deposit and final invoice payments.
+                                        Successful deposit and final invoice payments. These
+                                        are sent by email only; your delivery method above
+                                        does not turn them off.
                                     </Text>
                                     <Flex direction="column" gap="lg">
                                         <Checkbox
