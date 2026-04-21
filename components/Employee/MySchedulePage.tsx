@@ -24,6 +24,7 @@ import { addDays, eachWeekOfInterval, format, startOfDay } from 'date-fns';
 import { getApiHeaders } from '@/app/utils/apiClient';
 import { CalendarEventBar } from '@/components/Calendar/CalendarEventBar';
 import classes from '@/components/Calendar/CalendarPage.module.css';
+import type { CalendarTeamOption } from '@/components/Calendar/ScheduleJobModal';
 import type { CalendarGridJobEvent, WeekCalRow } from '@/utils/calendarGridMath';
 import {
   assignLanesForWeek,
@@ -42,9 +43,10 @@ import {
 } from '@/utils/calendarGridMath';
 import { parseLocalDateString, splitExplicitWorkDatesIntoContiguousSegments, splitRangeIntoWeekdaySegments } from '@/utils/calendarWorkingDays';
 import {
-  colorForScheduleKey,
-  mantineColorToCss,
-  teamBacklogCardBackground,
+  normalizeCalendarColorHex,
+  teamBacklogCardBackgroundForTeamId,
+  teamCalendarSolidCss,
+  teamCalendarSolidCssForTeamId,
 } from '@/utils/scheduleColors';
 
 const SHOW_NON_WORKING_DAYS_STORAGE_KEY = 'jobsuite-my-schedule-show-weekends';
@@ -65,6 +67,7 @@ export function MySchedulePage() {
   const [calEvents, setCalEvents] = useState<CalendarGridJobEvent[]>([]);
   const [workEntries, setWorkEntries] = useState<WorkTimeEntry[]>([]);
   const [showNonWorkingDays, setShowNonWorkingDays] = useState(false);
+  const [teamsForColors, setTeamsForColors] = useState<CalendarTeamOption[]>([]);
 
   useEffect(() => {
     try {
@@ -106,9 +109,10 @@ export function MySchedulePage() {
     setLoading(true);
     try {
       const headers = getApiHeaders();
-      const [calRes, wtRes] = await Promise.all([
+      const [calRes, wtRes, teamsRes] = await Promise.all([
         fetch(`/api/schedule/calendar?from=${from}&to=${to}&only_my_teams=true`, { headers }),
         fetch(`/api/jobsuite-work-time?from=${wtFrom}&to=${wtTo}`, { headers }),
+        fetch('/api/teams', { headers }),
       ]);
       if (!calRes.ok) {
         const err = await calRes.json().catch(() => ({}));
@@ -122,6 +126,36 @@ export function MySchedulePage() {
       const wtJson = await wtRes.json();
       setCalEvents(Array.isArray(calJson) ? (calJson as CalendarGridJobEvent[]) : []);
       setWorkEntries(Array.isArray(wtJson) ? wtJson : []);
+      if (teamsRes.ok) {
+        const teamList = await teamsRes.json().catch(() => []);
+        const mapped: CalendarTeamOption[] = (Array.isArray(teamList) ? teamList : [])
+          .filter(
+            (t: unknown): t is Record<string, unknown> =>
+              Boolean(t) && typeof t === 'object' && 'id' in (t as object)
+          )
+          .map((t) => {
+            const id = String(t.id).trim();
+            const tc = t.team_config as Record<string, unknown> | undefined;
+            const calColor =
+              typeof tc?.calendar_color === 'string' ? tc.calendar_color.trim() : null;
+            const calShadeRaw = tc?.calendar_color_shade;
+            const calendarColorShade =
+              typeof calShadeRaw === 'number' && Number.isFinite(calShadeRaw) ? calShadeRaw : null;
+            const hexRaw =
+              typeof tc?.calendar_color_hex === 'string' ? tc.calendar_color_hex.trim() : '';
+            const calendarColorHex = normalizeCalendarColorHex(hexRaw || null);
+            return {
+              id,
+              name: String(t.name ?? id).trim() || id,
+              calendarColor: calColor && calColor.length > 0 ? calColor : null,
+              calendarColorShade,
+              calendarColorHex,
+            };
+          });
+        setTeamsForColors(mapped);
+      } else {
+        setTeamsForColors([]);
+      }
     } catch (e) {
       notifications.show({
         title: 'Could not load schedule',
@@ -189,9 +223,12 @@ export function MySchedulePage() {
       }
     }
     return [...m.entries()]
-      .map(([id, name]) => ({ id, name }))
+      .map(([id, name]) => {
+        const fromApi = teamsForColors.find((t) => t.id === id);
+        return fromApi ?? { id, name };
+      })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [calendarJobEventsInView]);
+  }, [calendarJobEventsInView, teamsForColors]);
 
   const eventsByWeek = useMemo(() => {
     const map = new Map<string, WeekCalRow[]>();
@@ -229,10 +266,9 @@ export function MySchedulePage() {
           ) {
             const colorKeyRaw = ev.team_id || 'default';
             const colorKey = (colorKeyRaw || 'default').trim() || 'default';
-            const { color, shade } = colorForScheduleKey(colorKey);
             const backlogBackgroundCss =
               ev.calendar_kind === 'team_backlog'
-                ? teamBacklogCardBackground(theme.colors, color, shade ?? 6)
+                ? teamBacklogCardBackgroundForTeamId(theme.colors, colorKey, teamsForColors)
                 : null;
             list.push({
               rowKey: `${ev.schedule_id}-${seg.start.toISOString()}-${ev.calendar_kind}`,
@@ -268,7 +304,7 @@ export function MySchedulePage() {
       map.set(key, list);
     });
     return map;
-  }, [calendarJobEvents, weekStarts, showNonWorkingDays, range, theme.colors]);
+  }, [calendarJobEvents, weekStarts, showNonWorkingDays, range, theme.colors, teamsForColors]);
 
   const estimateTitles = useMemo(() => {
     const m: Record<string, string> = {};
@@ -325,8 +361,7 @@ export function MySchedulePage() {
             </Text>
             <Group gap="lg" wrap="wrap">
               {legendTeams.map((team) => {
-                const { color, shade } = colorForScheduleKey(team.id);
-                const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
+                const bg = teamCalendarSolidCss(theme.colors, team);
                 return (
                   <Group key={team.id} gap="xs" wrap="nowrap">
                     <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
@@ -434,8 +469,11 @@ export function MySchedulePage() {
                       >
                         {planned.map(({ row, seg }, idx) => {
                           const lane = lanes[idx] ?? 0;
-                          const { color, shade } = colorForScheduleKey(row.colorKey);
-                          const solidBg = mantineColorToCss(theme.colors, color, shade ?? 6);
+                          const solidBg = teamCalendarSolidCssForTeamId(
+                            theme.colors,
+                            row.colorKey,
+                            teamsForColors
+                          );
                           const segmentDates =
                             row.isBacklog && row.scheduleStartIso && row.scheduleEndIso
                               ? (formatBacklogSpanLabel(row.scheduleStartIso, row.scheduleEndIso) ??

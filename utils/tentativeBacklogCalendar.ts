@@ -18,6 +18,9 @@ import {
 export type TeamShapeForBacklogBar = {
   id: string;
   name: string;
+  calendarColor?: string | null;
+  calendarColorShade?: number | null;
+  calendarColorHex?: string | null;
   memberCount?: number;
   scheduleFromApi?: {
     painterCount: number;

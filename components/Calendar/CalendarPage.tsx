@@ -21,7 +21,6 @@ import {
   ActionIcon,
   Alert,
   Badge,
-  Box,
   Button,
   Container,
   Group,
@@ -62,6 +61,7 @@ import { CalendarScheduleDraggableBar } from './CalendarScheduleDraggableBar';
 import { ChangeTeamModal } from './ChangeTeamModal';
 import { LockedScheduleEditModal } from './LockedScheduleEditModal';
 import { ScheduleJobModal, type CalendarTeamOption } from './ScheduleJobModal';
+import { TeamColorLegendPopover, type TeamCalendarColorSave } from './TeamColorLegendPopover';
 import { TentativeBacklogTeamCard } from './TentativeBacklogTeamCard';
 import { UnassignedEstimateRow } from './UnassignedEstimateRow';
 
@@ -94,9 +94,9 @@ import {
 } from '@/utils/calendarWorkingDays';
 import { apiEstimateType } from '@/utils/scheduleApiTypes';
 import {
-  colorForScheduleKey,
-  mantineColorToCss,
-  teamBacklogCardBackground,
+  normalizeCalendarColorHex,
+  teamBacklogCardBackgroundForTeamId,
+  teamCalendarSolidCssForTeamId,
 } from '@/utils/scheduleColors';
 import type { TeamCapacityRowInput } from '@/utils/scheduleMath';
 import { reasonStartDateNotAllowed } from '@/utils/schedulingSeason';
@@ -289,8 +289,7 @@ function buildDragOverlayForWeekCalRow(
   teams: CalendarTeamOption[],
   colors: MantineTheme['colors']
 ): { title: string; solidBg: string; segmentLine: string } {
-  const { color, shade } = colorForScheduleKey(row.colorKey);
-  const solidBg = mantineColorToCss(colors, color, shade ?? 6);
+  const solidBg = teamCalendarSolidCssForTeamId(colors, row.colorKey, teams);
   const segmentDates =
     row.isBacklog && row.scheduleStartIso && row.scheduleEndIso
       ? (formatBacklogSpanLabel(row.scheduleStartIso, row.scheduleEndIso) ??
@@ -575,6 +574,71 @@ export function CalendarPage() {
       }
     },
     [refreshData, selectedTeamFilterIds]
+  );
+
+  const updateTeamCalendarColor = useCallback(
+    async (team: CalendarTeamOption, next: TeamCalendarColorSave): Promise<boolean> => {
+      const raw = team.teamConfigRaw;
+      if (!raw || typeof raw !== 'object') {
+        notifications.show({
+          title: 'Cannot update color',
+          message: 'Team configuration is not loaded. Refresh the page and try again.',
+          color: 'red',
+        });
+        return false;
+      }
+      const nextConfig: Record<string, unknown> = { ...raw };
+      delete nextConfig.calendar_color;
+      delete nextConfig.calendar_color_shade;
+      delete nextConfig.calendar_color_hex;
+      if (next.kind === 'palette') {
+        nextConfig.calendar_color = next.hue;
+        nextConfig.calendar_color_shade = 6;
+      } else if (next.kind === 'hex') {
+        const norm = normalizeCalendarColorHex(next.hex);
+        if (!norm) {
+          notifications.show({
+            title: 'Invalid color',
+            message: 'Enter a hex color such as #c92a2a or #abc.',
+            color: 'yellow',
+          });
+          return false;
+        }
+        nextConfig.calendar_color_hex = norm;
+      }
+      try {
+        const res = await fetch(`/api/teams/${team.id}`, {
+          method: 'PUT',
+          headers: getApiHeaders(),
+          body: JSON.stringify({ team_config: nextConfig }),
+        });
+        const errBody = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(
+            typeof errBody.message === 'string'
+              ? errBody.message
+              : typeof errBody.detail === 'string'
+                ? errBody.detail
+                : 'Update failed'
+          );
+        }
+        notifications.show({
+          title: 'Team color saved',
+          message: `Applies to ${team.name} on the calendar and tentative backlog.`,
+          color: 'green',
+        });
+        handleSaved();
+        return true;
+      } catch (e) {
+        notifications.show({
+          title: 'Could not save team color',
+          message: e instanceof Error ? e.message : 'Error',
+          color: 'red',
+        });
+        return false;
+      }
+    },
+    [handleSaved]
   );
 
   const openAdjustLockedSchedule = useCallback(
@@ -1029,6 +1093,8 @@ export function CalendarPage() {
             const memberIds = Array.isArray(t.member_user_ids) ? t.member_user_ids : [];
             const painterCount = memberIds.length;
             const tc = t.team_config as Record<string, unknown> | undefined;
+            const teamConfigRaw =
+              tc && typeof tc === 'object' ? ({ ...tc } as Record<string, unknown>) : undefined;
             const capRaw = tc?.team_capacity;
             const capacityRows: TeamCapacityRowInput[] = [];
             if (Array.isArray(capRaw)) {
@@ -1051,9 +1117,23 @@ export function CalendarPage() {
               painterCount > 0 && capacityRows.length > 0
                 ? { painterCount, capacityRows }
                 : undefined;
+            const calColor =
+              typeof tc?.calendar_color === 'string' ? tc.calendar_color.trim() : null;
+            const calShadeRaw = tc?.calendar_color_shade;
+            const calendarColorShade =
+              typeof calShadeRaw === 'number' && Number.isFinite(calShadeRaw)
+                ? calShadeRaw
+                : null;
+            const hexRaw =
+              typeof tc?.calendar_color_hex === 'string' ? tc.calendar_color_hex.trim() : '';
+            const calendarColorHex = normalizeCalendarColorHex(hexRaw || null);
             return {
               id,
               name,
+              teamConfigRaw,
+              calendarColor: calColor && calColor.length > 0 ? calColor : null,
+              calendarColorShade,
+              calendarColorHex,
               memberCount: painterCount > 0 ? painterCount : undefined,
               scheduleFromApi,
             };
@@ -1334,10 +1414,9 @@ export function CalendarPage() {
               : undefined;
             const colorKeyRaw = ev.team_id || est?.schedule_team_id || 'default';
             const colorKey = (colorKeyRaw || 'default').trim() || 'default';
-            const { color, shade } = colorForScheduleKey(colorKey);
             const backlogBackgroundCss =
               ev.calendar_kind === 'team_backlog'
-                ? teamBacklogCardBackground(theme.colors, color, shade ?? 6)
+                ? teamBacklogCardBackgroundForTeamId(theme.colors, colorKey, teams)
                 : null;
             list.push({
               rowKey: `${ev.schedule_id}-${seg.start.toISOString()}-${ev.calendar_kind}`,
@@ -1384,7 +1463,15 @@ export function CalendarPage() {
       map.set(key, list);
     });
     return map;
-  }, [calendarEventsForDisplay, estimates, weekStarts, showNonWorkingDays, range, theme.colors]);
+  }, [
+    calendarEventsForDisplay,
+    estimates,
+    weekStarts,
+    showNonWorkingDays,
+    range,
+    theme.colors,
+    teams,
+  ]);
 
   const calendarHasVisibleRows = useMemo(() => {
     for (const rows of eventsByWeek.values()) {
@@ -1399,7 +1486,7 @@ export function CalendarPage() {
   const noPipelineMatches =
     estimates.length > 0 && !calendarHasVisibleRows && unassignedTeam.length === 0;
 
-  /** One swatch per team; colors match bars (`colorForScheduleKey`). */
+  /** One swatch per team; colors match bars (palette, hex, or hash). */
   const teamLegendEntries = useMemo(
     () => [...teams].sort((a, b) => a.name.localeCompare(b.name)),
     [teams]
@@ -1462,8 +1549,6 @@ export function CalendarPage() {
             </Group>
             <Group gap="lg" align="center" wrap="wrap">
               {teamLegendEntries.map((team) => {
-                const { color, shade } = colorForScheduleKey(team.id);
-                const bg = mantineColorToCss(theme.colors, color, shade ?? 6);
                 const cfg = teamConfig.scheduleTeams.find((t) => t.id === team.id);
                 const rosterHint = [
                   cfg?.painterCount != null ? `${cfg.painterCount} painters` : '',
@@ -1473,34 +1558,37 @@ export function CalendarPage() {
                   .join(' · ');
                 const selected = selectedTeamFilterIds.includes(team.id);
                 return (
-                  <UnstyledButton
+                  <Group
                     key={team.id}
-                    type="button"
-                    onClick={() => toggleTeamFilter(team.id)}
-                    className={`${classes.legendTeamChip} ${selected ? classes.legendTeamChipSelected : ''}`}
-                    aria-pressed={selected}
-                    aria-label={`${selected ? 'Remove' : 'Add'} ${team.name} ${selected ? 'from' : 'to'} calendar filter`}
+                    gap="xs"
+                    wrap="nowrap"
+                    align="center"
                   >
-                    <Stack gap={rosterHint ? 2 : 0}>
-                      <Group gap="xs" wrap="nowrap" align="center">
-                        <Box className={classes.legendSwatch} style={{ backgroundColor: bg }} />
+                    <TeamColorLegendPopover
+                      team={team}
+                      theme={theme}
+                      onSave={updateTeamCalendarColor}
+                    />
+                    <UnstyledButton
+                      type="button"
+                      onClick={() => toggleTeamFilter(team.id)}
+                      className={`${classes.legendTeamChip} ${selected ? classes.legendTeamChipSelected : ''}`}
+                      aria-pressed={selected}
+                      aria-label={`${selected ? 'Remove' : 'Add'} ${team.name} ${selected ? 'from' : 'to'} calendar filter`}
+                      style={{ flex: 1, minWidth: 0, textAlign: 'left' }}
+                    >
+                      <Stack gap={rosterHint ? 2 : 0}>
                         <Text size="sm" fw={600} lh={1.2}>
                           {team.name}
                         </Text>
-                      </Group>
-                      {rosterHint ? (
-                        <Group gap="xs" wrap="nowrap" align="flex-start">
-                          <Box
-                            aria-hidden
-                            style={{ width: 14, flexShrink: 0 }}
-                          />
+                        {rosterHint ? (
                           <Text size="xs" c="dimmed" lh={1.35}>
                             {rosterHint}
                           </Text>
-                        </Group>
-                      ) : null}
-                    </Stack>
-                  </UnstyledButton>
+                        ) : null}
+                      </Stack>
+                    </UnstyledButton>
+                  </Group>
                 );
               })}
             </Group>
@@ -1690,8 +1778,11 @@ export function CalendarPage() {
                       >
                         {planned.map(({ row, seg }, idx) => {
                           const lane = lanes[idx] ?? 0;
-                          const { color, shade } = colorForScheduleKey(row.colorKey);
-                          const solidBg = mantineColorToCss(theme.colors, color, shade ?? 6);
+                          const solidBg = teamCalendarSolidCssForTeamId(
+                            theme.colors,
+                            row.colorKey,
+                            teams
+                          );
                           const segmentDates =
                             row.isBacklog && row.scheduleStartIso && row.scheduleEndIso
                               ? (formatBacklogSpanLabel(row.scheduleStartIso, row.scheduleEndIso) ??

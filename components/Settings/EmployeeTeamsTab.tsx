@@ -38,7 +38,7 @@ type TeamCapacityRow = {
 type Team = {
   id: string;
   name: string;
-  team_config: { team_capacity: TeamCapacityRow[] };
+  team_config: Record<string, unknown> & { team_capacity?: TeamCapacityRow[] };
   member_user_ids: string[];
   team_lead_user_id: string;
   description?: string | null;
@@ -168,9 +168,14 @@ export default function EmployeeTeamsTab() {
     }
     setSaving(true);
     try {
+      const existing = editingId ? teams.find((x) => x.id === editingId) : null;
+      const mergedTeamConfig =
+        editingId && existing?.team_config && typeof existing.team_config === 'object'
+          ? { ...existing.team_config, team_capacity: capacityRows }
+          : { team_capacity: capacityRows };
       const payload = {
         name: name.trim(),
-        team_config: { team_capacity: capacityRows },
+        team_config: mergedTeamConfig,
         member_user_ids: memberIds,
         team_lead_user_id: leadId,
       };
