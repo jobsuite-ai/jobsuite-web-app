@@ -12,6 +12,7 @@ import classes from '../styles/EstimateDetails.module.css';
 import { generateTemplate } from '@/app/api/estimate_template/template_builder';
 import { TemplateDescription, TemplateInput } from '@/app/api/estimate_template/template_model';
 import { getApiHeaders } from '@/app/utils/apiClient';
+import { getOrFetchPresignedUrl } from '@/app/utils/presignedUrlCache';
 import LoadingState from '@/components/Global/LoadingState';
 import { ContractorClient, Estimate, EstimateResource } from '@/components/Global/model';
 
@@ -107,24 +108,14 @@ function EstimateSignaturePreviewBase({
                     // Try to get estimate_id from the resource or estimate
                     const estimateId = estimate.id;
                     if (estimateId) {
-                        const response = await fetch(
-                            `/api/estimates/${estimateId}/resources/${selectedImage.id}/presigned-url`,
-                            {
-                                method: 'GET',
-                                headers: {
-                                    Authorization: `Bearer ${accessToken}`,
-                                    'Content-Type': 'application/json',
-                                },
-                            }
-                        );
-
-                        if (response.ok) {
-                            const data = await response.json();
-                            const presignedUrl = data.presigned_url || data.url;
-                            if (presignedUrl) {
-                                setImagePath(presignedUrl);
-                                return;
-                            }
+                        const presignedUrl = await getOrFetchPresignedUrl({
+                            estimateId,
+                            resourceId: selectedImage.id,
+                            accessToken,
+                        });
+                        if (presignedUrl) {
+                            setImagePath(presignedUrl);
+                            return;
                         }
                     }
                 } catch (error) {

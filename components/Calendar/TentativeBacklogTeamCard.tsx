@@ -37,9 +37,8 @@ import { getApiHeaders } from '@/app/utils/apiClient';
 import type { Estimate } from '@/components/Global/model';
 import { parseLocalDateString } from '@/utils/calendarWorkingDays';
 import {
-  colorForScheduleKey,
-  mantineColorToCss,
-  teamBacklogPaperBackground,
+  teamBacklogPaperBackgroundForTeam,
+  teamCalendarSolidCss,
 } from '@/utils/scheduleColors';
 import type { SchedulingSeasonRules } from '@/utils/schedulingSeason';
 import {
@@ -192,9 +191,8 @@ export function TentativeBacklogTeamCard({
     JSON.stringify(draftItems.map((i) => i.schedule_id)) !==
       JSON.stringify(serverItems.map((i) => i.schedule_id));
 
-  const { color, shade } = colorForScheduleKey(team.id);
-  const cardBg = teamBacklogPaperBackground(theme.colors, color, shade ?? 6);
-  const borderColor = mantineColorToCss(theme.colors, color, shade ?? 6);
+  const cardBg = teamBacklogPaperBackgroundForTeam(theme.colors, team);
+  const borderColor = teamCalendarSolidCss(theme.colors, team);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),

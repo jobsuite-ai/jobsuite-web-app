@@ -8,6 +8,7 @@ import { IconDownload, IconFile, IconEye, IconPlus, IconX } from '@tabler/icons-
 import FileUpload from './FileUpload';
 import classes from './styles/EstimateDetails.module.css';
 
+import { getOrFetchPresignedUrl } from '@/app/utils/presignedUrlCache';
 import { EstimateResource } from '@/components/Global/model';
 
 interface FileListProps {
@@ -81,25 +82,11 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
     if (!accessToken) return;
 
     try {
-      // Get presigned URL for the file
-      const response = await fetch(
-        `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to get download URL');
-      }
-
-      const data = await response.json();
-      const presignedUrl = data.presigned_url || data.url;
-
+      const presignedUrl = await getOrFetchPresignedUrl({
+        estimateId: estimateID,
+        resourceId: resource.id,
+        accessToken,
+      });
       if (presignedUrl) {
         // Open the presigned URL in a new tab to download
         window.open(presignedUrl, '_blank');
@@ -123,34 +110,12 @@ export default function FileList({ estimateID, resources, onUpdate }: FileListPr
     }));
 
     try {
-      const response = await fetch(
-        `/api/estimates/${estimateID}/resources/${resource.id}/presigned-url`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        // eslint-disable-next-line no-console
-        console.error('Error fetching PDF presigned URL:', errorData);
-        setPreviewStates(prev => ({
-          ...prev,
-          [resource.id]: { url: null, loading: false, isOpen: true },
-        }));
-        return;
-      }
-
-      const data = await response.json();
-      const presignedUrl = data.presigned_url || data.url;
-
+      const presignedUrl = await getOrFetchPresignedUrl({
+        estimateId: estimateID,
+        resourceId: resource.id,
+        accessToken,
+      });
       if (!presignedUrl) {
-        // eslint-disable-next-line no-console
-        console.error('No presigned URL in response:', data);
         setPreviewStates(prev => ({
           ...prev,
           [resource.id]: { url: null, loading: false, isOpen: true },
