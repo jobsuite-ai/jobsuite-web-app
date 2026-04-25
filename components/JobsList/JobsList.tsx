@@ -475,8 +475,16 @@ function KanbanColumn({
 // localStorage key for job order persistence
 const JOB_ORDER_STORAGE_KEY = 'jobsuite_job_order';
 
+// localStorage key for "entered column at" timestamps (used for FIFO ordering)
+const JOB_COLUMN_ENTERED_AT_STORAGE_KEY = 'jobsuite_job_column_entered_at';
+
 // Type for storing job order per column
 type JobOrderMap = Record<string, string[]>; // columnId -> array of job IDs
+
+type JobColumnEnteredAtMap = Record<
+    string,
+    Record<string, number> // jobId -> epoch ms
+>; // columnId -> ...
 
 function loadJobOrder(): JobOrderMap {
     if (typeof window === 'undefined') return {};
@@ -496,6 +504,24 @@ function saveJobOrder(orderMap: JobOrderMap): void {
     localStorage.setItem(JOB_ORDER_STORAGE_KEY, JSON.stringify(orderMap));
 }
 
+function loadJobColumnEnteredAt(): JobColumnEnteredAtMap {
+    if (typeof window === 'undefined') return {};
+    const saved = localStorage.getItem(JOB_COLUMN_ENTERED_AT_STORAGE_KEY);
+    if (saved) {
+        try {
+            return JSON.parse(saved) as JobColumnEnteredAtMap;
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
+function saveJobColumnEnteredAt(map: JobColumnEnteredAtMap): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(JOB_COLUMN_ENTERED_AT_STORAGE_KEY, JSON.stringify(map));
+}
+
 export default function JobsList() {
     const {
         clients,
@@ -513,6 +539,9 @@ export default function JobsList() {
     const [overId, setOverId] = useState<string | null>(null);
     const [columns, setColumns] = useState<ColumnConfig[]>(loadColumnSettings());
     const [jobOrder, setJobOrder] = useState<JobOrderMap>(loadJobOrder());
+    const [jobColumnEnteredAt, setJobColumnEnteredAt] = useState<JobColumnEnteredAtMap>(
+        loadJobColumnEnteredAt()
+    );
     const [isHistoricalCollapsed, setIsHistoricalCollapsed] = useState(() => {
         if (typeof window === 'undefined') return false;
         const saved = localStorage.getItem('historical_column_collapsed');
@@ -677,6 +706,11 @@ export default function JobsList() {
         saveJobOrder(jobOrder);
     }, [jobOrder]);
 
+    // Save "entered column at" map to localStorage whenever it changes
+    useEffect(() => {
+        saveJobColumnEnteredAt(jobColumnEnteredAt);
+    }, [jobColumnEnteredAt]);
+
     // Scroll to end when historical column is expanded (transitioning from collapsed)
     const prevCollapsedRef = useRef(isHistoricalCollapsed);
     const historicalColumnRef = useRef<HTMLDivElement | null>(null);
@@ -790,6 +824,23 @@ export default function JobsList() {
             return column.statuses.includes(jobStatus as JobStatus);
         });
 
+        // Not Scheduled column should be FIFO (oldest-in-column first)
+        // based on when a job entered this column.
+        if (columnId === 'scheduling') {
+            const enteredAtForColumn = jobColumnEnteredAt[columnId] || {};
+            return filteredJobs
+                .slice()
+                .sort((a, b) => {
+                    const estimateA = a as Estimate;
+                    const estimateB = b as Estimate;
+                    const fallbackA = getDateTimestamp(estimateA.created_at) ?? 0;
+                    const fallbackB = getDateTimestamp(estimateB.created_at) ?? 0;
+                    const aTs = enteredAtForColumn[a.id] ?? fallbackA;
+                    const bTs = enteredAtForColumn[b.id] ?? fallbackB;
+                    return aTs - bTs;
+                });
+        }
+
         // Check if we have a saved order for this column
         const savedOrder = jobOrder[columnId];
         if (savedOrder && savedOrder.length > 0) {
@@ -831,6 +882,64 @@ export default function JobsList() {
                 getSortDateForColumn(columnId, estimateB);
         });
     }
+
+    // Reconcile Not Scheduled (scheduling) ordering to be FIFO and stable across refreshes.
+    // This ensures jobs appear in the order they were brought into the column.
+    useEffect(() => {
+        const columnId = 'scheduling';
+        const column = columns.find((c) => c.id === columnId);
+        if (!column) return;
+
+        const schedulingJobs = jobs.filter((job) => {
+            const estimate = job as Estimate;
+            const jobStatus = typeof estimate.status === 'string' ? estimate.status : estimate.status;
+            return column.statuses.includes(jobStatus as JobStatus);
+        });
+        const schedulingIds = schedulingJobs.map((j) => j.id);
+        if (schedulingIds.length === 0) return;
+
+        // Seed entered-at timestamps (best-effort) for any missing jobs.
+        let enteredAtChanged = false;
+        const existingEnteredAt = jobColumnEnteredAt[columnId] || {};
+        const nextEnteredAtForColumn: Record<string, number> = { ...existingEnteredAt };
+        for (const job of schedulingJobs) {
+            if (nextEnteredAtForColumn[job.id] == null) {
+                const fallback = getDateTimestamp((job as Estimate).created_at);
+                nextEnteredAtForColumn[job.id] = fallback ?? Date.now();
+                enteredAtChanged = true;
+            }
+        }
+        if (enteredAtChanged) {
+            setJobColumnEnteredAt((prev) => ({
+                ...prev,
+                [columnId]: nextEnteredAtForColumn,
+            }));
+        }
+
+        // Ensure jobOrder contains all jobs in this column, in FIFO order.
+        const currentOrder = (jobOrder[columnId] || []).filter((id) => schedulingIds.includes(id));
+        const inOrder = new Set(currentOrder);
+        const missing = schedulingJobs
+            .filter((j) => !inOrder.has(j.id))
+            .slice()
+            .sort((a, b) => {
+                const aTs = nextEnteredAtForColumn[a.id] ?? 0;
+                const bTs = nextEnteredAtForColumn[b.id] ?? 0;
+                return aTs - bTs;
+            })
+            .map((j) => j.id);
+
+        const nextOrder = [...currentOrder, ...missing];
+        if (
+            nextOrder.length !== (jobOrder[columnId] || []).length ||
+            nextOrder.some((id, idx) => (jobOrder[columnId] || [])[idx] !== id)
+        ) {
+            setJobOrder((prev) => ({
+                ...prev,
+                [columnId]: nextOrder,
+            }));
+        }
+    }, [jobs, columns, jobColumnEnteredAt, jobOrder]);
 
     // Handle drag start
     function handleDragStart(event: DragStartEvent) {
@@ -969,6 +1078,23 @@ export default function JobsList() {
         const oldColumn = columns.find((col) =>
             col.statuses.some((status) => String(status) === currentStatus)
         );
+
+        // Update "entered column at" bookkeeping (used for FIFO ordering in Not Scheduled)
+        setJobColumnEnteredAt((prev) => {
+            const next = { ...prev };
+            const now = Date.now();
+
+            if (oldColumn) {
+                const oldMap = next[oldColumn.id];
+                if (oldMap && oldMap[estimateId] != null) {
+                    const { [estimateId]: _removed, ...rest } = oldMap;
+                    next[oldColumn.id] = rest;
+                }
+            }
+
+            next[targetColumnId] = { ...(next[targetColumnId] || {}), [estimateId]: now };
+            return next;
+        });
 
         setJobOrder((prev) => {
             const newOrder = { ...prev };
